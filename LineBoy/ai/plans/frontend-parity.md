@@ -11,7 +11,10 @@ framed tabs. The separate modern graphical mockup remains deferred.
 ## Implemented
 
 - Framed flexible tabs with reserved pixel close icons, full-name tooltips, active-tab visibility and horizontal strip scrolling.
-- Uniform command toolbar, aligned search/tab bands, legible track headings, wider sidebar minimums, and shaded Display sections.
+- Separated resolution and command bands with 8px gutters, equal-width DOS controls, aligned search/tab bands, and legible track headings.
+- Per-column playlist sorting through `CatalogPlaylistPresentationCore`, remembered by tab with selection and scroll position preserved.
+- Native Favorites and Recent playlist views backed by `FavoriteStoreCore` and `PlaybackHistoryCore`, with Command+Shift+F/H shortcuts.
+- Wider sidebar minimums and more generously inset, spaced Options cards using whole grid units.
 - Shared snappy selector timing.
 - Whole-device-pixel glyph advances and uncapped device ratio for mask sizing.
 - DOS-aligned AUDIO and PLAYBACK pages use VGMBoy's shared audio, timing, and
@@ -20,5 +23,5 @@ framed tabs. The separate modern graphical mockup remains deferred.
 ## Next work
 
 1. Audit each profile at normal and high-density scales: font baseline, frame origin phase, scanline alignment, sidebar minimums, clipping and keyboard focus. The grid calculation is not measured CRT hardware calibration.
-2. Map command/playlist/queue/favorites behavior against the shared frontend contracts. Keep catalog and playback policy in their owners.
+2. Map remaining queue and transport controls against the shared frontend contracts. Keep catalog and playback policy in their owners.
 3. Exercise native local-file playback separately from visual sample tests. Enable the live catalog gate only for deliberate catalog integration work; do not mix that proof with sample UI verification.

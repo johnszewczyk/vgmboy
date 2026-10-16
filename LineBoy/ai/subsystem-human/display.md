@@ -6,8 +6,8 @@ scanline density. The grid extends to the available window height in whole
 16-pixel rows; WIDTH MODE FILL also extends its width in whole 8-pixel
 columns. FRAME keeps the selected profile's 4:3 width. Text is never stretched
 to fill unused space. Resolution choices spread evenly across the first row as
-unlabeled blocks. The matching command toolbar gives its eight actions equal
-widths, with transport at the right.
+unlabeled blocks. The matching command toolbar gives its six view actions and
+three transport actions equal widths.
 New installations and Reset Display select the high-resolution 800×600 profile;
 saved raster choices remain intact.
 
@@ -25,7 +25,9 @@ needed.
 The window keeps at least an 8-pixel inset around the terminal, leaving a visible frame
 inside the native macOS title-bar area. The layout uses 8-pixel columns and
 16-pixel text rows. The unlabeled resolution block toolbar leads, followed by
-the matching command toolbar, library, playlist, and a two-line status footer.
+an 8-pixel gutter, the matching command toolbar, another 8-pixel gutter, the
+library and playlist, and a two-line status footer. The gutters separate the
+control bands without changing the text-row grid.
 The footer contains the LineBoy name, grid, beam pitch, clock, current item and
 playback state.
 Labels and controls use the same cell-top baseline: the 10px cap ink is centered
@@ -45,7 +47,10 @@ buttons with one character cell between actions. Each toolbar label is centered
 on its 16-pixel row; the active choice and hover or keyboard focus use the white
 inverse selector. Library and playlist headers match; the search field and
 framed tab toolbar share a two-row band below them. Track headings use light
-text on a shaded bar, followed by dense 16px text rows.
+text on a shaded bar, followed by dense 16px text rows. FILE, TITLE, GAME,
+ARTIST, SYSTEM, PATH, and TIME are clickable sort headings. Sorting uses the
+shared CatalogPlaylistPresentationCore policy, remembers direction per tab,
+and retains the selected track and scroll position.
 
 The playlist has a horizontal tab strip above its track headings. Selecting a
 tab restores that playlist, its selected track, favorites filter, and scroll
@@ -88,9 +93,10 @@ fit, then scroll as a strip; their compact close icon stays centered in a fixed
 trailing hit area.
 
 Phosphor persistence is disabled to keep interaction responsive. OPTIONS opens
-a two-column terminal settings view with square framed sections, shaded section
-headers, and the same filled block controls as the toolbars. Option rows and
-equalizer labels remain centered on the same 16px line grid. DISPLAY contains
+a two-column terminal settings view with inset square framed sections, visible
+space between cards, shaded section headers, and the same filled block controls
+as the toolbars. The added padding uses whole 8px and 16px grid units. Option
+rows and equalizer labels remain centered on the same 16px line grid. DISPLAY contains
 WIDTH MODE (FILL or FRAME), SCANLINES, BRIGHTNESS, SELECTOR FLOW, the active
 beam pitch, and a native fullscreen toggle. CRT contains a THIN/NORMAL/WIDE beam-width control
 and reports the active pitch. PLAYLIST contains AUTO SIZE and MAX WIDTH.
@@ -112,9 +118,12 @@ game rows lazily when a system is unfolded, and searches its shared game
 projection. The browser preview remains on the small sample library. In sample
 mode, Command+F searches the sample games; clearing the query restores the tree
 and its prior selection. Selecting a game loads its sample tracks. F toggles
-local sample favorites and FAV filters the current playlist. The native file
-picker remains connected for opening a real local track; native catalog and
-local-file playback use VGMBoy transport.
+local sample favorites and FAV filters the current playlist. In the native
+player, FAV opens FavoriteStoreCore's app-wide list and RECENT opens
+PlaybackHistoryCore's shared playback list. Command+Shift+F and Command+Shift+H
+open the same views; LIST or selecting a library game returns to a regular
+playlist tab. The native file picker remains connected for opening a real local
+track; native catalog and local-file playback use VGMBoy transport.
 
 Saved playlist rows paint from the tab snapshot while native catalog tracks
 rehydrate in the background. First-time game reads must not block the WebKit

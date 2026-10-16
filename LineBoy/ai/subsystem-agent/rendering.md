@@ -110,11 +110,13 @@ for each keystroke or duplicate searchable-field normalization in JavaScript.
 Debounce query updates, cap rendered results at 250, and preserve the tree DOM
 and its selection while the results scroller is shown.
 Keep the search input on its own 16px row aligned to the playlist heading row.
-The unlabeled resolution toolbar occupies source row 1; the eight command and
-transport blocks occupy row 2 with equal widths and one-cell gaps. Use the same
-square gray fill, black text, and white active/focus treatment for both toolbars.
-Workspace begins at row 3. The two-line status footer begins at row
-`textRows - 1`; workspace occupies `textRows - 4` lines. Keep the name, grid,
+The unlabeled resolution toolbar occupies source row 1. An 8px grid gutter
+separates it from the six view and three transport blocks on row 3; a second
+8px gutter separates the command bar from the workspace. Keep equal-width
+controls and one-cell gaps, with the same square gray fill, black text, and
+white active/focus treatment in both toolbars. Workspace begins at row 5. The
+two-line status footer begins at row `textRows - 1`; workspace occupies
+`textRows - 5` lines. Keep the name, grid,
 beam pitch, and clock on its first line, with current item and playback state on
 the second. Center all button text inside its exact 16px line box.
 
@@ -149,9 +151,10 @@ scrollbar, and preserve vertical offset from that container in tab snapshots.
 Rows, headings, and their child labels stay on the exact 16px source line grid;
 the integer raster scale makes their line height equal at every profile.
 
-OPTIONS keeps its compact 16px text grid with square framed sections, shaded
-section headers, and the same filled block controls as the toolbars. Keep option
-rows, labels, and buttons on 16px heights; center button text inside its line.
+OPTIONS keeps its 16px text grid with square framed sections, shaded section
+headers, and the same filled block controls as the toolbars. Cards use clear
+whole-cell outer spacing and inset padding; keep option rows, labels, and buttons
+on 16px heights and center button text inside its line.
 EQ bands use a responsive square card grid with 16px label and control lines.
 Maintain the fixed-width DOS font and do not fractional-scale text to gain
 density.

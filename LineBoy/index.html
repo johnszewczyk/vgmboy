@@ -60,11 +60,12 @@
     }
 
     .terminal {
+      container-type: inline-size;
       --columns: 40;
       --line-rows: 15;
       --footer-row: 15;
       --workspace-lines: 10;
-      --grid-rows: repeat(15, 16px);
+      --grid-rows: 16px 8px 16px 8px repeat(10, 16px) 16px 16px;
       width: 320px;
       height: 240px;
       padding-block: 0;
@@ -189,7 +190,7 @@
     }
 
     .toolrow {
-      grid-row: 2 / 3;
+      grid-row: 3;
       display: flex;
       gap: 1ch;
       align-items: center;
@@ -211,6 +212,8 @@
       text-align: center;
       text-transform: uppercase;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
       cursor: pointer;
     }
     .nav-button[aria-pressed="true"] {
@@ -226,7 +229,7 @@
     }
     .workspace {
       --workspace-rows: repeat(var(--workspace-lines), 16px);
-      grid-row: 3 / var(--footer-row);
+      grid-row: 5 / var(--footer-row);
       display: grid;
       grid-template-columns: var(--sidebar-width, 128px) 8px minmax(0, 1fr);
       grid-template-rows: var(--workspace-rows);
@@ -474,8 +477,29 @@
       transition: grid-template-columns var(--selector-duration) cubic-bezier(.2, 0, 0, 1);
     }
     .list-head > span,
+    .list-head > [role="columnheader"],
     .song > span { height: 16px; display: grid; align-items: center; line-height: 16px; }
-    .list-head span:last-child { text-align: right; }
+    .list-head [data-sort-column="length"] { text-align: right; }
+    .list-sort {
+      min-width: 0;
+      width: 100%;
+      height: 16px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      line-height: 16px;
+      text-align: inherit;
+      text-transform: inherit;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+    }
+    .list-sort:hover,
+    .list-sort:focus-visible { color: var(--white); outline: 1px solid var(--white); outline-offset: -1px; }
+    .list-sort[aria-pressed="true"] { color: var(--white); }
+    .sort-mark { color: var(--accent); }
     .songs {
       min-height: 16px;
       min-width: var(--playlist-width, 95ch);
@@ -611,7 +635,7 @@
       min-height: 0;
       overflow: auto;
       display: flow-root;
-      padding: 0 1ch 16px;
+      padding: 8px 2ch 24px;
       scrollbar-width: thin;
       scrollbar-color: var(--scroll-thumb) var(--scroll-track);
       overscroll-behavior: contain;
@@ -622,8 +646,8 @@
     .option-card {
       position: relative;
       min-width: 0;
-      margin-block: 16px;
-      padding: 0 1ch;
+      margin: 16px 1ch;
+      padding: 16px 2ch;
       background: var(--well);
     }
     .option-card::before {
@@ -636,7 +660,7 @@
     }
     .option-section-title {
       height: 16px;
-      margin: 0;
+      margin: 0 0 8px;
       padding: 0 1ch;
       background: var(--gray);
       color: var(--black);
@@ -647,6 +671,7 @@
       min-width: 0;
       height: 16px;
       min-height: 16px;
+      margin-block: 8px;
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(8ch, 1fr);
       align-items: center;
@@ -690,6 +715,12 @@
       outline: none;
     }
     .option-value:disabled, .brightness-range:disabled { opacity: .45; cursor: default; }
+    .toolbar-compact { display: none; }
+    @container (max-width: 440px) {
+      .toolrow { gap: .5ch; }
+      .toolbar-full { display: none; }
+      .toolbar-compact { display: inline; }
+    }
     .range-control {
       min-width: 0;
       display: grid;
@@ -808,7 +839,8 @@
           <button class="nav-button" type="button" data-action="OPEN" aria-pressed="false">FILE</button>
           <button class="nav-button" type="button" data-action="TREE" aria-pressed="false">TREE</button>
           <button class="nav-button" type="button" data-action="LIST" aria-pressed="true">LIST</button>
-          <button class="nav-button" type="button" data-action="FAVORITES" aria-pressed="false">FAV</button>
+          <button class="nav-button" type="button" data-action="FAVORITES" aria-label="Favorites playlist (Command+Shift+F)" aria-keyshortcuts="Meta+Shift+F" aria-pressed="false">FAV</button>
+          <button class="nav-button" type="button" data-action="RECENT" aria-label="Recent playback (Command+Shift+H)" aria-keyshortcuts="Meta+Shift+H" title="Recent playback" aria-pressed="false"><span class="toolbar-full">RECENT</span><span class="toolbar-compact">REC</span></button>
           <button class="nav-button" type="button" data-action="OPTIONS" aria-pressed="false">OPTS</button>
         </div>
         <div class="transport-group" role="group" aria-label="Transport">
@@ -849,7 +881,17 @@
               aria-label="New playlist tab (Command+T)" title="New playlist tab (Command+T)">[+]</button>
           </div>
           <div class="playlist-data">
-            <div class="list-head" role="row"><span>★</span><span>#</span><span>FILE</span><span>TITLE</span><span>GAME</span><span>ARTIST</span><span>SYSTEM</span><span>PATH</span><span>TIME</span></div>
+            <div class="list-head" role="row">
+              <span role="columnheader" aria-label="Favorite">★</span>
+              <span role="columnheader" aria-label="Track number">#</span>
+              <div role="columnheader" aria-sort="none"><button class="list-sort" type="button" data-sort-column="file" aria-label="Sort by file">FILE</button></div>
+              <div role="columnheader" aria-sort="none"><button class="list-sort" type="button" data-sort-column="title" aria-label="Sort by title">TITLE</button></div>
+              <div role="columnheader" aria-sort="none"><button class="list-sort" type="button" data-sort-column="game" aria-label="Sort by game">GAME</button></div>
+              <div role="columnheader" aria-sort="none"><button class="list-sort" type="button" data-sort-column="author" aria-label="Sort by artist">ARTIST</button></div>
+              <div role="columnheader" aria-sort="none"><button class="list-sort" type="button" data-sort-column="system" aria-label="Sort by system">SYSTEM</button></div>
+              <div role="columnheader" aria-sort="none"><button class="list-sort" type="button" data-sort-column="path" aria-label="Sort by path">PATH</button></div>
+              <div role="columnheader" aria-sort="none"><button class="list-sort" type="button" data-sort-column="length" aria-label="Sort by length">TIME</button></div>
+            </div>
             <div class="songs" id="song-list" role="listbox" aria-label="Playlist tracks"></div>
           </div>
         </section>
@@ -890,6 +932,10 @@
             </section>
           </div>
           <div class="option-page" data-options-content="PLAYLIST" hidden>
+            <section class="option-card">
+            <div class="option-section-title">FILTERS</div>
+            <div class="option-row"><span>FAVORITES ONLY</span><button class="option-value" id="favorites-only-filter" type="button" aria-pressed="false">OFF</button></div>
+            </section>
             <section class="option-card">
             <div class="option-section-title">COLUMNS</div>
             <div class="option-row"><span>AUTO SIZE</span><button class="option-value" id="playlist-column-fit" type="button" aria-pressed="true">ON</button></div>
@@ -960,6 +1006,8 @@
             <div class="option-section-title">KEYBOARD</div>
             <div class="option-row"><span>MOVE</span><span class="option-key">ARROWS</span></div>
             <div class="option-row"><span>SEARCH</span><span class="option-key">CMD+F</span></div>
+            <div class="option-row"><span>FAVORITES</span><span class="option-key">CMD+SHIFT+F</span></div>
+            <div class="option-row"><span>RECENT</span><span class="option-key">CMD+SHIFT+H</span></div>
             <div class="option-row"><span>OPEN/PLAY</span><span class="option-key">ENTER</span></div>
             <div class="option-row"><span>FAVORITE</span><span class="option-key">F</span></div>
             <div class="option-row"><span>BACK</span><span class="option-key">ESC</span></div>
@@ -1131,6 +1179,7 @@
     const sidebarWidthRange = document.querySelector("#sidebar-width-range");
     const sidebarWidthReadout = document.querySelector("#sidebar-width-readout");
     const selectorFlowModeButton = document.querySelector("#selector-flow-mode");
+    const favoritesOnlyButton = document.querySelector("#favorites-only-filter");
     const playlistColumnFitButton = document.querySelector("#playlist-column-fit");
     const playlistColumnWidthRange = document.querySelector("#playlist-column-width");
     const playlistColumnWidthReadout = document.querySelector("#playlist-column-width-readout");
@@ -1206,6 +1255,10 @@
     let returnAction = "LIST";
     let activeGame = nativeHost ? { title: "CATALOG", system: "", tracks: [] } : GAMES.CHRONO;
     let favoritesOnly = false;
+    let playlistSortColumn = null;
+    let playlistSortDirection = "ascending";
+    let activePlaylistSortSessionID = null;
+    let playlistSortRequestVersion = 0;
     let playlistTabs = [];
     let activePlaylistTabID = null;
     let playlistTabsReady = false;
@@ -1548,7 +1601,7 @@
         : raster.width;
       const columns = sourceWidth / 8;
       const halfLineInset = (sourceHeight - textRows * 16) / 2;
-      const workspaceLines = textRows - 4;
+      const workspaceLines = textRows - 5;
       const sidebarBoundsForRaster = sidebarBounds(columns);
       const defaultSidebarColumns = Math.max(sidebarBoundsForRaster.minimum,
         Math.min(sidebarBoundsForRaster.maximum, Math.round((columns - 1) * 0.25)));
@@ -1577,12 +1630,12 @@
       terminal.style.setProperty("--frame-width", `${1 / (scale * deviceRatio)}px`);
       terminal.style.paddingBlock = `${halfLineInset}px`;
       terminal.style.gridTemplateColumns = `repeat(${columns}, 8px)`;
-      terminal.style.gridTemplateRows = `repeat(${textRows}, 16px)`;
+      terminal.style.gridTemplateRows = `16px 8px 16px 8px repeat(${workspaceLines}, 16px) 16px 16px`;
       terminal.style.setProperty("--columns", columns);
       terminal.style.setProperty("--line-rows", textRows);
-      terminal.style.setProperty("--footer-row", textRows - 1);
+      terminal.style.setProperty("--footer-row", textRows);
       terminal.style.setProperty("--workspace-lines", workspaceLines);
-      terminal.style.setProperty("--grid-rows", `repeat(${textRows}, 16px)`);
+      terminal.style.setProperty("--grid-rows", `16px 8px 16px 8px repeat(${workspaceLines}, 16px) 16px 16px`);
       workspace.style.gridTemplateRows = `repeat(${workspaceLines}, 16px)`;
       workspace.style.setProperty("--workspace-rows", `repeat(${workspaceLines}, 16px)`);
       applySidebarColumnLayout();
@@ -1752,6 +1805,16 @@
     optionCategories.forEach((button) => button.addEventListener("click", () => {
       setOptionsPage(button.dataset.optionsPage);
     }));
+
+    favoritesOnlyButton.addEventListener("click", () => {
+      if (currentPlaylistTab()?.projection) return;
+      favoritesOnly = !favoritesOnly;
+      const tab = currentPlaylistTab();
+      if (tab) tab.favoritesOnly = favoritesOnly;
+      updateFavoritesOnlyControl();
+      applyFavoriteFilter();
+      schedulePlaylistTabsSave();
+    });
 
     const playbackToggles = [
       [playbackSettingsControls.longPlayEnabled, "Long Play", false],
@@ -2119,9 +2182,10 @@
       playlistData.style.setProperty("--playlist-width", `${Math.max(95, contentWidth + 10)}ch`);
     }
 
-    function renderSongs(game, preferredTrack = "01", columnContentHints = null) {
+    function renderSongs(game, preferredTrack = "01", columnContentHints = null, sortSessionID = null) {
       activeGame = game;
       activePlaylistColumnHints = columnContentHints || null;
+      activePlaylistSortSessionID = sortSessionID || null;
       gameTitle.textContent = game.title;
       trackCount.textContent = `${game.tracks.length} TRK`;
       songList.replaceChildren();
@@ -2159,6 +2223,8 @@
         song.dataset.systemText = systemText;
         song.dataset.pathText = pathText;
         song.dataset.lengthMilliseconds = isSampleRow ? "" : String(item.lengthMilliseconds || "");
+        song.dataset.trackNumber = isSampleRow ? "" : String(item.trackNumber ?? "");
+        song.dataset.timestampMilliseconds = String(item.timestampMilliseconds ?? "");
         song.dataset.nativeTrack = String(!isSampleRow && item.native !== false);
         song.dataset.index = String(index);
 
@@ -2198,8 +2264,120 @@
       songList.append(...rows);
       applyFavoriteFilter(preferredTrack);
       queuePlaylistColumnFit(activePlaylistColumnHints);
+      renderPlaylistSortState();
+      if (playlistSortColumn) void applyPlaylistSort(preferredTrack);
       if (!restoringPlaylistTab) schedulePlaylistTabsSave();
     }
+
+    function renderPlaylistSortState() {
+      playlistHeader.querySelectorAll(".list-sort").forEach((button) => {
+        const column = button.dataset.sortColumn;
+        const label = button.dataset.label || (button.dataset.label = button.textContent.trim());
+        const active = playlistSortColumn === column;
+        button.textContent = active ? `${label} ${playlistSortDirection === "ascending" ? "↑" : "↓"}` : label;
+        button.setAttribute("aria-pressed", String(active));
+        button.setAttribute("aria-label", active
+          ? `Sort by ${label.toLowerCase()}, ${playlistSortDirection}`
+          : `Sort by ${label.toLowerCase()}`);
+        button.parentElement?.setAttribute("aria-sort", active ? playlistSortDirection : "none");
+      });
+    }
+
+    function playlistSortRecords(rows) {
+      return rows.map((song, naturalOrder) => {
+        const trackNumber = Number(song.dataset.trackNumber);
+        const lengthMilliseconds = Number(song.dataset.lengthMilliseconds);
+        const timestampMilliseconds = Number(song.dataset.timestampMilliseconds);
+        return {
+          id: song.dataset.trackId,
+          naturalOrder,
+          trackNumber: Number.isInteger(trackNumber) && trackNumber > 0 ? trackNumber : null,
+          fileText: song.dataset.fileText || "",
+          titleText: song.dataset.title || "",
+          gameText: song.dataset.gameText || "",
+          authorText: song.dataset.authorText || "",
+          systemText: song.dataset.systemText || "",
+          pathText: song.dataset.pathText || "",
+          lengthMilliseconds: Number.isFinite(lengthMilliseconds) ? Math.max(0, Math.round(lengthMilliseconds)) : 0,
+          timestampMilliseconds: Number.isFinite(timestampMilliseconds) ? Math.round(timestampMilliseconds) : null,
+        };
+      });
+    }
+
+    function sampleSortedIDs(records, column, direction) {
+      const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+      const field = {
+        file: "fileText", title: "titleText", game: "gameText", author: "authorText",
+        system: "systemText", path: "pathText", length: "lengthMilliseconds",
+      }[column];
+      return [...records].sort((lhs, rhs) => {
+        const left = lhs[field];
+        const right = rhs[field];
+        const order = typeof left === "number" && typeof right === "number"
+          ? left - right : collator.compare(String(left ?? ""), String(right ?? ""));
+        return order === 0 ? lhs.naturalOrder - rhs.naturalOrder : direction === "ascending" ? order : -order;
+      }).map((record) => record.id);
+    }
+
+    async function applyPlaylistSort(preferredTrackID = null) {
+      if (!playlistSortColumn) return;
+      const rows = [...songList.querySelectorAll(".song")];
+      if (rows.length < 2) return;
+      const version = ++playlistSortRequestVersion;
+      const tabID = activePlaylistTabID;
+      const selectedID = rows.find((row) => row.getAttribute("aria-selected") === "true")?.dataset.trackId || preferredTrackID;
+      const scrollTop = playlistData.scrollTop;
+      const records = playlistSortRecords(rows);
+      let orderedIDs;
+      try {
+        if (!nativeHost) {
+          orderedIDs = sampleSortedIDs(records, playlistSortColumn, playlistSortDirection);
+        } else if (activePlaylistSortSessionID) {
+          orderedIDs = await nativeRequest("databasePlaylistSort", {
+            sessionId: activePlaylistSortSessionID,
+            ids: records.map((record) => record.id),
+            column: playlistSortColumn,
+            direction: playlistSortDirection,
+          });
+        } else {
+          orderedIDs = await nativeRequest("playlistProjectionSort", {
+            records,
+            frontendColumn: playlistSortColumn,
+            direction: playlistSortDirection,
+          });
+        }
+      } catch (error) {
+        if (version === playlistSortRequestVersion && tabID === activePlaylistTabID) {
+          status.textContent = `SORT/ERROR ${error.message}`;
+        }
+        return;
+      }
+      if (version !== playlistSortRequestVersion || tabID !== activePlaylistTabID) return;
+      const rowsByID = new Map(rows.map((row) => [row.dataset.trackId, row]));
+      if (!Array.isArray(orderedIDs) || orderedIDs.length !== rows.length || orderedIDs.some((id) => !rowsByID.has(id))) return;
+      songList.append(...orderedIDs.map((id) => rowsByID.get(id)));
+      const selected = rowsByID.get(selectedID);
+      if (selected) selectSong(selected);
+      playlistData.scrollTop = scrollTop;
+      renderPlaylistSortState();
+      schedulePlaylistTabsSave();
+    }
+
+    playlistHeader.addEventListener("click", (event) => {
+      const button = event.target.closest(".list-sort");
+      if (!button) return;
+      const column = button.dataset.sortColumn;
+      playlistSortDirection = playlistSortColumn === column && playlistSortDirection === "ascending"
+        ? "descending" : "ascending";
+      playlistSortColumn = column;
+      const tab = currentPlaylistTab();
+      if (tab) {
+        tab.sortColumn = playlistSortColumn;
+        tab.sortDirection = playlistSortDirection;
+      }
+      renderPlaylistSortState();
+      void applyPlaylistSort();
+    });
 
     function makePlaylistTabID() {
       return globalThis.crypto?.randomUUID?.()
@@ -2212,6 +2390,7 @@
         return {
           id: song.dataset.trackId,
           number: song.querySelector(".num")?.textContent || "",
+          trackNumber: song.dataset.trackNumber || "",
           title: song.dataset.title || "TRACK",
           fileText: song.dataset.fileText || "",
           game: song.dataset.gameText || "",
@@ -2223,6 +2402,7 @@
           favorite: song.dataset.favorite === "true",
           displayPath: song.dataset.displayPath || "",
           native: song.dataset.nativeTrack === "true",
+          timestampMilliseconds: song.dataset.timestampMilliseconds || "",
         };
       });
     }
@@ -2234,9 +2414,13 @@
         system: String(tab.system || "LOCAL").slice(0, 120),
         rootId: Number.isSafeInteger(tab.rootId) ? tab.rootId : null,
         game: typeof tab.game === "string" ? tab.game.slice(0, 500) : null,
+        projection: ["favorites", "recent"].includes(tab.projection) ? tab.projection : null,
+        sortColumn: typeof tab.sortColumn === "string" ? tab.sortColumn : null,
+        sortDirection: tab.sortDirection === "descending" ? "descending" : "ascending",
         playlist: Array.isArray(tab.playlist) ? tab.playlist.map((track) => ({
           id: String(track.id || ""),
           number: String(track.number || ""),
+          trackNumber: String(track.trackNumber || ""),
           title: String(track.title || "TRACK").slice(0, 500),
           fileText: String(track.fileText || "").slice(0, 500),
           game: String(track.game || "").slice(0, 500),
@@ -2249,6 +2433,8 @@
           favorite: Boolean(track.favorite),
           displayPath: String(track.displayPath || "").slice(0, 500),
           native: track.native !== false,
+          ...(Number.isFinite(Number(track.timestampMilliseconds))
+            ? { timestampMilliseconds: Number(track.timestampMilliseconds) } : {}),
         })) : [],
         selectedTrackId: typeof tab.selectedTrackId === "string" ? tab.selectedTrackId : null,
         favoritesOnly: Boolean(tab.favoritesOnly),
@@ -2270,6 +2456,9 @@
       tab.system = String(activeGame.system || "LOCAL");
       tab.rootId = Number.isSafeInteger(activeGame.rootId) ? activeGame.rootId : null;
       tab.game = typeof activeGame.game === "string" ? activeGame.game : null;
+      tab.projection = ["favorites", "recent"].includes(activeGame.projection) ? activeGame.projection : null;
+      tab.sortColumn = playlistSortColumn;
+      tab.sortDirection = playlistSortDirection;
       tab.playlist = capturePlaylistTracks();
       tab.selectedTrackId = songList.querySelector('.song[aria-selected="true"]')?.dataset.trackId || null;
       tab.favoritesOnly = favoritesOnly;
@@ -2388,23 +2577,33 @@
       if (!previousPlaylistWasLoading) syncActivePlaylistTab();
       activePlaylistTabID = tab.id;
       favoritesOnly = Boolean(tab.favoritesOnly);
+      updateFavoritesOnlyControl();
+      const viewAction = tab.projection === "favorites" ? "FAVORITES"
+        : tab.projection === "recent" ? "RECENT" : "LIST";
+      updateNavSelectionState(viewAction);
+      playlistSortColumn = ["file", "title", "game", "author", "system", "path", "length"].includes(tab.sortColumn)
+        ? tab.sortColumn : null;
+      playlistSortDirection = tab.sortDirection === "descending" ? "descending" : "ascending";
       activeGame = {
         title: tab.title,
         system: tab.system || "LOCAL",
         rootId: Number.isSafeInteger(tab.rootId) ? tab.rootId : null,
         game: typeof tab.game === "string" ? tab.game : null,
+        projection: ["favorites", "recent"].includes(tab.projection) ? tab.projection : null,
         tracks: Array.isArray(tab.playlist) ? tab.playlist : [],
       };
       activePlaylistColumnHints = tab.columnContentHints || null;
+      activePlaylistSortSessionID = tab.sortSessionId || null;
       restoringPlaylistTab = true;
-      renderSongs(activeGame, tab.selectedTrackId || "", activePlaylistColumnHints);
+      renderSongs(activeGame, tab.selectedTrackId || "", activePlaylistColumnHints, activePlaylistSortSessionID);
       playlistData.scrollTop = Math.max(0, Number(tab.scrollTop) || 0);
       restoringPlaylistTab = false;
       renderPlaylistTabs();
       selectSelectionTarget(playlistTabButtons().find((button) => button.getAttribute("aria-selected") === "true"));
       status.textContent = `PLAYLIST/TAB ${playlistTabs.indexOf(tab) + 1}`;
       schedulePlaylistTabsSave();
-      if (catalogHost && tab.rootId && tab.game) void hydrateCatalogPlaylist(tab.id);
+      if (tab.projection) void hydrateProjectionPlaylist(tab.id);
+      else if (catalogHost && tab.rootId && tab.game) void hydrateCatalogPlaylist(tab.id);
       return true;
     }
 
@@ -2422,12 +2621,14 @@
         const preferredTrackID = current.selectedTrackId || current.playlist[0]?.id || "";
         current.playlist = result.tracks || [];
         current.columnContentHints = result.columnContentHints || null;
+        current.sortSessionId = result.sortSessionId || null;
         if (activePlaylistTabID === tabID && catalogRequestVersion === activeRequestVersion) {
           catalogHydratedTabs.add(tabID);
           activeGame = { ...activeGame, tracks: current.playlist };
           activePlaylistColumnHints = current.columnContentHints;
+          activePlaylistSortSessionID = current.sortSessionId;
           restoringPlaylistTab = true;
-          renderSongs(activeGame, preferredTrackID, activePlaylistColumnHints);
+          renderSongs(activeGame, preferredTrackID, activePlaylistColumnHints, activePlaylistSortSessionID);
           playlistData.scrollTop = Math.max(0, Number(current.scrollTop) || 0);
           restoringPlaylistTab = false;
         }
@@ -2443,6 +2644,91 @@
       return pending;
     }
 
+    function updateFavoritesOnlyControl() {
+      const projection = Boolean(currentPlaylistTab()?.projection);
+      favoritesOnlyButton.disabled = projection;
+      favoritesOnlyButton.textContent = favoritesOnly ? "ON" : "OFF";
+      favoritesOnlyButton.setAttribute("aria-pressed", String(favoritesOnly));
+      favoritesOnlyButton.setAttribute("aria-label", projection
+        ? "Favorites only filter is unavailable in a Favorites or Recent view"
+        : `Favorites only ${favoritesOnly ? "on" : "off"}`);
+    }
+
+    async function hydrateProjectionPlaylist(tabID) {
+      const tab = playlistTabs.find((entry) => entry.id === tabID);
+      if (!nativeHost || !["favorites", "recent"].includes(tab?.projection)) return false;
+      const requestVersion = ++catalogRequestVersion;
+      const method = tab.projection === "favorites" ? "favoritesList" : "playbackHistoryList";
+      try {
+        const result = await nativeRequest(method);
+        if (activePlaylistTabID !== tabID || catalogRequestVersion !== requestVersion) return false;
+        tab.playlist = Array.isArray(result.tracks) ? result.tracks : [];
+        tab.sortSessionId = null;
+        const selectedID = tab.playlist.some((track) => track.id === tab.selectedTrackId)
+          ? tab.selectedTrackId : tab.playlist[0]?.id || "";
+        activeGame = { ...activeGame, tracks: tab.playlist, projection: tab.projection };
+        activePlaylistSortSessionID = null;
+        restoringPlaylistTab = true;
+        renderSongs(activeGame, selectedID);
+        playlistData.scrollTop = Math.max(0, Number(tab.scrollTop) || 0);
+        restoringPlaylistTab = false;
+        renderPlaylistTabs();
+        schedulePlaylistTabsSave();
+        status.textContent = `VIEW/${tab.projection.toUpperCase()} ${tab.playlist.length} TRK`;
+        return true;
+      } catch (error) {
+        if (activePlaylistTabID === tabID && catalogRequestVersion === requestVersion) {
+          status.textContent = `VIEW/ERROR ${error.message}`;
+        }
+        return false;
+      }
+    }
+
+    async function showPlaylistProjection(projection) {
+      if (!nativeHost) {
+        if (projection === "favorites") {
+          favoritesOnly = true;
+          setNavSelection("FAVORITES");
+          applyFavoriteFilter();
+          status.textContent = "VIEW/FAVORITES IN THIS PLAYLIST";
+        } else {
+          setNavSelection("RECENT");
+          status.textContent = "RECENT/NATIVE PLAYER ONLY";
+        }
+        return false;
+      }
+      let tab = playlistTabs.find((entry) => entry.projection === projection);
+      if (!tab) {
+        if (playlistTabs.length >= 64) {
+          status.textContent = "PLAYLIST/TAB LIMIT 64";
+          return false;
+        }
+        const title = projection === "favorites" ? "FAVORITES" : "RECENT";
+        tab = {
+          id: makePlaylistTabID(), title, system: "VGMMan", rootId: null, game: null,
+          projection, playlist: [], selectedTrackId: null, favoritesOnly: false,
+          sortColumn: null, sortDirection: "ascending", scrollTop: 0,
+        };
+        playlistTabs.push(tab);
+        renderPlaylistTabs();
+      }
+      setOptionsVisible(false);
+      setNavSelection(projection === "favorites" ? "FAVORITES" : "RECENT");
+      if (tab.id !== activePlaylistTabID) {
+        activatePlaylistTab(tab.id);
+        return true;
+      }
+      return hydrateProjectionPlaylist(tab.id);
+    }
+
+    function activateStandardPlaylistTab() {
+      if (!currentPlaylistTab()?.projection) return true;
+      const tab = [...playlistTabs].reverse().find((entry) => !entry.projection);
+      if (!tab) return false;
+      activatePlaylistTab(tab.id);
+      return true;
+    }
+
     function createPlaylistTab() {
       syncActivePlaylistTab();
       if (playlistTabs.length >= 64) {
@@ -2451,7 +2737,14 @@
       }
       const source = currentPlaylistTab();
       const tab = source
-        ? { ...snapshotPlaylistTab(source), id: makePlaylistTabID(), playlist: source.playlist.map((track) => ({ ...track })) }
+        ? {
+          ...snapshotPlaylistTab(source),
+          id: makePlaylistTabID(),
+          title: source.projection ? `${source.title} COPY` : source.title,
+          projection: null,
+          favoritesOnly: source.projection ? false : source.favoritesOnly,
+          playlist: source.playlist.map((track) => ({ ...track })),
+        }
         : {
           id: makePlaylistTabID(), title: activeGame.title, system: activeGame.system,
           rootId: activeGame.rootId || null, game: activeGame.game || null,
@@ -2485,6 +2778,7 @@
       const restorableTabs = value.tabs.slice(0, 64).filter((tab) => {
         if (!catalogHost) return true;
         if (Number.isSafeInteger(tab?.rootId) && tab.rootId > 0 && typeof tab.game === "string" && tab.game) return true;
+        if (["favorites", "recent"].includes(tab?.projection)) return true;
         if (Array.isArray(tab?.playlist) && tab.playlist.some((track) => String(track?.id || "").startsWith("local:"))) return true;
         return Array.isArray(tab?.playlist) && tab.playlist.length === 0 && tab.title === "PLAYLIST";
       });
@@ -2499,6 +2793,11 @@
         system: String(tab.system || "LOCAL").slice(0, 120),
         rootId: Number.isSafeInteger(tab.rootId) ? tab.rootId : null,
         game: typeof tab.game === "string" ? tab.game.slice(0, 500) : null,
+        projection: ["favorites", "recent"].includes(tab.projection) ? tab.projection : null,
+        sortColumn: ["file", "title", "game", "author", "system", "path", "length"].includes(tab.sortColumn)
+          ? tab.sortColumn : null,
+        sortDirection: tab.sortDirection === "descending" ? "descending" : "ascending",
+        sortSessionId: null,
         playlist: tab.playlist.filter((track) => track && typeof track === "object" && !Array.isArray(track))
           .map((track) => ({ ...track })),
         selectedTrackId: typeof tab.selectedTrackId === "string" ? tab.selectedTrackId : null,
@@ -2510,13 +2809,20 @@
         ? value.activeID : playlistTabs[0].id;
       const active = currentPlaylistTab();
       favoritesOnly = Boolean(active.favoritesOnly);
+      updateFavoritesOnlyControl();
+      updateNavSelectionState(active.projection === "favorites" ? "FAVORITES"
+        : active.projection === "recent" ? "RECENT" : "LIST");
+      playlistSortColumn = active.sortColumn;
+      playlistSortDirection = active.sortDirection;
       activeGame = {
         title: active.title,
         system: active.system,
         rootId: active.rootId,
         game: active.game,
+        projection: active.projection,
         tracks: active.playlist,
       };
+      activePlaylistSortSessionID = null;
       restoringPlaylistTab = true;
       renderSongs(activeGame, active.selectedTrackId || "");
       playlistData.scrollTop = active.scrollTop;
@@ -2555,6 +2861,8 @@
       schedulePlaylistTabsSave();
       if (catalogHost && currentPlaylistTab()?.rootId && currentPlaylistTab()?.game) {
         await hydrateCatalogPlaylist(activePlaylistTabID);
+      } else if (catalogHost && currentPlaylistTab()?.projection) {
+        await hydrateProjectionPlaylist(activePlaylistTabID);
       }
     }
 
@@ -2564,6 +2872,7 @@
       return tab ? activatePlaylistTab(tab.id) : false;
     };
     playlistTabAddButton.addEventListener("click", createPlaylistTab);
+    updateFavoritesOnlyControl();
 
     function visibleSongs() { return [...songList.querySelectorAll(".song:not([hidden])")]; }
 
@@ -2886,6 +3195,7 @@
     }
 
     async function loadNativeGame(game, row) {
+      activateStandardPlaylistTab();
       const version = ++catalogRequestVersion;
       const loadingTabID = activePlaylistTabID;
       const nextGame = {
@@ -2909,7 +3219,7 @@
         if (version !== catalogRequestVersion) return;
         catalogPlaylistLoading = false;
         activeGame = { ...nextGame, tracks: result.tracks || [] };
-        renderSongs(activeGame, keepCurrentTrack ? currentTrackID : "", result.columnContentHints || null);
+        renderSongs(activeGame, keepCurrentTrack ? currentTrackID : "", result.columnContentHints || null, result.sortSessionId || null);
         if (loadingTabID && loadingTabID === activePlaylistTabID) catalogHydratedTabs.add(loadingTabID);
         if (row) selectTreeRow(row);
         status.textContent = `CATALOG/${nextGame.system}/${nextGame.game}`;
@@ -3017,6 +3327,11 @@
         song.dataset.favorite = String(isFavorite);
         nativeFavoriteIDs[isFavorite ? "add" : "delete"](song.dataset.trackId);
         song.querySelector(".favorite").textContent = isFavorite ? "★" : "☆";
+        if (currentPlaylistTab()?.projection === "favorites" && !isFavorite) {
+          status.textContent = "FAVORITE/REMOVED";
+          void hydrateProjectionPlaylist(requestedTabID);
+          return;
+        }
         if (favoritesOnly && !isFavorite) applyFavoriteFilter();
         status.textContent = isFavorite ? "FAVORITE/ADDED" : "FAVORITE/REMOVED";
         schedulePlaylistTabsSave();
@@ -3049,21 +3364,36 @@
     }
 
     function setNavSelection(action) {
-      if (["OPEN", "TREE", "LIST", "FAVORITES", "OPTIONS"].includes(action)) currentNavAction = action;
-      navButtons.forEach((button) => {
-        const selected = button.dataset.action === action;
-        if (["OPEN", "TREE", "LIST", "FAVORITES", "OPTIONS"].includes(button.dataset.action)) {
-          button.setAttribute("aria-pressed", String(selected));
-        }
-      });
+      updateNavSelectionState(action);
       selectSelectionTarget(optionsVisible
         ? currentSelectorTarget()
         : navButtons.find((button) => button.dataset.action === currentNavAction));
     }
 
+    function updateNavSelectionState(action) {
+      const viewActions = ["OPEN", "TREE", "LIST", "FAVORITES", "RECENT", "OPTIONS"];
+      if (viewActions.includes(action)) currentNavAction = action;
+      navButtons.forEach((button) => {
+        const selected = button.dataset.action === action;
+        if (viewActions.includes(button.dataset.action)) {
+          button.setAttribute("aria-pressed", String(selected));
+        }
+      });
+    }
+
     document.addEventListener("keydown", (event) => {
       if (event.metaKey || event.ctrlKey) {
         const key = event.key.toLowerCase();
+        if (event.shiftKey && key === "f") {
+          event.preventDefault();
+          void showPlaylistProjection("favorites");
+          return;
+        }
+        if (event.shiftKey && key === "h") {
+          event.preventDefault();
+          void showPlaylistProjection("recent");
+          return;
+        }
         if (key === "f") {
           event.preventDefault();
           window.__lineBoyFocusSearch();
@@ -3114,7 +3444,11 @@
         return;
       }
 
-      if (action === "FAVORITES") {
+      if (action === "FAVORITES" && nativeHost) {
+        await showPlaylistProjection("favorites");
+      } else if (action === "RECENT") {
+        await showPlaylistProjection("recent");
+      } else if (action === "FAVORITES") {
         setOptionsVisible(false);
         favoritesOnly = !favoritesOnly;
         setNavSelection(favoritesOnly ? "FAVORITES" : "LIST");
@@ -3129,7 +3463,9 @@
         status.textContent = "VIEW/LIBRARY";
       } else if (action === "LIST") {
         setOptionsVisible(false);
+        activateStandardPlaylistTab();
         favoritesOnly = false;
+        updateFavoritesOnlyControl();
         setNavSelection(action);
         applyFavoriteFilter();
         schedulePlaylistTabsSave();
@@ -3142,7 +3478,7 @@
           status.textContent = "VIEW/PLAYER";
         } else {
           const selected = navButtons.find((entry) =>
-            ["TREE", "LIST", "FAVORITES"].includes(entry.dataset.action)
+            ["TREE", "LIST", "FAVORITES", "RECENT"].includes(entry.dataset.action)
             && entry.getAttribute("aria-pressed") === "true"
           );
           returnAction = selected?.dataset.action || "LIST";
@@ -3153,6 +3489,7 @@
         }
       } else if (action === "OPEN" && nativeHost) {
         setOptionsVisible(false);
+        activateStandardPlaylistTab();
         try {
           const track = await nativeRequest("chooseFile");
           if (track.cancelled) return;

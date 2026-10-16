@@ -11,6 +11,7 @@ import FrontendPreferencesCore
 import Foundation
 import PlaylistTabsPersistenceCore
 import PlaybackQueueCore
+import PlaybackHistoryCore
 import PlaybackTransportCore
 import VGMBoyFormatCore
 import VGMBoyKit
@@ -325,6 +326,21 @@ final class LineBoyAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         let viewMenu = NSMenu(title: "View")
         viewMenuItem.title = "View"
         viewMenu.addItem(menuItem(
+            "Favorites Playlist",
+            action: #selector(showFavoritesPlaylist(_:)),
+            key: "f",
+            modifiers: [.command, .shift],
+            target: self
+        ))
+        viewMenu.addItem(menuItem(
+            "Recent Playback",
+            action: #selector(showRecentPlayback(_:)),
+            key: "h",
+            modifiers: [.command, .shift],
+            target: self
+        ))
+        viewMenu.addItem(.separator())
+        viewMenu.addItem(menuItem(
             "Toggle Full Screen",
             action: #selector(NSWindow.toggleFullScreen(_:)),
             key: "f",
@@ -364,6 +380,14 @@ final class LineBoyAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
         clickToolbarAction("OPTIONS")
     }
 
+    @objc private func showFavoritesPlaylist(_ sender: Any?) {
+        clickToolbarAction("FAVORITES")
+    }
+
+    @objc private func showRecentPlayback(_ sender: Any?) {
+        clickToolbarAction("RECENT")
+    }
+
     @objc private func openFile(_ sender: Any?) {
         clickToolbarAction("OPEN")
     }
@@ -385,7 +409,7 @@ final class LineBoyAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegat
 
     private func clickToolbarAction(_ action: String) {
         guard let webView = window?.contentView as? WKWebView,
-              ["OPEN", "OPTIONS"].contains(action) else { return }
+              ["OPEN", "OPTIONS", "FAVORITES", "RECENT"].contains(action) else { return }
         webView.evaluateJavaScript("document.querySelector('[data-action=\"\(action)\"]')?.click();")
     }
 
@@ -424,6 +448,8 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
     private var localTracks: [String: LocalTrack] = [:]
     private var catalogPlaylists: [LineBoyCatalogPlaylistKey: [CatalogPlaylistTrack]] = [:]
     private var catalogPlaylistRecency: [LineBoyCatalogPlaylistKey] = []
+    private var catalogSortSessions: [String: [String: CatalogPlaylistSortRecord]] = [:]
+    private var catalogSortSessionOrder: [String] = []
     private var catalogGroups: [String: [LineBoyCatalogGame]] = [:]
     private var catalogSearch: LineBoyCatalogSearch?
     private let catalogPlaylistCacheLimit = 8
@@ -513,6 +539,10 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
                         self.reply(requestID, failure: error.localizedDescription)
                     }
                 }
+            case "databasePlaylistSort":
+                reply(requestID, success: try sortCatalogPlaylist(arguments))
+            case "playlistProjectionSort":
+                reply(requestID, success: try sortPlaylistProjection(arguments))
             case "playTrack":
                 reply(requestID, success: try startTrack(arguments["trackId"] as? String ?? ""))
             case "playPause":
@@ -526,6 +556,10 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
                 reply(requestID, success: adjacentTrack(arguments))
             case "toggleFavorite":
                 reply(requestID, success: try toggleFavorite(arguments["trackId"] as? String ?? ""))
+            case "favoritesList":
+                reply(requestID, success: try favoritesPlaylist())
+            case "playbackHistoryList":
+                reply(requestID, success: try recentPlaylist())
             case "chooseFile":
                 reply(requestID, success: try chooseFile())
             case "playbackStatus":
@@ -671,6 +705,34 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         catalogTracks.merge(nextTracks) { _, newest in newest }
 
         let projection = CatalogPlaylistPresentation.project(tracks: rows)
+        let sortSessionID = UUID().uuidString
+        catalogSortSessions[sortSessionID] = Dictionary(
+            projection.rows.enumerated().map { offset, track in
+                let identity = FavoriteTrackIdentity(
+                    sourcePath: track.sourcePath,
+                    archiveEntry: track.archiveEntry,
+                    trackIndex: track.trackIndex,
+                    trackCount: track.trackCount
+                )
+                return (identity.id, CatalogPlaylistSortRecord(
+                    id: identity.id,
+                    naturalOrder: offset,
+                    fileText: track.display.fileText,
+                    titleText: track.display.titleText,
+                    gameText: track.display.gameText,
+                    authorText: track.display.authorText,
+                    systemText: track.display.systemText,
+                    pathText: track.archiveEntry.map { "\(track.archivePath ?? track.sourcePath)#\($0)" }
+                        ?? track.sourcePath,
+                    lengthMilliseconds: track.lengthMilliseconds,
+                    trackNumber: track.trackNumber
+                ))
+            }, uniquingKeysWith: { first, _ in first }
+        )
+        catalogSortSessionOrder.append(sortSessionID)
+        while catalogSortSessionOrder.count > 8 {
+            catalogSortSessions.removeValue(forKey: catalogSortSessionOrder.removeFirst())
+        }
         let response = projection.rows.map { track -> [String: Any] in
             let identity = FavoriteTrackIdentity(
                 sourcePath: track.sourcePath,
@@ -687,6 +749,7 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
             return [
                 "id": id,
                 "number": trackNumber,
+                "trackNumber": track.trackNumber as Any? ?? NSNull(),
                 "fileText": track.display.fileText,
                 "title": track.display.titleText,
                 "game": track.display.gameText,
@@ -702,6 +765,7 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         let hints = projection.columnContentHints
         return [
             "tracks": response,
+            "sortSessionId": sortSessionID,
             "columnContentHints": [
                 "index": hints.indexText,
                 "filename": hints.fileText,
@@ -721,6 +785,7 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         var metadata: PlaybackTimingMetadata?
         var family: DecoderFamily?
         let catalogTrack = catalogTracks[id]
+        var historySnapshot: FavoriteTrackSnapshot?
         if let track = catalogTracks[id] {
             resolvedPath = track.sourcePath
             if let archivePath = track.archivePath, let archiveEntry = track.archiveEntry {
@@ -739,9 +804,15 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
                 introMilliseconds: track.introLengthMilliseconds,
                 loopMilliseconds: track.loopLengthMilliseconds
             )
+            historySnapshot = Self.favoriteSnapshot(for: track)
         } else if let local = localTracks[id] {
             resolvedPath = local.path
             family = FormatRegistry.family(for: resolvedPath)
+            historySnapshot = FavoriteTrackSnapshot(
+                identity: FavoriteTrackIdentity(sourcePath: local.path),
+                filename: URL(fileURLWithPath: local.path).lastPathComponent,
+                title: local.title
+            )
         } else if id.hasPrefix("local:") {
             let path = String(id.dropFirst("local:".count))
             let url = URL(fileURLWithPath: path).standardizedFileURL
@@ -753,6 +824,11 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
             localTracks[id] = LocalTrack(id: id, path: path, title: url.deletingPathExtension().lastPathComponent)
             resolvedPath = path
             family = FormatRegistry.family(for: resolvedPath)
+            historySnapshot = FavoriteTrackSnapshot(
+                identity: FavoriteTrackIdentity(sourcePath: path),
+                filename: url.lastPathComponent,
+                title: url.deletingPathExtension().lastPathComponent
+            )
         } else {
             throw LineBoyBridgeError.unknownTrack
         }
@@ -779,6 +855,11 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         )
         let continuation = try configuredRequest.continuationStart(resolvedPath: resolvedPath, requestID: requestID)
         try transport.start(continuation)
+        if let historySnapshot {
+            Task.detached(priority: .utility) {
+                _ = try? PlaybackHistoryStore().record(historySnapshot)
+            }
+        }
         activePlaybackMetadata = metadata
         activePlaybackFamily = family
         return playbackStatus()
@@ -861,20 +942,117 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         return ["trackId": request.response.trackID as Any? ?? NSNull()]
     }
 
+    private func sortCatalogPlaylist(_ arguments: [String: Any]) throws -> [String] {
+        guard let sessionID = arguments["sessionId"] as? String,
+              let records = catalogSortSessions[sessionID],
+              let ids = arguments["ids"] as? [String],
+              ids.count == records.count,
+              Set(ids).count == ids.count,
+              Set(ids) == Set(records.keys),
+              let columnName = arguments["column"] as? String,
+              let column = CatalogPlaylistSortColumn(frontendColumn: columnName),
+              let directionName = arguments["direction"] as? String,
+              let direction = CatalogPlaylistSortDirection(rawValue: directionName) else {
+            throw LineBoyBridgeError.invalidArguments
+        }
+        return CatalogPlaylistSorting.orderedIDs(
+            records: ids.compactMap { records[$0] },
+            column: column,
+            direction: direction
+        )
+    }
+
+    private func sortPlaylistProjection(_ arguments: [String: Any]) throws -> [String] {
+        guard JSONSerialization.isValidJSONObject(arguments) else {
+            throw LineBoyBridgeError.invalidArguments
+        }
+        let request = try JSONDecoder().decode(
+            CatalogPlaylistSortRequest.self,
+            from: JSONSerialization.data(withJSONObject: arguments)
+        )
+        guard let column = request.column,
+              Set(request.records.map(\.id)).count == request.records.count else {
+            throw LineBoyBridgeError.invalidArguments
+        }
+        return CatalogPlaylistSorting.orderedIDs(
+            records: request.records,
+            column: column,
+            direction: request.direction
+        )
+    }
+
     private func toggleFavorite(_ id: String) throws -> [String: Any] {
         guard let track = catalogTracks[id] else { throw LineBoyBridgeError.unknownTrack }
-        let identity = Self.favoriteIdentity(for: track)
-        let snapshot = FavoriteTrackSnapshot(
-            identity: identity,
-            filename: URL(fileURLWithPath: track.archiveEntry ?? track.sourcePath).lastPathComponent,
-            title: Self.displayName(for: track),
-            game: track.game,
-            author: track.author,
-            system: track.system,
-            playLengthMilliseconds: track.lengthMilliseconds
-        )
+        let snapshot = Self.favoriteSnapshot(for: track)
         let result = try FavoriteStore().toggle([snapshot])
         return ["favorite": result.added, "revision": result.revision]
+    }
+
+    private func favoritesPlaylist() throws -> [String: Any] {
+        let snapshots = try FavoriteStore().snapshots()
+        return ["tracks": snapshots.map { storedPlaylistTrack($0, id: $0.identity.id, isFavorite: true) }]
+    }
+
+    private func recentPlaylist() throws -> [String: Any] {
+        let favoriteIDs = Set(try FavoriteStore().snapshots().map(\.identity.id))
+        let records = try PlaybackHistoryStore().records()
+        return ["tracks": records.map { record in
+            storedPlaylistTrack(
+                record.snapshot,
+                id: record.id,
+                isFavorite: favoriteIDs.contains(record.snapshot.identity.id),
+                timestampMilliseconds: record.timestampMilliseconds
+            )
+        }]
+    }
+
+    private func storedPlaylistTrack(
+        _ snapshot: FavoriteTrackSnapshot,
+        id: String,
+        isFavorite: Bool,
+        timestampMilliseconds: Int64? = nil
+    ) -> [String: Any] {
+        let identity = snapshot.identity
+        let track = CatalogPlaylistTrack(
+            sourcePath: identity.sourcePath,
+            archivePath: identity.archiveEntry == nil ? nil : identity.sourcePath,
+            archiveEntry: identity.archiveEntry,
+            trackIndex: identity.trackIndex,
+            trackCount: identity.trackCount,
+            trackNumber: identity.trackCount > 1 ? identity.trackIndex + 1 : nil,
+            title: snapshot.title,
+            game: snapshot.game,
+            author: snapshot.author,
+            system: snapshot.system,
+            comment: "",
+            introLengthMilliseconds: 0,
+            loopLengthMilliseconds: 0,
+            lengthMilliseconds: snapshot.playLengthMilliseconds,
+            fadeLengthMilliseconds: 0
+        )
+        catalogTracks[id] = track
+        let row = CatalogPlaylistPresentation.project(tracks: [track]).rows[0]
+        let path = identity.archiveEntry.map { "\(identity.sourcePath)#\($0)" } ?? identity.sourcePath
+        var response: [String: Any] = [
+            "id": id,
+            "number": track.trackNumber ?? 1,
+            "trackNumber": track.trackNumber as Any? ?? NSNull(),
+            "fileText": row.display.fileText,
+            "title": row.display.titleText,
+            "game": row.display.gameText,
+            "author": row.display.authorText,
+            "system": row.display.systemText,
+            "path": path,
+            "lengthMilliseconds": track.lengthMilliseconds,
+            "length": row.display.lengthText,
+            "favorite": isFavorite,
+            "displayPath": row.display.sourceFilename,
+            "native": true
+        ]
+        if let timestampMilliseconds {
+            response["timestampMilliseconds"] = timestampMilliseconds
+        }
+        return response
     }
 
     private func chooseFile() throws -> [String: Any] {
@@ -935,6 +1113,18 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
             archiveEntry: track.archiveEntry,
             trackIndex: track.trackIndex,
             trackCount: track.trackCount
+        )
+    }
+
+    private static func favoriteSnapshot(for track: CatalogPlaylistTrack) -> FavoriteTrackSnapshot {
+        FavoriteTrackSnapshot(
+            identity: favoriteIdentity(for: track),
+            filename: URL(fileURLWithPath: track.archiveEntry ?? track.sourcePath).lastPathComponent,
+            title: displayName(for: track),
+            game: track.game,
+            author: track.author,
+            system: track.system,
+            playLengthMilliseconds: track.lengthMilliseconds
         )
     }
 
