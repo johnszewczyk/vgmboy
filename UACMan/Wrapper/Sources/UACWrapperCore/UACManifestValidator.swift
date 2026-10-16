@@ -89,13 +89,19 @@ enum UACManifestValidator {
         }
 
         let membersByPath = Dictionary(uniqueKeysWithValues: manifest.members.map { ($0.path, $0) })
-        try validateTransformations(manifest.transformations, sourceIDs: sourceIDSet, membersByPath: membersByPath)
+        try validateTransformations(
+            manifest.transformations,
+            sourcesByID: Dictionary(uniqueKeysWithValues: manifest.sources.map { ($0.id, $0) }),
+            sourceIDs: sourceIDSet,
+            membersByPath: membersByPath
+        )
         try validatePlaylists(manifest.playlists, variantIDs: variantIDs, membersByPath: membersByPath)
         try validatePathCollisions(paths)
     }
 
     private static func validateTransformations(
         _ transformations: [UACTransformation],
+        sourcesByID: [String: UACSource],
         sourceIDs: Set<String>,
         membersByPath: [String: UACMember]
     ) throws {
@@ -103,9 +109,21 @@ enum UACManifestValidator {
             guard !transformation.operation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   !transformation.tool.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   !transformation.toolVersion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                  !transformation.appliedAt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                  !transformation.inputs.isEmpty else {
-                throw UACContainerError.invalidManifest("Transformation records require an operation, tool, timestamp, and at least one input.")
+                  !transformation.appliedAt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw UACContainerError.invalidManifest("Transformation records require an operation, tool, and timestamp.")
+            }
+            if transformation.inputs.isEmpty {
+                guard transformation.operation == "metadata-harvest",
+                      transformation.outputs.isEmpty,
+                      case .string(let sourceID)? = transformation.details["sourceID"],
+                      case .string(let sourceName)? = transformation.details["sourceName"],
+                      let source = sourcesByID[sourceID],
+                      source.sourceName == sourceName,
+                      source.packageBlake3.map(isBLAKE3) == true else {
+                    throw UACContainerError.invalidManifest(
+                        "Input-free metadata harvests must identify a hashed source record by sourceID and sourceName."
+                    )
+                }
             }
             for input in transformation.inputs {
                 guard sourceIDs.contains(input.sourceID),

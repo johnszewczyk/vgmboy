@@ -228,14 +228,19 @@ before distributing newly packed files.
   package bytes. `metadata.sourceRelativePath`, `sourceHashScope`, and
   `sourceHashProfile` identify the source member and hash meaning for database
   ingestion. A source URL is provenance; local absolute file paths are not
-  identity fields.
+  identity fields. Readers treat omitted empty `metadata` and `extensions`
+  objects as `{}` for older packages.
 - Each `transformation` is a per-game ledger entry: operation class, source
   member paths and raw/stream BLAKE3 inputs, output member paths and hashes,
   tool/version, timestamp, optional rationale, and extensible details. Common
   operation classes include `rename`, `tag-normalization`, `recompress`,
   `transcode`, `playlist-repair`, `duplicate-prune`, `metadata-harvest`, and
-  `package`; new classes are allowed. Every input source must exist, and every
-  output must resolve to a manifest member with the same raw BLAKE3.
+  `package`; new classes are allowed. Every member input source must exist, and
+  every output must resolve to a manifest member with the same raw BLAKE3. A
+  source-level `metadata-harvest` may have no member inputs or outputs only
+  when `details.sourceID` and `details.sourceName` match a source record whose
+  `packageBlake3` is present and valid; this covers metadata derived from the
+  recorded source package identity, such as its filename.
 - A canonical derived CD/stream audio member may use Monkey's Audio (APE) at
   the selected maximum/insane compression profile. FLAC remains a readable
   compatibility input, but a FLAC-to-APE conversion is a PCM-preserving

@@ -304,8 +304,13 @@ public final class CatalogScanner: @unchecked Sendable {
                     skipped.append(contentsOf: inspection.skipped)
                     scanned += 1
                 case .failure(let message):
-                    let stage: ScanFailureStage = StandaloneArchiveExtractor.isSupportedArchive(candidate.sourceURL)
-                        ? .archiveExtraction : .metadata
+                    let stage: ScanFailureStage
+                    if StandaloneArchiveExtractor.isUAC(candidate.sourceURL) {
+                        stage = .metadata
+                    } else {
+                        stage = StandaloneArchiveExtractor.isSupportedArchive(candidate.sourceURL)
+                            ? .archiveExtraction : .metadata
+                    }
                     let failure = ScanFailure(
                         identity: candidate.identity,
                         fingerprint: candidate.fingerprint,

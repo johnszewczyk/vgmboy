@@ -94,7 +94,8 @@ inner-format inspector. If the manifest has explicit `subsong` entries, each
 unique member/decoder-index pair becomes a catalog row in playlist order; the
 entry's per-track metadata and decoder index are retained while all rows point
 to the same unchanged member. Ordinary file entries do not expand or duplicate
-member rows.
+member rows. Malformed UAC framing, manifests, and seek tables are reported as
+metadata failures; the scanner never expands the UAC payload.
 
 The UAC game title and console select the catalog's browser grouping only.
 UAC member fields and explicit subsong projections define the common track
