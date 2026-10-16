@@ -18,18 +18,21 @@
       color-scheme: dark;
       --black: #080808;
       --screen-black: #0b0b0b;
-      --well: #141414;
-      --well-inset: #101110;
-      --gray: #bdbdbd;
-      --white: #eeeeee;
-      --dim: #888888;
-      --selected-muted: #454545;
-      --well-highlight: #414141;
-      --frame-color: #555555;
-      --option-edge: #3c413e;
-      --accent: #c8d8ce;
-      --scroll-track: #111312;
-      --scroll-thumb: #626b65;
+      --well: #151816;
+      --well-inset: #0f1210;
+      --gray: #bfc9c2;
+      --white: #effff4;
+      --dim: #849188;
+      --selected-muted: #53645a;
+      --well-highlight: #29332d;
+      --frame-color: #536258;
+      --option-edge: #354239;
+      --accent: #a9d4b5;
+      --scroll-track: #101411;
+      --scroll-thumb: #64756a;
+      --surface-raised: #222a24;
+      --surface-row: #171c18;
+      --surface-row-alt: #111512;
       --selector-duration: 220ms;
       --mono: "Modern DOS", "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
     }
@@ -134,6 +137,7 @@
       background: transparent !important;
       color: var(--black) !important;
       outline: none !important;
+      box-shadow: none !important;
     }
     .selector-current .chev,
     .selector-current .count,
@@ -162,7 +166,8 @@
       display: grid;
       grid-template-columns: minmax(0, 1fr);
       align-items: center;
-      background: var(--black);
+      padding-inline: 1ch;
+      background: var(--well-inset);
     }
     .resolution-options {
       display: grid;
@@ -180,6 +185,7 @@
       line-height: 16px;
       text-align: center;
       cursor: pointer;
+      box-shadow: inset 1px 1px #f4fff477, inset -1px -1px #354039;
     }
     .resolution-choice:hover,
     .resolution-choice:focus-visible,
@@ -194,8 +200,12 @@
       display: flex;
       gap: 1ch;
       align-items: center;
+      padding-inline: 1ch;
+      background: var(--well-inset);
     }
-    .nav-group, .transport-group { display: contents; }
+    .nav-group, .transport-group { min-width: 0; display: flex; gap: 1ch; }
+    .nav-group { flex: 2 1 0; }
+    .transport-group { flex: 1 1 0; }
     .nav-button {
       position: relative;
       z-index: 2;
@@ -215,10 +225,12 @@
       overflow: hidden;
       text-overflow: ellipsis;
       cursor: pointer;
+      box-shadow: inset 1px 1px #f4fff477, inset -1px -1px #354039;
     }
     .nav-button[aria-pressed="true"] {
       background: var(--white);
       color: var(--black);
+      box-shadow: inset 1px 1px #ffffff, inset -1px -1px #9aa99f;
     }
     .nav-button:hover,
     .nav-button:focus-visible,
@@ -240,7 +252,10 @@
       min-height: 0;
       display: grid;
       grid-template-rows: var(--workspace-rows);
-      background: transparent;
+      background: var(--well-inset);
+    }
+    .library-panel, .listpanel, .options-sidebar, .options-content {
+      box-shadow: inset 0 0 0 1px var(--frame-color);
     }
     .library-panel { grid-column: 1; grid-row: 1 / -1; }
     .listpanel { grid-column: 3; grid-row: 1 / -1; }
@@ -250,19 +265,32 @@
       min-width: 0;
       height: 16px;
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-columns: 1ch minmax(0, 1fr) auto;
       align-items: center;
       gap: 1ch;
       padding: 0 1ch;
       overflow: hidden;
-      background: var(--gray);
-      color: var(--black);
+      background: var(--well-highlight);
+      color: var(--white);
       text-align: left;
       text-transform: uppercase;
       white-space: nowrap;
+      box-shadow: inset 0 -1px var(--frame-color);
+    }
+    .panel-title::before {
+      content: "";
+      width: 1ch;
+      height: 8px;
+      background: var(--accent);
+      box-shadow: inset 1px 1px #effff477, inset -1px -1px #53645a;
     }
     .panel-title > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-    .panel-title .count { text-align: right; }
+    .panel-title .count {
+      padding-inline: .5ch;
+      background: var(--well-inset);
+      color: var(--accent);
+      text-align: right;
+    }
 
     .tree {
       grid-row: 4 / -1;
@@ -275,15 +303,53 @@
       scrollbar-width: none;
       scroll-snap-type: y proximity;
     }
-    .library-search {
+    .search-field {
       grid-row: 2 / 4;
       min-width: 0;
       width: 100%;
       height: 32px;
-      padding: 8px 1ch;
+      display: flex;
+      align-items: center;
+      padding-inline: 1ch;
+      background: var(--well);
+      box-shadow: inset 1px 1px #ffffff18, inset -1px -1px #000a;
+    }
+    .search-icon {
+      position: relative;
+      flex: 0 0 2ch;
+      width: 2ch;
+      height: 16px;
+      color: var(--dim);
+    }
+    .search-icon::before {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 1px;
+      width: 7px;
+      height: 7px;
+      border: 1px solid currentColor;
+      border-radius: 50%;
+    }
+    .search-icon::after {
+      content: "";
+      position: absolute;
+      top: 10px;
+      left: 9px;
+      width: 4px;
+      height: 1px;
+      background: currentColor;
+      transform: rotate(45deg);
+      transform-origin: left center;
+    }
+    .library-search {
+      min-width: 0;
+      flex: 1 1 auto;
+      height: 32px;
+      padding: 8px 0;
       border: 0;
       border-radius: 0;
-      background: var(--well);
+      background: transparent;
       color: var(--gray);
       font: inherit;
       line-height: 16px;
@@ -291,7 +357,9 @@
       appearance: none;
     }
     .library-search::placeholder { color: var(--dim); opacity: 1; }
-    .library-search:focus-visible { background: var(--gray); color: var(--black); outline: none; }
+    .search-field:focus-within { background: var(--well-highlight); box-shadow: inset 0 0 0 1px var(--accent); }
+    .search-field:focus-within .search-icon { color: var(--accent); }
+    .library-search:focus-visible { color: var(--white); outline: none; }
     .library-search:focus-visible::placeholder { color: var(--selected-muted); }
     .library-results {
       grid-row: 4 / -1;
@@ -322,7 +390,15 @@
       white-space: nowrap;
       cursor: pointer;
       scroll-snap-align: start;
+      box-shadow: inset 0 -1px #ffffff08;
     }
+    .tree-row:nth-child(even) { background: var(--surface-row-alt); }
+    .tree-row[aria-level="1"] {
+      background: var(--surface-raised);
+      color: var(--white);
+      box-shadow: inset 2px 0 var(--frame-color), inset 0 -1px #ffffff10;
+    }
+    .tree-row[aria-level="1"][aria-expanded="true"] { box-shadow: inset 2px 0 var(--accent), inset 0 -1px #ffffff10; }
     .tree-row[hidden] { display: none; }
     .tree-row .chev { text-align: center; color: var(--dim); }
     .tree-row .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -377,7 +453,9 @@
       display: flex;
       align-items: center;
       gap: 1ch;
-      padding-block: 4px;
+      padding: 4px 1ch;
+      background: var(--well);
+      box-shadow: inset 0 -1px var(--frame-color);
     }
     .playlist-tabs {
       position: relative;
@@ -434,9 +512,31 @@
       box-shadow: 3px 0 currentColor, 1px 1px currentColor, 2px 1px currentColor,
         1px 2px currentColor, 2px 2px currentColor, 0 3px currentColor, 3px 3px currentColor;
     }
-    .playlist-tab[aria-selected="true"] { border-color: var(--accent); background: var(--well-highlight); }
+    .playlist-tab[aria-selected="true"] {
+      border-color: var(--accent);
+      background: var(--well-highlight);
+      box-shadow: inset 0 2px var(--accent), inset 0 -1px #0008;
+    }
     .playlist-tab[aria-selected="true"] .playlist-tab-select { color: var(--white); }
-    .playlist-tab-add { flex: 0 0 4ch; height: 24px; border: 1px solid var(--frame-color); }
+    .playlist-tab-add {
+      position: relative;
+      flex: 0 0 4ch;
+      height: 24px;
+      border: 1px solid var(--frame-color);
+      background: var(--surface-raised);
+      font-size: 0;
+      box-shadow: inset 1px 1px #ffffff22, inset -1px -1px #0009;
+    }
+    .playlist-tab-add::before, .playlist-tab-add::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      background: currentColor;
+      transform: translate(-50%, -50%);
+    }
+    .playlist-tab-add::before { width: 8px; height: 2px; }
+    .playlist-tab-add::after { width: 2px; height: 8px; }
     .playlist-tab-select:hover, .playlist-tab-select:focus-visible,
     .playlist-tab-close:hover, .playlist-tab-close:focus-visible,
     .playlist-tab-add:hover, .playlist-tab-add:focus-visible {
@@ -479,6 +579,10 @@
     .list-head > span,
     .list-head > [role="columnheader"],
     .song > span { height: 16px; display: grid; align-items: center; line-height: 16px; }
+    .list-head > [role="columnheader"]:not(:first-child) {
+      padding-left: .5ch;
+      box-shadow: inset 1px 0 #ffffff18;
+    }
     .list-head [data-sort-column="length"] { text-align: right; }
     .list-sort {
       min-width: 0;
@@ -521,7 +625,7 @@
       padding: 0 1ch;
       justify-self: start;
       border: 0;
-      background: var(--well);
+      background: var(--surface-row);
       color: var(--gray);
       line-height: 16px;
       text-align: left;
@@ -529,7 +633,9 @@
       cursor: pointer;
       scroll-snap-align: start;
       transition: grid-template-columns var(--selector-duration) cubic-bezier(.2, 0, 0, 1);
+      box-shadow: inset 0 -1px #ffffff08;
     }
+    .song:nth-child(even) { background: var(--surface-row-alt); }
     .song[hidden] { display: none; }
     .song .favorite { color: var(--dim); text-align: center; }
     .song .num { color: var(--dim); text-align: right; }
@@ -582,8 +688,26 @@
       justify-content: space-between;
       gap: 1ch;
       padding: 0 1ch;
-      background: var(--black);
+      background: var(--well-highlight);
       line-height: 16px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: .5ch;
+      color: var(--white);
+    }
+    .brand::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      box-shadow: 0 0 0 1px #050706, inset 1px 1px #effff477;
+    }
+    .statbits > span {
+      padding-inline: .5ch;
+      background: var(--well-inset);
+      color: var(--accent);
     }
     .status-details {
       min-width: 0;
@@ -593,20 +717,26 @@
       align-items: center;
       gap: 1ch;
       padding: 0 1ch;
-      background: var(--well);
+      background: var(--well-inset);
       line-height: 16px;
     }
     .status-details > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-    .status-details > span:last-child { color: var(--white); text-align: right; }
+    .status-details > span:last-child {
+      padding-inline: 1ch;
+      background: var(--accent);
+      color: var(--black);
+      text-align: right;
+    }
 
     .option-navigation {
       grid-row: 2 / -1;
       min-height: 0;
       display: grid;
-      grid-auto-rows: 16px;
+      grid-auto-rows: 24px;
       align-content: start;
-      padding: 8px 4px 8px 0;
-      background: linear-gradient(90deg, var(--well-inset), transparent);
+      align-items: center;
+      padding: 0 1ch;
+      background: var(--well-inset);
     }
     .option-category {
       position: relative;
@@ -617,11 +747,12 @@
       place-items: center;
       padding: 0 1ch;
       border: 0;
-      background: var(--gray);
-      color: var(--black);
+      background: var(--surface-raised);
+      color: var(--white);
       line-height: 16px;
       text-align: center;
       cursor: pointer;
+      box-shadow: inset 1px 1px #f4fff466, inset -1px -1px #0009;
     }
     .option-category:hover,
     .option-category:focus-visible,
@@ -629,6 +760,7 @@
       outline: none;
       color: var(--black);
       background: var(--white);
+      box-shadow: inset 1px 1px #fff, inset -1px -1px #9aa99f;
     }
     .option-page {
       grid-row: 2 / -1;
@@ -662,7 +794,7 @@
       height: 16px;
       margin: 0 0 8px;
       padding: 0 1ch;
-      background: var(--gray);
+      background: var(--accent);
       color: var(--black);
       line-height: 16px;
       text-align: center;
@@ -706,6 +838,7 @@
       overflow: hidden;
       text-overflow: ellipsis;
       cursor: pointer;
+      box-shadow: inset 1px 1px #f4fff477, inset -1px -1px #354039;
     }
     .option-value:hover,
     .option-value:focus-visible,
@@ -713,13 +846,138 @@
       background: var(--white);
       color: var(--black);
       outline: none;
+      box-shadow: inset 1px 1px #fff, inset -1px -1px #9aa99f;
     }
     .option-value:disabled, .brightness-range:disabled { opacity: .45; cursor: default; }
     .toolbar-compact { display: none; }
     @container (max-width: 440px) {
       .toolrow { gap: .5ch; }
+      .nav-group, .transport-group { gap: .5ch; }
       .toolbar-full { display: none; }
       .toolbar-compact { display: inline; }
+      .nav-button { font-size: 0; }
+      .nav-button > * { display: none; }
+      .nav-button::before, .nav-button::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+      .nav-button[data-action="OPEN"]::before {
+        width: 10px;
+        height: 7px;
+        border: 1px solid currentColor;
+        border-top-width: 2px;
+      }
+      .nav-button[data-action="OPEN"]::after {
+        top: calc(50% - 4px);
+        left: calc(50% - 5px);
+        width: 4px;
+        height: 2px;
+        background: currentColor;
+      }
+      .nav-button[data-action="TREE"]::before {
+        width: 10px;
+        height: 8px;
+        background:
+          linear-gradient(currentColor, currentColor) 1px 1px / 1px 6px no-repeat,
+          linear-gradient(currentColor, currentColor) 1px 1px / 7px 1px no-repeat,
+          linear-gradient(currentColor, currentColor) 1px 4px / 7px 1px no-repeat,
+          linear-gradient(currentColor, currentColor) 5px 1px / 1px 3px no-repeat;
+      }
+      .nav-button[data-action="TREE"]::after {
+        top: calc(50% - 4px);
+        left: calc(50% - 5px);
+        width: 3px;
+        height: 3px;
+        background: currentColor;
+        box-shadow: 5px 3px currentColor, 5px 0 currentColor;
+      }
+      .nav-button[data-action="LIST"]::before {
+        width: 10px;
+        height: 1px;
+        background: currentColor;
+        box-shadow: 0 3px currentColor, 0 6px currentColor;
+      }
+      .nav-button[data-action="FAVORITES"]::before {
+        content: "★";
+        font: 12px/12px var(--mono);
+      }
+      .nav-button[data-action="RECENT"]::before {
+        width: 9px;
+        height: 9px;
+        border: 1px solid currentColor;
+        border-radius: 50%;
+      }
+      .nav-button[data-action="RECENT"]::after {
+        top: calc(50% - 2px);
+        left: 50%;
+        width: 3px;
+        height: 3px;
+        border-left: 1px solid currentColor;
+        border-bottom: 1px solid currentColor;
+      }
+      .nav-button[data-action="OPTIONS"]::before {
+        width: 10px;
+        height: 1px;
+        background: currentColor;
+        box-shadow: 0 3px currentColor, 0 6px currentColor;
+      }
+      .nav-button[data-action="OPTIONS"]::after {
+        top: calc(50% - 3px);
+        left: calc(50% - 2px);
+        width: 2px;
+        height: 2px;
+        background: currentColor;
+        box-shadow: 4px 3px currentColor, -2px 6px currentColor;
+      }
+      .nav-button[data-action="PREV"]::before,
+      .nav-button[data-action="NEXT"]::before {
+        width: 0;
+        height: 0;
+        border-top: 4px solid transparent;
+        border-bottom: 4px solid transparent;
+      }
+      .nav-button[data-action="PREV"]::before {
+        left: calc(50% - 2px);
+        border-right: 6px solid currentColor;
+      }
+      .nav-button[data-action="PREV"]::after {
+        left: calc(50% + 4px);
+        width: 1px;
+        height: 8px;
+        background: currentColor;
+      }
+      .nav-button[data-action="NEXT"]::before {
+        left: calc(50% + 2px);
+        border-left: 6px solid currentColor;
+      }
+      .nav-button[data-action="NEXT"]::after {
+        left: calc(50% - 4px);
+        width: 1px;
+        height: 8px;
+        background: currentColor;
+      }
+      .nav-button[data-action="PLAY"]::before {
+        width: 0;
+        height: 0;
+        border-top: 5px solid transparent;
+        border-bottom: 5px solid transparent;
+        border-left: 8px solid currentColor;
+      }
+    }
+    @container (max-width: 512px) {
+      .library-panel .panel-title,
+      .options-sidebar .panel-title {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
+        padding-inline: 1ch;
+      }
+      .library-panel .panel-title::before,
+      .library-panel .panel-title .count,
+      .options-sidebar .panel-title::before,
+      .options-sidebar .panel-title .count { display: none; }
     }
     .range-control {
       min-width: 0;
@@ -836,25 +1094,28 @@
 
       <nav class="toolrow" aria-label="Commands and transport">
         <div class="nav-group" role="group" aria-label="Views">
-          <button class="nav-button" type="button" data-action="OPEN" aria-pressed="false">FILE</button>
-          <button class="nav-button" type="button" data-action="TREE" aria-pressed="false">TREE</button>
-          <button class="nav-button" type="button" data-action="LIST" aria-pressed="true">LIST</button>
-          <button class="nav-button" type="button" data-action="FAVORITES" aria-label="Favorites playlist (Command+Shift+F)" aria-keyshortcuts="Meta+Shift+F" aria-pressed="false">FAV</button>
+          <button class="nav-button" type="button" data-action="OPEN" aria-label="Open file" title="Open file" aria-pressed="false">FILE</button>
+          <button class="nav-button" type="button" data-action="TREE" aria-label="Library tree" title="Library tree" aria-pressed="false">TREE</button>
+          <button class="nav-button" type="button" data-action="LIST" aria-label="Playlist" title="Playlist" aria-pressed="true">LIST</button>
+          <button class="nav-button" type="button" data-action="FAVORITES" aria-label="Favorites playlist (Command+Shift+F)" title="Favorites" aria-keyshortcuts="Meta+Shift+F" aria-pressed="false">FAV</button>
           <button class="nav-button" type="button" data-action="RECENT" aria-label="Recent playback (Command+Shift+H)" aria-keyshortcuts="Meta+Shift+H" title="Recent playback" aria-pressed="false"><span class="toolbar-full">RECENT</span><span class="toolbar-compact">REC</span></button>
-          <button class="nav-button" type="button" data-action="OPTIONS" aria-pressed="false">OPTS</button>
+          <button class="nav-button" type="button" data-action="OPTIONS" aria-label="Options" title="Options" aria-pressed="false">OPTS</button>
         </div>
         <div class="transport-group" role="group" aria-label="Transport">
-          <button class="nav-button" type="button" data-action="PREV" aria-label="Previous track">&lt;&lt;</button>
-          <button class="nav-button" type="button" data-action="PLAY" aria-pressed="false">PLAY</button>
-          <button class="nav-button" type="button" data-action="NEXT" aria-label="Next track">&gt;&gt;</button>
+          <button class="nav-button" type="button" data-action="PREV" aria-label="Previous track" title="Previous track">&lt;&lt;</button>
+          <button class="nav-button" type="button" data-action="PLAY" aria-label="Play or pause" title="Play or pause" aria-pressed="false">PLAY</button>
+          <button class="nav-button" type="button" data-action="NEXT" aria-label="Next track" title="Next track">&gt;&gt;</button>
         </div>
       </nav>
 
       <main class="workspace" aria-label="Library and playlist">
         <aside class="panel library-panel" aria-label="Library">
           <div class="panel-title"><span>LIBRARY</span><span class="count" id="library-count">12/64</span></div>
-          <input class="library-search" id="library-search" type="search" placeholder="Search library"
-            aria-label="Search library" aria-keyshortcuts="Meta+F" autocomplete="off" spellcheck="false">
+          <div class="search-field">
+            <span class="search-icon" aria-hidden="true"></span>
+            <input class="library-search" id="library-search" type="search" placeholder="SEARCH LIBRARY"
+              aria-label="Search library" aria-keyshortcuts="Meta+F" autocomplete="off" spellcheck="false">
+          </div>
           <div class="tree" id="library-tree" role="tree" aria-label="Systems and demo folders">
             <button class="tree-row" type="button" role="treeitem" aria-level="1" aria-selected="false" tabindex="-1"><span class="chev"></span><span class="label">AMIGA</span><span class="count">38</span></button>
             <button class="tree-row" type="button" role="treeitem" aria-level="1" aria-selected="false" tabindex="-1"><span class="chev"></span><span class="label">ARCADE</span><span class="count">54</span></button>

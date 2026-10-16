@@ -28,8 +28,9 @@ inside the native macOS title-bar area. The layout uses 8-pixel columns and
 an 8-pixel gutter, the matching command toolbar, another 8-pixel gutter, the
 library and playlist, and a two-line status footer. The gutters separate the
 control bands without changing the text-row grid.
-The footer contains the LineBoy name, grid, beam pitch, clock, current item and
-playback state.
+The footer is a two-band instrument panel: its first line groups the LineBoy
+mark, grid, beam pitch, and clock into readout cells; the second line separates
+the current item from a high-contrast playback-state badge.
 Labels and controls use the same cell-top baseline: the 10px cap ink is centered
 inside its 16px row, with three source pixels above and below. The fixed-width
 font keeps an 8px advance, with kerning and ligatures disabled. The baseline
@@ -43,14 +44,22 @@ same filter. The CSS mask provides the same fixed-gap fallback when WebGL2 is
 unavailable.
 
 The resolution and command toolbars use the same square, filled color-block
-buttons with one character cell between actions. Each toolbar label is centered
-on its 16-pixel row; the active choice and hover or keyboard focus use the white
-inverse selector. Library and playlist headers match; the search field and
-framed tab toolbar share a two-row band below them. Track headings use light
-text on a shaded bar, followed by dense 16px text rows. FILE, TITLE, GAME,
-ARTIST, SYSTEM, PATH, and TIME are clickable sort headings. Sorting uses the
-shared CatalogPlaylistPresentationCore policy, remembers direction per tab,
-and retains the selected track and scroll position.
+buttons with one character cell between actions. The command bar groups the six
+view actions separately from the three transport controls. At narrow widths,
+the command blocks switch to compact geometric icons while retaining their
+accessible names and hover titles. Button faces have a subtle raised edge; the
+active choice and hover or keyboard focus use the white inverse selector. The
+dark green-gray monochrome palette uses a muted phosphor
+accent for active rails, readouts, and status marks. The library and playlist
+are framed panels with shaded title bands, a compact count badge, and a distinct
+two-row search or tab well. The search well has a drawn magnifier and recessed
+edge. Top-level library rows have a raised surface and accent rail; playlist
+rows alternate two nearby dark surfaces beneath the column header. These
+surface changes add visual grouping without changing 8×16 row geometry.
+Track headings use light text on a shaded bar with faint column rules. FILE,
+TITLE, GAME, ARTIST, SYSTEM, PATH, and TIME are clickable sort headings.
+Sorting uses the shared CatalogPlaylistPresentationCore policy, remembers
+direction per tab, and retains the selected track and scroll position.
 
 The playlist has a horizontal tab strip above its track headings. Selecting a
 tab restores that playlist, its selected track, favorites filter, and scroll
@@ -94,9 +103,12 @@ trailing hit area.
 
 Phosphor persistence is disabled to keep interaction responsive. OPTIONS opens
 a two-column terminal settings view with inset square framed sections, visible
-space between cards, shaded section headers, and the same filled block controls
-as the toolbars. The added padding uses whole 8px and 16px grid units. Option
-rows and equalizer labels remain centered on the same 16px line grid. DISPLAY contains
+space between cards, phosphor section headers, and the same raised block
+controls as the toolbars. Its six sidebar buttons use 24px vertical slots,
+leaving 8px of breathing room while preserving their 16px labels; at the
+smallest raster the six slots exactly fill the options sidebar. The added
+padding uses whole 8px and 16px grid units. Option rows and equalizer labels
+remain centered on the same 16px line grid. DISPLAY contains
 WIDTH MODE (FILL or FRAME), SCANLINES, BRIGHTNESS, SELECTOR FLOW, the active
 beam pitch, and a native fullscreen toggle. CRT contains a THIN/NORMAL/WIDE beam-width control
 and reports the active pitch. PLAYLIST contains AUTO SIZE and MAX WIDTH.
