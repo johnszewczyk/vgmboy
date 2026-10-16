@@ -264,6 +264,11 @@ public struct UACSource: Codable, Equatable, Sendable {
     public let metadata: [String: UACJSONValue]
     public let extensions: [String: UACJSONValue]
 
+    private enum CodingKeys: String, CodingKey {
+        case id, collection, setName, sourceName, sourceURL, packageBlake3
+        case observedAt, metadata, extensions
+    }
+
     public init(
         id: String,
         collection: String,
@@ -284,6 +289,19 @@ public struct UACSource: Codable, Equatable, Sendable {
         self.observedAt = observedAt
         self.metadata = metadata
         self.extensions = extensions
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        collection = try values.decode(String.self, forKey: .collection)
+        setName = try values.decode(String.self, forKey: .setName)
+        sourceName = try values.decode(String.self, forKey: .sourceName)
+        sourceURL = try values.decodeIfPresent(String.self, forKey: .sourceURL)
+        packageBlake3 = try values.decodeIfPresent(String.self, forKey: .packageBlake3)
+        observedAt = try values.decode(String.self, forKey: .observedAt)
+        metadata = try values.decodeIfPresent([String: UACJSONValue].self, forKey: .metadata) ?? [:]
+        extensions = try values.decodeIfPresent([String: UACJSONValue].self, forKey: .extensions) ?? [:]
     }
 }
 

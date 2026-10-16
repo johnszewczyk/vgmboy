@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-public enum UACContainerError: Error, Equatable, Sendable {
+public enum UACContainerError: Error, Equatable, Sendable, LocalizedError {
     case notARegularFile
     case truncatedHeader
     case invalidMagic
@@ -30,6 +30,39 @@ public enum UACContainerError: Error, Equatable, Sendable {
     case destinationExists
     case sourceChangedDuringRewrite
     case payloadCopyFailed
+
+    public var errorDescription: String? {
+        switch self {
+        case .notARegularFile: return "The UAC source is not a regular file."
+        case .truncatedHeader: return "The UAC header is truncated."
+        case .invalidMagic: return "The file does not have a UAC container marker."
+        case .invalidMetadataMagic: return "The UAC metadata frame marker is invalid."
+        case .invalidPayloadMagic: return "The UAC payload is not a Zstandard frame."
+        case .unsupportedVersion(let major, let minor): return "Unsupported UAC container version \(major).\(minor)."
+        case .manifestTooLarge: return "The UAC manifest exceeds the reader size limit."
+        case .invalidLengths: return "The UAC container lengths are inconsistent."
+        case .manifestChecksumMismatch: return "The UAC manifest SHA-256 does not match its header."
+        case .manifestDecoderRequired: return "A Zstandard manifest decoder is required for this UAC package."
+        case .manifestDecompressionFailed: return "The compressed UAC manifest could not be decoded."
+        case .manifestDecodedSizeMismatch: return "The decoded UAC manifest size does not match its declaration."
+        case .invalidCompressedManifestFrame: return "The compressed UAC manifest frame is invalid."
+        case .invalidManifest(let message): return "Invalid UAC manifest: \(message)"
+        case .invalidSeekTable(let message): return "Invalid UAC seek table: \(message)"
+        case .memberMissingSeekOffset(let path): return "UAC member is missing a seek offset: \(path)"
+        case .memberSeekRangeOutOfBounds(let path): return "UAC member seek range is out of bounds: \(path)"
+        case .memberNotFound(let path): return "UAC member was not found: \(path)"
+        case .seekablePayloadRequired: return "This operation requires a seekable UAC payload."
+        case .invalidSeekFrameCacheLimit: return "The UAC seek-frame cache limit is invalid."
+        case .invalidMemberReadRange: return "The requested UAC member byte range is invalid."
+        case .memberRangeNotCovered: return "The UAC seek table does not cover the requested member range."
+        case .seekableFrameReadFailed(let index): return "Could not read UAC seekable frame \(index)."
+        case .seekableFrameDecodeFailed(let index): return "Could not decode UAC seekable frame \(index)."
+        case .seekableFrameSizeMismatch(let index): return "Decoded UAC seekable frame \(index) has an unexpected size."
+        case .destinationExists: return "The UAC destination already exists."
+        case .sourceChangedDuringRewrite: return "The UAC source changed during the manifest rewrite."
+        case .payloadCopyFailed: return "Could not preserve the UAC payload while rewriting the manifest."
+        }
+    }
 }
 
 public struct UACContainer: Sendable, Equatable {
