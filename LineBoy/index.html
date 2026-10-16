@@ -629,6 +629,7 @@
       color: var(--black);
       outline: none;
     }
+    .option-value:disabled, .brightness-range:disabled { opacity: .45; cursor: default; }
     .range-control {
       min-width: 0;
       display: grid;
@@ -764,6 +765,8 @@
           <div class="option-navigation" role="group" aria-label="Option categories">
             <button class="option-category" type="button" data-options-page="DISPLAY" aria-pressed="true">DISPLAY</button>
             <button class="option-category" type="button" data-options-page="PLAYLIST" aria-pressed="false">PLAYLIST</button>
+            <button class="option-category" type="button" data-options-page="PLAYBACK" aria-pressed="false">PLAYBACK</button>
+            <button class="option-category" type="button" data-options-page="AUDIO" aria-pressed="false">AUDIO</button>
             <button class="option-category" type="button" data-options-page="CRT" aria-pressed="false">CRT</button>
             <button class="option-category" type="button" data-options-page="KEYS" aria-pressed="false">KEYS</button>
           </div>
@@ -793,6 +796,43 @@
             <div class="option-row"><span>RESIZE MOTION</span><span class="option-key">SELECTOR EASE</span></div>
             <div class="option-note">8PX CELLS. LONG PLAYLISTS SCROLL.</div>
             <div class="option-note">SIZES FOLLOW THE SHARED PLAYLIST PROJECTION.</div>
+          </div>
+          <div class="option-page" data-options-content="PLAYBACK" hidden>
+            <div class="option-section-title">PLAY TIME</div>
+            <div class="option-row"><span>LONG PLAY</span><button class="option-value" id="long-play-enabled" type="button" data-native-setting aria-pressed="false">OFF</button></div>
+            <div class="option-row"><span>LONG PLAY TIME</span><div class="range-control"><input class="brightness-range" id="long-play-seconds" type="range" min="0" max="1800" step="15" data-native-setting aria-label="Long Play duration"><output class="range-readout" id="long-play-readout" for="long-play-seconds">3:00</output></div></div>
+            <div class="option-row"><span>UNKNOWN LENGTH</span><div class="range-control"><input class="brightness-range" id="unknown-duration-seconds" type="range" min="30" max="900" step="15" data-native-setting aria-label="Unknown duration default"><output class="range-readout" id="unknown-duration-readout" for="unknown-duration-seconds">2:30</output></div></div>
+            <div class="option-section-title">END FADE</div>
+            <div class="option-row"><span>FADE OUT</span><button class="option-value" id="fade-enabled" type="button" data-native-setting aria-pressed="true">ON</button></div>
+            <div class="option-row"><span>FADE TIME</span><div class="range-control"><input class="brightness-range" id="fade-seconds" type="range" min="0" max="30" step="1" data-native-setting aria-label="Fade duration"><output class="range-readout" id="fade-readout" for="fade-seconds">0:06</output></div></div>
+            <div class="option-section-title">DECODER SPEED</div>
+            <div class="option-row"><span>LIBGME</span><button class="option-value" id="libgme-speed-enabled" type="button" data-native-setting aria-pressed="false">OFF</button></div>
+            <div class="option-row"><span>LIBGME RATE</span><div class="range-control"><input class="brightness-range" id="libgme-speed" type="range" min="16" max="64" step="1" data-native-setting aria-label="libgme playback speed"><output class="range-readout" id="libgme-speed-readout" for="libgme-speed">1.00X</output></div></div>
+            <div class="option-row"><span>LIBVGM</span><button class="option-value" id="libvgm-speed-enabled" type="button" data-native-setting aria-pressed="false">OFF</button></div>
+            <div class="option-row"><span>LIBVGM RATE</span><div class="range-control"><input class="brightness-range" id="libvgm-speed" type="range" min="16" max="64" step="1" data-native-setting aria-label="libvgm playback speed"><output class="range-readout" id="libvgm-speed-readout" for="libvgm-speed">1.00X</output></div></div>
+            <div class="option-note">SPEED USES 1/32 STEPS FROM 0.50X TO 2.00X.</div>
+            <div class="option-note">TIMING CHANGES RESTART THE CURRENT TRACK AT ITS POSITION.</div>
+          </div>
+          <div class="option-page" data-options-content="AUDIO" hidden>
+            <div class="option-section-title">OUTPUT</div>
+            <div class="option-row"><span>VOLUME</span><div class="range-control"><input class="brightness-range" id="audio-volume" type="range" min="0" max="20" step="1" data-native-setting aria-label="Playback volume"><output class="range-readout" id="audio-volume-readout" for="audio-volume">100%</output></div></div>
+            <div class="option-row"><span>MONO</span><button class="option-value" id="mono-enabled" type="button" data-native-setting aria-pressed="false">OFF</button></div>
+            <div class="option-section-title">10-BAND EQUALIZER</div>
+            <div class="option-row"><span>EQUALIZER</span><button class="option-value" id="equalizer-enabled" type="button" data-native-setting aria-pressed="false">OFF</button></div>
+            <div id="equalizer-bands">
+              <div class="option-row"><span>31 HZ</span><div class="range-control"><input class="brightness-range eq-band" type="range" min="-12" max="12" step="0.5" data-band="0" data-native-setting aria-label="31 Hz equalizer gain"><output class="range-readout">0.0</output></div></div>
+              <div class="option-row"><span>62 HZ</span><div class="range-control"><input class="brightness-range eq-band" type="range" min="-12" max="12" step="0.5" data-band="1" data-native-setting aria-label="62 Hz equalizer gain"><output class="range-readout">0.0</output></div></div>
+              <div class="option-row"><span>125 HZ</span><div class="range-control"><input class="brightness-range eq-band" type="range" min="-12" max="12" step="0.5" data-band="2" data-native-setting aria-label="125 Hz equalizer gain"><output class="range-readout">0.0</output></div></div>
+              <div class="option-row"><span>250 HZ</span><div class="range-control"><input class="brightness-range eq-band" type="range" min="-12" max="12" step="0.5" data-band="3" data-native-setting aria-label="250 Hz equalizer gain"><output class="range-readout">0.0</output></div></div>
+              <div class="option-row"><span>500 HZ</span><div class="range-control"><input class="brightness-range eq-band" type="range" min="-12" max="12" step="0.5" data-band="4" data-native-setting aria-label="500 Hz equalizer gain"><output class="range-readout">0.0</output></div></div>
+              <div class="option-row"><span>1 KHZ</span><div class="range-control"><input class="brightness-range eq-band" type="range" min="-12" max="12" step="0.5" data-band="5" data-native-setting aria-label="1 kHz equalizer gain"><output class="range-readout">0.0</output></div></div>
+              <div class="option-row"><span>2 KHZ</span><div class="range-control"><input class="brightness-range eq-band" type="range" min="-12" max="12" step="0.5" data-band="6" data-native-setting aria-label="2 kHz equalizer gain"><output class="range-readout">0.0</output></div></div>
+              <div class="option-row"><span>4 KHZ</span><div class="range-control"><input class="brightness-range eq-band" type="range" min="-12" max="12" step="0.5" data-band="7" data-native-setting aria-label="4 kHz equalizer gain"><output class="range-readout">0.0</output></div></div>
+              <div class="option-row"><span>8 KHZ</span><div class="range-control"><input class="brightness-range eq-band" type="range" min="-12" max="12" step="0.5" data-band="8" data-native-setting aria-label="8 kHz equalizer gain"><output class="range-readout">0.0</output></div></div>
+              <div class="option-row"><span>16 KHZ</span><div class="range-control"><input class="brightness-range eq-band" type="range" min="-12" max="12" step="0.5" data-band="9" data-native-setting aria-label="16 kHz equalizer gain"><output class="range-readout">0.0</output></div></div>
+            </div>
+            <div class="option-row"><span>EQ CURVE</span><button class="option-value" id="equalizer-reset" type="button" data-native-setting>RESET FLAT</button></div>
+            <div class="option-note" id="audio-native-note">VOLUME, MONO AND EQ USE VGMBoy OUTPUT.</div>
           </div>
           <div class="option-page" data-options-content="CRT" hidden>
             <div class="option-row"><span>BEAM WIDTH</span><button class="option-value" id="beam-width-mode" type="button">NORMAL</button></div>
@@ -937,6 +977,31 @@
     const optionsPageTitle = document.querySelector("#options-page-title");
     const optionCategories = [...document.querySelectorAll(".option-category")];
     const optionPages = [...document.querySelectorAll(".option-page")];
+    const nativePlaybackControls = [...document.querySelectorAll("[data-native-setting]")];
+    const playbackSettingsControls = {
+      longPlayEnabled: document.querySelector("#long-play-enabled"),
+      longPlaySeconds: document.querySelector("#long-play-seconds"),
+      longPlayReadout: document.querySelector("#long-play-readout"),
+      unknownDurationSeconds: document.querySelector("#unknown-duration-seconds"),
+      unknownDurationReadout: document.querySelector("#unknown-duration-readout"),
+      fadeEnabled: document.querySelector("#fade-enabled"),
+      fadeSeconds: document.querySelector("#fade-seconds"),
+      fadeReadout: document.querySelector("#fade-readout"),
+      libGmeTempoEnabled: document.querySelector("#libgme-speed-enabled"),
+      libGmeTempo: document.querySelector("#libgme-speed"),
+      libGmeTempoReadout: document.querySelector("#libgme-speed-readout"),
+      libVgmTempoEnabled: document.querySelector("#libvgm-speed-enabled"),
+      libVgmTempo: document.querySelector("#libvgm-speed"),
+      libVgmTempoReadout: document.querySelector("#libvgm-speed-readout"),
+      outputVolume: document.querySelector("#audio-volume"),
+      outputVolumeReadout: document.querySelector("#audio-volume-readout"),
+      monoEnabled: document.querySelector("#mono-enabled"),
+      equalizerEnabled: document.querySelector("#equalizer-enabled"),
+      equalizerReset: document.querySelector("#equalizer-reset"),
+      equalizerBands: [...document.querySelectorAll(".eq-band")],
+      equalizerBandReadouts: [...document.querySelectorAll(".eq-band + output")],
+      nativeNote: document.querySelector("#audio-native-note"),
+    };
     const widthModeButton = document.querySelector("#width-mode");
     const scanlineModeButton = document.querySelector("#scanline-mode");
     const beamWidthModeButton = document.querySelector("#beam-width-mode");
@@ -1051,6 +1116,156 @@
         const id = String(++nativeRequestID);
         nativeRequests.set(id, { resolve, reject });
         window.webkit.messageHandlers.lineBoy.postMessage({ id, method, args });
+      });
+    }
+
+    function playbackTempoStep(value) {
+      const numerator = Number(value?.numerator);
+      const denominator = Number(value?.denominator);
+      const multiplier = denominator > 0 && Number.isFinite(numerator / denominator)
+        ? numerator / denominator : 1;
+      return Math.max(16, Math.min(64, Math.round(multiplier * 32)));
+    }
+
+    function normalizePlaybackSettings(value = {}) {
+      const snap = (number, min, max, step) => {
+        const bounded = Math.max(min, Math.min(max, Number.isFinite(Number(number)) ? Number(number) : min));
+        return min + Math.round((bounded - min) / step) * step;
+      };
+      const gains = Array.isArray(value.equalizerBandGains) ? value.equalizerBandGains : [];
+      return {
+        version: 1,
+        longPlayEnabled: Boolean(value.longPlayEnabled),
+        longPlaySeconds: snap(value.longPlaySeconds ?? 180, 0, 1800, 15),
+        unknownDurationSeconds: snap(value.unknownDurationSeconds ?? 150, 30, 900, 15),
+        fadeEnabled: value.fadeEnabled !== false,
+        fadeSeconds: snap(value.fadeSeconds ?? 6, 0, 30, 1),
+        outputVolume: snap(Number(value.outputVolume ?? 1) * 20, 0, 20, 1) / 20,
+        monoEnabled: Boolean(value.monoEnabled),
+        equalizerEnabled: Boolean(value.equalizerEnabled),
+        equalizerBandGains: Array.from({ length: 10 }, (_, index) => {
+          const gain = Number(gains[index] ?? 0);
+          return snap(Number.isFinite(gain) ? gain : 0, -12, 12, 0.5);
+        }),
+        libGmeTempoEnabled: Boolean(value.libGmeTempoEnabled),
+        libGmeTempo: { numerator: playbackTempoStep(value.libGmeTempo), denominator: 32 },
+        libVgmTempoEnabled: Boolean(value.libVgmTempoEnabled),
+        libVgmTempo: { numerator: playbackTempoStep(value.libVgmTempo), denominator: 32 },
+      };
+    }
+
+    let playbackSettings = normalizePlaybackSettings();
+    let playbackSettingsSaveTimer = 0;
+
+    function formatOptionTime(value) {
+      const seconds = Math.max(0, Math.round(Number(value) || 0));
+      return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+    }
+
+    function setOptionToggle(button, value, label) {
+      button.textContent = value ? "ON" : "OFF";
+      button.setAttribute("aria-pressed", String(value));
+      button.setAttribute("aria-label", `${label} ${value ? "on" : "off"}. Activate to turn it ${value ? "off" : "on"}.`);
+    }
+
+    function renderPlaybackSettings() {
+      const controls = playbackSettingsControls;
+      controls.longPlayEnabled.value = String(playbackSettings.longPlayEnabled);
+      setOptionToggle(controls.longPlayEnabled, playbackSettings.longPlayEnabled, "Long Play");
+      controls.longPlaySeconds.value = String(playbackSettings.longPlaySeconds);
+      controls.longPlayReadout.value = formatOptionTime(playbackSettings.longPlaySeconds);
+      controls.longPlayReadout.textContent = controls.longPlayReadout.value;
+      controls.unknownDurationSeconds.value = String(playbackSettings.unknownDurationSeconds);
+      controls.unknownDurationReadout.value = formatOptionTime(playbackSettings.unknownDurationSeconds);
+      controls.unknownDurationReadout.textContent = controls.unknownDurationReadout.value;
+      setOptionToggle(controls.fadeEnabled, playbackSettings.fadeEnabled, "Fade out");
+      controls.fadeSeconds.value = String(playbackSettings.fadeSeconds);
+      controls.fadeReadout.value = formatOptionTime(playbackSettings.fadeSeconds);
+      controls.fadeReadout.textContent = controls.fadeReadout.value;
+      setOptionToggle(controls.libGmeTempoEnabled, playbackSettings.libGmeTempoEnabled, "libgme speed");
+      const libGmeStep = playbackTempoStep(playbackSettings.libGmeTempo);
+      controls.libGmeTempo.value = String(libGmeStep);
+      controls.libGmeTempoReadout.value = `${(libGmeStep / 32).toFixed(2)}X`;
+      controls.libGmeTempoReadout.textContent = controls.libGmeTempoReadout.value;
+      setOptionToggle(controls.libVgmTempoEnabled, playbackSettings.libVgmTempoEnabled, "libvgm speed");
+      const libVgmStep = playbackTempoStep(playbackSettings.libVgmTempo);
+      controls.libVgmTempo.value = String(libVgmStep);
+      controls.libVgmTempoReadout.value = `${(libVgmStep / 32).toFixed(2)}X`;
+      controls.libVgmTempoReadout.textContent = controls.libVgmTempoReadout.value;
+      controls.outputVolume.value = String(Math.round(playbackSettings.outputVolume * 20));
+      controls.outputVolumeReadout.value = `${Math.round(playbackSettings.outputVolume * 100)}%`;
+      controls.outputVolumeReadout.textContent = controls.outputVolumeReadout.value;
+      setOptionToggle(controls.monoEnabled, playbackSettings.monoEnabled, "Mono output");
+      setOptionToggle(controls.equalizerEnabled, playbackSettings.equalizerEnabled, "Equalizer");
+      controls.equalizerBands.forEach((input, index) => {
+        input.value = String(playbackSettings.equalizerBandGains[index]);
+        const readout = controls.equalizerBandReadouts[index];
+        readout.value = `${playbackSettings.equalizerBandGains[index] >= 0 ? "+" : ""}${playbackSettings.equalizerBandGains[index].toFixed(1)}`;
+        readout.textContent = readout.value;
+      });
+      if (controls.nativeNote) {
+        controls.nativeNote.textContent = nativeHost
+          ? "VOLUME, MONO AND EQ USE VGMBoy OUTPUT."
+          : "PLAYBACK SETTINGS ARE AVAILABLE IN THE NATIVE PLAYER.";
+      }
+      nativePlaybackControls.forEach((control) => { control.disabled = !nativeHost; });
+    }
+
+    function readPlaybackSettingsFromControls() {
+      const controls = playbackSettingsControls;
+      return normalizePlaybackSettings({
+        ...playbackSettings,
+        longPlayEnabled: controls.longPlayEnabled.getAttribute("aria-pressed") === "true",
+        longPlaySeconds: controls.longPlaySeconds.value,
+        unknownDurationSeconds: controls.unknownDurationSeconds.value,
+        fadeEnabled: controls.fadeEnabled.getAttribute("aria-pressed") === "true",
+        fadeSeconds: controls.fadeSeconds.value,
+        libGmeTempoEnabled: controls.libGmeTempoEnabled.getAttribute("aria-pressed") === "true",
+        libGmeTempo: { numerator: Number(controls.libGmeTempo.value), denominator: 32 },
+        libVgmTempoEnabled: controls.libVgmTempoEnabled.getAttribute("aria-pressed") === "true",
+        libVgmTempo: { numerator: Number(controls.libVgmTempo.value), denominator: 32 },
+        outputVolume: Number(controls.outputVolume.value) / 20,
+        monoEnabled: controls.monoEnabled.getAttribute("aria-pressed") === "true",
+        equalizerEnabled: controls.equalizerEnabled.getAttribute("aria-pressed") === "true",
+        equalizerBandGains: controls.equalizerBands.map((input) => Number(input.value)),
+      });
+    }
+
+    function schedulePlaybackSettingsSave() {
+      if (!nativeHost) return;
+      window.clearTimeout(playbackSettingsSaveTimer);
+      playbackSettingsSaveTimer = window.setTimeout(async () => {
+        try {
+          playbackSettings = normalizePlaybackSettings(await nativeRequest("playbackSettingsSave", { settings: playbackSettings }));
+          renderPlaybackSettings();
+          status.textContent = `OPTIONS/${selectedOptionsPage} SAVED`;
+        } catch (error) {
+          status.textContent = `OPTIONS/ERROR ${error.message}`;
+        }
+      }, 140);
+    }
+
+    function updatePlaybackSettings({ save = false, applyAudio = false } = {}) {
+      playbackSettings = readPlaybackSettingsFromControls();
+      renderPlaybackSettings();
+      if (applyAudio && nativeHost) {
+        nativeRequest("playbackAudioApply", { settings: playbackSettings }).catch((error) => {
+          status.textContent = `AUDIO/ERROR ${error.message}`;
+        });
+      }
+      if (save) schedulePlaybackSettingsSave();
+    }
+
+    function loadPlaybackSettings() {
+      if (!nativeHost) {
+        renderPlaybackSettings();
+        return;
+      }
+      nativeRequest("playbackSettingsLoad").then((value) => {
+        playbackSettings = normalizePlaybackSettings(value);
+        renderPlaybackSettings();
+      }).catch((error) => {
+        status.textContent = `OPTIONS/ERROR ${error.message}`;
       });
     }
 
@@ -1392,6 +1607,47 @@
     optionCategories.forEach((button) => button.addEventListener("click", () => {
       setOptionsPage(button.dataset.optionsPage);
     }));
+
+    const playbackToggles = [
+      [playbackSettingsControls.longPlayEnabled, "Long Play", false],
+      [playbackSettingsControls.fadeEnabled, "Fade out", false],
+      [playbackSettingsControls.libGmeTempoEnabled, "libgme speed", false],
+      [playbackSettingsControls.libVgmTempoEnabled, "libvgm speed", false],
+      [playbackSettingsControls.monoEnabled, "Mono output", true],
+      [playbackSettingsControls.equalizerEnabled, "Equalizer", true],
+    ];
+    playbackToggles.forEach(([button, label, applyAudio]) => button.addEventListener("click", () => {
+      const enabled = button.getAttribute("aria-pressed") !== "true";
+      setOptionToggle(button, enabled, label);
+      updatePlaybackSettings({ save: true, applyAudio });
+    }));
+
+    const playbackTimingRanges = [
+      playbackSettingsControls.longPlaySeconds,
+      playbackSettingsControls.unknownDurationSeconds,
+      playbackSettingsControls.fadeSeconds,
+      playbackSettingsControls.libGmeTempo,
+      playbackSettingsControls.libVgmTempo,
+    ];
+    playbackTimingRanges.forEach((input) => {
+      input.addEventListener("input", () => updatePlaybackSettings());
+      input.addEventListener("change", () => updatePlaybackSettings({ save: true }));
+    });
+
+    const playbackAudioRanges = [
+      playbackSettingsControls.outputVolume,
+      ...playbackSettingsControls.equalizerBands,
+    ];
+    playbackAudioRanges.forEach((input) => {
+      input.addEventListener("input", () => updatePlaybackSettings({ applyAudio: true }));
+      input.addEventListener("change", () => updatePlaybackSettings({ save: true, applyAudio: true }));
+    });
+
+    playbackSettingsControls.equalizerReset.addEventListener("click", () => {
+      playbackSettingsControls.equalizerBands.forEach((input) => { input.value = "0"; });
+      updatePlaybackSettings({ save: true, applyAudio: true });
+    });
+    loadPlaybackSettings();
 
     brightnessRange.addEventListener("input", () => {
       brightnessPercent = Number(brightnessRange.value);

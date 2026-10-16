@@ -86,7 +86,13 @@ a two-column terminal settings view. DISPLAY contains WIDTH MODE (FILL or
 FRAME), SCANLINES, BRIGHTNESS, SELECTOR FLOW, the active beam pitch, and a
 native fullscreen toggle. CRT contains a THIN/NORMAL/WIDE beam-width control
 and reports the active pitch. PLAYLIST contains AUTO SIZE and MAX WIDTH.
-FILL and FRAME, scanline visibility, brightness,
+PLAYBACK contains Long Play duration, the unknown-duration default, fade
+settings, and independent libgme/libvgm speed controls. AUDIO contains output
+volume, mono, and a ten-band equalizer with per-band gain and reset-flat
+control. These native playback settings persist across restarts. Volume uses
+the shared 20-detent scale; audio controls apply through VGMBoy, and timing or
+speed changes use its shared transport policy. The browser preview disables
+playback-only settings. FILL and FRAME, scanline visibility, brightness,
 selector motion, pane width, beam width, and the selected raster profile are
 remembered. The native app provides standard macOS menus and
 shortcuts: Command+O opens a file, Command+comma opens OPTIONS, Control+Command+F

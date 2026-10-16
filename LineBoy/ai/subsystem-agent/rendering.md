@@ -36,6 +36,17 @@ pending, then replace its heading and rows together. Guard UI application with
 both the active tab and catalog request version so stale responses cannot
 overwrite current state.
 
+LineBoy owns the DOS presentation and its versioned playback-settings bridge
+payload. Keep playback semantics in VGMBoyKit and transport behavior in
+PlaybackTransportCore: derive effective timing preferences with fade disabled
+mapped to zero seconds, and use `PlaybackTimingPolicy` for start and active-track
+reconfiguration. Apply volume, mono, and EQ through
+`PlaybackTransportAudioConfigurationRequest`; use
+`FrontendPlaybackVolumeScale` for its 20-step volume control. Persist native
+settings in LineBoy's own UserDefaults key. The browser preview has no playback
+bridge, so disable AUDIO and PLAYBACK controls there rather than persisting a
+second frontend-only preference copy.
+
 The selected raster profile uses the 320×240 reference to choose its largest
 fitting even device-pixel multiple. Extend the viewport in whole 16-pixel text
 rows at that scale; in FILL width mode, extend it in whole 8-pixel columns.

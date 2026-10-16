@@ -7,6 +7,7 @@ import CatalogPlaylistPresentationCore
 import CatalogReader
 import FavoriteStoreCore
 import FavoriteTrackCore
+import FrontendPreferencesCore
 import Foundation
 import PlaylistTabsPersistenceCore
 import PlaybackQueueCore
@@ -77,6 +78,112 @@ private struct LineBoyCatalogPlaylistKey: Hashable, Sendable {
 private struct LineBoyCatalogPlaylistRead: Sendable {
     let tracks: [CatalogPlaylistTrack]
     let favoriteIDs: Set<String>
+}
+
+private struct LineBoyPlaybackSettings: Codable, Equatable {
+    static let defaultsKey = "LineBoy.playbackSettings.v1"
+
+    var version = 1
+    var longPlayEnabled = false
+    var longPlaySeconds = PlaybackTimingPreferences.defaultLongPlaySeconds
+    var unknownDurationSeconds = PlaybackTimingPreferences.defaultUnknownDurationSeconds
+    var fadeEnabled = true
+    var fadeSeconds = PlaybackTimingPreferences.defaultFadeSeconds
+    var outputVolume: Float = 1
+    var monoEnabled = false
+    var equalizerEnabled = false
+    var equalizerBandGains = Array(repeating: Float(0), count: EqualizerConfiguration.bandCount)
+    var libGmeTempoEnabled = false
+    var libGmeTempo = PlaybackTempo.defaultValue
+    var libVgmTempoEnabled = false
+    var libVgmTempo = PlaybackTempo.defaultValue
+
+    var playbackPreferences: PlaybackPreferences {
+        PlaybackPreferences(
+            timing: PlaybackTimingPreferences(
+                longPlaySeconds: longPlaySeconds,
+                unknownDurationSeconds: unknownDurationSeconds,
+                fadeSeconds: fadeSeconds
+            ),
+            fadeEnabled: fadeEnabled,
+            equalizerEnabled: equalizerEnabled,
+            equalizerBandGains: equalizerBandGains,
+            outputVolume: outputVolume,
+            monoEnabled: monoEnabled,
+            libgmeTempo: libGmeTempo,
+            libgmeTempoEnabled: libGmeTempoEnabled,
+            libvgmTempo: libVgmTempo,
+            libvgmTempoEnabled: libVgmTempoEnabled
+        )
+    }
+
+    init() {}
+
+    init(longPlayEnabled: Bool, preferences: PlaybackPreferences) {
+        self.version = 1
+        self.longPlayEnabled = longPlayEnabled
+        self.longPlaySeconds = preferences.timing.longPlaySeconds
+        self.unknownDurationSeconds = preferences.timing.unknownDurationSeconds
+        self.fadeEnabled = preferences.fadeEnabled
+        self.fadeSeconds = preferences.timing.fadeSeconds
+        self.outputVolume = preferences.outputVolume
+        self.monoEnabled = preferences.monoEnabled
+        self.equalizerEnabled = preferences.equalizer.enabled
+        self.equalizerBandGains = preferences.equalizer.gainsDecibels
+        self.libGmeTempoEnabled = preferences.libgmeTempoEnabled
+        self.libGmeTempo = preferences.libgmeTempo
+        self.libVgmTempoEnabled = preferences.libvgmTempoEnabled
+        self.libVgmTempo = preferences.libvgmTempo
+    }
+
+    func normalized() -> Self {
+        let boundedGME = Self.normalizedTempo(libGmeTempo)
+        let boundedVGM = Self.normalizedTempo(libVgmTempo)
+        let preferences = PlaybackPreferences(
+            timing: PlaybackTimingPreferences(
+                longPlaySeconds: min(max(longPlaySeconds, 0), 1_800),
+                unknownDurationSeconds: min(max(unknownDurationSeconds, 30), 900),
+                fadeSeconds: min(max(fadeSeconds, 0), 30)
+            ),
+            fadeEnabled: fadeEnabled,
+            equalizerEnabled: equalizerEnabled,
+            equalizerBandGains: equalizerBandGains,
+            outputVolume: Float(FrontendPlaybackVolumeScale.normalized(Double(outputVolume))),
+            monoEnabled: monoEnabled,
+            libgmeTempo: boundedGME,
+            libgmeTempoEnabled: libGmeTempoEnabled,
+            libvgmTempo: boundedVGM,
+            libvgmTempoEnabled: libVgmTempoEnabled
+        )
+        return Self(longPlayEnabled: longPlayEnabled, preferences: preferences)
+    }
+
+    func tempo(for family: DecoderFamily?) -> PlaybackTempo {
+        switch family?.id {
+        case FormatRegistry.libgmeFamily.id where libGmeTempoEnabled: libGmeTempo
+        case FormatRegistry.libvgmFamily.id where libVgmTempoEnabled: libVgmTempo
+        default: .defaultValue
+        }
+    }
+
+    static func restore() -> Self {
+        guard let data = UserDefaults.standard.data(forKey: defaultsKey),
+              let value = try? JSONDecoder().decode(Self.self, from: data),
+              value.version == 1 else { return Self() }
+        return value.normalized()
+    }
+
+    var bridgeValue: [String: Any] {
+        guard let data = try? JSONEncoder().encode(self),
+              let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+        return value
+    }
+
+    private static func normalizedTempo(_ value: PlaybackTempo) -> PlaybackTempo {
+        let numerator = min(max(value.numerator, 1), PlaybackTempo.maxComponent)
+        let denominator = min(max(value.denominator, 1), PlaybackTempo.maxComponent)
+        return PlaybackTempo(numerator: numerator, denominator: denominator)
+    }
 }
 
 private func readLineBoyCatalogBootstrap(at catalogURL: URL) throws -> LineBoyCatalogBootstrap {
@@ -320,6 +427,9 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
     private var catalogGroups: [String: [LineBoyCatalogGame]] = [:]
     private var catalogSearch: LineBoyCatalogSearch?
     private let catalogPlaylistCacheLimit = 8
+    private var playbackSettings = LineBoyPlaybackSettings.restore()
+    private var activePlaybackMetadata: PlaybackTimingMetadata?
+    private var activePlaybackFamily: DecoderFamily?
     private weak var webView: WKWebView?
     private weak var window: NSWindow?
 
@@ -328,6 +438,7 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         transport.setStatusHandler { [weak self] status in
             Task { @MainActor [weak self] in self?.publishPlaybackStatus(status) }
         }
+        try? applyAudioSettings(playbackSettings)
     }
 
     func attach(window: NSWindow) {
@@ -419,6 +530,22 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
                 reply(requestID, success: try chooseFile())
             case "playbackStatus":
                 reply(requestID, success: playbackStatus())
+            case "playbackSettingsLoad":
+                reply(requestID, success: playbackSettings.bridgeValue)
+            case "playbackAudioApply":
+                let settings = try decodePlaybackSettings(arguments["settings"])
+                try applyAudioSettings(settings)
+                playbackSettings = settings
+                reply(requestID, success: ["applied": true])
+            case "playbackSettingsSave":
+                Task { [weak self] in
+                    guard let self else { return }
+                    do {
+                        self.reply(requestID, success: try await self.savePlaybackSettings(arguments["settings"]))
+                    } catch {
+                        self.reply(requestID, failure: error.localizedDescription)
+                    }
+                }
             default:
                 throw LineBoyBridgeError.unsupportedMethod(method)
             }
@@ -590,18 +717,11 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
 
     private func startTrack(_ id: String) throws -> [String: Any] {
         let requestID = transport.reservePlaybackRequest()
-        let startRequest: PlaybackTransportStartRequest
         var resolvedPath: String
+        var metadata: PlaybackTimingMetadata?
+        var family: DecoderFamily?
+        let catalogTrack = catalogTracks[id]
         if let track = catalogTracks[id] {
-            startRequest = PlaybackTransportStartRequest(
-                trackID: id,
-                sourcePath: track.sourcePath,
-                archivePath: track.archivePath,
-                archiveEntry: track.archiveEntry,
-                trackIndex: track.trackIndex,
-                playMilliseconds: track.lengthMilliseconds,
-                fadeMilliseconds: track.fadeLengthMilliseconds
-            )
             resolvedPath = track.sourcePath
             if let archivePath = track.archivePath, let archiveEntry = track.archiveEntry {
                 guard let requirement = FormatRegistry.archiveMaterializationRequirement(for: [archiveEntry]) else {
@@ -613,9 +733,15 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
                     requirement: requirement
                 ).path
             }
+            family = FormatRegistry.family(for: resolvedPath)
+            metadata = PlaybackTimingMetadata(
+                playMilliseconds: track.lengthMilliseconds,
+                introMilliseconds: track.introLengthMilliseconds,
+                loopMilliseconds: track.loopLengthMilliseconds
+            )
         } else if let local = localTracks[id] {
-            startRequest = PlaybackTransportStartRequest(trackID: id, sourcePath: local.path)
             resolvedPath = local.path
+            family = FormatRegistry.family(for: resolvedPath)
         } else if id.hasPrefix("local:") {
             let path = String(id.dropFirst("local:".count))
             let url = URL(fileURLWithPath: path).standardizedFileURL
@@ -625,15 +751,95 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
                 throw LineBoyBridgeError.localFileUnavailable(url.lastPathComponent)
             }
             localTracks[id] = LocalTrack(id: id, path: path, title: url.deletingPathExtension().lastPathComponent)
-            startRequest = PlaybackTransportStartRequest(trackID: id, sourcePath: path)
             resolvedPath = path
+            family = FormatRegistry.family(for: resolvedPath)
         } else {
             throw LineBoyBridgeError.unknownTrack
         }
         guard transport.isCurrentPlaybackRequest(requestID) else { throw CancellationError() }
-        let continuation = try startRequest.continuationStart(resolvedPath: resolvedPath, requestID: requestID)
+        let preferences = playbackSettings.playbackPreferences
+        let plan = PlaybackTimingPolicy.plan(
+            metadata: metadata,
+            family: family,
+            longPlayEnabled: playbackSettings.longPlayEnabled,
+            preferences: Self.effectiveTimingPreferences(preferences)
+        )
+        let tempo = playbackSettings.tempo(for: family)
+        let configuredRequest = PlaybackTransportStartRequest(
+            trackID: id,
+            sourcePath: catalogTrack?.sourcePath ?? resolvedPath,
+            archivePath: catalogTrack?.archivePath,
+            archiveEntry: catalogTrack?.archiveEntry,
+            trackIndex: catalogTrack?.trackIndex ?? 0,
+            playMilliseconds: plan.preFadeSeconds * 1_000,
+            fadeMilliseconds: plan.fadeSeconds * 1_000,
+            tempo: tempo,
+            longPlayEnabled: plan.isLongPlay,
+            unknownDurationMilliseconds: plan.unknownDurationSeconds * 1_000
+        )
+        let continuation = try configuredRequest.continuationStart(resolvedPath: resolvedPath, requestID: requestID)
         try transport.start(continuation)
+        activePlaybackMetadata = metadata
+        activePlaybackFamily = family
         return playbackStatus()
+    }
+
+    private func decodePlaybackSettings(_ value: Any?) throws -> LineBoyPlaybackSettings {
+        guard let value = value as? [String: Any], JSONSerialization.isValidJSONObject(value) else {
+            throw LineBoyBridgeError.invalidArguments
+        }
+        let data = try JSONSerialization.data(withJSONObject: value)
+        let settings = try JSONDecoder().decode(LineBoyPlaybackSettings.self, from: data)
+        guard settings.version == 1 else { throw LineBoyBridgeError.invalidArguments }
+        return settings.normalized()
+    }
+
+    private func applyAudioSettings(_ settings: LineBoyPlaybackSettings) throws {
+        let preferences = settings.playbackPreferences
+        _ = try transport.configureAudio(PlaybackTransportAudioConfigurationRequest(
+            outputVolume: preferences.outputVolume,
+            equalizerEnabled: preferences.equalizer.enabled,
+            equalizerBandGains: preferences.equalizer.gainsDecibels,
+            monoEnabled: preferences.monoEnabled
+        ))
+    }
+
+    private static func effectiveTimingPreferences(_ preferences: PlaybackPreferences) -> PlaybackTimingPreferences {
+        PlaybackTimingPreferences(
+            longPlaySeconds: preferences.timing.longPlaySeconds,
+            unknownDurationSeconds: preferences.timing.unknownDurationSeconds,
+            fadeSeconds: preferences.fadeSeconds
+        )
+    }
+
+    private func savePlaybackSettings(_ value: Any?) async throws -> [String: Any] {
+        let next = try decodePlaybackSettings(value)
+        let previous = playbackSettings
+        try applyAudioSettings(next)
+        playbackSettings = next
+        UserDefaults.standard.set(try JSONEncoder().encode(next), forKey: LineBoyPlaybackSettings.defaultsKey)
+
+        let timingChanged = previous.longPlayEnabled != next.longPlayEnabled
+            || previous.longPlaySeconds != next.longPlaySeconds
+            || previous.unknownDurationSeconds != next.unknownDurationSeconds
+            || previous.fadeEnabled != next.fadeEnabled
+            || previous.fadeSeconds != next.fadeSeconds
+            || previous.libGmeTempoEnabled != next.libGmeTempoEnabled
+            || previous.libGmeTempo != next.libGmeTempo
+            || previous.libVgmTempoEnabled != next.libVgmTempoEnabled
+            || previous.libVgmTempo != next.libVgmTempo
+        if timingChanged, transport.statusSync().trackLoaded, let family = activePlaybackFamily {
+            let preferences = next.playbackPreferences
+            let plan = PlaybackTimingPolicy.plan(
+                metadata: activePlaybackMetadata,
+                family: family,
+                longPlayEnabled: next.longPlayEnabled,
+                preferences: Self.effectiveTimingPreferences(preferences)
+            )
+            let tempo = next.tempo(for: family)
+            try await transport.reconfigureCurrentTrack(plan: plan, tempo: tempo)
+        }
+        return next.bridgeValue
     }
 
     private func adjacentTrack(_ arguments: [String: Any]) -> [String: Any] {
