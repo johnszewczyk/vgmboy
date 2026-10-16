@@ -178,6 +178,7 @@ function persistPlaylistTabs() {
         title: tab.title,
         kind: tab.kind === "gallery" ? "gallery" : "playlist",
         playlist: tab.playlist || [],
+        catalogPlaylistColumnContentHints: tab.catalogPlaylistColumnContentHints || null,
         selectedTrackId: tab.selectedTrackId || null,
         selectedTrackIds: tab.selectedTrackIds || [],
         playlistSelectionAnchorId: tab.playlistSelectionAnchorId || null,
@@ -448,9 +449,9 @@ async function restorePlaylistTabs(value, { loadMissingGames = true, loadGallery
     selectedTrackIds: Array.isArray(tab.selectedTrackIds) ? tab.selectedTrackIds.filter((id) => typeof id === "string") : [],
     playlistSelectionAnchorId: typeof tab.playlistSelectionAnchorId === "string" ? tab.playlistSelectionAnchorId : null,
     scrollTop: Math.max(0, Number(tab.scrollTop) || 0),
-    // Catalog sort sessions are process-local; a restored catalog projection
-    // can still be sorted through the shared projection-sort core.
-    catalogPlaylistColumnContentHints: null,
+    // Sort sessions are process-local; content hints are safe to retain with
+    // their playlist snapshot so restored columns fit the full projection.
+    catalogPlaylistColumnContentHints: normalizePlaylistColumnContentHints(tab.catalogPlaylistColumnContentHints),
     catalogPlaylistSortSessionId: null
   }));
   if (!tabs.length) return false;
@@ -1377,6 +1378,7 @@ function appendPlaylistTracks(additions, selectedBrowserPath = state.selectedBro
   if (!uniqueAdditions.length) return false;
   state.selectedBrowserPath = selectedBrowserPath;
   state.playlist = [...state.playlist, ...uniqueAdditions];
+  autoSizedPlaylistSignature = null;
   state.catalogPlaylistColumnContentHints = null;
   state.catalogPlaylistSortSessionId = null;
   state.selectedTrackId = uniqueAdditions[0].id;
@@ -2117,6 +2119,7 @@ async function showFavoritesPlaylist() {
   await invalidatePlaylistCatalogSession();
   if (!isCurrentPlaylistContentRequest(request)) return false;
   state.playlist = [...state.favorites];
+  autoSizedPlaylistSignature = null;
   state.playlistTitle = "Favorites";
   state.catalogPlaylistColumnContentHints = null;
   state.catalogPlaylistSortSessionId = null;
@@ -2184,6 +2187,7 @@ async function showPlaybackHistory() {
   state.playlist = (Array.isArray(records) ? records : [])
     .map(historyRecordToPlaylistTrack)
     .filter(Boolean);
+  autoSizedPlaylistSignature = null;
   state.playlistTitle = "Recent";
   state.catalogPlaylistColumnContentHints = null;
   state.catalogPlaylistSortSessionId = null;
@@ -2629,6 +2633,7 @@ async function loadDatabaseGamesIntoPlaylist(games, {
   state.databaseSidebarError = "";
   state.selectedDatabaseGameKey = games.length === 1 ? databaseGameKey(games[0]) : null;
   state.playlist = sortedPlaylist;
+  autoSizedPlaylistSignature = null;
   state.playlistTitle = playlistTitle;
   state.catalogPlaylistColumnContentHints = rows.columnContentHints || null;
   state.catalogPlaylistSortSessionId = rows.sortSessionId || null;
@@ -2853,6 +2858,14 @@ function playlistDisplayPath(track) {
   if (sourceForMatch === rootForMatch) return `${rootLabel}${archiveSuffix}`;
   if (sourceForMatch.startsWith(rootPrefix.toLocaleLowerCase())) return `${rootLabel}/${normalizedPhysical.slice(rootPrefix.length)}${archiveSuffix}`;
   return sourcePath;
+}
+
+function normalizePlaylistColumnContentHints(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const hints = Object.fromEntries(COLUMN_DEFS.flatMap((column) => (
+    typeof value[column.id] === "string" ? [[column.id, value[column.id]]] : []
+  )));
+  return Object.keys(hints).length ? hints : null;
 }
 
 function playlistColumnValue(track, column, rowIndex = null) {
@@ -3096,7 +3109,28 @@ function columnContentWidth(columnId) {
   const sample = state.playlist.length > 1200
     ? [...state.playlist.slice(0, 600), ...state.playlist.slice(-600)]
     : state.playlist;
-  const values = sharedHint
+  // Path must not use the bounded sample: its longest entry can sit in the
+  // middle of a large playlist. Cache a full-list hint for restored tabs.
+  const pathValue = columnId === "path" && !sharedHint
+    ? state.playlist.reduce((longest, track) => {
+      const value = String(playlistColumnValue(track, column));
+      return value.length > longest.length ? value : longest;
+    }, "")
+    : null;
+  if (pathValue !== null && pathValue) {
+    state.catalogPlaylistColumnContentHints = {
+      ...(state.catalogPlaylistColumnContentHints || {}),
+      path: pathValue
+    };
+    const activeTab = findActivePlaylistTab();
+    if (activeTab) {
+      activeTab.catalogPlaylistColumnContentHints = state.catalogPlaylistColumnContentHints;
+      persistPlaylistTabs();
+    }
+  }
+  const values = pathValue !== null
+    ? [renderedHeader, pathValue]
+    : sharedHint
     ? [renderedHeader, sharedHint]
     : [renderedHeader, ...sample.map((track, rowIndex) => String(playlistColumnValue(track, column, rowIndex)))];
   return Math.max(...values.map((value) => textMeasureContext.measureText(value).width), 0) + playlistColumnHorizontalPadding();
@@ -4690,6 +4724,7 @@ async function applyFolderSelection(selection, targetTabID = state.activePlaylis
   const preserveBrowserFocus = document.activeElement?.classList.contains("tree-node");
   state.selectedFolderPath = selection.selectedFolderPath;
   state.playlist = sortedPlaylist;
+  autoSizedPlaylistSignature = null;
   state.playlistTitle = playlistTitle;
   state.catalogPlaylistColumnContentHints = selection.columnContentHints || null;
   state.catalogPlaylistSortSessionId = selection.sortSessionId || null;
