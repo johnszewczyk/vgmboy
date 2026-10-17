@@ -141,7 +141,11 @@ before distributing newly packed files.
   for one member and an array of strings for multiple members with the same
   role. Standard names include `Title Snap`, `Cover Front`, `Cover Back`,
   `Cue Sheet`, `Text File`, and `Documents`; use Title Case for other authored
-  attachment roles. For example, `game.metadata["Title Snap"]` may be
+  attachment roles. `Title Snap` is the one package-level classification for
+  a game title image across formats and source sets. The member role and file
+  extension describe the file but do not replace this attachment tag. Reserve
+  `Cover Front` and `Cover Back` for images that are explicitly cover art. For
+  example, `game.metadata["Title Snap"]` may be
   `"art/title.png"`, while `game.metadata["Text File"]` may be
   `"meta.txt"`. Use a single path string for one attachment or an array of
   paths for several files with the same role. Keep file type, byte size, and
