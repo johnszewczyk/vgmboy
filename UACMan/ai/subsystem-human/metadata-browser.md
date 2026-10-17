@@ -75,9 +75,11 @@ discarded with **Revert changes**. **Pack Tags** contains the
 package-level tag table, a final inline draft row marked with **＋**, and the
 attachments table. Structural package attachment references remain in the
 manifest but do not appear as tag rows; their member files appear in the
-attachments table. A `.txt` document is labeled **Text File** there. Each table
-title is part of its own canonical grid rather than a separate decorative
-section heading. Non-string
+attachments table. A `.txt` document is labeled **Text File** there. A game
+title image is classified by the package-level **Title Snap** attachment; a
+member role or file extension alone does not supply that tag. Each table title
+is part of its own canonical grid rather than a separate decorative section
+heading. Non-string
 values in Pack Tags and Track Tags use `[Nested Tags]` to open the recursive
 canonical JSON table. The **Nested Tables** option controls how those tables
 appear: **Staircase** aligns each child table with its parent’s second column,
