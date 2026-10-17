@@ -65,16 +65,16 @@ the per-set ledger recording operations and checkpoints.
   `art/title-snap.png`). This is the standard package-level Meta attachment
   name for title images in every UAC profile and source set. Use a direct member
   path, or an array of paths when the package intentionally retains multiple
-  title snaps. A member's `role`, filename, or extension alone does not expose
-  it as a **Title Snap**; do not use alternate tags such as `Image`, `Artwork`,
-  or lower-case/snake-case variants for the same classification. Reserve
-  **Cover Front** and **Cover Back** for explicitly identified cover art.
-  Include each image as a UAC member with the normal integrity records, and
-  record its source and attachment operation in package provenance. Do not
-  duplicate this tag across tracks or leave it blank. If the exact image is
-  unavailable, region/release identity conflicts, or an existing snap differs,
-  leave the package unchanged and route the case to the set report for review;
-  do not substitute a nearby image.
+  title snaps. Include each image as a UAC member with the normal integrity
+  records. A member's role, filename, or extension alone does not expose it as
+  a **Title Snap**; do not use alternate tags such as `Image`, `Artwork`, or
+  lower-case/snake-case variants for the same classification. Reserve **Cover
+  Front** and **Cover Back** for explicitly identified cover art. Record the
+  image source and attachment operation in package provenance. Do not duplicate
+  this tag across tracks or leave it blank. If the exact image is unavailable,
+  region/release identity conflicts, or an existing snap differs, leave the
+  package unchanged and route the case to the set report for review; do not
+  substitute a nearby image.
 - **Snap-based identity evidence** — A title-snap collection may help identify
   an otherwise unnamed package. Match the candidate image by its visible title
   and recognizable screen, then record the source pack and match evidence in
