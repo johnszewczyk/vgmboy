@@ -2441,7 +2441,6 @@ body.sb2-frontend .options-header .tool-button .ui-icon { width: var(--sb-contro
 body.sb2-frontend .options-header .tool-button:hover { background: var(--sb-button-hover-surface); color: var(--sb-button-hover-ink); }
 body.sb2-frontend .options-header .tool-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 body.sb2-frontend .options-body { grid-template-columns: 12rem minmax(0, 1fr); gap: 2rem; min-height: 0; height: 100%; }
-body.sb2-frontend .options-nav { gap: var(--sb-toolbar-gap); padding: var(--sb-toolbar-inset) 0; }
 body.sb2-frontend .options-nav-group { gap: var(--sb-toolbar-gap); padding: 0; border: 0; border-radius: 0; background: transparent; }
 body.sb2-frontend .options-nav-group + .options-nav-group { border: 0; }
 body.sb2-frontend .options-nav-group-title { justify-content: flex-start; margin: 0; font-weight: 600; text-align: left; }
@@ -2533,13 +2532,15 @@ body.sb2-frontend .library-root-row { padding: var(--sb-space-050) 0; border: 0;
 body.sb2-frontend .options-panel-actions { gap: var(--sb-toolbar-gap); }
 body.sb2-frontend .options-panel-actions .tool-button { height: var(--sb-control-size); min-height: var(--sb-control-size); padding: 0 var(--sb-space-075); }
 
-/* Floating toolbars use equal outer insets and gaps around square controls. */
+/* Horizontal toolbars and the vertical Options stack share toolbar spacing. */
 body.sb2-frontend .transport-toolbar,
-body.sb2-frontend .playlist-tabs-toolbar {
-  min-height: var(--sb-toolbar-height);
+body.sb2-frontend .playlist-tabs-toolbar,
+body.sb2-frontend .options-nav {
   padding: var(--sb-toolbar-inset);
   gap: var(--sb-toolbar-gap);
 }
+body.sb2-frontend .transport-toolbar,
+body.sb2-frontend .playlist-tabs-toolbar { min-height: var(--sb-toolbar-height); }
 body.sb2-frontend .sidebar-search-wrap {
   min-height: var(--sb-control-size);
   padding: 0 var(--sb-toolbar-inset);
