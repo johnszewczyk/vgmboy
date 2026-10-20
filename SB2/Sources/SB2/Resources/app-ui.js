@@ -3793,7 +3793,7 @@ function renderRoutingConflicts() {
 }
 
 function setRoutingPreference(extension, backendId) {
-  const candidates = window.SB2PlaybackBackends?.candidatesForPath?.(`route${extension}`) || [];
+  const candidates = window.SB2PlaybackBackends?.candidatesForExtension?.(extension) || [];
   if (!candidates.some((backend) => backend.id === backendId)) return;
   const nextPreferences = { ...state.routingPreferences };
   if (backendId === candidates[0]?.id) delete nextPreferences[extension];

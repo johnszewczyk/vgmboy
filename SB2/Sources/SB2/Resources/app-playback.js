@@ -190,8 +190,11 @@ function currentBasePlaybackSeconds(track) {
 function playbackSpeedForTrack(track) {
   const sourceName = track?.archiveEntry || track?.sourceFilename || track?.path || "";
   const backend = playbackBackends.forPath(sourceName);
-  const extension = sourceName.slice(sourceName.lastIndexOf(".")).toLowerCase();
-  if (backend?.playbackSpeedMode === "native-tempo" && backend.playbackSpeedExtensions?.includes(extension)) {
+  const extension = playbackBackends.extensionForPath(sourceName);
+  const supportsNativeTempo = backend?.playbackSpeedExtensions?.some(
+    (candidate) => playbackBackends.normalizeExtension(candidate) === extension
+  );
+  if (backend?.playbackSpeedMode === "native-tempo" && supportsNativeTempo) {
     if (backend.id === "libgme" && state.playbackSpeedEnabled) return state.playbackSpeed;
     if (backend.id === "libvgm" && state.libvgmPlaybackSpeedEnabled) return state.libvgmPlaybackSpeed;
   }
