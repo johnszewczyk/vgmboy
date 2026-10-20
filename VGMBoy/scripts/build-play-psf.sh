@@ -40,6 +40,12 @@ if ! grep -q 'm_ps2DynamicLinkHack' "$root/vendor/play/Source/MA_MIPSIV.h"; then
   exit 1
 fi
 
+# CMake caches FindZLIB/FindBZip2 paths. A dependency stamp can correctly
+# detect an SDK change while those cached paths still point at the old SDK.
+# Reconfigure this generated build directory from scratch to keep all headers
+# and libraries on the SDK selected by build-dependencies.sh.
+rm -rf "$build"
+
 cmake -S "$root/vendor/play" -B "$build" \
   -DCMAKE_OSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-26.0}" \
   -DCMAKE_OSX_SYSROOT="${SDKROOT:-$(xcrun --sdk macosx --show-sdk-path)}" \
