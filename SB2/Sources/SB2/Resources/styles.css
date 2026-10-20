@@ -2443,7 +2443,23 @@ body.sb2-frontend .options-header .tool-button:focus-visible { outline: 2px soli
 body.sb2-frontend .options-body { grid-template-columns: 12rem minmax(0, 1fr); gap: 2rem; min-height: 0; height: 100%; }
 body.sb2-frontend .options-nav-group { gap: var(--sb-toolbar-gap); padding: 0; border: 0; border-radius: 0; background: transparent; }
 body.sb2-frontend .options-nav-group + .options-nav-group { border: 0; }
-body.sb2-frontend .options-nav-group-title { justify-content: flex-start; margin: 0; font-weight: 600; text-align: left; }
+body.sb2-frontend .options-nav-group-title {
+  display: block;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0 0 .5rem;
+  border: 0;
+  border-bottom: 1px solid #2c3340;
+  border-radius: 0;
+  background: transparent;
+  color: #b9dfff;
+  font-family: var(--ui-font-family);
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: left;
+}
 body.sb2-frontend .options-nav-item { width: 100%; height: var(--sb-control-size); min-height: var(--sb-control-size); justify-content: flex-start; gap: var(--sb-space-066); padding: 0 var(--sb-space-075); font-weight: 400; text-align: left; }
 /* Keep each owner's options navigation explicitly alphabetical in visual order. */
 body.sb2-frontend #options-database-tab { order: 1; }

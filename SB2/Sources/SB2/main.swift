@@ -175,6 +175,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                       case "next": app.playback?.playAdjacent(1); break;
                       case "newPlaylistTab": app.ui?.createPlaylistTab?.({ duplicateActive: true }); break;
                       case "closePlaylistTab": app.ui?.closePlaylistTab?.(); break;
+                      case "closeWindow": app.ui?.closeWindowShortcut?.(); break;
                       case "sidebarPaths": app.ui?.setSidebarMode?.("paths"); break;
                       case "sidebarConsoles": app.ui?.setSidebarMode?.("consoles"); break;
                       case "favoritesPlaylist": app.ui?.showFavoritesPlaylist?.(); break;
@@ -454,7 +455,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let target = NSApp.keyWindow ?? window
         guard let target else { return }
         if target === window {
-            dispatchClosePlaylistTab()
+            dispatchCustom("closeWindow")
         } else {
             target.performClose(sender)
         }
@@ -474,10 +475,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc private func newPlaylistTab(_ sender: Any?) { dispatchCustom("newPlaylistTab") }
     @objc private func selectPlaylistTab(_ sender: NSMenuItem) {
         dispatchCustom("selectPlaylistTab:\(sender.tag)")
-    }
-
-    private func dispatchClosePlaylistTab() {
-        dispatchCustom("closePlaylistTab")
     }
 
     private func dispatchCustom(_ command: String) {
