@@ -90,7 +90,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     var onWindowAction: ((String) -> Void)?
     var onChooseAACExportDirectory: (() -> String?)?
     var onAppearanceSettingsChanged: (([String: Any]) -> Void)?
-    var onFrontendSettingsChanged: ((SB2PreferencesSnapshot) -> Void)?
+    var onFrontendSettingsChanged: (([String: Any]) -> Void)?
     var onFrontendEqualizerSettingsChanged: ((SB2EqualizerPreferencesPatch) -> Void)?
     var onCatalogReloaded: (@MainActor (String) -> Void)?
     var onPlaybackEvent: (@MainActor (String, [String: Any]) -> Void)?
@@ -300,6 +300,9 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.name == "spcBoySB2",
+              message.frameInfo.isMainFrame,
+              SB2WebContentPolicy.isTrustedDocument(message.frameInfo.request.url),
+              SB2WebContentPolicy.isTrustedDocument(message.webView?.url),
               let body = message.body as? [String: Any],
               let id = body["id"] as? String,
               let method = body["method"] as? String,
@@ -364,7 +367,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             do {
                 let savedSettings = try Self.frontendSettingsSave(settings)
                 Task { @MainActor in
-                    handler?(savedSettings)
+                    let normalized = try? Self.object(savedSettings) as? [String: Any]
+                    let patch = Dictionary(uniqueKeysWithValues: settings.keys.map {
+                        ($0, normalized?[$0] ?? NSNull())
+                    })
+                    handler?(patch)
                     await Self.reply(to: message.webView, id: id, success: true, valueJSON: "true")
                 }
             } catch {
@@ -1180,7 +1187,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         defaults.set(true, forKey: appVolumeRepairKey)
     }
 
+    nonisolated private static let preferencesLock = NSRecursiveLock()
+
     nonisolated private static func frontendSettingsLoad() throws -> SB2PreferencesSnapshot {
+        preferencesLock.lock()
+        defer { preferencesLock.unlock() }
         let defaults = UserDefaults.standard
         if let data = defaults.data(forKey: frontendSettingsKey) {
             var snapshot = try JSONDecoder().decode(SB2PreferencesSnapshot.self, from: data)
@@ -1201,13 +1212,19 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
     @discardableResult
     nonisolated private static func frontendSettingsSave(_ settings: [String: Any]) throws -> SB2PreferencesSnapshot {
-        let snapshot = try SB2PreferencesSnapshot(jsonObject: settings)
+        preferencesLock.lock()
+        defer { preferencesLock.unlock() }
+        var merged = try Self.object(frontendSettingsLoad()) as? [String: Any] ?? [:]
+        merged.merge(settings) { _, changed in changed }
+        let snapshot = try SB2PreferencesSnapshot(jsonObject: merged)
         FrontendPreferencesStore(defaults: .standard, keys: .sb2).save(snapshot.frontendInterfacePreferences)
         UserDefaults.standard.set(try JSONEncoder().encode(snapshot), forKey: frontendSettingsKey)
         return snapshot
     }
 
     nonisolated private static func frontendEqualizerSettingsSave(_ settings: [String: Any]) throws -> SB2EqualizerPreferencesPatch {
+        preferencesLock.lock()
+        defer { preferencesLock.unlock() }
         guard JSONSerialization.isValidJSONObject(settings) else { throw BridgeError.invalidSettings }
         let patch: SB2EqualizerPreferencesPatch
         do {

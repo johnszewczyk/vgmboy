@@ -303,12 +303,15 @@ for (const [input, role] of [
 }
 if (window.spcBoySB2?.onAppearanceSettingsChanged) {
   window.spcBoySB2.onAppearanceSettingsChanged((settings) => {
-    app.ui.applyAppearanceSettings(settings);
+    const patch = app.acceptSettingsPatch(settings);
+    if (Object.keys(patch).length) app.ui.applyAppearanceSettings(patch);
   });
 }
 
 if (window.spcBoySB2?.onFrontendSettingsChanged) {
   window.spcBoySB2.onFrontendSettingsChanged((settings) => {
+    settings = app.acceptSettingsPatch(settings);
+    if (!Object.keys(settings).length) return;
     const previousFavoriteSortOrder = state.favoriteSortOrder;
     const previousTiming = {
       manualPlayTimeSeconds: state.manualPlayTimeSeconds,
@@ -317,6 +320,7 @@ if (window.spcBoySB2?.onFrontendSettingsChanged) {
       fadeEnabled: state.fadeEnabled,
       spcFadeSeconds: state.spcFadeSeconds
     };
+    Object.assign(state, settings);
     if (settings.manualPlayTimeSeconds !== undefined) state.manualPlayTimeSeconds = app.normalizeLongPlayTime(settings.manualPlayTimeSeconds);
     if (settings.unknownDurationSeconds !== undefined) state.unknownDurationSeconds = app.normalizePlayTime(settings.unknownDurationSeconds);
     if (settings.longPlayEnabled !== undefined) state.longPlayEnabled = Boolean(settings.longPlayEnabled);
@@ -338,7 +342,7 @@ if (window.spcBoySB2?.onFrontendSettingsChanged) {
     state.selectedFolderPath = null;
     state.selectedBrowserPath = null;
     state.sidebarMode = state.sidebarMode === "paths" ? "paths" : "consoles";
-    state.favoriteSortOrder = settings.favoriteSortOrder === "alphabetical" ? "alphabetical" : "historical";
+    if (settings.favoriteSortOrder !== undefined) state.favoriteSortOrder = settings.favoriteSortOrder === "alphabetical" ? "alphabetical" : "historical";
     if (settings.autoResizeAnimationMilliseconds !== undefined) {
       state.autoResizeAnimationMilliseconds = app.normalizeAnimationMilliseconds(settings.autoResizeAnimationMilliseconds);
     }
@@ -349,6 +353,7 @@ if (window.spcBoySB2?.onFrontendSettingsChanged) {
     if (settings.selectionAnimationEnabled !== undefined) state.selectionAnimationEnabled = settings.selectionAnimationEnabled !== false;
     if (settings.mainWindowAlwaysOnTop !== undefined) state.mainWindowAlwaysOnTop = Boolean(settings.mainWindowAlwaysOnTop);
     if (settings.settingsWindowAlwaysOnTop !== undefined) state.settingsWindowAlwaysOnTop = Boolean(settings.settingsWindowAlwaysOnTop);
+    app.didApplySettingsPatch(settings);
     app.ui.renderAll();
     if (!window.spcBoySB2.isOptionsWindow && timingChanged) {
       app.playback.refreshPlaybackForTimingChange().catch((error) => console.error("[SPCBoy] playback timing sync failed", error));
@@ -699,8 +704,12 @@ window.addEventListener("keydown", (event) => {
   }
 });
 
+app.flushPendingState = async () => {
+  await app.flushSettings();
+  await app.ui.flushPlaylistTabs();
+};
 window.addEventListener("pagehide", () => {
-  app.persistSettings();
+  void app.flushPendingState().catch((error) => console.error("[SPCBoy] final save failed", error));
 });
 
 app.ui.bootstrap().catch((error) => {

@@ -25,6 +25,7 @@ and renderer distinct.
 - Archive playback and materialization: `subsystem-agent/archive-materialization.md`
 - Options behavior: `subsystem-human/options.md`
 - Startup progress ownership: `subsystem-agent/startup-experience.md`
+- State persistence, virtual scrolling and WebKit trust: `subsystem-agent/state-and-webkit.md`
 - Swift package and app bundle: `Package.swift`, `Sources/SB2/`
 - WebKit presentation and host adaptation: `Sources/SB2/Resources/`, `Sources/SB2/`
 

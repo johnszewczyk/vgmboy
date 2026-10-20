@@ -7,6 +7,10 @@ import WebKit
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var window: NSWindow?
     private var optionsWindow: NSWindow?
+    private let webContentPolicy = SB2WebContentPolicy()
+    private var approvedWindowClosures = Set<ObjectIdentifier>()
+    private var savingWindows = Set<ObjectIdentifier>()
+    private var terminationPending = false
     private weak var webView: WKWebView?
     private weak var optionsWebView: WKWebView?
     private weak var closePlaylistMenuItem: NSMenuItem?
@@ -189,6 +193,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             ))
         }
         let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.navigationDelegate = webContentPolicy
         return webView
     }
 
@@ -274,8 +279,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         optionsWebView?.evaluateJavaScript(script, completionHandler: nil)
     }
 
-    private func broadcastFrontendSettings(_ settings: SB2PreferencesSnapshot) {
-        guard let data = try? JSONEncoder().encode(settings),
+    private func broadcastFrontendSettings(_ settings: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: settings),
               let json = String(data: data, encoding: .utf8) else { return }
         let script = "window.__spcBoySB2Event('frontendSettingsChanged', \(json));"
         webView?.evaluateJavaScript(script, completionHandler: nil)
@@ -306,11 +311,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         optionsWebView?.evaluateJavaScript(script, completionHandler: nil)
     }
 
-    private func receiveFrontendSettings(_ settings: SB2PreferencesSnapshot) {
-        if let value = settings.mainWindowAlwaysOnTop {
+    private func receiveFrontendSettings(_ settings: [String: Any]) {
+        if let value = settings["mainWindowAlwaysOnTop"] as? Bool {
             window?.level = value ? .floating : .normal
         }
-        if let value = settings.settingsWindowAlwaysOnTop {
+        if let value = settings["settingsWindowAlwaysOnTop"] as? Bool {
             optionsWindow?.level = value ? .floating : .normal
         }
         NSApp.mainMenu?.update()
@@ -536,6 +541,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return true
     }
 
+    // Await native persistence acknowledgements, not just the JavaScript debounce.
+    private func flushPendingState(in views: [WKWebView], completion: @escaping (Bool) -> Void) {
+        guard !views.isEmpty else { completion(true); return }
+        var remaining = views.count
+        var finished = false
+        let finish: (Error?) -> Void = { error in
+            guard !finished else { return }
+            if let error {
+                finished = true
+                let alert = NSAlert()
+                alert.messageText = "Could not save SB2 state"
+                alert.informativeText = "The window will stay open. Try closing again after resolving the save error.\n\n\(error.localizedDescription)"
+                alert.runModal()
+                completion(false)
+                return
+            }
+            remaining -= 1
+            if remaining == 0 { finished = true; completion(true) }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
+            guard !finished else { return }
+            finish(NSError(domain: "SB2.Persistence", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "Timed out waiting for the saved workspace."
+            ]))
+        }
+        for view in views {
+            view.callAsyncJavaScript(
+                "await window.SB2App?.flushPendingState?.(); return true;",
+                arguments: [:], in: nil, in: .page
+            ) { result in
+                switch result {
+                case .success: finish(nil)
+                case .failure(let error): finish(error)
+                }
+            }
+        }
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !terminationPending else { return .terminateLater }
+        terminationPending = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { sender.reply(toApplicationShouldTerminate: true); return }
+            self.flushPendingState(in: [self.webView, self.optionsWebView].compactMap { $0 }) { [weak self] success in
+                self?.terminationPending = false
+                sender.reply(toApplicationShouldTerminate: success)
+            }
+        }
+        return .terminateLater
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
     }
@@ -549,6 +605,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 }
 
 extension AppDelegate: NSWindowDelegate {
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        let id = ObjectIdentifier(sender)
+        if approvedWindowClosures.remove(id) != nil { return true }
+        guard savingWindows.insert(id).inserted else { return false }
+        let view = sender === window ? webView : sender === optionsWindow ? optionsWebView : nil
+        flushPendingState(in: [view].compactMap { $0 }) { [weak self, weak sender] success in
+            guard let self else { return }
+            self.savingWindows.remove(id)
+            guard success, let sender else { return }
+            self.approvedWindowClosures.insert(id)
+            sender.performClose(nil)
+        }
+        return false
+    }
+
     func windowDidBecomeKey(_ notification: Notification) {
         NSApp.mainMenu?.update()
     }
