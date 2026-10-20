@@ -3,7 +3,8 @@
 - Options slide down over the main content from the Options toolbar button or
   Command-comma (⌘,). Command-comma toggles the page; Escape, the visible Close
   Options button, and clicking outside the page dismiss it.
-- Close Options is a square icon button matching the other SB2 toolbar controls.
+- Close Options is a square icon button using the standard straight-line X mark
+  from SB2's toolbar icon set.
   The Options layer covers home controls and floating popovers while leaving
   the app title and status bars visible.
 - Opening Options moves keyboard focus to Close Options; closing returns focus
@@ -14,12 +15,14 @@
 - Pages stay alphabetical within their owner groups: Database, Gallery, UI
   Chrome, UI Fonts, Windows; then Audio, Diagnostics, Playback, Routing.
   Section groups within pages are alphabetical.
+- Command-W dismisses the in-page Options overlay before it closes a playlist
+  tab. In the separate Options window, Command-W closes that window.
 - The options sidebar groups SPCBOY-owned frontend settings separately from
   VGMBoy-owned playback-core settings. Keep that ownership split when adding
-  settings. Owner headings use the filled toolbar heading block, and category
-  items reuse the common toolbar button surface and selected state. Navigation
-  controls and owner groups use the same shared gap and inset as the home
-  toolbars, playlist tabs, and column headers.
+  settings. Owner headings use the underlined text-heading style from the
+  Options pages; category items reuse the common toolbar button surface and
+  selected state. Navigation controls and owner groups use the same shared gap
+  and inset as the home toolbars, playlist tabs, and column headers.
 - Playback volume uses twenty 5% steps in Options and in the compact Volume
   popup on the home toolbar. The home popup stays behind the Options layer.
 - Option pages use a readable system font and a 65-character content width.

@@ -10,6 +10,7 @@
   <body class="sb2-frontend">
     <svg class="icon-sprite" aria-hidden="true" focusable="false">
       <symbol id="icon-folder-tree" viewBox="0 0 24 24"><path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z" /><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z" /><path d="M3 5a2 2 0 0 0 2 2h3" /><path d="M3 3v13a2 2 0 0 0 2 2h3" /></symbol>
+      <symbol id="icon-xmark" viewBox="0 0 24 24"><path d="M6 6L18 18M18 6L6 18" /></symbol>
       <symbol id="icon-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" /></symbol>
       <symbol id="icon-sidebar-views" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /><path d="M12 8h6" /><path d="M12 12h6" /><path d="M12 16h6" /><path d="M5.5 8h1" /><path d="M5.5 12h1" /><path d="M5.5 16h1" /></symbol>
       <symbol id="icon-gallery" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /><path d="M14 21 9 16" /></symbol>
@@ -158,13 +159,13 @@
         <div class="sb2-selection-indicator sb2-options-selection-indicator is-hidden" aria-hidden="true"></div>
         <div class="options-header">
           <span>Options</span>
-          <button id="options-close-button" class="tool-button glyph-button ui-control options-close-button" type="button" title="Close Options" aria-label="Close Options"><svg class="ui-icon" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg></button>
+          <button id="options-close-button" class="tool-button glyph-button ui-control options-close-button" type="button" title="Close Options" aria-label="Close Options"><svg class="ui-icon" aria-hidden="true"><use href="#icon-xmark"></use></svg></button>
         </div>
 
         <div class="options-body">
           <nav class="options-nav" aria-label="Options sections">
             <div class="options-nav-group" aria-labelledby="options-native-heading">
-              <div id="options-native-heading" class="options-nav-group-title toolbar-heading">SPCBoy</div>
+              <div id="options-native-heading" class="options-nav-group-title">SPCBoy</div>
               <button id="options-database-tab" data-app-option-section="database" class="tool-button options-nav-item is-selected" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-database"></use></svg><span>Database</span></button>
               <button id="options-gallery-tab" data-app-option-section="gallery" class="tool-button options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-gallery"></use></svg><span>Gallery</span></button>
               <button id="options-theme-tab" data-app-option-section="interface" class="tool-button options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-palette"></use></svg><span>UI Chrome</span></button>
@@ -172,7 +173,7 @@
               <button id="options-windows-tab" data-app-option-section="windows" class="tool-button options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sidebar-views"></use></svg><span>Windows</span></button>
             </div>
             <div class="options-nav-group" aria-labelledby="options-extension-heading">
-              <div id="options-extension-heading" class="options-nav-group-title toolbar-heading">VGMBoy</div>
+              <div id="options-extension-heading" class="options-nav-group-title">VGMBoy</div>
               <button id="options-audio-tab" class="tool-button options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sliders-horizontal"></use></svg><span>Audio</span></button>
               <button id="options-diagnostics-tab" class="tool-button options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-scan-search"></use></svg><span>Diagnostics</span></button>
               <button id="options-playback-tab" class="tool-button options-nav-item" type="button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-play"></use></svg><span>Playback</span></button>

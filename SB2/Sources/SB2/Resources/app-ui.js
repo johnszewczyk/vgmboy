@@ -4454,6 +4454,14 @@ function toggleOptionsOpen() {
   setOptionsOpen(!state.optionsOpen);
 }
 
+async function closeWindowShortcut() {
+  if (state.optionsOpen) {
+    setOptionsOpen(false);
+    return true;
+  }
+  return closePlaylistTab();
+}
+
 function updateSB2Titlebar() {
   const track = uiApp.currentTrack() || state.currentTrackInfo || uiApp.selectedTrack();
   if (refs.sb2ConsoleLabel) refs.sb2ConsoleLabel.textContent = String(track?.system || "—").toLocaleUpperCase();
@@ -4703,6 +4711,7 @@ uiApp.ui = {
   activatePlaylistTab,
   activatePlaylistTabAtIndex,
   closePlaylistTab,
+  closeWindowShortcut,
   restorePlaylistTabs,
   refreshPlaylistPlaybackState,
   renderAll,
