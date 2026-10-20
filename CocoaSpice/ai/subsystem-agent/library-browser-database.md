@@ -71,8 +71,8 @@
   in separate roots remain distinct.
 - Games, Files, and activation consume ScanSong's stored projections and
   playable leaves. They do not walk or regroup the filesystem.
-- Search is a temporary Games view independent of the underlying Games/Files
-  choice. Clearing search restores that choice.
+- Search filters the current Games/Files snapshot without changing projection
+  or reopening SQLite. Empty loaded snapshots are retained until explicit reload.
 - Archive source leaves resolve their stored members; libgme source leaves
   resolve their stored child tracks.
 - Query failure remains visible and cannot trigger a writable fallback database

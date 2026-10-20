@@ -18,7 +18,7 @@
   startup does not hydrate metadata for a queue replaced by the restored tab.
 - Launch restores at most 1,024 queued entries and performs no filesystem existence walk. Remaining entries stay in the persisted session so startup work remains bounded; a missing source fails only if the user later activates it.
 - The current database sidebar persists its last selected library folder path independently from queued playlist state.
-- Sidebar double-click behavior, `Playlist Follows Cursor`, `Group by Console`, the Games/Files selection, and `Prefer Folders over Metadatas` persist in `UserDefaults`. A non-empty search temporarily displays Games results without rewriting the stored Games/Files selection.
+- Sidebar double-click behavior, `Playlist Follows Cursor`, `Group by Console`, the Games/Files selection, and `Prefer Folders over Metadatas` persist in `UserDefaults`. Search filters the selected Games or Files snapshot without changing modes or reloading the catalog.
 - Sidebar and playlist monospace-font preferences persist in the shared playback preference bundle.
 - Solid Playlist Selection Bar persists as a CocoaSpice UserDefaults preference and defaults to outlined single-row playlist and sidebar capsules.
 - Playlist sort state persists independently from broader playback preferences.

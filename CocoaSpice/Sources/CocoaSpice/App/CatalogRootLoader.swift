@@ -75,7 +75,8 @@ enum CatalogBrowser {
     ) throws -> [DatabaseGameItem] {
         databaseGameItems(from: try CatalogSidebarReader.gameBuckets(
             databaseURL: databaseURL,
-            preferFoldersOverMetadata: preferFoldersOverMetadata
+            preferFoldersOverMetadata: preferFoldersOverMetadata,
+            naturallySorted: false
         ))
     }
 

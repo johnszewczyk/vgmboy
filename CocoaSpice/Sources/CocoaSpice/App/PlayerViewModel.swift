@@ -431,8 +431,9 @@ final class PlayerViewModel {
         refreshPlaylistMetadata()
         updateRemoteTransportState()
         schedulePlaylistTabsSave()
-        if tab.kind == .gallery, startupProgress.phase == .ready {
-            loadGalleryGamesIfNeeded()
+        if startupProgress.phase == .ready {
+            if tab.kind == .gallery { loadGalleryGamesIfNeeded() }
+            else { loadDatabaseSidebarIfNeeded() }
         }
     }
 
@@ -1129,7 +1130,6 @@ final class PlayerViewModel {
             detail: "Loading catalog entries for the library sidebar."
         )
         reloadCatalogRoots()
-        reloadDatabaseSidebar()
         startupProgress.advance(
             to: .restorePlaylists,
             detail: "Restoring saved playlists and playback controls."
@@ -1146,12 +1146,15 @@ final class PlayerViewModel {
         )
         updateRemoteTransportState()
         startupRestorationCompleted = true
-        if libraryDatabase == nil {
+        if libraryDatabase == nil || libraryDatabaseLocationStatus != nil {
             startupProgress.fail(libraryDatabaseLocationStatus ?? "The library catalog is unavailable.")
-        } else if enabledCatalogRootURLs.isEmpty {
-            startupProgress.finish()
         } else {
-            finishStartupIfReady()
+            startupProgress.finish()
+            if isGalleryTabActive {
+                loadGalleryGamesIfNeeded()
+            } else {
+                loadDatabaseSidebarIfNeeded()
+            }
         }
     }
 
@@ -3406,7 +3409,7 @@ final class PlayerViewModel {
         resetGalleryProjection()
         databaseSidebarLoader.invalidateAndLoad(
             databaseURL: libraryDatabase?.databaseURL,
-            mode: effectiveSidebarBrowserMode,
+            mode: isGalleryTabActive ? nil : effectiveSidebarBrowserMode,
             preferFoldersOverMetadata: preferFoldersOverMetadata,
             didLoadGames: { [weak self] in self?.databaseGamesDidLoad() },
             didLoadFiles: { [weak self] in self?.databaseFilesDidLoad() },
@@ -3418,6 +3421,7 @@ final class PlayerViewModel {
     }
 
     private func loadDatabaseSidebarIfNeeded() {
+        guard startupRestorationCompleted, !isGalleryTabActive else { return }
         databaseSidebarLoader.loadIfNeeded(
             databaseURL: libraryDatabase?.databaseURL,
             mode: effectiveSidebarBrowserMode,
@@ -3637,7 +3641,7 @@ final class PlayerViewModel {
 
     private func applySidebarSearch() {
         let hasQuery = !sidebarSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        if hasQuery || sidebarBrowserMode == .games {
+        if sidebarBrowserMode == .games {
             databaseFileSidebarSearchTaskOwner.cancel()
             databaseSidebar.searchText = sidebarSearchQuery
             if sidebarSystemMode {

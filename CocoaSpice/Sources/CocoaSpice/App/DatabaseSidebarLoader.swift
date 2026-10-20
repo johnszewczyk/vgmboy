@@ -27,7 +27,7 @@ final class DatabaseSidebarLoader {
 
     func invalidateAndLoad(
         databaseURL: URL?,
-        mode: SidebarBrowserMode,
+        mode: SidebarBrowserMode?,
         preferFoldersOverMetadata: Bool = true,
         didLoadGames: @escaping @MainActor () -> Void,
         didLoadFiles: @escaping @MainActor () -> Void,
@@ -47,14 +47,16 @@ final class DatabaseSidebarLoader {
             gameSidebar.clear()
             fileSidebar.clear()
         }
-        loadIfNeeded(
-            databaseURL: databaseURL,
-            mode: mode,
-            preferFoldersOverMetadata: preferFoldersOverMetadata,
-            didLoadGames: didLoadGames,
-            didLoadFiles: didLoadFiles,
-            didFail: didFail
-        )
+        if let mode {
+            loadIfNeeded(
+                databaseURL: databaseURL,
+                mode: mode,
+                preferFoldersOverMetadata: preferFoldersOverMetadata,
+                didLoadGames: didLoadGames,
+                didLoadFiles: didLoadFiles,
+                didFail: didFail
+            )
+        }
     }
 
     func loadIfNeeded(
@@ -106,12 +108,13 @@ final class DatabaseSidebarLoader {
         gameLoadingStatus = "Reading indexed games…"
         gameLoadError = nil
         let task = Task { [weak self] in
-            let result = await Task.detached(priority: .utility) { () -> Result<[DatabaseGameItem], Error> in
+            let result = await Task.detached(priority: .utility) { () -> Result<(items: [DatabaseGameItem], searchIndex: DatabaseGameSearchIndex), Error> in
                 Result {
-                    try CatalogBrowser.gameItems(
+                    let items = try CatalogBrowser.gameItems(
                         databaseURL: databaseURL,
                         preferFoldersOverMetadata: preferFoldersOverMetadata
                     )
+                    return (items, DatabaseGameSearchIndex(items: items))
                 }
             }.value
             guard !Task.isCancelled,
@@ -121,8 +124,8 @@ final class DatabaseSidebarLoader {
             self.catalogSessions.finish(generation, for: .games)
             self.isLoadingGames = false
             switch result {
-            case .success(let items):
-                self.gameSidebar.replaceGameItems(items)
+            case .success(let snapshot):
+                self.gameSidebar.replaceGameItems(snapshot.items, searchIndex: snapshot.searchIndex)
                 self.hasLoadedGames = true
                 didLoad()
             case .failure(let error):

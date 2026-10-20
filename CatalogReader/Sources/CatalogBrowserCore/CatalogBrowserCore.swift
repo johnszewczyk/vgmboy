@@ -70,17 +70,17 @@ public struct CatalogBrowserState: Codable, Equatable, Sendable {
     }
 
     public var contentMode: CatalogBrowserContentMode {
-        switch view {
-        case .consoles, .search: return .database
+        switch storedMode {
+        case .consoles: return .database
         case .paths, .diskPath: return .tree
         }
     }
 
     public var resultSource: CatalogBrowserResultSource {
-        switch view {
+        switch storedMode {
         case .paths: return .catalogPathIndex
         case .diskPath: return .diskPathTree
-        case .consoles, .search: return .catalogConsoleIndex
+        case .consoles: return .catalogConsoleIndex
         }
     }
 

@@ -10,6 +10,10 @@ selection reducer and the incremental `CatalogSearchIndex` used by projected
 game searches. `CatalogReader` supplies the
 same folder-versus-metadata aggregation policy to every skin before projection.
 
+- Search retains the selected mode's content and result source. Searching Paths
+  filters the loaded path index; it must not switch to Games or start a catalog
+  read merely because the query became non-empty.
+
 ## Ownership
 
 The package consumes published `CatalogReader` records and returns UI-neutral
@@ -18,7 +22,7 @@ write SQLite, or activate playback.
 
 ## Invariants
 
-- Search temporarily presents catalog-console results and clearing search restores the stored mode.
+- Search filters the selected catalog source; clearing it restores the unfiltered snapshot.
 - Favorites is not a catalog-browser mode. Frontends project the shared favorite
   snapshot into the playlist without changing this catalog state.
 - Duplicate game names are disambiguated consistently from system and root information.

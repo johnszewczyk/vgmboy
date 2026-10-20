@@ -172,6 +172,7 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
     public static let supportedSchemaVersion = 25
     public static let supportedSchemaVersions: Set<Int> = [24, supportedSchemaVersion]
     private let database: OpaquePointer
+    private let gameSnapshotLock = NSLock()
     public let databaseURL: URL
 
     public init(databaseURL: URL) throws {
@@ -261,14 +262,44 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
     /// an empty string to select buckets without a system assignment.
     public func gameBuckets(
         preferFoldersOverMetadata: Bool = true,
-        system: String? = nil
+        system: String? = nil,
+        naturallySorted: Bool = true
     ) throws -> [CatalogGameBucket] {
+        gameSnapshotLock.lock()
+        defer { gameSnapshotLock.unlock() }
+        guard sqlite3_exec(database, "BEGIN DEFERRED;", nil, nil, nil) == SQLITE_OK else {
+            throw CatalogReaderError.sqlite(String(cString: sqlite3_errmsg(database)))
+        }
+        // Projection validity and rows must belong to the same SQLite snapshot.
+        defer { sqlite3_exec(database, "ROLLBACK;", nil, nil, nil) }
         let systemExpression = preferFoldersOverMetadata
             ? "COALESCE(NULLIF(t.browser_system, ''), NULLIF(m.system, ''), '')"
             : "COALESCE(NULLIF(m.system, ''), NULLIF(t.browser_system, ''), '')"
         let systemFilter = system == nil ? "" : " AND \(systemExpression)=?"
         let sql: String
-        if try gameSidebarBucketsAreCurrent() {
+        let bucketsAreCurrent = try gameSidebarBucketsAreCurrent()
+        let hasResolvedBuckets = try scalarInt(
+            "SELECT COUNT(*)=2 FROM sqlite_master WHERE type='table' AND name IN ('resolved_game_sidebar_buckets', 'resolved_game_sidebar_state');"
+        ) != 0
+        let resolvedBucketsAreCurrent = try hasResolvedBuckets && (scalarInt(
+            """
+            SELECT NOT EXISTS (
+                SELECT 1 FROM library_roots r
+                LEFT JOIN resolved_game_sidebar_state s ON s.root_id=r.id
+                WHERE r.is_attached=1 AND r.is_enabled=1 AND COALESCE(s.is_current, 0)=0
+            );
+            """
+        ) != 0)
+        if bucketsAreCurrent && resolvedBucketsAreCurrent {
+            let resolvedFilter = system == nil ? "" : " AND b.system=?"
+            sql = """
+            SELECT b.root_id, r.path, b.browser_game, b.system, b.track_count
+            FROM resolved_game_sidebar_buckets b
+            INNER JOIN library_roots r ON r.id=b.root_id
+            WHERE r.is_attached=1 AND r.is_enabled=1
+              AND b.prefer_folders=\(preferFoldersOverMetadata ? 1 : 0)\(resolvedFilter);
+            """
+        } else if bucketsAreCurrent {
             sql = """
             SELECT b.root_id, r.path, b.browser_game, \(systemExpression), COUNT(t.id)
             FROM game_sidebar_buckets b
@@ -279,8 +310,7 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
                AND t.browser_system=b.browser_system
             LEFT JOIN track_metadata m ON m.track_id=t.id
             WHERE r.is_attached=1 AND r.is_enabled=1\(systemFilter)
-            GROUP BY b.root_id, r.path, b.browser_game, \(systemExpression)
-            ORDER BY lower(b.browser_game), b.browser_game, lower(\(systemExpression)), \(systemExpression), lower(r.path), r.path;
+            GROUP BY b.root_id, r.path, b.browser_game, \(systemExpression);
             """
         } else {
             sql = """
@@ -290,11 +320,10 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
             LEFT JOIN track_metadata m ON m.track_id=t.id
             WHERE r.is_attached=1 AND r.is_enabled=1\(systemFilter)
               AND NOT EXISTS (SELECT 1 FROM dead_sources d WHERE d.root_id=t.root_id AND d.path=t.path)
-            GROUP BY t.root_id, r.path, t.browser_game, \(systemExpression)
-            ORDER BY lower(t.browser_game), t.browser_game, lower(\(systemExpression)), \(systemExpression), lower(r.path), r.path;
+            GROUP BY t.root_id, r.path, t.browser_game, \(systemExpression);
             """
         }
-        return try query(sql, textBindings: system.map { [$0] } ?? []) { statement in
+        let buckets: [CatalogGameBucket] = try query(sql, textBindings: system.map { [$0] } ?? []) { statement in
             CatalogGameBucket(
                 rootID: sqlite3_column_int64(statement, 0),
                 rootPath: Self.string(statement, 1),
@@ -302,10 +331,14 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
                 system: Self.string(statement, 3),
                 trackCount: Int(sqlite3_column_int64(statement, 4))
             )
-        }.sorted {
-            Self.naturalCompare($0.game, $1.game) == .orderedAscending
-                || (Self.naturalCompare($0.game, $1.game) == .orderedSame && Self.naturalCompare($0.system, $1.system) == .orderedAscending)
-                || (Self.naturalCompare($0.game, $1.game) == .orderedSame && Self.naturalCompare($0.system, $1.system) == .orderedSame && Self.naturalCompare($0.rootPath, $1.rootPath) == .orderedAscending)
+        }
+        guard naturallySorted else { return buckets }
+        return buckets.sorted {
+            let game = Self.naturalCompare($0.game, $1.game)
+            if game != .orderedSame { return game == .orderedAscending }
+            let system = Self.naturalCompare($0.system, $1.system)
+            if system != .orderedSame { return system == .orderedAscending }
+            return Self.naturalCompare($0.rootPath, $1.rootPath) == .orderedAscending
         }
     }
 
@@ -396,13 +429,13 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
 
     private func gameSidebarBucketsAreCurrent() throws -> Bool {
         try scalarInt(
-            "SELECT NOT EXISTS (SELECT 1 FROM library_roots WHERE is_enabled=1 AND game_sidebar_buckets_dirty=1);"
+            "SELECT NOT EXISTS (SELECT 1 FROM library_roots WHERE is_attached=1 AND is_enabled=1 AND game_sidebar_buckets_dirty=1);"
         ) != 0
     }
 
     private func fileSidebarBucketsAreCurrent() throws -> Bool {
         try scalarInt(
-            "SELECT NOT EXISTS (SELECT 1 FROM library_roots WHERE is_enabled=1 AND file_sidebar_buckets_dirty=1);"
+            "SELECT NOT EXISTS (SELECT 1 FROM library_roots WHERE is_attached=1 AND is_enabled=1 AND file_sidebar_buckets_dirty=1);"
         ) != 0
     }
 

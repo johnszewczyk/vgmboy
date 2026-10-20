@@ -23,6 +23,47 @@ enum CanonicalCatalogSchema {
         "PRAGMA user_version=25;"
     ]
 
+    // Additive schema-25 projection. Existing readers can ignore this table.
+    static let resolvedGameBucketsStatement = """
+        CREATE TABLE IF NOT EXISTS resolved_game_sidebar_buckets (
+            root_id INTEGER NOT NULL,
+            prefer_folders INTEGER NOT NULL,
+            browser_game TEXT NOT NULL,
+            system TEXT NOT NULL,
+            track_count INTEGER NOT NULL,
+            PRIMARY KEY(root_id, prefer_folders, browser_game, system),
+            FOREIGN KEY(root_id) REFERENCES library_roots(id) ON DELETE CASCADE
+        );
+        """
+
+    static var resolvedGameInvalidationStatements: [String] {
+        var statements = ["""
+            CREATE TABLE resolved_game_sidebar_state (
+                root_id INTEGER PRIMARY KEY REFERENCES library_roots(id) ON DELETE CASCADE,
+                is_current INTEGER NOT NULL
+            );
+            """]
+        // Database-owned invalidation also protects these projections when an
+        // older schema-25 writer publishes without knowing about the new table.
+        for (table, root) in [
+            ("tracks", "{row}.root_id"),
+            ("track_metadata", "(SELECT root_id FROM tracks WHERE id={row}.track_id)"),
+            ("dead_sources", "{row}.root_id")
+        ] {
+            for (event, rows) in [("INSERT", ["NEW"]), ("DELETE", ["OLD"]), ("UPDATE", ["OLD", "NEW"])] {
+                let roots = rows.map { root.replacingOccurrences(of: "{row}", with: $0) }.joined(separator: ", ")
+                statements.append("""
+                    CREATE TRIGGER resolved_games_\(table)_\(event.lowercased()) AFTER \(event) ON \(table)
+                    BEGIN
+                        UPDATE resolved_game_sidebar_state SET is_current=0
+                        WHERE is_current=1 AND root_id IN (\(roots));
+                    END;
+                    """)
+            }
+        }
+        return statements
+    }
+
     static let metadataTagMigrationStatements = [
         "CREATE TABLE track_metadata_tags (track_id INTEGER NOT NULL, tag_index INTEGER NOT NULL, tag_name TEXT NOT NULL, normalized_name TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(track_id, tag_index), FOREIGN KEY(track_id) REFERENCES tracks(id) ON DELETE CASCADE);",
         "CREATE INDEX track_metadata_tags_name_index ON track_metadata_tags(normalized_name, track_id);"

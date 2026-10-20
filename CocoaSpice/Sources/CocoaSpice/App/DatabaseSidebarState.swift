@@ -15,9 +15,9 @@ final class DatabaseSidebarState {
     var selectedGameID: String?
     var selectedGameIDs: Set<String> = []
 
-    func replaceGameItems(_ items: [DatabaseGameItem]) {
+    func replaceGameItems(_ items: [DatabaseGameItem], searchIndex: DatabaseGameSearchIndex? = nil) {
         gameItems = items
-        searchIndex = DatabaseGameSearchIndex(items: items)
+        self.searchIndex = searchIndex ?? DatabaseGameSearchIndex(items: items)
         if let selectedGameID,
            !items.contains(where: { $0.id == selectedGameID }) {
             clearSelection()

@@ -10,8 +10,8 @@ CocoaSpice startup stages and the native progress screen.
   reveal and ready timing.
 - `PlayerViewModel` advances that state around session restoration, catalog
   setup, sidebar loading, and playlist restoration.
-- `DatabaseSidebarLoader` owns the asynchronous initial sidebar read; its
-  completion or failure settles startup progress.
+- `DatabaseSidebarLoader` owns asynchronous sidebar reads, cached snapshots,
+  and local errors. Games search indexes are constructed off the main actor.
 - `MainView` owns the CocoaSpice-skinned overlay. It does not own catalog or
   session work.
 - Gallery metadata and artwork are excluded from startup readiness. If Gallery
@@ -19,8 +19,11 @@ CocoaSpice startup stages and the native progress screen.
 
 ## Invariants
 
-- Keep startup stage order monotonic and mark ready only after the initial
-  sidebar read completes.
+- Keep startup stages monotonic. Mark the restored workspace ready after
+  catalog validation; sidebar data loads independently and cannot block reveal.
+- Restore tabs and mode before requesting a sidebar. Gallery needs only its own
+  projection; ordinary tabs reuse loaded Games/Files snapshots, including empty
+  results. Search filters the selected mode and does not switch projections.
 - A failure remains visible with its message; a fast launch does not flash a
   loading screen.
 - Keep SwiftUI presentation out of `FrontendStartupCore`.

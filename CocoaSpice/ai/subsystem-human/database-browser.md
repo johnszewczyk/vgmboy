@@ -27,15 +27,16 @@
 - When a changed archive is rescanned, its stored member set is replaced as a whole. Renamed or removed members therefore cannot remain in the Database after a repack.
 - While ScanSong writes, CocoaSpice continues showing its opened read-only snapshot. Choose Options > Database > Reload Library after publication to consume the current catalog without restarting or interrupting playback.
 - If a database sidebar read fails, the existing list remains available and an inline Retry message shows the error instead of presenting an empty library.
+- Restored playlists and controls are available while the first sidebar snapshot loads. Switching playlist tabs reuses cached views; empty results are cached too. Reload Library explicitly refreshes them.
 - Database reads show a loading status while the indexed snapshot is being obtained; the database view never expands by walking source folders.
 
 ## Search
 
 - Search: accepts typing immediately, waits 250 ms before a new first-character query, then filters follow-up typing after 100 ms.
-- Search: temporarily presents the indexed game results in the dense list while preserving the stored Games or Files mode. Clearing it returns to that mode.
+- Search: filters the loaded Games list or Files tree. Switching tabs and typing do not reload the database.
 - Search: matches game titles and compact source-root names; console headings organize the results but are not an additional search field.
 - Search: preserves the active database selection when the query changes.
-- Search: Return and list navigation act on the visible indexed game results even when Files is the covered underlying view.
+- Search: Return and list navigation act on the visible results in the selected view.
 - Search: clearing the query folds all Group by Console headings, returning the sidebar to its compact state.
 
 ## Selection
