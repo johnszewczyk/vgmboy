@@ -2445,22 +2445,28 @@ body.sb2-frontend .options-header .tool-button:focus-visible { outline: 2px soli
 body.sb2-frontend .options-body { grid-template-columns: 12rem minmax(0, 1fr); gap: 2rem; min-height: 0; height: 100%; }
 body.sb2-frontend .options-nav-group { gap: var(--sb-toolbar-gap); padding: 0; border: 0; border-radius: 0; background: transparent; }
 body.sb2-frontend .options-nav-group + .options-nav-group { border: 0; }
-body.sb2-frontend .options-nav-group-title {
+body.sb2-frontend .options-nav-group-title,
+body.sb2-frontend .options-subpanel-title {
   display: block;
-  height: auto;
-  min-height: 0;
   margin: 0;
   padding: 0 0 .5rem;
   border: 0;
   border-bottom: 1px solid #2c3340;
-  border-radius: 0;
-  background: transparent;
   color: #b9dfff;
   font-family: var(--ui-font-family);
   font-size: 1.1rem;
   font-weight: 600;
   line-height: 1.4;
+}
+body.sb2-frontend .options-nav-group-title {
+  height: auto;
+  min-height: 0;
+  border-radius: 0;
+  background: transparent;
   text-align: left;
+}
+body.sb2-frontend .options-nav-group-title + .options-nav-item {
+  margin-top: calc(var(--sb-space-050) - var(--sb-toolbar-gap));
 }
 body.sb2-frontend .options-nav-item { width: 100%; height: var(--sb-control-size); min-height: var(--sb-control-size); justify-content: flex-start; gap: var(--sb-space-066); padding: 0 var(--sb-space-075); font-weight: 400; text-align: left; }
 /* Keep each owner's options navigation explicitly alphabetical in visual order. */
@@ -2477,7 +2483,6 @@ body.sb2-frontend .options-content { padding: 1rem 2rem 2rem; border: 0; border-
 body.sb2-frontend .options-page { width: min(100%, 65ch); gap: 2rem; min-height: 100%; margin-inline: auto; padding: 0 0 2rem; border-radius: 0; background: transparent; }
 body.sb2-frontend .options-page-title { margin: 0; padding: 0 0 .75rem; border-bottom: 1px solid #343a48; color: #e0e1eb; font-size: 1.5rem; line-height: 1.3; font-weight: 600; letter-spacing: 0; }
 body.sb2-frontend .options-subpanel { gap: var(--sb-space-050); padding: 0; border: 0; border-radius: 0; background: transparent; }
-body.sb2-frontend .options-subpanel-title { margin: 0; padding: 0 0 .5rem; border-bottom: 1px solid #2c3340; color: #b9dfff; font-size: 1.1rem; line-height: 1.4; font-weight: 600; }
 body.sb2-frontend .options-field { min-height: 3.75rem; gap: 1.5rem; padding: .75rem .25rem; color: #d8dced; font-size: 1rem; line-height: 1.5; }
 body.sb2-frontend .options-field-copy { gap: .35rem; }
 body.sb2-frontend .options-field-copy small,
