@@ -2,7 +2,7 @@
 
 ## Scope
 
-SB2's shared animated selector for interactive items in the main app shell.
+SB2's shared animated selector and custom range-control motion.
 
 ## Ownership
 
@@ -12,7 +12,8 @@ SB2's shared animated selector for interactive items in the main app shell.
   geometry transition, inverse foreground treatment, and reduced-motion rule.
 - The existing `selectionAnimationEnabled` and
   `selectionAnimationMilliseconds` preferences control its transition timing.
-  Keep the preference namespace and persistence contract unchanged.
+  Custom range slider fills and thumbs use the same duration and easing. Keep
+  the preference namespace and persistence contract unchanged.
 
 ## Invariants
 
@@ -31,7 +32,7 @@ SB2's shared animated selector for interactive items in the main app shell.
   shared selector is a surface treatment and does not replace track selection
   state or change playback behavior.
 - Honor the UI setting that disables selection motion and the system reduced
-  motion preference.
+  motion preference for the selector and range sliders.
 - The main Options overlay uses the same configured motion duration for its
   top-down entrance and exit. Keep it inert and hidden from accessibility while
   closed, and restore focus to its opener when dismissed. Its stacking layer

@@ -1318,7 +1318,8 @@ async function previewBrowserLeaf(node) {
 }
 
 async function handleBrowserPrimaryClick(node) {
-  await handleBrowserGesture(node, "primaryClick", state.selectedBrowserPath === node.path);
+  const gesture = node.kind === "file" ? "preview" : "primaryClick";
+  await handleBrowserGesture(node, gesture, state.selectedBrowserPath === node.path);
 }
 
 async function handleBrowserGesture(node, gesture, wasSelected = false) {
@@ -4115,6 +4116,7 @@ function syncEqualizerControls() {
     input.value = String(state.equalizerBandGains[index] || 0);
     refs.equalizerBandValues[index].textContent = `${(state.equalizerBandGains[index] || 0) >= 0 ? "+" : ""}${(state.equalizerBandGains[index] || 0).toFixed(1)} dB`;
   });
+  syncAnimatedRanges();
 }
 
 function setEqualizerEnabled(enabled) {

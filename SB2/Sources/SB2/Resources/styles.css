@@ -1276,7 +1276,7 @@ body.playlist-columns-resizing .playlist-table td {
   height: 100%;
   border-radius: inherit;
   background: var(--accent);
-  transition: width 125ms ease;
+  transition: width var(--selection-animation-duration) var(--selection-animation-easing);
 }
 
 .range-slider-thumb {
@@ -1288,7 +1288,9 @@ body.playlist-columns-resizing .playlist-table td {
   border-radius: 50%;
   background: var(--accent);
   transform: translate(-50%, -50%);
-  transition: left 125ms ease, box-shadow 125ms ease;
+  transition:
+    left var(--selection-animation-duration) var(--selection-animation-easing),
+    box-shadow var(--selection-animation-duration) var(--selection-animation-easing);
 }
 
 .range-slider:focus-within .range-slider-thumb {
@@ -2513,8 +2515,8 @@ body.sb2-frontend .options-input {
 }
 body.sb2-frontend .options-input:focus { border-color: var(--accent); }
 body.sb2-frontend .options-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-body.sb2-frontend .options-inline-trailing { flex: 0 1 var(--sb-options-control-width); min-width: 12ch; }
-body.sb2-frontend .options-inline-trailing.options-color-trailing { flex: 0 0 20ch; min-width: 20ch; }
+body.sb2-frontend .options-inline-trailing { flex: 0 0 var(--sb-options-control-width); width: var(--sb-options-control-width); min-width: 0; }
+body.sb2-frontend .options-inline-trailing.options-color-trailing { flex: 0 0 20ch; width: 20ch; min-width: 20ch; }
 body.sb2-frontend .options-color-text-input { box-sizing: border-box; flex: 0 0 20ch; width: 20ch; max-width: 20ch; }
 body.sb2-frontend .options-subpanel .tool-button {
   height: var(--sb-control-size);
@@ -2646,6 +2648,8 @@ body.sb2-frontend.options-window .options-panel { padding-top: var(--sb-space-07
 @media (prefers-reduced-motion: reduce) {
   body.sb2-frontend .options-overlay { transition-duration: 0ms; transition-delay: 0ms, 0ms; }
   body.sb2-frontend .options-panel { transition-duration: 0ms; transition-delay: 0ms, 0ms; }
+  body.sb2-frontend .range-slider-fill,
+  body.sb2-frontend .range-slider-thumb { transition: none; }
 }
 
 @media (max-width: 720px) {
