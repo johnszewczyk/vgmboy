@@ -122,8 +122,12 @@ Build and launch the app bundle with:
 
 LaunchPad uses `./launch.sh --build-only` followed by
 `open -W -n ./.build/UACMan.app` so it can track the app until it quits.
-The app bundle registers `org.vgmman.uac` with Finder and supplies the
-UACMan document icon for `.uac` files.
+The app bundle imports the registered `com.facebook.zstandard-archive` type and
+declares `org.vgmman.uac` as its subtype. This keeps the `.uac` extension while
+advertising that Zstandard-aware applications can decode its payload to an
+ordinary TAR stream. UACMan remains an alternate editor for the package type;
+whether another app offers to open it depends on that app honoring UTI
+conformance rather than only checking the filename extension.
 
 Compressed manifests currently use the installed `zstd` command-line tool;
 `UACWrapperCore` owns validation and payload-preserving metadata rewrites. The

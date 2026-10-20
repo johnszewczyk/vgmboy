@@ -28,7 +28,10 @@
 	<array>
 		<dict>
 			<key>UTTypeConformsTo</key>
-			<array><string>public.data</string></array>
+			<array>
+				<string>com.facebook.zstandard-archive</string>
+				<string>public.data</string>
+			</array>
 			<key>UTTypeDescription</key>
 			<string>Universal Audio Container</string>
 			<key>UTTypeIdentifier</key>
@@ -37,6 +40,28 @@
 			<dict>
 				<key>public.filename-extension</key>
 				<array><string>uac</string></array>
+			</dict>
+		</dict>
+	</array>
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.archive</string>
+				<string>public.data</string>
+				<string>public.item</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Zstandard Archive</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.facebook.zstandard-archive</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array><string>zst</string></array>
+				<key>public.mime-type</key>
+				<array><string>application/zstd</string></array>
 			</dict>
 		</dict>
 	</array>
