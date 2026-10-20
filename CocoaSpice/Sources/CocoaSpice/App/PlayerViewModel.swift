@@ -603,9 +603,9 @@ final class PlayerViewModel {
         visibleGalleryGames = []
     }
 
-    private func loadGalleryGamesIfNeeded() {
-        guard isGalleryTabActive,
-              startupProgress.phase == .ready,
+    private func loadGalleryGamesIfNeeded(preload: Bool = false) {
+        guard (preload || isGalleryTabActive),
+              (preload || startupProgress.phase == .ready),
               !galleryHasLoaded,
               !galleryIsLoading else { return }
         guard let databaseURL = libraryDatabaseURL else {
@@ -660,6 +660,8 @@ final class PlayerViewModel {
                     self.statusText = self.galleryLoadError ?? "Could not load Gallery."
                 }
             }
+            self.finishStartupIfReady()
+            self.finishLibraryReloadIfNeeded()
         }
         gallerySessions.install(task, generation: generation, for: .gallery)
     }
@@ -1149,12 +1151,8 @@ final class PlayerViewModel {
         if libraryDatabase == nil || libraryDatabaseLocationStatus != nil {
             startupProgress.fail(libraryDatabaseLocationStatus ?? "The library catalog is unavailable.")
         } else {
-            startupProgress.finish()
-            if isGalleryTabActive {
-                loadGalleryGamesIfNeeded()
-            } else {
-                loadDatabaseSidebarIfNeeded()
-            }
+            preloadCatalogViews()
+            finishStartupIfReady()
         }
     }
 
@@ -3409,15 +3407,26 @@ final class PlayerViewModel {
         resetGalleryProjection()
         databaseSidebarLoader.invalidateAndLoad(
             databaseURL: libraryDatabase?.databaseURL,
-            mode: isGalleryTabActive ? nil : effectiveSidebarBrowserMode,
+            mode: nil,
             preferFoldersOverMetadata: preferFoldersOverMetadata,
             didLoadGames: { [weak self] in self?.databaseGamesDidLoad() },
-            didLoadFiles: { [weak self] in self?.databaseFilesDidLoad() },
-            didFail: { [weak self] message in self?.startupProgress.fail(message) }
+            didLoadFiles: { [weak self] in self?.databaseFilesDidLoad() }
         )
-        if startupProgress.phase == .ready, isGalleryTabActive {
-            loadGalleryGamesIfNeeded()
+        preloadCatalogViews()
+    }
+
+    private func preloadCatalogViews() {
+        for mode in [SidebarBrowserMode.games, .files] {
+            databaseSidebarLoader.loadIfNeeded(
+                databaseURL: libraryDatabase?.databaseURL,
+                mode: mode,
+                preferFoldersOverMetadata: preferFoldersOverMetadata,
+                didLoadGames: { [weak self] in self?.databaseGamesDidLoad() },
+                didLoadFiles: { [weak self] in self?.databaseFilesDidLoad() },
+                didFail: { [weak self] _ in self?.finishStartupIfReady() }
+            )
         }
+        loadGalleryGamesIfNeeded(preload: true)
     }
 
     private func loadDatabaseSidebarIfNeeded() {
@@ -3452,21 +3461,21 @@ final class PlayerViewModel {
     }
 
     private func finishLibraryReloadIfNeeded() {
+        guard databaseSidebarLoader.hasLoadedGames,
+              databaseSidebarLoader.hasLoadedFiles, galleryHasLoaded else { return }
         guard libraryDatabaseLocationStatus?.hasPrefix("Reloading the current ScanSong catalog") == true else { return }
         libraryDatabaseLocationStatus = "Library reloaded from the current ScanSong catalog."
     }
 
     private func finishStartupIfReady() {
         guard startupRestorationCompleted, startupProgress.phase == .starting else { return }
-        if let error = databaseSidebarLoadError {
+        if let error = databaseSidebarLoader.gameLoadError
+            ?? databaseSidebarLoader.fileLoadError ?? galleryLoadError {
             startupProgress.fail(error)
-        } else if enabledCatalogRootURLs.isEmpty
-                    || databaseSidebarLoader.hasLoadedGames
-                    || databaseSidebarLoader.hasLoadedFiles {
+        } else if databaseSidebarLoader.hasLoadedGames
+                    && databaseSidebarLoader.hasLoadedFiles
+                    && galleryHasLoaded {
             startupProgress.finish()
-            if isGalleryTabActive {
-                loadGalleryGamesIfNeeded()
-            }
         }
     }
 

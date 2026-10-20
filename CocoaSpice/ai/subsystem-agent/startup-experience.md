@@ -14,16 +14,16 @@ CocoaSpice startup stages and the native progress screen.
   and local errors. Games search indexes are constructed off the main actor.
 - `MainView` owns the CocoaSpice-skinned overlay. It does not own catalog or
   session work.
-- Gallery metadata and artwork are excluded from startup readiness. If Gallery
-  is the restored active tab, its projection begins after startup reaches ready.
+- Games, Files, their search indexes, and Gallery metadata are preloaded before
+  startup reaches ready. Artwork bytes remain bounded, visible-tile requests.
 
 ## Invariants
 
-- Keep startup stages monotonic. Mark the restored workspace ready after
-  catalog validation; sidebar data loads independently and cannot block reveal.
-- Restore tabs and mode before requesting a sidebar. Gallery needs only its own
-  projection; ordinary tabs reuse loaded Games/Files snapshots, including empty
-  results. Search filters the selected mode and does not switch projections.
+- Keep startup stages monotonic. Readiness waits for Games, Files, and Gallery
+  metadata so first interaction does not pay for deferred catalog work.
+- Restore tabs and mode, then preload all three projections. Tab activation
+  reuses loaded snapshots, including empty results. Search filters the selected
+  mode and does not switch projections. Explicit reload preloads all views too.
 - A failure remains visible with its message; a fast launch does not flash a
   loading screen.
 - Keep SwiftUI presentation out of `FrontendStartupCore`.

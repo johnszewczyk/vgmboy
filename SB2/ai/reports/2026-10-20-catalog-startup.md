@@ -23,3 +23,7 @@ A compiled reader probe verified both modes and system filtering. Disposable tra
 The selected live catalog was backed up to `/tmp/vgmman-startup-backup.sqlite` before ScanSong installed the projections. The backup is temporary local recovery data, not a repository artifact.
 
 SB2, CocoaSpice, and ScanSong app bundles were rebuilt. Player packaging reused existing decoder archives. JavaScript syntax checks and Git whitespace checks passed. SB2 was reopened interactively with its saved playlist; creating and closing a duplicate tab retained the loaded Path sidebar without a loading screen. CocoaSpice interactive behavior and an instrumented end-to-end cold launch were not measured. No app test suites were run.
+
+## Upfront readiness correction
+
+Startup readiness now waits for Games, Files, Gallery metadata, and search indexes in both players. Explicit catalog reload preloads all three views as well. Cached snapshots and faster SQL remain; the loading delay is no longer intentionally moved to the first interaction. Gallery artwork bytes remain loaded only for visible tiles.

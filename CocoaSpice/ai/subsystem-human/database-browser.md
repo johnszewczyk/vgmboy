@@ -10,7 +10,7 @@
 - Gallery: the toolbar button or Command-Shift-G opens or switches to the
   artwork Gallery tab without changing the sidebar view. It shows indexed
   Title Snap artwork; double-click a tile or choose Play Now to open a playlist
-  tab and start that game. Gallery metadata waits until startup completes, and
+  tab and start that game. Gallery metadata loads during startup, and
   visible tiles load bounded, downsampled thumbnails on demand.
 - Direct files and supported archives can be dropped onto the playlist for immediate playback. The sidebar remains database-only and does not browse arbitrary disk paths.
 - Rows: dense list of scanned games by default.
@@ -27,7 +27,7 @@
 - When a changed archive is rescanned, its stored member set is replaced as a whole. Renamed or removed members therefore cannot remain in the Database after a repack.
 - While ScanSong writes, CocoaSpice continues showing its opened read-only snapshot. Choose Options > Database > Reload Library after publication to consume the current catalog without restarting or interrupting playback.
 - If a database sidebar read fails, the existing list remains available and an inline Retry message shows the error instead of presenting an empty library.
-- Restored playlists and controls are available while the first sidebar snapshot loads. Switching playlist tabs reuses cached views; empty results are cached too. Reload Library explicitly refreshes them.
+- Startup loads Games, Files, Gallery metadata, and search indexes before reporting ready. Switching playlist tabs or views reuses cached data, including empty results. Reload Library refreshes all three views upfront.
 - Database reads show a loading status while the indexed snapshot is being obtained; the database view never expands by walking source folders.
 
 ## Search
