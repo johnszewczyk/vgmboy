@@ -36,6 +36,9 @@ for ScanSong's external inspection executables.
   reusing incompatible products.
 - `build-scanner-plugins.sh` creates `.build/scanner-plugins` before staging
   products, so a clean checkout can build ScanSong without prior output state.
+- The Play! PSF dependency builder clears its generated `.build/play-psf`
+  directory before configuring CMake, so cached ZLIB/BZip2 paths cannot carry
+  headers from a different SDK into the current build.
 - Its CMake build uses the SDK reported by the active `xcrun`, keeping the
   selected compiler and SDK in sync when the Command Line Tools SDK is newer.
 - The MDX scanner handoff is the release `vgmboy-mdx-inspect` product copied to
@@ -94,6 +97,7 @@ for ScanSong's external inspection executables.
 - [build-app.sh](../../build-app.sh)
 - [build-scanner-plugins.sh](../../scripts/build-scanner-plugins.sh)
 - [build-dependencies.sh](../../scripts/build-dependencies.sh)
+- [build-play-psf.sh](../../scripts/build-play-psf.sh)
 - [build-psgplay.sh](../../scripts/build-psgplay.sh)
 - [stage-aosdk-qsf.sh](../../scripts/stage-aosdk-qsf.sh) and
   [aosdk-qsf-lifecycle.patch](../../patches/aosdk-qsf-lifecycle.patch)
