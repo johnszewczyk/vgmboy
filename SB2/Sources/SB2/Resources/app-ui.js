@@ -4683,21 +4683,15 @@ async function bootstrap() {
   if (!restoredPlaylistTabs && !window.spcBoySB2?.isOptionsWindow) await ensurePlaylistTab();
   if (!window.spcBoySB2?.isOptionsWindow) playlistTabsReady = true;
 
-  setStartupStage(3, "Preparing the library sidebar.");
+  setStartupStage(3, "Loading library views and search indexes.");
   renderAll();
   if (!window.spcBoySB2?.isOptionsWindow && window.spcBoySB2?.databaseRoots) {
-    const initialTabID = state.activePlaylistTabId;
-    const initialInteractionGeneration = sidebarInteractionGeneration;
-    void (async () => {
-      state.libraryRoots = await window.spcBoySB2.databaseRoots();
-      await uiApp.ui.handleLibraryRootsChanged(state.libraryRoots, { invalidate: false });
-      if (!restoredPlaylistTabs && state.sidebarMode === "consoles"
-          && state.activePlaylistTabId === initialTabID
-          && sidebarInteractionGeneration === initialInteractionGeneration) {
-        const selectedGame = state.databaseGames.find((game) => databaseGameKey(game) === state.selectedDatabaseGameKey);
-        if (selectedGame) await loadDatabaseGame(selectedGame);
-      }
-    })().catch((error) => reportDatabaseSidebarError("load the catalog", error));
+    state.libraryRoots = await window.spcBoySB2.databaseRoots();
+    await uiApp.ui.handleLibraryRootsChanged(state.libraryRoots, { invalidate: false });
+    if (!restoredPlaylistTabs && state.sidebarMode === "consoles") {
+      const selectedGame = state.databaseGames.find((game) => databaseGameKey(game) === state.selectedDatabaseGameKey);
+      if (selectedGame) await loadDatabaseGame(selectedGame);
+    }
   }
   syncTreeSelection();
   scrollSelectedTrackIntoView();

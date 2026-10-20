@@ -17,8 +17,10 @@ SB2's startup progress contract and compact WebKit status card.
 - Keep the shared stage order and timing. A fast startup does not show a brief
   card; ready briefly confirms completion; failure stays visible.
 - Keep the loading card out of the separate Options window.
-- Restore the active playlist before scheduling the sidebar read. The workspace
-  becomes ready without awaiting Games, Files, Gallery, or cache statistics.
+- Restore the active playlist, then preload Games, Files, and Gallery metadata
+  and search indexes before marking startup ready. Do not defer catalog work
+  to the first tab switch, view selection, or search. Cache statistics remain
+  outside the startup wait.
 - Validate catalog location with its schema, never a full active-track count.
 - Archive-cache configuration only saves policy. Read inventory when Options
   requests it; cache enumeration cannot hold up startup.

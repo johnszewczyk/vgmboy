@@ -18,9 +18,9 @@
   share a centered text baseline.
 - Startup reads the shared CocoaSpice catalog through CatalogReader; ScanSong
   remains its writer.
-- Restored playlists and controls become usable before sidebar loading finishes.
-  Games, Paths, and Gallery reuse their loaded snapshots across tabs, including
-  empty results; search filters the current view without reloading the catalog.
+- Startup loads Games, Paths, Gallery metadata, and search indexes before
+  reporting ready. Tabs and view switches reuse those snapshots, including empty
+  results; search filters the current view without reloading the catalog.
 - Development runs can select an isolated catalog with
   `SPCBOY_SB2_CATALOG_PATH`; normal launches keep using the shared default.
 - If startup lasts beyond a short reveal delay, a compact status card shows

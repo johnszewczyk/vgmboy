@@ -6,10 +6,6 @@ function renderAll() {
   app.ui.renderAll();
 }
 
-function refreshDatabaseGamesForVisibleRoots() {
-  return app.ui.refreshDatabaseGamesForVisibleRoots();
-}
-
 async function refreshLibraryRoots() {
   if (!window.spcBoySB2?.databaseRoots) return;
   state.libraryRoots = await window.spcBoySB2.databaseRoots();
@@ -23,13 +19,12 @@ async function handleLibraryRootsChanged(roots, { invalidate = true } = {}) {
   if (invalidate) app.ui.invalidateDatabaseGames();
   renderAll();
   try {
-    if (state.activePlaylistTabKind === "gallery") {
-      await app.ui.loadGalleryGames();
-    } else if (state.sidebarMode === "paths") {
-      await app.ui.loadDatabaseFiles();
-    } else {
-      await refreshDatabaseGamesForVisibleRoots();
-    }
+    await Promise.all([
+      app.ui.loadDatabaseGames(),
+      app.ui.loadDatabaseFiles(),
+      app.ui.loadGalleryGames()
+    ]);
+    if (state.galleryGamesError) throw new Error(state.galleryGamesError);
     persistSettings();
   } finally {
     state.databaseSidebarLoading = false;
