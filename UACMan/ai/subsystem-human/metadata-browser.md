@@ -17,9 +17,11 @@ remain visible in an error disclosure with the path and reader error.
 This is a live filesystem view, not a saved database or media-library manager.
 UACMan reads the bounded UAC manifest and validates wrapper/seek-table
 structure; it does not decompress or extract TAR/audio payloads to populate the
-list. Finder displays macOS's generic document icon for `.uac` files. Hidden files and
-symbolic links are skipped. Choose **Open UAC** to open a single package
-without scanning its parent folder.
+list. The macOS UAC type conforms to the registered
+`com.facebook.zstandard-archive` type, so Zstandard-aware applications can
+recognize `.uac` files while the extension and UAC-specific identity remain
+intact. Hidden files and symbolic links are skipped. Choose **Open UAC** to
+open a single package without scanning its parent folder.
 
 Selecting a package opens its playable tracks in the primary **Tracks** view.
 The member filter searches visible metadata values, role, format, filename, and
