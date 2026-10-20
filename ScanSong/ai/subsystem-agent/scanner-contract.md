@@ -32,6 +32,13 @@ and reader behavior live in
   presentation, upgrades 24 with the source-tag table, and upgrades 23 through
   24 before adding that table. Other legacy or unrelated databases are rejected.
   Player readers accept both 24 and 25 because the tag table is additive.
+- The additive schema-25 `resolved_game_sidebar_buckets` projection stores
+  final game/system counts for both folder-first and metadata-first modes.
+  Writer startup installs and backfills it once for clean roots, without a
+  media rescan. Publication and link maintenance rebuild it inside the same
+  transaction as the existing sidebar buckets; root deletion cascades to it.
+  SQLite triggers invalidate the per-root projection state when tracks, metadata,
+  or dead-source records change, including writes by older schema-25 writers.
 - `track_metadata_tags` preserves source tag order, spelling, and values beside
   the common `track_metadata` projection. Incremental reuse copies tag rows with
   the track; existing pre-25 rows need Deep Scan before the tag inventory is

@@ -99,7 +99,7 @@ enum SB2ArchiveMaterialization {
             mode: enabled ? .enabled : .disabled,
             maximumBytes: limit
         ).save(keys: cacheKeys)
-        return cacheSummary()
+        return ["enabled": enabled, "limitBytes": limit]
     }
 
     static func cacheSummary() -> [String: Any] {

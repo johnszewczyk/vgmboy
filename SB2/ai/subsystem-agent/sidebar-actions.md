@@ -65,6 +65,11 @@ in the SB2 home view.
 - Late shared console-state responses cannot overwrite selection after a tab
   switch or newer sidebar action.
 
+- Sidebar snapshots belong to the catalog session, not individual playlist
+  tabs. Loaded empty results are cached. Search filters those snapshots locally;
+  switching tabs or entering search must not refresh Games, Files, or Gallery.
+  Explicit Reload Library invalidates their generations.
+
 ## Files
 
 - `Sources/SB2/Resources/index.html`

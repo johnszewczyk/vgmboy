@@ -17,6 +17,14 @@ row models, queue publication, and UI.
 
 ## Invariants
 
+- ScanSong optionally publishes the additive schema-25
+  `resolved_game_sidebar_buckets` table for both folder-first and metadata-first
+  system assignment. Clean projections read it directly without joining tracks. Per-root validity
+  and rows are read in one SQLite snapshot; writer triggers invalidate cached
+  projections even when an older writer modifies the catalog.
+  Catalogs predating that publication and dirty projections retain the existing
+  read-only derivation; players never create the table. Detached roots do not
+  force active projections into the dirty path.
 - Only attached and enabled roots are visible to browser projections.
 - Use `schemaVersion()` for startup schema checks; `summary()` also counts all
   track rows and is reserved for callers that need that full count.

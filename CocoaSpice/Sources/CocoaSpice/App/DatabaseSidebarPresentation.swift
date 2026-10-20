@@ -10,7 +10,7 @@ enum DatabaseSidebarPresentation {
 /// Caches prefix-search candidates for the Games sidebar. The input field is
 /// already debounced; this prevents each successive keystroke from rescanning
 /// the complete game list.
-struct DatabaseGameSearchIndex {
+struct DatabaseGameSearchIndex: Sendable {
     private let items: [DatabaseGameItem]
     private var sharedIndex: CatalogSearchIndex
 

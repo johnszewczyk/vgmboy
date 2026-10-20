@@ -153,10 +153,11 @@ public final class CatalogSessionCoordinator: @unchecked Sendable {
 public enum CatalogSidebarReader {
     public static func gameBuckets(
         databaseURL: URL,
-        preferFoldersOverMetadata: Bool = true
+        preferFoldersOverMetadata: Bool = true,
+        naturallySorted: Bool = true
     ) throws -> [CatalogGameBucket] {
         try ReadOnlyCatalog(databaseURL: databaseURL)
-            .gameBuckets(preferFoldersOverMetadata: preferFoldersOverMetadata)
+            .gameBuckets(preferFoldersOverMetadata: preferFoldersOverMetadata, naturallySorted: naturallySorted)
     }
 
     public static func fileBuckets(databaseURL: URL) throws -> [CatalogFileBucket] {

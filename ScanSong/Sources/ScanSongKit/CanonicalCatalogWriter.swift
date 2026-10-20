@@ -170,6 +170,7 @@ public final class CanonicalCatalogWriter: @unchecked Sendable {
         try execute("PRAGMA synchronous=NORMAL;")
         try execute("PRAGMA foreign_keys=ON;")
         try prepareSchema()
+        try installResolvedGameBucketsIfNeeded()
         try recoverInterruptedStages()
     }
 
@@ -872,7 +873,56 @@ public final class CanonicalCatalogWriter: @unchecked Sendable {
         )
     }
 
+    private func installResolvedGameBucketsIfNeeded() throws {
+        let needsInstall = try scalarInt("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='resolved_game_sidebar_state';") == 0
+        try execute("BEGIN IMMEDIATE;")
+        do {
+            if needsInstall {
+                try execute(CanonicalCatalogSchema.resolvedGameBucketsStatement)
+                for statement in CanonicalCatalogSchema.resolvedGameInvalidationStatements { try execute(statement) }
+            }
+            let rootIDs = try query("""
+                SELECT r.id FROM library_roots r
+                LEFT JOIN resolved_game_sidebar_state s ON s.root_id=r.id
+                WHERE r.game_sidebar_buckets_dirty=0 AND COALESCE(s.is_current, 0)=0;
+                """) {
+                sqlite3_column_int64($0, 0)
+            }
+            for rootID in rootIDs { try rebuildResolvedGameBuckets(rootID: rootID) }
+            try execute("COMMIT;")
+        } catch {
+            try? execute("ROLLBACK;")
+            throw error
+        }
+    }
+
+    private func rebuildResolvedGameBuckets(rootID: Int64) throws {
+        try execute("DELETE FROM resolved_game_sidebar_buckets WHERE root_id=?;", [.integer(rootID)])
+        for preferFolders in [true, false] {
+            let system = preferFolders
+                ? "COALESCE(NULLIF(t.browser_system, ''), NULLIF(m.system, ''), '')"
+                : "COALESCE(NULLIF(m.system, ''), NULLIF(t.browser_system, ''), '')"
+            try execute(
+                """
+                INSERT INTO resolved_game_sidebar_buckets(root_id, prefer_folders, browser_game, system, track_count)
+                SELECT t.root_id, ?, t.browser_game, \(system), COUNT(*)
+                FROM tracks t LEFT JOIN track_metadata m ON m.track_id=t.id
+                WHERE t.root_id=? AND NOT EXISTS (
+                    SELECT 1 FROM dead_sources d WHERE d.root_id=t.root_id AND d.path=t.path
+                )
+                GROUP BY t.root_id, t.browser_game, \(system);
+                """,
+                [.integer(preferFolders ? 1 : 0), .integer(rootID)]
+            )
+        }
+        try execute(
+            "INSERT INTO resolved_game_sidebar_state(root_id, is_current) VALUES (?, 1) ON CONFLICT(root_id) DO UPDATE SET is_current=1;",
+            [.integer(rootID)]
+        )
+    }
+
     private func rebuildBuckets(rootID: Int64) throws {
+        try rebuildResolvedGameBuckets(rootID: rootID)
         try execute(
             """
             INSERT INTO game_sidebar_buckets(root_id, browser_game, browser_system, track_count)

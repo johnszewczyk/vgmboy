@@ -684,12 +684,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             guard let settings = args.first as? [String: Any] else { throw BridgeError.invalidArguments }
             let enabled = settings["enabled"] as? Bool ?? true
             let limitBytes = int64(settings["limitBytes"]) ?? ArchiveCachePolicy.defaultLimitBytes
-            let summary = SB2ArchiveMaterialization.configure(enabled: enabled, limitBytes: limitBytes)
-            return [
-                "enabled": enabled,
-                "limitBytes": summary["limitBytes"] ?? limitBytes,
-                "summary": summary
-            ]
+            return SB2ArchiveMaterialization.configure(enabled: enabled, limitBytes: limitBytes)
         case "archiveCacheSummary":
             return SB2ArchiveMaterialization.cacheSummary()
         case "clearArchiveCache":
@@ -780,8 +775,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "requiresRestart": false,
             "reloaded": reloaded,
             "catalog": [
-                "schemaVersion": try catalog.schemaVersion(),
-                "trackCount": try catalog.activeTrackCount()
+                "schemaVersion": try catalog.schemaVersion()
             ]
         ]
     }
@@ -793,7 +787,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     }
 
     nonisolated private static func games(catalogURL: URL) throws -> [String: Any] {
-        let projected = CatalogBrowserProjection.games(from: try openCatalog(catalogURL).gameBuckets())
+        let projected = CatalogBrowserProjection.games(from: try openCatalog(catalogURL).gameBuckets(naturallySorted: false))
         return [
             "games": projected.map(gameResponse),
             "groups": CatalogBrowserProjection.groups(from: projected).map { group in
@@ -817,6 +811,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                     "rootName": URL(fileURLWithPath: game.rootPath).lastPathComponent,
                     "name": game.game,
                     "displayName": game.game,
+                    "searchText": CatalogBrowserSearchText.game(
+                        name: game.game, system: game.system,
+                        rootDisplayName: URL(fileURLWithPath: game.rootPath).lastPathComponent,
+                        displayName: game.game
+                    ),
                     "system": game.system,
                     "consoleGroupName": CatalogGalleryIndex.consoleName(for: game),
                     "sourcePath": game.sourcePath,
@@ -902,7 +901,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
     nonisolated private static func searchGames(_ query: String, catalogURL: URL) throws -> [[String: Any]] {
         let projected = CatalogBrowserProjection.search(
-            CatalogBrowserProjection.games(from: try openCatalog(catalogURL).gameBuckets()),
+            CatalogBrowserProjection.games(from: try openCatalog(catalogURL).gameBuckets(naturallySorted: false)),
             query: query
         )
         return projected.map(gameResponse)

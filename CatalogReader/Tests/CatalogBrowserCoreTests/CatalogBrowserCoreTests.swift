@@ -10,15 +10,15 @@ import Testing
     #expect(SidebarRowInteraction.intent(kind: .group, gesture: .activate) == .activate)
 }
 
-@Test func searchTemporarilyUsesCatalogConsoleView() {
+@Test func searchRetainsSelectedCatalogSource() {
     var state = CatalogBrowserState(mode: .paths)
     #expect(state.view == .paths)
     #expect(state.contentMode == .tree)
 
     state.setQuery("  sonic  ")
     #expect(state.view == .search)
-    #expect(state.contentMode == .database)
-    #expect(state.resultSource == .catalogConsoleIndex)
+    #expect(state.contentMode == .tree)
+    #expect(state.resultSource == .catalogPathIndex)
 
     state.setQuery("")
     #expect(state.view == .paths)

@@ -12,7 +12,7 @@
         },
         {
           "setQuery": "Castlevania",
-          "expected": { "storedMode": "folders", "query": "Castlevania", "view": "search", "contentMode": "database", "resultSource": "database-index", "isTemporary": true }
+          "expected": { "storedMode": "folders", "query": "Castlevania", "view": "search", "contentMode": "folders", "resultSource": "folder-tree", "isTemporary": true }
         },
         {
           "setQuery": "",
@@ -40,7 +40,7 @@
       "steps": [
         {
           "setQuery": "Chrono",
-          "expected": { "storedMode": "folders", "query": "Chrono", "view": "search", "contentMode": "database", "resultSource": "database-index", "isTemporary": true }
+          "expected": { "storedMode": "folders", "query": "Chrono", "view": "search", "contentMode": "folders", "resultSource": "folder-tree", "isTemporary": true }
         },
         {
           "setMode": "database",
@@ -48,7 +48,7 @@
         },
         {
           "setMode": "folders",
-          "expected": { "storedMode": "folders", "query": "Chrono", "view": "search", "contentMode": "database", "resultSource": "database-index", "isTemporary": true }
+          "expected": { "storedMode": "folders", "query": "Chrono", "view": "search", "contentMode": "folders", "resultSource": "folder-tree", "isTemporary": true }
         },
         {
           "setQuery": "",
@@ -72,11 +72,11 @@
       "steps": [
         {
           "setQuery": "Castlevania",
-          "expected": { "storedMode": "folders", "query": "Castlevania", "view": "search", "contentMode": "database", "resultSource": "database-index", "isTemporary": true }
+          "expected": { "storedMode": "folders", "query": "Castlevania", "view": "search", "contentMode": "folders", "resultSource": "folder-tree", "isTemporary": true }
         },
         {
           "setQuery": "Metroid",
-          "expected": { "storedMode": "folders", "query": "Metroid", "view": "search", "contentMode": "database", "resultSource": "database-index", "isTemporary": true }
+          "expected": { "storedMode": "folders", "query": "Metroid", "view": "search", "contentMode": "folders", "resultSource": "folder-tree", "isTemporary": true }
         }
       ]
     }

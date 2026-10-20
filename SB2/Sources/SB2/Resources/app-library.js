@@ -16,16 +16,16 @@ async function refreshLibraryRoots() {
   renderAll();
 }
 
-async function handleLibraryRootsChanged(roots) {
+async function handleLibraryRootsChanged(roots, { invalidate = true } = {}) {
   state.libraryRoots = Array.isArray(roots) ? roots : [];
   state.databaseSidebarLoading = true;
   state.databaseSidebarError = "";
-  state.databaseFiles = [];
-  state.databaseFileTree = [];
+  if (invalidate) app.ui.invalidateDatabaseGames();
   renderAll();
   try {
-    if (state.sidebarMode === "paths") {
-      app.ui.invalidateDatabaseGames();
+    if (state.activePlaylistTabKind === "gallery") {
+      await app.ui.loadGalleryGames();
+    } else if (state.sidebarMode === "paths") {
       await app.ui.loadDatabaseFiles();
     } else {
       await refreshDatabaseGamesForVisibleRoots();
@@ -62,7 +62,7 @@ async function chooseDatabaseLocation() {
   const result = await window.spcBoySB2?.chooseDatabaseLocation?.();
   if (!result) return;
   state.databaseLocation = result;
-  state.databaseLocationStatus = `Validated ${Number(result.catalog?.trackCount || 0).toLocaleString()} tracks. Restart SPCBoy to use this database.`;
+  state.databaseLocationStatus = "Catalog validated. Restart SPCBoy to use this database.";
   renderAll();
 }
 

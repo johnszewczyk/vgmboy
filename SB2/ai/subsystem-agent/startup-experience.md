@@ -17,10 +17,16 @@ SB2's startup progress contract and compact WebKit status card.
 - Keep the shared stage order and timing. A fast startup does not show a brief
   card; ready briefly confirms completion; failure stays visible.
 - Keep the loading card out of the separate Options window.
-- Restore the active playlist tab before loading the sidebar projection so a
-  Gallery tab selects Games and startup reads only that sidebar mode.
-- Use the archive-cache configuration response for the initial inventory; do
-  not immediately call `archiveCacheSummary` to enumerate it again.
+- Restore the active playlist before scheduling the sidebar read. The workspace
+  becomes ready without awaiting Games, Files, Gallery, or cache statistics.
+- Validate catalog location with its schema, never a full active-track count.
+- Archive-cache configuration only saves policy. Read inventory when Options
+  requests it; cache enumeration cannot hold up startup.
+- Games and Files snapshots have explicit loaded flags (including empty results)
+  and shared in-flight promises. Tab activation reuses them; explicit catalog
+  reload invalidates all snapshots and rejects older generations.
+- Gallery owns its independent projection and search; it must not load Games
+  merely to populate its console sidebar.
 - Preserve app-specific details and visual treatment in SB2 resources.
 
 ## Files

@@ -11,11 +11,11 @@
 - Sidebar search uses the single database search field.
 - Sidebar placeholder text is `Search Library`.
 - The native field delays a new non-empty query 250 ms, then follow-up edits 100 ms. Pending AppKit text is never overwritten by unrelated SwiftUI refreshes.
-- A non-empty query is an effective temporary Games view that filters the indexed game list while preserving the stored Games/Files mode. Clearing the query restores that mode unchanged.
-- `SidebarViewResolution` is the production effective-view owner and executes the shared CocoaSpice/SPCBoy search-view contract. It preserves the stored mode while exposing Search as database content and normalizes whitespace-only queries as no search.
+- Search filters the loaded Games or Files snapshot in the selected mode. Typing and clearing the field never switch the catalog source.
+- `SidebarViewResolution` is the production effective-view owner and executes the shared CocoaSpice/SPCBoy search-view contract. It preserves the stored mode and its content source while exposing Search as a temporary presentation and normalizes whitespace-only queries as no search.
 - Search results stay inside the same dense database list; `Group by Console` applies to those results.
 - Search should not interrupt playback.
-- The Files tree is not searched while the temporary Games view is active.
+- Files search filters its cached path index and retains tree presentation.
 
 ## Rules
 
