@@ -38,6 +38,7 @@ const EMPTY_DATABASE_GAMES = [];
 let playlistVirtualRowHeight = 28;
 let playlistViewportFrame = 0;
 let playlistTabsSaveTimer = 0;
+let playlistTabsReady = false;
 let playlistTabsSaveChain = Promise.resolve();
 let playlistTabTransitionChain = Promise.resolve();
 let playlistContentRequestGeneration = 0;
@@ -165,31 +166,37 @@ function syncActivePlaylistTab() {
 }
 
 function persistPlaylistTabs() {
-  if (window.spcBoySB2?.isOptionsWindow || !window.spcBoySB2?.playlistTabsSave) return;
+  if (!playlistTabsReady || window.spcBoySB2?.isOptionsWindow || !window.spcBoySB2?.playlistTabsSave) return;
   syncActivePlaylistTab();
   window.clearTimeout(playlistTabsSaveTimer);
   playlistTabsSaveTimer = window.setTimeout(() => {
-    playlistTabsSaveTimer = 0;
-    const payload = {
-      version: 1,
-      activeID: state.activePlaylistTabId,
-      tabs: (state.playlistTabs || []).map((tab) => ({
-        id: tab.id,
-        title: tab.title,
-        kind: tab.kind === "gallery" ? "gallery" : "playlist",
-        playlist: tab.playlist || [],
-        catalogPlaylistColumnContentHints: tab.catalogPlaylistColumnContentHints || null,
-        selectedTrackId: tab.selectedTrackId || null,
-        selectedTrackIds: tab.selectedTrackIds || [],
-        playlistSelectionAnchorId: tab.playlistSelectionAnchorId || null,
-        scrollTop: Math.max(0, Number(tab.scrollTop) || 0)
-      }))
-    };
-    playlistTabsSaveChain = playlistTabsSaveChain
-      .catch(() => {})
-      .then(() => window.spcBoySB2.playlistTabsSave(payload))
-      .catch((error) => console.error("[SPCBoy] playlist tabs could not be saved", error));
+    void flushPlaylistTabs().catch((error) => console.error("[SPCBoy] playlist tabs save failed", error));
   }, 500);
+}
+
+async function flushPlaylistTabs() {
+  window.clearTimeout(playlistTabsSaveTimer);
+  playlistTabsSaveTimer = 0;
+  if (!playlistTabsReady || window.spcBoySB2?.isOptionsWindow || !window.spcBoySB2?.playlistTabsSave) return playlistTabsSaveChain;
+  await playlistTabTransitionChain;
+  syncActivePlaylistTab();
+  const payload = {
+    version: 1,
+    activeID: state.activePlaylistTabId,
+    tabs: (state.playlistTabs || []).map((tab) => ({
+      id: tab.id, title: tab.title,
+      kind: tab.kind === "gallery" ? "gallery" : "playlist",
+      playlist: tab.playlist || [],
+      catalogPlaylistColumnContentHints: tab.catalogPlaylistColumnContentHints || null,
+      selectedTrackId: tab.selectedTrackId || null,
+      selectedTrackIds: [...(tab.selectedTrackIds || [])],
+      playlistSelectionAnchorId: tab.playlistSelectionAnchorId || null,
+      scrollTop: Math.max(0, Number(tab.scrollTop) || 0)
+    }))
+  };
+  playlistTabsSaveChain = playlistTabsSaveChain.catch(() => {})
+    .then(() => window.spcBoySB2.playlistTabsSave(payload));
+  return playlistTabsSaveChain;
 }
 
 function restorePlaylistTabView(tab, { loadMissingGames = true, loadGalleryData = true } = {}) {
@@ -744,7 +751,7 @@ function schedulePlaylistViewportRender() {
   if (!playlistUsesVirtualRows() || playlistViewportFrame) return;
   playlistViewportFrame = window.requestAnimationFrame(() => {
     playlistViewportFrame = 0;
-    renderPlaylist({ sort: false, persistTab: false, preserveVirtualRows: true });
+    renderPlaylistViewport();
   });
 }
 
@@ -768,12 +775,7 @@ function measurePlaylistRowHeight() {
     : (anchorIndex * measuredHeight) + Math.min(offsetWithinAnchorRow, measuredHeight);
 
   playlistVirtualRowHeight = measuredHeight;
-  renderPlaylist({
-    sort: false,
-    persistTab: false,
-    virtualScrollTop: adjustedScrollTop,
-    preserveVirtualRows: true
-  });
+  renderPlaylistViewport({ scrollTop: adjustedScrollTop });
   if (refs.playlistBodyWrap) refs.playlistBodyWrap.scrollTop = adjustedScrollTop;
   const tab = findActivePlaylistTab();
   if (tab) tab.scrollTop = Math.max(0, Number(refs.playlistBodyWrap?.scrollTop) || 0);
@@ -3359,9 +3361,17 @@ function playlistAutoSizeSignature() {
   return `${columns.map((column) => column.id).join("\u0001")}\u0002${state.playlist.length}\u0002${firstID}\u0002${lastID}`;
 }
 
+const playlistSelectionSets = new WeakMap();
+function playlistSelectedIDs() {
+  const ids = state.selectedTrackIds;
+  let selected = playlistSelectionSets.get(ids);
+  if (!selected) { selected = new Set(ids); playlistSelectionSets.set(ids, selected); }
+  return selected;
+}
+
 function updatePlaylistRowState(row, trackId) {
   if (!row) return;
-  row.classList.toggle("is-selected", state.selectedTrackIds.includes(trackId));
+  row.classList.toggle("is-selected", playlistSelectedIDs().has(trackId));
   row.classList.toggle("is-current", state.activePlaylistTabId === state.playbackTabId && state.currentTrackId === trackId);
 }
 
@@ -3482,7 +3492,7 @@ function createPlaylistRow(track, rowIndex) {
   row.tabIndex = 0;
   row.setAttribute("aria-label", `${track.title || track.filename || "Track"}`);
   const isCurrent = state.activePlaylistTabId === state.playbackTabId && state.currentTrackId === track.id;
-  row.className = `playlist-row${state.selectedTrackIds.includes(track.id) ? " is-selected" : ""}${isCurrent ? " is-current" : ""}`;
+  row.className = `playlist-row${playlistSelectedIDs().has(track.id) ? " is-selected" : ""}${isCurrent ? " is-current" : ""}`;
 
   for (const column of orderedColumns()) {
     row.appendChild(renderPlaylistCell(track, column, rowIndex));
@@ -3572,7 +3582,7 @@ function appendPlaylistRowsInBatches(generation, startIndex = 0, endIndex = stat
   else window.requestAnimationFrame(appendBatch);
 }
 
-function renderPlaylist({ sort = true, persistTab = true, virtualScrollTop = null, preserveVirtualRows = false } = {}) {
+function renderPlaylist({ sort = true, persistTab = true } = {}) {
   if (isGalleryActive()) {
     refs.playlistScrollWrap?.classList.add("is-hidden");
     refs.galleryView?.classList.remove("is-hidden");
@@ -3600,13 +3610,10 @@ function renderPlaylist({ sort = true, persistTab = true, virtualScrollTop = nul
   }
   if (!state.selectedTrackId && state.selectedTrackIds.length) state.selectedTrackId = state.selectedTrackIds.at(-1) || null;
   const virtualized = playlistUsesVirtualRows();
-  const preserveWindow = preserveVirtualRows && virtualized;
-  if (!preserveWindow) {
-    refs.playlistBody.innerHTML = "";
-    playlistRowsByTrackId.clear();
-    selectedPlaylistRow = null;
-    currentPlaylistRow = null;
-  }
+  refs.playlistBody.innerHTML = "";
+  playlistRowsByTrackId.clear();
+  selectedPlaylistRow = null;
+  currentPlaylistRow = null;
   if (sort && state.playlistSortEnabled && !isCatalogPlaylistProjection()) {
     void applyProjectionPlaylistSort()
       .then((didSort) => { if (didSort) renderPlaylist({ sort: false }); })
@@ -3639,29 +3646,20 @@ function renderPlaylist({ sort = true, persistTab = true, virtualScrollTop = nul
     return;
   }
 
-  const scrollTop = virtualScrollTop === null
-    ? preservedScrollTop
-    : Math.max(0, Number(virtualScrollTop) || 0);
+  renderPlaylistViewport({ scrollTop: preservedScrollTop, preserveRows: false });
+}
+
+function renderPlaylistViewport({ scrollTop = refs.playlistBodyWrap?.scrollTop || 0, preserveRows = true } = {}) {
+  if (isGalleryActive() || !playlistUsesVirtualRows()) return;
   const viewportHeight = refs.playlistBodyWrap?.clientHeight || (playlistVirtualRowHeight * 24);
-  const firstVisibleRow = Math.max(0, Math.floor(scrollTop / playlistVirtualRowHeight) - PLAYLIST_VIRTUAL_OVERSCAN);
-  const lastVisibleRow = Math.min(
-    state.playlist.length,
-    Math.ceil((scrollTop + viewportHeight) / playlistVirtualRowHeight) + PLAYLIST_VIRTUAL_OVERSCAN
-  );
-  if (preserveWindow) {
-    reconcilePlaylistVirtualRows(firstVisibleRow, lastVisibleRow);
-    return;
-  }
-  appendPlaylistRowsInBatches(
-    generation,
-    firstVisibleRow,
-    lastVisibleRow,
-    {
-      top: firstVisibleRow * playlistVirtualRowHeight,
-      bottom: (state.playlist.length - lastVisibleRow) * playlistVirtualRowHeight
-    },
-    { synchronous: true }
-  );
+  const first = Math.max(0, Math.floor(scrollTop / playlistVirtualRowHeight) - PLAYLIST_VIRTUAL_OVERSCAN);
+  const last = Math.min(state.playlist.length,
+    Math.ceil((scrollTop + viewportHeight) / playlistVirtualRowHeight) + PLAYLIST_VIRTUAL_OVERSCAN);
+  if (preserveRows) reconcilePlaylistVirtualRows(first, last);
+  else appendPlaylistRowsInBatches(playlistRenderGeneration, first, last, {
+    top: first * playlistVirtualRowHeight,
+    bottom: (state.playlist.length - last) * playlistVirtualRowHeight
+  }, { synchronous: true });
   if (refs.playlistBodyWrap) refs.playlistBodyWrap.scrollTop = scrollTop;
 }
 
@@ -3717,40 +3715,6 @@ function applyUISettings() {
   rootStyle.setProperty("--selection-animation-duration", `${state.selectionAnimationEnabled ? state.selectionAnimationMilliseconds : 0}ms`);
   rootStyle.setProperty("--titlebar-text-color", state.titlebarTextColor);
   rootStyle.setProperty("--titlebar-font-weight", state.titlebarBold ? "700" : "400");
-}
-
-function appearanceSettings() {
-  return {
-    uiItemSpacingRem: state.uiItemSpacingRem,
-    sidebarWidthPercent: state.sidebarWidthPercent,
-    uiChromeFontSizePt: state.uiChromeFontSizePt,
-    contentFontSizePt: state.sidebarFontSizePt,
-    sidebarFontSizePt: state.sidebarFontSizePt,
-    sidebarTextColor: state.sidebarTextColor,
-    sidebarMonospace: state.sidebarMonospace,
-    sidebarPathCounts: state.sidebarPathCounts,
-    playlistFontSizePt: state.playlistFontSizePt,
-    playlistTextColor: state.playlistTextColor,
-    playlistHeaderTextColor: state.playlistHeaderTextColor,
-    playlistMonospace: state.playlistMonospace,
-    applicationMonospace: state.applicationMonospace,
-    uiChromeMonospace: state.uiChromeMonospace,
-    contentMonospace: state.contentMonospace,
-    playlistHeaderBold: state.playlistHeaderBold,
-    titlebarTextColor: state.titlebarTextColor,
-    titlebarBold: state.titlebarBold,
-    accentColor: state.accentColor,
-    uiChromeColor: state.uiChromeColor,
-    uiChromePrimaryColor: state.uiChromePrimaryColor,
-    uiChromeSecondaryColor: state.uiChromeSecondaryColor,
-    uiChromePaneColor: state.uiChromePaneColor,
-    uiChromeHoverColor: state.uiChromeHoverColor,
-    uiChromeDividerColor: state.uiChromeDividerColor
-  };
-}
-
-function broadcastAppearanceSettings() {
-  window.spcBoySB2?.setAppearanceSettings?.(appearanceSettings());
 }
 
 function formatArchiveCacheSummary(summary) {
@@ -4213,7 +4177,6 @@ function setPlaybackSpeedEnabled(backendId, enabled) {
 function setUiItemSpacing(nextSpacingRem) {
   state.uiItemSpacingRem = uiApp.normalizeItemSpacing(nextSpacingRem);
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
@@ -4222,7 +4185,6 @@ function setContentFontSize(nextSize) {
   state.sidebarFontSizePt = size;
   state.playlistFontSizePt = size;
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
@@ -4231,7 +4193,6 @@ function setUIChromeFontSize(nextSize) {
   state.uiChromeFontSizePt = size;
   state.uiFontSizePt = size;
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
@@ -4242,7 +4203,6 @@ function setFontSize(nextSize) {
 function setSidebarWidth(nextWidth) {
   state.sidebarWidthPercent = uiApp.normalizeSidebarWidth(nextWidth);
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
@@ -4261,21 +4221,18 @@ function setSidebarTextColor(color) {
   state.sidebarTextColor = normalized;
   state.playlistTextColor = normalized;
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
 function setSidebarMonospace(enabled) {
   state.sidebarMonospace = Boolean(enabled);
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
 function setSidebarPathCounts(enabled) {
   state.sidebarPathCounts = Boolean(enabled);
   persistSettings();
-  broadcastAppearanceSettings();
   renderedDatabaseGames = null;
   renderSidebar();
 }
@@ -4284,28 +4241,24 @@ function commitPlaylistFontSizeInput(rawValue) {
   const parsedValue = uiApp.parseNumericInput(rawValue);
   state.playlistFontSizePt = uiApp.normalizeFontSize(parsedValue ?? state.playlistFontSizePt);
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
 function setPlaylistTextColor(color) {
   state.playlistTextColor = uiApp.normalizeFontColor(color);
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
 function setPlaylistHeaderTextColor(color) {
   state.playlistHeaderTextColor = uiApp.normalizeFontColor(color);
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
 function setPlaylistMonospace(enabled) {
   state.playlistMonospace = Boolean(enabled);
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
@@ -4315,7 +4268,6 @@ function setApplicationMonospace(enabled) {
   state.sidebarMonospace = value;
   state.playlistMonospace = value;
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
@@ -4324,28 +4276,24 @@ function setUIChromeMonospace(enabled) {
   state.uiChromeMonospace = value;
   state.applicationMonospace = value;
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
 function setPlaylistHeaderBold(enabled) {
   state.playlistHeaderBold = Boolean(enabled);
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
 function setTitlebarTextColor(color) {
   state.titlebarTextColor = uiApp.normalizeFontColor(color);
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
 function setTitlebarBold(enabled) {
   state.titlebarBold = Boolean(enabled);
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
@@ -4431,14 +4379,13 @@ function applyAppearanceSettings(settings) {
   })) {
     if (settings[key] !== undefined) state[key] = uiApp.normalizeUIColor(settings[key], fallback);
   }
-  persistSettings();
+  uiApp.didApplySettingsPatch(settings);
   renderAll();
 }
 
 function setAccentColor(color) {
   state.accentColor = uiApp.normalizeAccentColor(color);
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
@@ -4446,7 +4393,6 @@ function setUIChromeColor(color) {
   state.uiChromePrimaryColor = uiApp.normalizeUIColor(color, "rgb(30 30 30)");
   state.uiChromeColor = state.uiChromePrimaryColor;
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
@@ -4460,7 +4406,6 @@ function setUIChromePaletteColor(role, color) {
   state[key] = uiApp.normalizeUIColor(color, fallbacks[role]);
   if (role === "primary") state.uiChromeColor = state[key];
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
@@ -4468,7 +4413,6 @@ function commitSidebarWidthInput(rawValue) {
   const parsedValue = uiApp.parseNumericInput(rawValue);
   state.sidebarWidthPercent = uiApp.normalizeSidebarWidth(parsedValue ?? state.sidebarWidthPercent);
   persistSettings();
-  broadcastAppearanceSettings();
   renderAll();
 }
 
@@ -4678,6 +4622,7 @@ async function bootstrap() {
   const restoredPlaylistTabs = !window.spcBoySB2?.isOptionsWindow
     && await restorePlaylistTabs(savedPlaylistTabs, { loadMissingGames: false, loadGalleryData: false });
   if (!restoredPlaylistTabs && !window.spcBoySB2?.isOptionsWindow) await ensurePlaylistTab();
+  if (!window.spcBoySB2?.isOptionsWindow) playlistTabsReady = true;
 
   if (!window.spcBoySB2?.isOptionsWindow && window.spcBoySB2?.databaseRoots) {
     setStartupStage(3, "Loading the selected library view and its search results.");
@@ -4753,6 +4698,7 @@ uiApp.ui = {
   renderPlaylist,
   refreshPlaylistFavoriteRows,
   renderPlaylistTabs,
+  flushPlaylistTabs,
   createPlaylistTab,
   activatePlaylistTab,
   activatePlaylistTabAtIndex,

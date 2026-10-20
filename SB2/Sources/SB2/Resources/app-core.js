@@ -178,7 +178,6 @@ const state = {
   }
 };
 
-let settingsSaveChain = Promise.resolve();
 
 const audioEngine = {
   context: null,
@@ -438,12 +437,13 @@ async function loadSettings() {
     state.selectionAnimationEnabled = parsed.selectionAnimationEnabled !== false;
     state.mainWindowAlwaysOnTop = Boolean(parsed.mainWindowAlwaysOnTop);
     state.settingsWindowAlwaysOnTop = Boolean(parsed.settingsWindowAlwaysOnTop);
+    settingsPersistence.initialize();
   } catch {
     return;
   }
 }
 
-function persistSettings() {
+function settingsSnapshot() {
   const settings = {
     manualPlayTimeSeconds: state.manualPlayTimeSeconds,
     unknownDurationSeconds: state.unknownDurationSeconds,
@@ -517,12 +517,17 @@ function persistSettings() {
     mainWindowAlwaysOnTop: state.mainWindowAlwaysOnTop,
     settingsWindowAlwaysOnTop: state.settingsWindowAlwaysOnTop
   };
-  settingsSaveChain = settingsSaveChain
-    .catch(() => {})
-    .then(() => window.spcBoySB2.frontendSettingsSave(settings))
-    .catch((error) => console.error("[SPCBoy] native settings save failed", error));
-  return settingsSaveChain;
+  return settings;
 }
+
+const settingsPersistence = window.SB2SettingsPersistence.create({
+  snapshot: settingsSnapshot,
+  send: (patch) => window.spcBoySB2.frontendSettingsSave(patch)
+});
+function persistSettings() { return settingsPersistence.save(); }
+function flushSettings() { return settingsPersistence.flush(); }
+function acceptSettingsPatch(patch) { return settingsPersistence.accept(patch); }
+function didApplySettingsPatch(patch) { settingsPersistence.applied(patch); }
 
 function formatTime(totalSeconds) {
   const whole = Math.max(0, Math.round(totalSeconds));
@@ -726,6 +731,9 @@ window.SB2App = {
   refs,
   loadSettings,
   persistSettings,
+  acceptSettingsPatch,
+  didApplySettingsPatch,
+  flushSettings,
   formatTime,
   normalizePlayTime,
   normalizeLongPlayTime,

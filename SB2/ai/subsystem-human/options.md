@@ -56,3 +56,7 @@
   applies in the main window and the standalone Options window.
 - Reload Library refreshes the read-only catalog projections used by the
   sidebar. ScanSong remains the catalog writer.
+
+Settings updates persist only the fields changed by that window, preserving
+other windows’ independent edits. Receiving a settings update does not save an
+older full snapshot back over newer values.

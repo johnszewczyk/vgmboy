@@ -86,3 +86,6 @@
   resizing follows display frames while dragging and resumes configured easing
   after release. Setting inputs may use the full
   control height; they are fields rather than action buttons.
+
+Tab changes are saved during use. Closing a window or quitting waits for pending
+workspace and preference writes; a failed save leaves the window open.
