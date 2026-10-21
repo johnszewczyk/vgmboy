@@ -1,38 +1,39 @@
 # Hosted Site Player
 
-## Playback
+## Player
 
-The private site's SPCBOY page streams a selected track as 64 kbps AAC. Source
-packages remain compressed; the server reads and decodes only the requested
-track. The shared player and queue stay available while members move between
-site pages. Tracks linked from member profiles, Community activity, Feed
-listening snapshots, and Played can be played or added to the queue.
+SBONLINE's authenticated SPCBOY page follows SB2's dark desktop presentation:
+a compact title strip, left transport and search toolbars, console/game sidebar,
+dense aligned track columns, Gallery, and a narrow status footer. Options uses
+a section sidebar and shaded section headers. Phone layouts retain the responsive
+library, player controls, and drawers.
 
-Long Play offers Off, 5, 10, or 15 minutes. Playback speed ranges from 0.5× to
-2×. Account favorites and personal Recents are available in the player; the
-site-level Played page includes plays from all members, with profile icons,
-Today/Yesterday filters, and daily counts.
+The toolbar uses the existing hosted player for previous/next, Play/Pause, Stop,
+EQ, Long Play, volume, queue, and Options. Stop resets the selected track to the
+beginning and retains its queue. Account pages retain their existing theme;
+Profile, Listening, Favorites, Spotlight, and owner tools remain in the account
+menu.
 
-The player also supports whole-album favorites and a Shuffle Favorites action.
-Its Gallery view groups albums under console tabs and shows only games with
-artwork. The deployment builds a private, optimized 240-pixel square PNG cache
-from art inside compressed UACs; package paths and original artwork stay server-side.
-Album favorites appear on member profiles and the shared favorites page, where
-Play album adds that album to the shared player's queue.
+Selected tracks stream as 64 kbps AAC. Source packages stay compressed on the
+server; only the requested member is materialized for playback. Browser EQ and
+fractional playback speed use the existing audio engine. Long Play supports
+whole-minute durations from 1 through 30. Favorites, album favorites, Recent,
+Gallery, and the shared player retain their hosted API and account contracts.
+The retired Chat and generic Feed do not appear in the player.
 
-The hosted player is integrated with the site's passkey accounts, profiles,
-Community, shared Feed, and Now Playing. See the
-[private-admin behavior note](../../../../MathBook/ai/subsystem-human/private-admin.md)
-for the complete site workflow.
+The web UI is a hosted adaptation, not the macOS host: native window controls,
+local filesystem browsing, catalog maintenance, and native decoder routing are
+not browser controls. Production behavior and deployment remain owned by the
+[MathBook private-admin notes](../../../../MathBook/ai/subsystem-human/private-admin.md).
 
 ## Standalone Concept
 
-[`prototypes/mobile/index.html`](../../prototypes/mobile/index.html) is a
-visual concept with sample entries. It does not connect to the hosted catalog,
-accounts, or audio stream.
+[`prototypes/mobile/index.html`](../../prototypes/mobile/index.html) is an older
+sample-only visual concept. It is not the hosted player or a playback test.
 
 ## Files
 
-- `prototypes/mobile/index.html`
-- [MathBook player source](../../../../MathBook/private-admin/static/accounts/site-player.js)
-- [MathBook production template](../../../../MathBook/private-admin/templates/accounts/base.html)
+- [Hosted player template](../../../../MathBook/private-admin/templates/accounts/spcboy.html)
+- [SB2-style hosted skin](../../../../MathBook/private-admin/static/accounts/sbonline.css)
+- [Hosted player adapter](../../../../MathBook/private-admin/static/accounts/site-player.js)
+- [Hosted library UI](../../../../MathBook/private-admin/static/accounts/spcboy.js)
