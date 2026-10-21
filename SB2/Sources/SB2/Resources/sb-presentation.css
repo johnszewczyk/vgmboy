@@ -2,11 +2,11 @@
 body {
   --sb-motion-duration: var(--selection-animation-duration, var(--site-motion-duration, 200ms));
   --sb-motion-ease: cubic-bezier(.2, 0, 0, 1);
-  --sb-scroll-fade-size: 24px;
+  --sb-scroll-fade-size: 1rem;
 }
 .sb-scroll-fade {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--sb-scroll-fade-size)), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--sb-scroll-fade-size)), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--sb-scroll-fade-size)), rgb(0 0 0 / .5) calc(100% - var(--sb-scroll-fade-size) / 2), rgb(0 0 0 / .25));
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--sb-scroll-fade-size)), rgb(0 0 0 / .5) calc(100% - var(--sb-scroll-fade-size) / 2), rgb(0 0 0 / .25));
   padding-bottom: var(--sb-scroll-fade-size) !important;
 }
 .sb-column-dragging { opacity: .4; }

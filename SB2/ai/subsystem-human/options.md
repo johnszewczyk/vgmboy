@@ -65,10 +65,10 @@ Settings updates persist only the fields changed by that window, preserving
 other windows’ independent edits. Receiving a settings update does not save an
 older full snapshot back over newer values.
 
-- Row Gap uses whole pixels (0–32), defaults to 1 px, and applies equally to
+- Row Gap uses whole pixels (0–32), defaults to 0 px, and applies equally to
   sidebar and playlist rows. Saved positive rem spacing migrates to equivalent
-  pixels; the previous zero/unset default becomes 1 px. Font sizes do not scale
-  the saved gap. Both lists fade over their bottom 24 px and retain scroll room
+  pixels; the previous zero/unset default stays 0 px. Font sizes do not scale
+  the saved gap. Both lists fade over their bottom 1 rem (0%, 50%, 75% background coverage) and retain scroll room
   to reveal the final row.
 - Drag playlist headings to reorder them. Neighboring headings slide aside
   using the interface motion preference; Escape cancels the reorder. The open
