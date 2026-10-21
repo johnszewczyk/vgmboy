@@ -5,16 +5,21 @@
 SBONLINE's authenticated SPCBOY page follows SB2's dark desktop presentation:
 a compact title strip, left transport and search toolbars, console/game sidebar,
 dense aligned track columns, Gallery, and a narrow status footer. Options uses
-a section sidebar and shaded section headers. Phone layouts retain the responsive
-library, player controls, and drawers.
+a full-width top drawer with a section sidebar and shaded headers. Playlist tabs
+remember each account's browsing contexts in the current browser; plus adds a
+fresh tab, and album/track context menus can open foreground or background tabs.
+Phones retain the top playback bar, saved-tab strip, larger track targets, and
+responsive drawers. Desktop and phone site navigation retain the shared player.
+Interface options adjust playlist/sidebar font sizes and SB2-style motion timing.
+Site Favorites uses dense desktop rows and phone cards.
 
 The toolbar uses the existing hosted player for previous/next, Play/Pause, Stop,
 EQ, Long Play, volume, queue, and Options. Stop resets the selected track to the
-beginning and retains its queue. Account pages retain their existing theme;
+beginning and retains its queue. The entire site uses the same charcoal/cyan theme;
 Profile, Listening, Favorites, Spotlight, and owner tools remain in the account
 menu.
 
-Selected tracks stream as 64 kbps AAC. Source packages stay compressed on the
+Selected tracks stream as 128 kbps AAC. Source packages stay compressed on the
 server; only the requested member is materialized for playback. Browser EQ and
 fractional playback speed use the existing audio engine. Long Play supports
 whole-minute durations from 1 through 30. Favorites, album favorites, Recent,
