@@ -21,8 +21,8 @@ menu.
 
 Selected tracks stream as 128 kbps AAC. Source packages stay compressed on the
 server; only the requested member is materialized for playback. Browser EQ and
-fractional playback speed use the existing audio engine. Long Play supports
-whole-minute durations from 1 through 30. Favorites, album favorites, Recent,
+fractional playback speed use the existing audio engine. Long Play supports seconds or M:SS/H:MM:SS durations; zero means unlimited,
+within the hosted 60-minute session limit. Existing saved durations migrate. Favorites, album favorites, Recent,
 Gallery, and the shared player retain their hosted API and account contracts.
 The retired Chat and generic Feed do not appear in the player.
 
