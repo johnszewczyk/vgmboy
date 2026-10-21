@@ -188,9 +188,9 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
         if uiItemSpacingPx == nil {
             let legacy = uiItemSpacingRem ?? 0
             let pixels = legacy * Double(uiChromeFontSizePt ?? 10) * 8 / 3
-            uiItemSpacingPx = legacy > 0 && pixels.isFinite ? Int(min(32, max(0, pixels.rounded()))) : 1
+            uiItemSpacingPx = legacy > 0 && pixels.isFinite ? Int(min(32, max(0, pixels.rounded()))) : 0
         }
-        uiItemSpacingPx = min(32, max(0, uiItemSpacingPx ?? 1))
+        uiItemSpacingPx = min(32, max(0, uiItemSpacingPx ?? 0))
         uiItemSpacingRem = nil
         // SB2 is intentionally database-only. Clear legacy local-browser
         // values whenever preferences cross the native persistence boundary.

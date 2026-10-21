@@ -85,7 +85,7 @@ const state = {
   manualPlayTimeSeconds: DEFAULT_LONG_PLAY_SECONDS,
   unknownDurationSeconds: 150,
   spcFadeSeconds: DEFAULT_PLAY_FADE_SECONDS,
-  uiItemSpacingPx: 1,
+  uiItemSpacingPx: 0,
   uiFontSizePt: 10,
   uiChromeFontSizePt: 10,
   sidebarFontSizePt: 10,
@@ -361,7 +361,7 @@ async function loadSettings() {
     state.aacExportDirectory = typeof parsed.aacExportDirectory === "string" && parsed.aacExportDirectory
       ? parsed.aacExportDirectory
       : (await window.spcBoySB2.defaultAACExportDirectory?.()) || "";
-    state.uiItemSpacingPx = normalizeItemSpacing(parsed.uiItemSpacingPx ?? (Number(parsed.uiItemSpacingRem) > 0 ? Number(parsed.uiItemSpacingRem) * (Number(parsed.uiChromeFontSizePt) || 10) * 8 / 3 : 1));
+    state.uiItemSpacingPx = normalizeItemSpacing(parsed.uiItemSpacingPx ?? (Number(parsed.uiItemSpacingRem) > 0 ? Number(parsed.uiItemSpacingRem) * (Number(parsed.uiChromeFontSizePt) || 10) * 8 / 3 : 0));
     // SB2 is a database-backed player. Older preference files may still
     // contain local-browser state, but it must never reactivate that UI.
     state.rootPath = null;
@@ -614,7 +614,7 @@ function normalizeItemSpacing(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric)
     ? Math.max(0, Math.min(32, Math.round(numeric)))
-    : 1;
+    : 0;
 }
 
 function normalizeFontSize(value) {
