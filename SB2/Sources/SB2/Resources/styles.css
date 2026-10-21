@@ -15,8 +15,8 @@
   --line: rgb(40 40 40);
   --ui-font-size-pt: 10;
   --sidebar-width-percent: 20;
-  --item-spacing-rem: 0;
-  --list-item-padding-y: calc(var(--item-spacing-rem) * 1rem);
+  --item-spacing-px: 1px;
+  --list-item-padding-y: 0;
   --progress-percent: 0%;
   --ui-font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mono-font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
@@ -47,7 +47,7 @@
   --column-resize-duration: 200ms;
   --selection-animation-duration: 200ms;
   --selection-animation-easing: cubic-bezier(0.2, 0, 0, 1);
-  --column-resize-easing: ease;
+  --column-resize-easing: var(--selection-animation-easing);
   --control-glyph-size: 0.33rem;
   --status-clean: limegreen;
   --status-attention: orange;
@@ -1764,7 +1764,6 @@ body.sb2-frontend {
   --top-toolbar-inset: var(--sb-toolbar-inset);
   --toolbar-gap: var(--sb-toolbar-gap);
   --control-radius: var(--sb-button-radius);
-  --item-spacing-rem: 0;
   --list-item-padding-y: 0;
   color: var(--text);
   font-family: var(--mono-font-family);
@@ -2032,10 +2031,12 @@ body.sb2-frontend .toolbar-volume-popover output { align-self: flex-end; color: 
 body.sb2-frontend #tree-root.tree-root {
   min-height: 0;
   padding: var(--sb-space-020) var(--sb-space-050) var(--sb-space-050);
-  gap: 1px;
+  gap: var(--item-spacing-px);
   background: #090b0f;
 }
-body.sb2-frontend .tree-group { gap: 1px; }
+body.sb2-frontend .tree-root,
+body.sb2-frontend .tree-group,
+body.sb2-frontend .database-console-games { gap: var(--item-spacing-px); }
 body.sb2-frontend .tree-node,
 body.sb2-frontend .database-game-row,
 body.sb2-frontend .database-console-row {
@@ -2043,7 +2044,7 @@ body.sb2-frontend .database-console-row {
   padding: 0 var(--sb-space-050);
   border-radius: 0;
   font-size: var(--sb-sidebar-font-size);
-  line-height: 1.05;
+  line-height: 1;
 }
 body.sb2-frontend .tree-label,
 body.sb2-frontend .database-game-name,
@@ -2229,8 +2230,9 @@ body.sb2-frontend .playlist-header-table th:hover .playlist-header-label {
   background: var(--sb-button-hover-surface);
   color: var(--sb-button-hover-ink);
 }
-body.sb2-frontend .playlist-body-table td { padding-top: 0; padding-bottom: 0; line-height: 1.05; }
-body.sb2-frontend .playlist-body-table tr { height: 1.05em; }
+body.sb2-frontend .playlist-body-table td { padding-top: 0; padding-bottom: var(--item-spacing-px); line-height: 1; }
+body.sb2-frontend .playlist-body-table tr { height: auto; }
+body.sb2-frontend .playlist-favorite-heading { width: var(--sb-control-icon-size); height: var(--sb-control-icon-size); fill: none; stroke: currentColor; stroke-width: 1.5; }
 
 body.sb2-frontend .gallery-view {
   overflow: auto;
@@ -2667,3 +2669,7 @@ body.sb2-frontend.options-window .options-panel { padding-top: var(--sb-space-07
   body.sb2-frontend .options-inline-trailing { min-width: 9ch; }
   body.sb2-frontend .sb-console { display: none; }
 }
+
+/* Row icons fit inside the text line instead of inflating compact rows. */
+body.sb2-frontend .favorite-toggle { min-height: 0; line-height: 1; height: var(--sb-playlist-font-size); }
+body.sb2-frontend .favorite-toggle .ui-icon { width: var(--sb-playlist-font-size); height: var(--sb-playlist-font-size); transform: none; }

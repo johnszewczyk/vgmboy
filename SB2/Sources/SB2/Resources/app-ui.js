@@ -10,7 +10,7 @@ if (document.body.classList.contains("sb2-frontend") && !isStandaloneOptionsWind
   if (optionsOverlay && content) content.append(optionsOverlay);
 }
 const expandedFolders = new Set();
-let draggedColumnId = null;
+let columnDragController = null;
 let metadataRefreshFrame = 0;
 const metadataRefreshTrackIds = new Set();
 let columnMenu = null;
@@ -799,7 +799,7 @@ function measurePlaylistRowHeight() {
   const anchorIndex = Math.floor(scrollTop / previousHeight);
   const offsetWithinAnchorRow = scrollTop - (anchorIndex * previousHeight);
   const adjustedScrollTop = wasAtBottom
-    ? Math.max(0, state.playlist.length * measuredHeight - viewportHeight)
+    ? Math.max(0, state.playlist.length * measuredHeight + (parseFloat(getComputedStyle(refs.playlistBodyWrap).paddingBottom) || 0) - viewportHeight)
     : (anchorIndex * measuredHeight) + Math.min(offsetWithinAnchorRow, measuredHeight);
 
   playlistVirtualRowHeight = measuredHeight;
@@ -3357,6 +3357,20 @@ function autoSizeColumn(columnId) {
 }
 
 function renderPlaylistHeader() {
+  if (!columnDragController) columnDragController = window.SBPresentation.columns(refs.playlistHeaderRow, {
+    selector: 'th[data-column-id]', key: cell => cell.dataset.columnId,
+    preview(order) {
+      state.columnOrder = window.SBPresentation.mergeOrder(state.columnOrder, order);
+      for (const row of playlistRowsByTrackId.values()) {
+        for (const id of order) {
+          const cell = row.querySelector(`[data-column-id="${CSS.escape(id)}"]`);
+          if (cell) row.append(cell);
+        }
+      }
+      syncPlaylistColumnWidths();
+    },
+    commit() { persistSettings(); }
+  });
   updateAutomaticColumnVisibility();
   const columns = orderedColumns();
   applyColumnMinimumWidths(columns);
@@ -3367,7 +3381,8 @@ function renderPlaylistHeader() {
       && (column.id !== "timestamp" || state.playlistTitle === "Recent");
     const th = document.createElement("th");
     th.dataset.columnId = column.id;
-    th.draggable = true;
+    th.draggable = column.id !== "favorite";
+    th.tabIndex = 0;
     th.className = column.className || "";
     th.style.width = `${state.columnWidths[column.id]}%`;
     th.style.minWidth = `${columnMinimumWidthPixels(column.id)}px`;
@@ -3375,7 +3390,10 @@ function renderPlaylistHeader() {
 
     const label = document.createElement("span");
     label.className = "playlist-header-label toolbar-heading toolbar-control";
-    label.textContent = column.label;
+    if (column.id === 'favorite') {
+      label.innerHTML = '<svg class="ui-icon playlist-favorite-heading" aria-hidden="true"><use href="#icon-star"></use></svg>';
+      label.setAttribute('aria-label', 'Favorites');
+    } else label.textContent = column.label;
     if (state.playlistSortEnabled && state.sortColumn === column.id) {
       label.textContent += state.sortDirection === "ascending" ? " ▲" : " ▼";
     }
@@ -3392,7 +3410,7 @@ function renderPlaylistHeader() {
     th.appendChild(resizeHandle);
 
     if (canSortColumn) th.addEventListener("click", async (event) => {
-      if (event.target === resizeHandle || columnResizePointerId !== null) return;
+      if (event.target === resizeHandle || columnResizePointerId !== null || columnDragController?.recentlyDragged()) return;
       if (state.playlistSortEnabled && state.sortColumn === column.id) {
         state.sortDirection = state.sortDirection === "ascending" ? "descending" : "ascending";
       } else {
@@ -3409,54 +3427,6 @@ function renderPlaylistHeader() {
     th.addEventListener("contextmenu", (event) => {
       event.preventDefault();
       showColumnMenu(event);
-    });
-
-    th.addEventListener("dragstart", (event) => {
-      draggedColumnId = column.id;
-      th.classList.add("is-dragging");
-      event.dataTransfer.effectAllowed = "move";
-      event.dataTransfer.setData("text/plain", column.id);
-    });
-
-    th.addEventListener("dragend", () => {
-      draggedColumnId = null;
-      refs.playlistHeaderRow.querySelectorAll("th").forEach((cell) => {
-        cell.classList.remove("is-dragging", "is-drop-target");
-      });
-    });
-
-    th.addEventListener("dragover", (event) => {
-      if (!draggedColumnId || draggedColumnId === column.id) {
-        return;
-      }
-
-      event.preventDefault();
-      th.classList.add("is-drop-target");
-    });
-
-    th.addEventListener("dragleave", () => {
-      th.classList.remove("is-drop-target");
-    });
-
-    th.addEventListener("drop", (event) => {
-      if (!draggedColumnId || draggedColumnId === column.id) {
-        return;
-      }
-
-      event.preventDefault();
-      const nextOrder = [...state.columnOrder];
-      const fromIndex = nextOrder.indexOf(draggedColumnId);
-      const toIndex = nextOrder.indexOf(column.id);
-      if (fromIndex < 0 || toIndex < 0) {
-        return;
-      }
-
-      const [moved] = nextOrder.splice(fromIndex, 1);
-      nextOrder.splice(toIndex, 0, moved);
-      state.columnOrder = nextOrder;
-      persistSettings();
-      renderPlaylistHeader();
-      renderPlaylist();
     });
 
     refs.playlistHeaderRow.appendChild(th);
@@ -3867,7 +3837,8 @@ function applyUISettings() {
   rootStyle.setProperty("--bg-sidebar", state.uiChromePaneColor ?? "rgb(20 20 20)");
   rootStyle.setProperty("--bg-hover", state.uiChromeHoverColor ?? "rgb(50 50 50)");
   rootStyle.setProperty("--line", state.uiChromeDividerColor ?? "rgb(40 40 40)");
-  rootStyle.setProperty("--item-spacing-rem", String(state.uiItemSpacingRem));
+  rootStyle.setProperty("--item-spacing-px", `${state.uiItemSpacingPx}px`);
+  document.body.dataset.sbMotion = state.selectionAnimationEnabled ? "on" : "off";
   rootStyle.setProperty("--column-resize-duration", `${state.autoResizeAnimationEnabled ? state.autoResizeAnimationMilliseconds : 0}ms`);
   rootStyle.setProperty("--selection-animation-duration", `${state.selectionAnimationEnabled ? state.selectionAnimationMilliseconds : 0}ms`);
   rootStyle.setProperty("--titlebar-text-color", state.titlebarTextColor);
@@ -4334,8 +4305,8 @@ function setPlaybackSpeedEnabled(backendId, enabled) {
   renderAll();
 }
 
-function setUiItemSpacing(nextSpacingRem) {
-  state.uiItemSpacingRem = uiApp.normalizeItemSpacing(nextSpacingRem);
+function setUiItemSpacing(nextSpacingPx) {
+  state.uiItemSpacingPx = uiApp.normalizeItemSpacing(nextSpacingPx);
   persistSettings();
   renderAll();
 }
@@ -4483,7 +4454,7 @@ function setWindowAlwaysOnTop(key, enabled) {
 }
 
 function applyAppearanceSettings(settings) {
-  if (settings.uiItemSpacingRem !== undefined) state.uiItemSpacingRem = uiApp.normalizeItemSpacing(settings.uiItemSpacingRem);
+  if (settings.uiItemSpacingPx !== undefined) state.uiItemSpacingPx = uiApp.normalizeItemSpacing(settings.uiItemSpacingPx);
   if (settings.sidebarWidthPercent !== undefined) state.sidebarWidthPercent = uiApp.normalizeSidebarWidth(settings.sidebarWidthPercent);
   const contentFontSize = settings.contentFontSizePt ?? settings.sidebarFontSizePt ?? settings.playlistFontSizePt;
   if (contentFontSize !== undefined) {

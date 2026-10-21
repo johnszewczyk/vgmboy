@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>SPCBOY SB2</title>
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./sb-presentation.css" />
   </head>
   <body class="sb2-frontend">
     <svg class="icon-sprite" aria-hidden="true" focusable="false">
@@ -56,7 +57,7 @@
             <div class="transport toolbar-fixed">
               <button id="previous-button" class="tool-button glyph-button ui-control" title="Previous" aria-label="Previous"><svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-back"></use></svg></button>
               <button id="stop-button" class="tool-button glyph-button ui-control" title="Stop" aria-label="Stop"><svg class="ui-icon" aria-hidden="true"><use href="#icon-stop"></use></svg></button>
-              <button id="play-button" class="tool-button glyph-button ui-control is-primary" title="Play / Pause" aria-label="Play / Pause"><svg class="ui-icon" aria-hidden="true"><use href="#icon-play"></use></svg></button>
+              <button id="play-button" class="tool-button glyph-button ui-control is-primary" title="Play / Pause" aria-label="Play / Pause"><svg class="ui-icon sb-play-glyph" aria-hidden="true"><use href="#icon-play"></use></svg><svg class="ui-icon sb-playing-bars" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="2" height="12"/><rect x="7" y="4" width="2" height="12"/><rect x="11" y="4" width="2" height="12"/><rect x="15" y="4" width="2" height="12"/></svg></button>
               <button id="next-button" class="tool-button glyph-button ui-control" title="Next" aria-label="Next"><svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-forward"></use></svg></button>
               <button id="equalizer-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Enable Equalizer" aria-label="Enable Equalizer" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sliders-horizontal"></use></svg></button>
               <button id="long-play-button" class="tool-button glyph-button ui-control" type="button" title="Toggle Long Play" aria-label="Toggle Long Play"><svg class="ui-icon" aria-hidden="true"><use href="#icon-infinity"></use></svg></button>
@@ -88,7 +89,7 @@
               </div>
             </div>
           </div>
-          <div id="tree-root" class="tree-root"></div>
+          <div id="tree-root" class="tree-root sb-scroll-fade"></div>
           <div id="sidebar-context-menu" class="sidebar-context-menu is-hidden" role="menu"></div>
         </aside>
         <div id="sidebar-resize-handle" class="sidebar-resize-handle" role="separator" aria-orientation="vertical" aria-label="Resize sidebar" aria-valuemin="12" aria-valuemax="50" aria-valuenow="20" tabindex="0"></div>
@@ -118,7 +119,7 @@
                   <thead><tr></tr></thead>
                 </table>
               </div>
-              <div class="playlist-body-wrap">
+              <div class="playlist-body-wrap sb-scroll-fade">
                 <div id="playlist-selection-indicator" class="list-selection-indicator is-hidden" aria-hidden="true"></div>
                 <table class="playlist-table playlist-body-table">
                   <tbody id="playlist-body"></tbody>
@@ -241,7 +242,7 @@
               </div>
               <div class="options-subpanel">
                 <h2 class="options-subpanel-title">Playlist Options</h2>
-                <label class="options-field"><span class="options-field-copy"><span>Item Spacing</span><small>Row spacing in rems (for example, 0.2rem).</small></span><span class="options-inline-trailing"><input id="ui-item-spacing-input" class="options-input" type="text" inputmode="decimal" value=".2" aria-label="Item spacing in rems" /></span></label>
+                <label class="options-field"><span class="options-field-copy"><span>Row Gap</span><small>Pixels between sidebar and playlist rows.</small></span><span class="options-inline-trailing"><input id="ui-item-spacing-input" class="options-input" type="number" min="0" max="32" step="1" value="1" aria-label="Row gap in pixels" /></span></label>
                 <label class="options-field options-inline-field"><span class="options-inline-leading"><input id="column-auto-size-checkbox" type="checkbox" checked /><span class="options-checkbox-copy"><span>Column Auto-size</span><small>Automatically resize columns for content width on selection.</small></span></span></label>
               </div>
               <div class="options-subpanel">
@@ -388,6 +389,7 @@
 
     <script src="./playback-speed.js"></script>
     <script src="./settings-persistence.js"></script>
+    <script src="./sb-presentation.js"></script>
     <script src="./app-core.js"></script>
     <script src="./playlist-controller.js"></script>
     <script src="./options-controller.js"></script>
