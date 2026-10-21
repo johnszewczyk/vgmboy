@@ -49,3 +49,16 @@ SB2's shared animated selector and custom range-control motion.
 - `Sources/SB2/Resources/app-ui.js`
 - `ai/subsystem-human/home.md`
 - `ai/subsystem-human/options.md`
+
+## Portable player presentation
+
+`Sources/SB2/Resources/sb-presentation.{css,js}` is the canonical source for
+bottom scroll fades, the playing-bar icon animation, and FLIP column reorder
+motion. SB2 and SBONLINE supply their own DOM adapters and persistence; the
+shared module must remain free of audio/catalog/account logic. Reorders update
+all cached local playlist rows, including detached virtual rows.
+
+After editing these assets, run `python3 scripts/sync-online-presentation.py`
+from SB2, then `python3 scripts/sync-online-presentation.py --check`. The copies
+live in the MathBook owner at `private-admin/static/accounts/`; commit each
+owner separately and bump hosted asset versions when deploying changes.

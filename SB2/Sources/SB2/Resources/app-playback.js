@@ -368,7 +368,7 @@ function updateTimingSummary() {
     refs.spcFadeInput.value = formatTime(state.spcFadeSeconds);
   }
   if (!shouldPreserveFieldValue(refs.uiItemSpacingInput)) {
-    refs.uiItemSpacingInput.value = String(state.uiItemSpacingRem);
+    refs.uiItemSpacingInput.value = String(state.uiItemSpacingPx);
   }
   refs.spcForceLengthCheckbox.checked = state.longPlayEnabled;
   refs.queuedSkipsCheckbox.checked = state.queuedSkipsEnabled;
@@ -470,7 +470,9 @@ function updatePlaybackReadout() {
   const playlistTotalSeconds = state.playlist.reduce((sum, entry) => sum + currentOutputBasePlaybackSeconds(entry), 0);
   refs.playlistTotalLabel.textContent = formatTime(playlistTotalSeconds);
   playbackApp.ui?.updateSB2Titlebar?.();
-  refs.playButton.querySelector("use")?.setAttribute("href", state.isPlaying ? "#icon-pause" : "#icon-play");
+  refs.playButton.querySelector("use")?.setAttribute("href", "#icon-play");
+  refs.playButton.classList.toggle("sb-is-playing", state.isPlaying);
+  refs.playButton.setAttribute("aria-label", state.isPlaying ? "Pause" : "Play");
   refs.stopButton.disabled = !state.currentTrackId && !state.currentTrackInfo;
   syncMediaSessionState();
 }

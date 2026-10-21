@@ -50,7 +50,8 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
     var playbackSpeedEnabled: Bool?
     var libvgmPlaybackSpeed: PlaybackRate?
     var libvgmPlaybackSpeedEnabled: Bool?
-    var uiItemSpacingRem: Double?
+    var uiItemSpacingRem: Double? // Legacy decode only.
+    var uiItemSpacingPx: Int?
     var rootPath: String?
     var localBrowserEnabled: Bool?
     var selectedFolderPath: String?
@@ -184,6 +185,13 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
     /// Repairs the durable, renderer-neutral preference subset before it is
     /// exposed to WebKit or written back to the app-specific JSON container.
     mutating func normalizeForPersistence() {
+        if uiItemSpacingPx == nil {
+            let legacy = uiItemSpacingRem ?? 0
+            let pixels = legacy * Double(uiChromeFontSizePt ?? 10) * 8 / 3
+            uiItemSpacingPx = legacy > 0 && pixels.isFinite ? Int(min(32, max(0, pixels.rounded()))) : 1
+        }
+        uiItemSpacingPx = min(32, max(0, uiItemSpacingPx ?? 1))
+        uiItemSpacingRem = nil
         // SB2 is intentionally database-only. Clear legacy local-browser
         // values whenever preferences cross the native persistence boundary.
         rootPath = nil

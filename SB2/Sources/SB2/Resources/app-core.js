@@ -4,7 +4,7 @@ const SAMPLE_RATE = 44_100;
 const DEFAULT_ARCHIVE_CACHE_LIMIT_BYTES = 2 * 1024 * 1024 * 1024;
 const ARCHIVE_CACHE_LIMIT_CHOICES = Object.freeze([2, 4, 8, 16].map((gigabytes) => gigabytes * 1024 * 1024 * 1024));
 const COLUMN_DEFS = [
-  { id: "favorite", label: "★", className: "col-favorite", sortable: false },
+  { id: "favorite", label: "☆", className: "col-favorite", sortable: false },
   { id: "index", label: "#", className: "mono col-index", sortable: false },
   { id: "filename", label: "File" },
   { id: "title", label: "Title" },
@@ -85,7 +85,7 @@ const state = {
   manualPlayTimeSeconds: DEFAULT_LONG_PLAY_SECONDS,
   unknownDurationSeconds: 150,
   spcFadeSeconds: DEFAULT_PLAY_FADE_SECONDS,
-  uiItemSpacingRem: 0,
+  uiItemSpacingPx: 1,
   uiFontSizePt: 10,
   uiChromeFontSizePt: 10,
   sidebarFontSizePt: 10,
@@ -361,7 +361,7 @@ async function loadSettings() {
     state.aacExportDirectory = typeof parsed.aacExportDirectory === "string" && parsed.aacExportDirectory
       ? parsed.aacExportDirectory
       : (await window.spcBoySB2.defaultAACExportDirectory?.()) || "";
-    state.uiItemSpacingRem = normalizeItemSpacing(parsed.uiItemSpacingRem);
+    state.uiItemSpacingPx = normalizeItemSpacing(parsed.uiItemSpacingPx ?? (Number(parsed.uiItemSpacingRem) > 0 ? Number(parsed.uiItemSpacingRem) * (Number(parsed.uiChromeFontSizePt) || 10) * 8 / 3 : 1));
     // SB2 is a database-backed player. Older preference files may still
     // contain local-browser state, but it must never reactivate that UI.
     state.rootPath = null;
@@ -461,7 +461,7 @@ function settingsSnapshot() {
     playbackSpeedEnabled: state.playbackSpeedEnabled,
     libvgmPlaybackSpeed: state.libvgmPlaybackSpeed,
     libvgmPlaybackSpeedEnabled: state.libvgmPlaybackSpeedEnabled,
-    uiItemSpacingRem: state.uiItemSpacingRem,
+    uiItemSpacingPx: state.uiItemSpacingPx,
     rootPath: null,
     localBrowserEnabled: false,
     selectedFolderPath: null,
@@ -613,8 +613,8 @@ function parseDurationSeconds(value) {
 function normalizeItemSpacing(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric)
-    ? Math.max(0, Math.min(2, Math.round(numeric * 100) / 100))
-    : 0.2;
+    ? Math.max(0, Math.min(32, Math.round(numeric)))
+    : 1;
 }
 
 function normalizeFontSize(value) {

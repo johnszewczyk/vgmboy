@@ -1,0 +1,29 @@
+/* Canonical SB2/SBONLINE presentation. Sync with SB2/scripts/sync-online-presentation.py. */
+body {
+  --sb-motion-duration: var(--selection-animation-duration, var(--site-motion-duration, 200ms));
+  --sb-motion-ease: cubic-bezier(.2, 0, 0, 1);
+  --sb-scroll-fade-size: 24px;
+}
+.sb-scroll-fade {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--sb-scroll-fade-size)), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--sb-scroll-fade-size)), transparent);
+  padding-bottom: var(--sb-scroll-fade-size) !important;
+}
+.sb-column-dragging { opacity: .4; }
+.sb-column-handle { position: absolute; z-index: 4; inset: 0 -3px 0 auto; width: 7px; cursor: col-resize; touch-action: none; }
+button .sb-playing-bars { display: none; }
+button.sb-is-playing .sb-play-glyph { display: none; }
+button.sb-is-playing .sb-playing-bars { display: block; }
+.sb-playing-bars rect {
+  fill: currentColor;
+  stroke: none;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: sb-playing-pulse calc(var(--sb-motion-duration) * 4) ease-in-out infinite alternate;
+}
+.sb-playing-bars rect:nth-child(2) { animation-delay: -.31s; }
+.sb-playing-bars rect:nth-child(3) { animation-delay: -.53s; }
+.sb-playing-bars rect:nth-child(4) { animation-delay: -.17s; }
+@keyframes sb-playing-pulse { 0% { transform: scaleY(.25); } 45% { transform: scaleY(1); } 100% { transform: scaleY(.45); } }
+body[data-sb-motion="off"] .sb-playing-bars rect { animation: none; }
+@media (prefers-reduced-motion: reduce) { .sb-playing-bars rect { animation: none; } }
