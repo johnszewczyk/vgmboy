@@ -416,8 +416,12 @@ def normalize_package_attachment_tags(metadata: dict) -> dict:
             continue
         path_values = [path for path in paths if path is not None]
         if name == "Documents":
-            grouped.setdefault("Text File", []).extend(path for path in path_values if Path(path).suffix.casefold() == ".txt")
-            grouped.setdefault("Documents", []).extend(path for path in path_values if Path(path).suffix.casefold() != ".txt")
+            text_paths = [path for path in path_values if Path(path).suffix.casefold() == ".txt"]
+            document_paths = [path for path in path_values if Path(path).suffix.casefold() != ".txt"]
+            if text_paths:
+                grouped.setdefault("Text File", []).extend(text_paths)
+            if document_paths:
+                grouped.setdefault("Documents", []).extend(document_paths)
         else:
             grouped.setdefault(name, []).extend(path_values)
 
@@ -948,6 +952,7 @@ def harvest_spc_metadata(
 
 
 _CANONICAL_IMPORTED_TAG_NAMES = {
+    "cuesheet": "Cue Sheet",
     "title": "Title",
     "game": "Game",
     "system": "System",
