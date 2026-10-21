@@ -41,6 +41,9 @@ let databaseGamesLoadPromise = null;
 let databaseFilesLoadPromise = null;
 let columnResizePointerId = null;
 let columnResizeFrame = 0;
+let playlistColumnAutoSizeFrame = 0;
+let playlistColumnAutoSizeObserver = null;
+let lastPlaylistAutoSizeAvailableWidth = 0;
 const PLAYLIST_VIRTUALIZATION_THRESHOLD = 200;
 const PLAYLIST_VIRTUAL_OVERSCAN = 12;
 const EMPTY_DATABASE_GAMES = [];
@@ -761,7 +764,12 @@ interactionScopeElement?.addEventListener("pointermove", (event) => {
 }, { passive: true });
 window.addEventListener("resize", () => {
   positionInteractionIndicator(currentInteractionTarget(), { instant: true });
+  schedulePlaylistColumnAutoSize();
 }, { passive: true });
+if (typeof ResizeObserver === "function" && refs.playlistScrollWrap) {
+  playlistColumnAutoSizeObserver = new ResizeObserver(schedulePlaylistColumnAutoSize);
+  playlistColumnAutoSizeObserver.observe(refs.playlistScrollWrap);
+}
 
 function playlistUsesVirtualRows() {
   return state.playlist.length > PLAYLIST_VIRTUALIZATION_THRESHOLD;
@@ -3208,7 +3216,17 @@ function columnContentWidth(columnId) {
     (widest, value) => Math.max(widest, textMeasureContext.measureText(value).width),
     0
   );
-  return Math.max(headerWidth, contentWidth) + playlistColumnHorizontalPadding();
+  const width = Math.max(headerWidth, contentWidth) + playlistColumnHorizontalPadding();
+  return columnId === "favorite" || columnId === "index"
+    ? Math.max(width, playlistColumnSquareMinimumWidth())
+    : width;
+}
+
+function playlistColumnSquareMinimumWidth() {
+  const headerCell = refs.playlistHeaderRow.querySelector("th");
+  return headerCell?.getBoundingClientRect().height
+    || refs.playlistHeaderRow.getBoundingClientRect().height
+    || 0;
 }
 
 function playlistColumnHorizontalPadding() {
@@ -3283,44 +3301,59 @@ function redistributeOtherColumnWidths(columns, targetTotal, tableWidth) {
   });
 }
 
-function autoSizeColumns() {
+function autoSizeColumns({ persist = true } = {}) {
   const columns = orderedColumns();
   if (!columns.length || !state.playlist.length) return;
   const preferredWidths = columns.map((column) => columnContentWidth(column.id));
-  const totalWidth = preferredWidths.reduce((sum, width) => sum + width, 0);
-  if (!totalWidth) return;
+  const contentWidth = preferredWidths.reduce((sum, width) => sum + width, 0);
+  if (!contentWidth) return;
   const table = refs.playlistHeaderTable;
-  const availableWidth = refs.playlistScrollWrap?.clientWidth || table.clientWidth || totalWidth;
-  const width = `${Math.max(availableWidth, totalWidth)}px`;
+  const availableWidth = refs.playlistScrollWrap?.clientWidth || table.clientWidth || contentWidth;
+  const flexibleColumnIndex = columns.findIndex((column) => column.id === "path");
+  const fixedWidth = preferredWidths.reduce(
+    (sum, width, index) => sum + (index === flexibleColumnIndex ? 0 : width),
+    0
+  );
+  const fittedWidths = [...preferredWidths];
+  if (flexibleColumnIndex >= 0) {
+    fittedWidths[flexibleColumnIndex] = Math.max(
+      preferredWidths[flexibleColumnIndex],
+      availableWidth - fixedWidth
+    );
+  }
+  const fittedTotalWidth = fittedWidths.reduce((sum, width) => sum + width, 0);
+  const width = `${fittedTotalWidth}px`;
   [refs.playlistHeaderTable, refs.playlistBodyTable].forEach((playlistTable) => {
     playlistTable.style.width = width;
-    playlistTable.style.minWidth = `${availableWidth}px`;
+    playlistTable.style.minWidth = width;
   });
   columns.forEach((column, index) => {
-    state.columnWidths[column.id] = (preferredWidths[index] / totalWidth) * 100;
+    state.columnWidths[column.id] = (fittedWidths[index] / fittedTotalWidth) * 100;
   });
   applyColumnMinimumWidths(columns);
-  persistSettings();
+  lastPlaylistAutoSizeAvailableWidth = availableWidth;
+  if (persist) persistSettings();
+}
+
+function schedulePlaylistColumnAutoSize() {
+  if (playlistColumnAutoSizeFrame
+      || !state.columnAutoSize
+      || !state.playlist.length
+      || isGalleryActive()
+      || columnResizePointerId !== null) return;
+  playlistColumnAutoSizeFrame = window.requestAnimationFrame(() => {
+    playlistColumnAutoSizeFrame = 0;
+    const availableWidth = refs.playlistScrollWrap?.clientWidth || 0;
+    if (!availableWidth || Math.abs(availableWidth - lastPlaylistAutoSizeAvailableWidth) < 1) return;
+    autoSizeColumns({ persist: false });
+    renderPlaylistHeader();
+  });
 }
 
 function autoSizeColumn(columnId) {
   if (!state.playlist.length || !state.columnVisibility[columnId]) return;
-  refreshColumnMinimumWidths();
-  const columns = orderedColumns();
-  const tableWidth = refs.playlistHeaderRow.closest("table").getBoundingClientRect().width;
-  const nextWidth = Math.max(
-    columnMinimumWidthPercent(columnId, tableWidth),
-    Math.min(80, (columnContentWidth(columnId) / tableWidth) * 100)
-  );
-  const previousWidth = state.columnWidths[columnId];
-  const otherColumns = columns.filter((column) => column.id !== columnId);
-  const targetOtherTotal = 100 - nextWidth;
-  state.columnWidths[columnId] = nextWidth;
-  redistributeOtherColumnWidths(otherColumns, targetOtherTotal, tableWidth);
-  if (!Number.isFinite(previousWidth)) state.columnWidths[columnId] = nextWidth;
-  persistSettings();
+  autoSizeColumns();
   renderPlaylistHeader();
-  syncPlaylistColumnWidths();
 }
 
 function renderPlaylistHeader() {
