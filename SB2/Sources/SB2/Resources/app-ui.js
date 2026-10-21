@@ -17,6 +17,9 @@ let columnMenu = null;
 let autoSizedPlaylistSignature = null;
 let playlistRenderGeneration = 0;
 let textMeasureContext = null;
+const displayedPathHintCache = new WeakMap();
+let columnMinimumWidths = new Map();
+let columnMinimumWidthsSignature = null;
 let renderedDatabaseGames = null;
 let galleryVisibleQuery = null;
 let galleryVisibleGallerySource = null;
@@ -2926,6 +2929,20 @@ function playlistColumnValue(track, column, rowIndex = null) {
   return column.id === "path" ? playlistDisplayPath(track) : (track[column.id] ?? "");
 }
 
+function longestDisplayedPlaylistPath(column) {
+  const playlist = state.playlist;
+  if (!column || !playlist.length) return "";
+  const rootPath = String(state.rootPath || "");
+  const cached = displayedPathHintCache.get(playlist);
+  if (cached?.rootPath === rootPath) return cached.value;
+  const value = playlist.reduce((longest, track) => {
+    const candidate = String(playlistColumnValue(track, column));
+    return candidate.length > longest.length ? candidate : longest;
+  }, "");
+  displayedPathHintCache.set(playlist, { rootPath, value });
+  return value;
+}
+
 function isCatalogPlaylistProjection() {
   return state.catalogPlaylistColumnContentHints !== null
     && state.playlist.length > 0
@@ -3080,6 +3097,7 @@ function showColumnMenu(event) {
 function beginColumnResize(event, columnId, header) {
   event.preventDefault();
   event.stopPropagation();
+  refreshColumnMinimumWidths();
   const startX = event.clientX;
   const table = refs.playlistHeaderRow.closest("table");
   const tableWidth = table?.getBoundingClientRect().width || 0;
@@ -3153,23 +3171,24 @@ function columnContentWidth(columnId) {
   const column = COLUMN_DEFS.find((candidate) => candidate.id === columnId);
   if (!column) return 0;
   textMeasureContext ||= document.createElement("canvas").getContext("2d");
-  const styleSource = header?.querySelector(".playlist-header-label") || header || refs.playlistBody;
-  const style = getComputedStyle(styleSource);
-  textMeasureContext.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-  const renderedHeader = header?.querySelector(".playlist-header-label")?.textContent?.trim() || column.label;
+  const headerLabel = header?.querySelector(".playlist-header-label");
+  const headerStyle = getComputedStyle(headerLabel || header || refs.playlistHeaderTable);
+  const renderedHeader = playlistColumnHeaderLabel(columnId);
+  textMeasureContext.font = `${headerStyle.fontWeight} ${headerStyle.fontSize} ${headerStyle.fontFamily}`;
+  const headerWidth = textMeasureContext.measureText(renderedHeader).width;
+
+  const bodyCell = refs.playlistBody.querySelector(`[data-column-id="${CSS.escape(columnId)}"]`);
+  const bodyStyle = getComputedStyle(bodyCell || refs.playlistBodyTable || refs.playlistBody);
+  textMeasureContext.font = `${bodyStyle.fontWeight} ${bodyStyle.fontSize} ${bodyStyle.fontFamily}`;
   const sharedHint = state.catalogPlaylistColumnContentHints?.[columnId];
   const sample = state.playlist.length > 1200
     ? [...state.playlist.slice(0, 600), ...state.playlist.slice(-600)]
     : state.playlist;
-  // Path must not use the bounded sample: its longest entry can sit in the
-  // middle of a large playlist. Cache a full-list hint for restored tabs.
-  const pathValue = columnId === "path" && !sharedHint
-    ? state.playlist.reduce((longest, track) => {
-      const value = String(playlistColumnValue(track, column));
-      return value.length > longest.length ? value : longest;
-    }, "")
-    : null;
-  if (pathValue !== null && pathValue) {
+  // Measure the exact path text rendered by this frontend. The shared catalog
+  // hint contains source paths, which can differ from the root-relative path
+  // shown in playlist cells.
+  const pathValue = columnId === "path" ? longestDisplayedPlaylistPath(column) : null;
+  if (pathValue !== null && pathValue && pathValue !== sharedHint) {
     state.catalogPlaylistColumnContentHints = {
       ...(state.catalogPlaylistColumnContentHints || {}),
       path: pathValue
@@ -3181,11 +3200,15 @@ function columnContentWidth(columnId) {
     }
   }
   const values = pathValue !== null
-    ? [renderedHeader, pathValue]
+    ? [pathValue]
     : sharedHint
-    ? [renderedHeader, sharedHint]
-    : [renderedHeader, ...sample.map((track, rowIndex) => String(playlistColumnValue(track, column, rowIndex)))];
-  return Math.max(...values.map((value) => textMeasureContext.measureText(value).width), 0) + playlistColumnHorizontalPadding();
+      ? [sharedHint]
+      : sample.map((track, rowIndex) => String(playlistColumnValue(track, column, rowIndex)));
+  const contentWidth = values.reduce(
+    (widest, value) => Math.max(widest, textMeasureContext.measureText(value).width),
+    0
+  );
+  return Math.max(headerWidth, contentWidth) + playlistColumnHorizontalPadding();
 }
 
 function playlistColumnHorizontalPadding() {
@@ -3194,23 +3217,54 @@ function playlistColumnHorizontalPadding() {
 }
 
 function columnHeaderContentWidth(columnId) {
-  const header = refs.playlistHeaderRow.querySelector(`[data-column-id="${CSS.escape(columnId)}"]`);
-  const column = COLUMN_DEFS.find((candidate) => candidate.id === columnId);
-  if (!column) return 0;
+  refreshColumnMinimumWidths();
+  return columnMinimumWidths.get(columnId) || 0;
+}
+
+function refreshColumnMinimumWidths(columns = orderedColumns()) {
   textMeasureContext ||= document.createElement("canvas").getContext("2d");
-  const styleSource = header?.querySelector(".playlist-header-label") || header || refs.playlistBody;
+  const styleSource = refs.playlistHeaderRow.querySelector(".playlist-header-label") || refs.playlistHeaderTable;
   const style = getComputedStyle(styleSource);
-  textMeasureContext.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+  const font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+  const padding = playlistColumnHorizontalPadding();
+  const labels = columns.map((column) => [column.id, playlistColumnHeaderLabel(column.id)]);
+  const signature = JSON.stringify([font, padding, labels]);
+  if (signature === columnMinimumWidthsSignature) return;
+  textMeasureContext.font = font;
+  columnMinimumWidths = new Map(labels.map(([columnId, label]) => [
+    columnId,
+    textMeasureContext.measureText(label).width + padding
+  ]));
+  columnMinimumWidthsSignature = signature;
+}
+
+function playlistColumnHeaderLabel(columnId) {
+  const column = COLUMN_DEFS.find((candidate) => candidate.id === columnId);
+  if (!column) return "";
   const sortMarker = state.playlistSortEnabled && state.sortColumn === columnId
     ? state.sortDirection === "ascending" ? " ▲" : " ▼"
     : "";
-  const label = header?.querySelector(".playlist-header-label")?.textContent?.trim() || `${column.label}${sortMarker}`;
-  return textMeasureContext.measureText(label).width + playlistColumnHorizontalPadding();
+  return `${column.label}${sortMarker}`;
+}
+
+function columnMinimumWidthPixels(columnId) {
+  return columnMinimumWidths.get(columnId) || columnHeaderContentWidth(columnId);
 }
 
 function columnMinimumWidthPercent(columnId, tableWidth) {
   if (!Number.isFinite(tableWidth) || tableWidth <= 0) return 0;
-  return Math.min(80, (columnHeaderContentWidth(columnId) / tableWidth) * 100);
+  return Math.min(80, (columnMinimumWidthPixels(columnId) / tableWidth) * 100);
+}
+
+function applyColumnMinimumWidths(columns = orderedColumns()) {
+  refreshColumnMinimumWidths(columns);
+  const tableWidth = refs.playlistHeaderTable?.getBoundingClientRect().width || 0;
+  for (const column of columns) {
+    state.columnWidths[column.id] = Math.max(
+      Number(state.columnWidths[column.id]) || 0,
+      columnMinimumWidthPercent(column.id, tableWidth)
+    );
+  }
 }
 
 function redistributeOtherColumnWidths(columns, targetTotal, tableWidth) {
@@ -3245,11 +3299,13 @@ function autoSizeColumns() {
   columns.forEach((column, index) => {
     state.columnWidths[column.id] = (preferredWidths[index] / totalWidth) * 100;
   });
+  applyColumnMinimumWidths(columns);
   persistSettings();
 }
 
 function autoSizeColumn(columnId) {
   if (!state.playlist.length || !state.columnVisibility[columnId]) return;
+  refreshColumnMinimumWidths();
   const columns = orderedColumns();
   const tableWidth = refs.playlistHeaderRow.closest("table").getBoundingClientRect().width;
   const nextWidth = Math.max(
@@ -3269,20 +3325,19 @@ function autoSizeColumn(columnId) {
 
 function renderPlaylistHeader() {
   updateAutomaticColumnVisibility();
+  const columns = orderedColumns();
+  applyColumnMinimumWidths(columns);
   refs.playlistHeaderRow.innerHTML = "";
 
-  for (const column of orderedColumns()) {
+  for (const column of columns) {
     const canSortColumn = column.sortable !== false
       && (column.id !== "timestamp" || state.playlistTitle === "Recent");
     const th = document.createElement("th");
     th.dataset.columnId = column.id;
     th.draggable = true;
     th.className = column.className || "";
-    state.columnWidths[column.id] = Math.max(
-      Number(state.columnWidths[column.id]) || 0,
-      columnMinimumWidthPercent(column.id, refs.playlistHeaderTable?.getBoundingClientRect().width || 0)
-    );
     th.style.width = `${state.columnWidths[column.id]}%`;
+    th.style.minWidth = `${columnMinimumWidthPixels(column.id)}px`;
     th.title = canSortColumn ? `Sort by ${column.label}` : (column.id === "index" ? "Line number" : column.label);
 
     const label = document.createElement("span");
@@ -3373,6 +3428,7 @@ function renderPlaylistHeader() {
 
     refs.playlistHeaderRow.appendChild(th);
   }
+  syncPlaylistColumnWidths();
 }
 
 function renderPlaylistCell(track, column, rowIndex) {
@@ -3380,6 +3436,7 @@ function renderPlaylistCell(track, column, rowIndex) {
   td.className = column.className || "";
   td.dataset.columnId = column.id;
   td.style.width = `${state.columnWidths[column.id]}%`;
+  td.style.minWidth = `${columnMinimumWidthPixels(column.id)}px`;
   if (column.id === "favorite") {
     const button = document.createElement("button");
     button.type = "button";
@@ -3408,7 +3465,17 @@ function playlistAutoSizeSignature() {
   const columns = orderedColumns();
   const firstID = state.playlist[0]?.id || "";
   const lastID = state.playlist.at(-1)?.id || "";
-  return `${columns.map((column) => column.id).join("\u0001")}\u0002${state.playlist.length}\u0002${firstID}\u0002${lastID}`;
+  const longestPath = columns.some((column) => column.id === "path")
+    ? longestDisplayedPlaylistPath(COLUMN_DEFS.find((column) => column.id === "path"))
+    : "";
+  return JSON.stringify([
+    columns.map((column) => column.id),
+    state.playlist.length,
+    firstID,
+    lastID,
+    state.rootPath || "",
+    longestPath
+  ]);
 }
 
 const playlistSelectionSets = new WeakMap();
@@ -3525,12 +3592,18 @@ function playlistSortDependsOnMetadata() {
 function syncPlaylistColumnWidths() {
   for (const column of orderedColumns()) {
     const header = refs.playlistHeaderRow.querySelector(`[data-column-id="${CSS.escape(column.id)}"]`);
-    if (header) header.style.width = `${state.columnWidths[column.id]}%`;
+    if (header) {
+      header.style.width = `${state.columnWidths[column.id]}%`;
+      header.style.minWidth = `${columnMinimumWidthPixels(column.id)}px`;
+    }
   }
   for (const row of playlistRowsByTrackId.values()) {
     for (const column of orderedColumns()) {
       const cell = row.querySelector(`[data-column-id="${CSS.escape(column.id)}"]`);
-      if (cell) cell.style.width = `${state.columnWidths[column.id]}%`;
+      if (cell) {
+        cell.style.width = `${state.columnWidths[column.id]}%`;
+        cell.style.minWidth = `${columnMinimumWidthPixels(column.id)}px`;
+      }
     }
   }
 }
@@ -3648,6 +3721,7 @@ function renderPlaylist({ sort = true, persistTab = true } = {}) {
   const preservedScrollTop = Math.max(0, Number(refs.playlistBodyWrap?.scrollTop) || 0);
   if (persistTab && findActivePlaylistTab()) persistPlaylistTabs();
   updateAutomaticColumnVisibility();
+  applyColumnMinimumWidths();
   playlistRenderGeneration += 1;
   const generation = playlistRenderGeneration;
   if (!state.selectedTrackIds.length && state.selectedTrackId) {
