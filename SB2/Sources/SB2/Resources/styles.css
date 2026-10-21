@@ -2058,7 +2058,7 @@ body.sb2-frontend .database-game-row {
 }
 body.sb2-frontend .sidebar-resize-handle::before { background: #29303a; }
 body.sb2-frontend .tree-group { margin-left: var(--sb-space-075); padding-left: var(--sb-space-025); }
-body.sb2-frontend .database-console-games { padding-left: 0; }
+body.sb2-frontend .database-console-games { padding-left: 0; padding-top: var(--item-spacing-px); }
 body.sb2-frontend .database-indent { flex-basis: 0; width: 0; }
 
 body.sb2-frontend .content,
