@@ -204,7 +204,7 @@ public enum FormatRegistry {
     public static let amigaPrefixes: Set<String> = AmigaFormatManifest.prefixes
 
     /// Stable frontend order. Keep this list aligned with the backend order
-    /// exposed by the existing CocoaSpice and SPCBoyWK controls.
+    /// exposed by the playback controls.
     public static let playbackDescriptors: [PlaybackFormatDescriptor] = [
         PlaybackFormatDescriptor(id: "libgme", family: libgmeFamily, extensions: libgmeExtensions),
         PlaybackFormatDescriptor(id: "asap", family: asapFamily, extensions: asapExtensions),

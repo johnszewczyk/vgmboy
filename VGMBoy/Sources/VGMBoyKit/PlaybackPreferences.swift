@@ -3,8 +3,8 @@ import Foundation
 /// Shared semantic playback preferences.
 ///
 /// UserDefaults keys, JSON names, and migration rules remain frontend-owned.
-/// This value owns the meanings, defaults, and numeric normalization used by
-/// both CocoaSpice and SPCBoyWK before values reach `PlaybackController`.
+/// This value owns the meanings, defaults, and numeric normalization shared by
+/// maintained frontends before values reach `PlaybackController`.
 public struct PlaybackPreferences: Codable, Equatable, Sendable {
     public static let defaultValue = PlaybackPreferences()
     public static let volumeRange: ClosedRange<Float> = 0...1

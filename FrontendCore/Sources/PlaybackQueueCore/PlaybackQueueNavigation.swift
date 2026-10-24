@@ -326,7 +326,7 @@ public struct PlaybackQueueAdjacentResponse: Equatable, Sendable, Codable {
 /// Queue identity policy shared by native frontends.
 ///
 /// This type deliberately works on stable track IDs rather than frontend
-/// models. CocoaSpice and SPCBoyWK can therefore share the exact same queue
+/// models. Player frontends can therefore share the exact same queue
 /// transitions while keeping their presentation layers independent.
 public enum PlaybackQueueNavigation {
     public static func transportPlaybackTarget(

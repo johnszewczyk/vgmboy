@@ -1,7 +1,7 @@
 # FrontendCore
 
 `FrontendCore` contains UI-neutral services shared by CocoaSpice, SB2, ViewBoy,
-and LineBoy; retired SPCBoyWK remains a historical consumer. Its modules own
+and LineBoy. Retired SPCBoyWK source is archived outside the active tree. Its modules own
 archive-cache identity and policy, cache leases, preferences, favorites and
 playlist identity, shared startup progress, playback queues, and native
 transport coordination. The package does not read or write the catalog,

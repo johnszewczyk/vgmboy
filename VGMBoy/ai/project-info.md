@@ -7,8 +7,8 @@ transport, and the macOS audio device for the VGMMan family. It is a shared
 in-process kit, not a daemon or catalog service.
 
 CocoaSpice, SB2, ViewBoy, and LineBoy are maintained player clients. Each
-bundles the shared playback core behind its own host adapter. Retired SPCBoyWK
-remains a historical client. ScanSong consumes
+bundles the shared playback core behind its own host adapter. SPCBoyWK's source
+is archived and no longer a maintained client. ScanSong consumes
 VGMBoy-built inspection helpers, but does not link the playback kit or invoke
 a player app.
 

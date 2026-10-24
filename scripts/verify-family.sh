@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FAMILY_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MODE="verify"
 RESULT_ROOT=""
-PROJECTS=(CatalogReader VGMBoy FrontendCore MetaMan UACMan UACMan/Wrapper ScanSong CocoaSpice SPCBoyWK ViewBoy)
+PROJECTS=(CatalogReader VGMBoy FrontendCore MetaMan UACMan UACMan/Wrapper ScanSong CocoaSpice ViewBoy)
 
 usage() {
   echo "Usage: $0 [--inventory-only] [--output-dir PATH]"
@@ -220,9 +220,6 @@ if [[ "$MODE" == "verify" ]]; then
   run_check uacman-tests UACMan swift test --disable-sandbox
   run_check scansong-tests ScanSong swift test --disable-sandbox --jobs 1
   run_check cocoaspice-tests CocoaSpice swift test --disable-sandbox --jobs 1
-  run_check spcboywk-build SPCBoyWK swift build --disable-sandbox
-  run_check spcboywk-js-syntax SPCBoyWK check_renderer_js
-  run_check spcboywk-renderer-tests SPCBoyWK run_renderer_tests
   run_check viewboy-build ViewBoy ./build.sh
   run_check viewboy-js-syntax ViewBoy check_renderer_js
   run_check viewboy-renderer-tests ViewBoy run_renderer_tests

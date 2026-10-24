@@ -8,5 +8,6 @@ namespace, and release boundary. Read
 
 Keep SPCBOY presentation and host adaptation here. Catalog reads belong to
 CatalogReader, shared frontend policy belongs to FrontendCore, and decoding,
-timing, and audio output belong to VGMBoy. Do not change SPCBoyWK or CocoaSpice
-skins to implement SB2 behavior.
+timing, and audio output belong to VGMBoy. CocoaSpice is a separate active
+frontend; do not change its skin to implement SB2 behavior. SPCBoyWK's retired
+source is archived under `LocalRecovery/`.

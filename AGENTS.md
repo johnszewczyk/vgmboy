@@ -22,13 +22,14 @@ Preserve component ownership, provenance, and release boundaries. Compilation
 alone does not prove packaged, visible, or audible behavior; use the family
 verification script and state any live-fixture gaps explicitly.
 
-SPCBoyWK is the retired legacy SPCBOY frontend, superseded by SB2; retain its
-source for history and reproducible builds, but do not add features or list it
-as an active app. SB2 is the current SPCBOY frontend under development with its
-own package and release boundary. LaunchPad has separate entries for SB2,
-ViewBoy, LineBoy, and VGMManDocs. CocoaSpice, SB2, and ViewBoy are the active
-player apps; LineBoy remains a separate experimental player. VGMManDocs owns
-the published Markdown library and its viewer. Keep each frontend as a separate
+SPCBoyWK is retired and superseded by SB2. Its tracked source has been removed
+from the active tree and retained as a local ZIP under `LocalRecovery/`; Git
+history remains the source of record. Do not add features or list it as an
+active app. SB2 is the current SPCBOY frontend under development with its own
+package and release boundary. LaunchPad has separate entries for SB2, ViewBoy,
+LineBoy, and VGMManDocs. CocoaSpice, SB2, and ViewBoy are the active player
+apps; LineBoy remains a separate experimental player. VGMManDocs owns the
+published Markdown library and its viewer. Keep each frontend as a separate
 presentation client over the shared catalog, frontend, and playback packages;
 do not merge one skin into another.
 
@@ -39,10 +40,10 @@ Keep SBONLINE separate from the SB2 macOS app, and do not claim production code
 has moved until its source and deployment packaging move together.
 
 For a ViewBoy task, the active application and UI live in `ViewBoy/`; use its
-`README.md` and `AGENTS.md` route and launch with `ViewBoy/launch.sh`. `SPCBoyWK/`
-is a retired legacy frontend, and `LocalRecovery/ViewBoy/` contains historical
-archives only. ViewBoy's implementation and launch script are in `ViewBoy/`
-regardless of historical bridge names.
+`README.md` and `AGENTS.md` route and launch with `ViewBoy/launch.sh`.
+`LocalRecovery/ViewBoy/` contains historical archives only. ViewBoy's
+implementation and launch script are in `ViewBoy/` regardless of historical
+bridge names.
 
 For a LineBoy task, use the standalone family subproject at `LineBoy/`, follow
 its `AGENTS.md` route, and build/launch with `LineBoy/build.sh` and

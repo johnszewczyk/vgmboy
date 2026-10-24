@@ -13,9 +13,10 @@ family.
 - Cross-package changes belong in one family-root commit so the checked-in
   package combination stays reviewable.
 - SPCBoyWK is the retired legacy SPCBOY frontend, superseded by SB2. Its source
-  remains in the family for history and reproducible builds, but it is not an
-  active product. CocoaSpice, SB2, and ViewBoy remain separate app packages
-  with independent identities and presentation.
+  is removed from the active tree and retained in a local ZIP under
+  `LocalRecovery/SPCBoyWK/`; Git history remains the source of record.
+  CocoaSpice, SB2, and ViewBoy remain separate app packages with independent
+  identities and presentation.
 - Vendored decoder snapshots under `VGMBoy/vendor/` are ordinary tracked files,
   not submodules. Their upstream pins and provenance are documented beside the
   vendor tree.

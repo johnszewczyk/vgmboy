@@ -311,7 +311,7 @@ public struct PlaybackNaturalEndGate: Sendable {
     }
 }
 
-/// The single native transport façade shared by CocoaSpice and SPCBoyWK.
+/// The shared native transport façade used by CocoaSpice and WebKit frontends.
 ///
 /// Frontends provide a direct path or archive/member identity plus stable
 /// identity. This type owns command serialization, request invalidation, the

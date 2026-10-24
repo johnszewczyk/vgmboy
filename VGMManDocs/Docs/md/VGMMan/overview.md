@@ -12,7 +12,8 @@ playback.
 - [MetaMan](../MetaMan/format-layouts.md) reads source metadata without
   depending on playback decoders.
 - UACMan browses and edits reversible `.uac` package manifests.
-- CocoaSpice, SPCBoyWK, and ViewBoy are separate player applications.
+- CocoaSpice, SB2, and ViewBoy are maintained player applications. SPCBoyWK is
+  retired; its source is preserved in Git history and a local recovery ZIP.
 - VGMManDocs presents this Markdown library from the local filesystem.
 
 The application repository is organized as one Git family. Its subdirectories

@@ -19,7 +19,7 @@ ownership and preservation rules.
 | [CocoaSpice](CocoaSpice/README.md) | Native AppKit/SwiftUI player frontend. |
 | [SPCBOY SB2](SB2/README.md) | Current SPCBOY pixel-style WebKit frontend under development. |
 | [SBONLINE](SBONLINE/README.md) | Hosted SPCBOY web player; production site integration currently lives in MathBook. |
-| [SPCBoyWK](SPCBoyWK/README.md) | Retired legacy SPCBOY frontend, retained for source history and reproducible builds. |
+| SPCBoyWK source snapshot | Retired frontend source ZIP recorded in [LocalRecovery](LocalRecovery/README.md); not an active package. |
 | [ViewBoy](ViewBoy/README.md) | Native player with a screen-first, four-shade Yoga LCD interface. |
 | [LineBoy](LineBoy/README.md) | Monochrome DOS-style line-grid display experiment. |
 | [VGMManDocs](VGMManDocs/README.md) | Native viewer and editor for the family's published Markdown library. |

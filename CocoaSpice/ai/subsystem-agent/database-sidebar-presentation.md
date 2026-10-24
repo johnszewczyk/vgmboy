@@ -39,8 +39,8 @@
 - Playlist hydration is deliberately not a second Files/Games policy here:
   `PlaylistQueueLoader` reaches the shared `CatalogPlaylistReader` and
   `PlaybackQueueNavigation` boundary. `TrackItem`, metadata caches, and
-  native column-width hints remain CocoaSpice adapters because SPCBoyWK's
-  bridge/DOM row shape is different.
+  native column-width hints remain CocoaSpice adapters because the retired
+  SPCBoyWK bridge/DOM row shape was different.
 - File roots begin collapsed after a Files refresh. This keeps flattened native-table construction proportional to the folders the user opens instead of eagerly building every source-file row.
 - The Files sidebar builds its reusable folder graph alongside the background SQLite read. Once published, a disclosure reload walks only expanded branches; it must never rebuild the full graph on the main actor.
 - The reusable folder graph, stable IDs, ordering, row flattening, and

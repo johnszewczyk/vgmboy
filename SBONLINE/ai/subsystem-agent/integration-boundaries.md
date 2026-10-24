@@ -16,17 +16,24 @@ playback family and MathBook private site.
 - VGMBoy owns shared playback admission, archive/source preparation, decoder
   source, and timing. Its `VGMBoyArchiveCore` accepts the original source plus
   selected member and prepares playable input in the core.
-- MathBook's production player has not yet been wired to
-  `VGMBoyArchiveCore`: `accounts/spcboy_uac.py` and `accounts/views.py` still
-  implement selected-member/UAC preparation independently. Its
-  `private-admin/streaming/` libvgm bridge is a deployment source copy whose
-  upstream commit and mapping are recorded in `UPSTREAM.md`; these copies do
-  not receive VGMBoy changes automatically.
+- VGMBoy now exposes an initial `vgmboy-prepare <archive> <member>` executable
+  bridge that emits the selected prepared member on stdout. The executable
+  builds on the local macOS host, but a Linux build/runtime package has not yet
+  been verified.
+- MathBook's source now has an adapter at `accounts/vgmboy_prepare.py` and
+  calls it when the packaged executable is present. Until that Linux artifact
+  is installed, the existing selected-member/UAC extractor remains a
+  compatibility fallback. The production site has not been deployed with this
+  adapter. The adapter forwards configured `tar`, `zstd`, and `7z` tool paths
+  to VGMBoy's host-tool settings. The site's `private-admin/streaming/` libvgm
+  bridge is a deployment source copy whose upstream commit and mapping are
+  recorded in `UPSTREAM.md`; it does not receive VGMBoy changes automatically.
 - Keep the hosted integration limited to Django authentication, catalog
   metadata, quotas, HTTP streaming, and the Linux AAC/PCM host adapter. Before
-  claiming core parity, expose and verify a Linux-buildable VGMBoy interface
-  for source preparation and playback, then have MathBook call it instead of
-  maintaining archive and decoder behavior in parallel.
+  switching production, package and verify the VGMBoy executable for Linux,
+  then have MathBook invoke it instead of maintaining archive behavior in
+  parallel. Decoder parity remains a separate future boundary; the current
+  Linux streamer still owns PCM decoding.
 - ScanSong is the catalog writer. SBONLINE consumes only the published catalog.
 
 ## Invariants
@@ -37,9 +44,9 @@ playback family and MathBook private site.
 - Keep source music compressed on the server. Materialize a selected member
   only for a playback request and stream AAC directly to the browser; do not
   create per-track AAC files or an extracted playback tree.
-- Do not extend MathBook's parallel archive/decoder implementation for new
-  VGMBoy behavior. Core updates reach SBONLINE only after the hosted Linux
-  adapter is built against or invokes that shared core.
+- Do not extend MathBook's compatibility archive extractor or parallel decoder
+  implementation for new VGMBoy behavior. Remove the extraction fallback after
+  the Linux executable is packaged and production playback is verified.
 - Return hosted track identifiers and display metadata to the browser; keep
   package paths and archive member paths server-side.
 - Do not copy the production implementation into this folder while MathBook

@@ -16,8 +16,8 @@ VGMBoyKit through a host adapter.
 - VGMBoyArchiveCore owns archive/member source preparation; VGMBoyKit owns
   format admission, decoding, timing, and audio output.
 - MetaMan owns native-format metadata. UACMan owns the UAC package contract.
-- SB2 and ViewBoy are active frontend siblings; SPCBoyWK is retired and kept
-  for historical builds.
+- SB2 and ViewBoy are active frontend siblings. SPCBoyWK is retired; its source
+  is preserved in a local ZIP and Git history.
 
 ## Task Routing
 

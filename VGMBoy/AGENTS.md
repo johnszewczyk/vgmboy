@@ -7,9 +7,9 @@ routed by the task.
 VGMBoy owns playback/export source preparation, playback admission, decoder
 integration, timing, native transport, and the macOS audio device. The
 maintained player frontends—CocoaSpice, SB2,
-and ViewBoy—are clients of the shared kit and family service packages. Retired
-SPCBoyWK remains a historical client; cross-app behavior belongs with its
-shared owner.
+and ViewBoy—are clients of the shared kit and family service packages.
+SPCBoyWK's source is archived and no longer a maintained client; cross-app
+behavior belongs with its shared owner.
 
 Do not fork upstream decoders or duplicate a complete MetaMan reader in a
 playback/scanner adapter. Keep public APIs narrow, fail explicitly on

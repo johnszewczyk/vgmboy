@@ -12,7 +12,8 @@ LineBoy, and ScanSong products.
   `VGMBoyKit` in-process.
 - SB2 is the current SPCBOY WebKit frontend under development. It reads the
   ScanSong catalog and links the shared VGMBoy core through its native endpoint
-  bridge. SPCBoyWK is retired; its retained source remains a historical client.
+  bridge. SPCBoyWK is retired; its source is preserved in a local recovery ZIP
+  and Git history, and is no longer a maintained client.
 - SBONLINE is the hosted SPCBOY web-player project and is separate from SB2's
   macOS app bundle. The production Django pages, account integration, streaming
   adapter, and deployment currently remain in MathBook's `private-admin/` app;
@@ -25,8 +26,8 @@ LineBoy, and ScanSong products.
 
 ## Invariants
 
-- CocoaSpice, SB2, ViewBoy, and retained legacy SPCBoyWK source open the selected
-  catalog read-only; all catalog writes belong to ScanSong.
+- CocoaSpice, SB2, and ViewBoy open the selected catalog read-only; all catalog
+  writes belong to ScanSong.
 - Frontends own catalog selection, queue policy, presentation, durable settings, and cache policy.
   They pass VGMBoy a direct source path or an archive path plus selected member. VGMBoy owns
   archive inspection and preparation, UAC frame decompression, format admission, decoder
@@ -49,6 +50,5 @@ LineBoy, and ScanSong products.
 - [build-app.sh](../../build-app.sh)
 - [build-integration.md](build-integration.md)
 - [CocoaSpice project info](../../../CocoaSpice/ai/project-info.md)
-- [SPCBoy WK project info](../../../SPCBoyWK/ai/project-info.md)
 - [ViewBoy project info](../../../ViewBoy/ai/project-info.md)
 - [ScanSong project info](../../../ScanSong/ai/project-info.md)
