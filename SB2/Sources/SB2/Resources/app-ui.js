@@ -72,6 +72,10 @@ let playlistTabTransitionChain = Promise.resolve();
 let playlistContentRequestGeneration = 0;
 let playlistSortGeneration = 0;
 const treeSearchText = new WeakMap();
+let treeSearchSource = null;
+let treeSearchRecords = [];
+let treeSearchResultsQuery = "";
+let treeSearchMatchedRecords = [];
 let startupStartedAt = 0;
 let startupRevealTimer = 0;
 let startupElapsedTimer = 0;
@@ -1750,28 +1754,53 @@ function filteredTree() {
 
   if (!terms.length) return sourceTree;
 
-  function ownSearchText(node) {
-    const cached = treeSearchText.get(node);
-    if (cached !== undefined) return cached;
-    const searchable = `${node.name || ""} ${node.path || ""}`.toLowerCase();
-    treeSearchText.set(node, searchable);
-    return searchable;
+  if (treeSearchSource !== sourceTree) {
+    treeSearchSource = sourceTree;
+    treeSearchRecords = [];
+    const indexNodes = (nodes, parent = null) => {
+      for (const node of nodes || []) {
+        let searchText = treeSearchText.get(node);
+        if (searchText === undefined) {
+          searchText = `${node.name || ""} ${node.path || ""}`.toLowerCase();
+          treeSearchText.set(node, searchText);
+        }
+        const record = { node, parent, searchText };
+        treeSearchRecords.push(record);
+        if (Array.isArray(node.children) && node.children.length) indexNodes(node.children, record);
+      }
+    };
+    indexNodes(sourceTree);
+    treeSearchResultsQuery = "";
+    treeSearchMatchedRecords = treeSearchRecords;
   }
 
-  function filterNode(node) {
-    const matches = terms.every((term) => ownSearchText(node).includes(term));
-    const children = node.children || [];
-    const filteredChildren = children.length ? children.map(filterNode).filter(Boolean) : [];
-    if (matches || filteredChildren.length > 0) {
-      return {
-        ...node,
-        children: filteredChildren
-      };
-    }
-    return null;
+  const query = normalizedSidebarQuery(state.sidebarQuery);
+  const candidates = treeSearchMatchedRecords
+      && query.startsWith(treeSearchResultsQuery)
+    ? treeSearchMatchedRecords
+    : treeSearchRecords;
+  const matches = candidates.filter(({ searchText }) => terms.every((term) => searchText.includes(term)));
+  treeSearchResultsQuery = query;
+  treeSearchMatchedRecords = matches;
+  if (!matches.length) return [];
+
+  const included = new Set();
+  for (const match of matches) {
+    const chain = [];
+    for (let record = match; record && !included.has(record); record = record.parent) chain.push(record);
+    for (let index = chain.length - 1; index >= 0; index -= 1) included.add(chain[index]);
   }
 
-  return sourceTree.map(filterNode).filter(Boolean);
+  const clones = new Map();
+  const roots = [];
+  for (const record of included) {
+    const clone = { ...record.node, children: [] };
+    clones.set(record, clone);
+    const parent = record.parent ? clones.get(record.parent) : null;
+    if (parent) parent.children.push(clone);
+    else roots.push(clone);
+  }
+  return roots;
 }
 
 function renderTree() {
