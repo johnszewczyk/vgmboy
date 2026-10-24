@@ -81,7 +81,8 @@
   treatment. Buttons match the 1.75rem control height. The nine first-row
   controls share the available width equally; Search shares a row with five
   square Console/Path, Gallery, Recent, Favorites, and expand/collapse controls. The
-  pane enforces enough minimum width to keep the first row intact. Text bars
+  pane enforces enough minimum width to keep the first row intact and can be
+  resized through an even 50/50 split. Text bars
   use the same height and 0.25rem inline padding; glyph buttons center their icons.
   Playlist tabs are separate rounded blocks with a visible gap and the same
   height as square buttons; their width follows the label. Column headers use

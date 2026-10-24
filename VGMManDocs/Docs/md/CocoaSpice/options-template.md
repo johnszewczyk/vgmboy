@@ -40,7 +40,7 @@
 - Checkboxes use the native checkbox style: `[ ]` unchecked, `[x]` checked.
 - Duration fields use a dark translucent rounded rectangle, a one-point white translucent stroke, monospaced text, right alignment, and a width of `72` points.
 - Timing fields use a numeric text field, a width of `58` points, and the suffix `ms`.
-- Tempo fields use a rounded-border text field, a width of `72` points, and the placeholder `1`.
+- Tempo fields use a rounded-border text field, a width of `56` points, and the placeholder `1`. They commit only on Return.
 - Path bars use a monospaced `11`-point font, one line, middle truncation, selectable text, a folder icon button, and the accessibility label `Browse`.
 - Menu pickers use the menu style with their labels hidden. Bordered action buttons use regular control size; equal-width action buttons share the available row width.
 
@@ -86,16 +86,16 @@
 
 ### Play Speed
 
-> Fractions and decimals are accepted and snap to 1/32 increments.
+> Fractions and decimals are accepted and snap to 1/64 increments. Reduced fractions through denominator 64 display as fractions. The compact field commits only when Return is pressed.
 
 | Control | Detail | Value field | Default |
 | --- | --- | --- | --- |
 | [ ] `libgme` | `SPC, NSF/NSFE, GBS, HES, KSS, and AY` | `[text field: 1]` | `1×` |
 | [ ] `libvgm` | `GYM, S98, VGM, VGZ, and DRO` | `[text field: 1]` | `1×` |
 
-**Tempo field format:** placeholder `1`, rounded-border style, width `72`.  
+**Tempo field format:** placeholder `1`, rounded-border style, width `56`.
 **Accepted input:** fractions and decimals.  
-**Quantization:** `1/32` increments.
+**Quantization:** `1/64` increments.
 
 ---
 
@@ -205,6 +205,12 @@
 > Automatically resize columns for content width on selection.
 
 **Default:** on.
+
+**Control:** [ ] `Link Mode`
+
+> Single-click a playlist row to play it. The pointer changes to a hand over playlist rows.
+
+**Default:** off. Return continues to play the selected row.
 
 ### Animations
 

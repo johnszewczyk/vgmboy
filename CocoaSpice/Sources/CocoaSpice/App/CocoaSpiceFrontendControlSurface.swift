@@ -49,6 +49,7 @@ struct CocoaSpiceOptionsSnapshot: Codable, Equatable, Sendable {
     let appVolume: Float
     let monoEnabled: Bool
     let playlistFollowsCursor: Bool
+    let playlistLinkMode: Bool
     let doubleClickEnqueues: Bool
     let interfaceFontSize: Double
     let interfaceTextColor: String
@@ -99,6 +100,7 @@ enum CocoaSpiceOptionsCommand: Codable, Equatable, Sendable {
     case setAppVolume(Float)
     case setMonoEnabled(Bool)
     case setPlaylistFollowsCursor(Bool)
+    case setPlaylistLinkMode(Bool)
     case setDoubleClickEnqueues(Bool)
     case setInterfaceFontSize(Double)
     case setInterfaceTextColor(String)
@@ -152,6 +154,7 @@ final class CocoaSpiceOptionsControlSurface {
             appVolume: model.appVolume,
             monoEnabled: model.monoEnabled,
             playlistFollowsCursor: model.playlistFollowsCursor,
+            playlistLinkMode: model.playlistLinkMode,
             doubleClickEnqueues: model.sidebarDoubleClickAction == .enqueue,
             interfaceFontSize: Double(model.interfaceFontSize),
             interfaceTextColor: model.interfaceTextColor.rawValue,
@@ -225,6 +228,8 @@ final class CocoaSpiceOptionsControlSurface {
             model.setMonoEnabled(enabled)
         case .setPlaylistFollowsCursor(let enabled):
             model.setPlaylistFollowsCursorEnabled(enabled)
+        case .setPlaylistLinkMode(let enabled):
+            model.setPlaylistLinkModeEnabled(enabled)
         case .setDoubleClickEnqueues(let enabled):
             model.setSidebarDoubleClickAction(enabled ? .enqueue : .playNow)
         case .setInterfaceFontSize(let size):
