@@ -23,6 +23,7 @@ enum AppDefaultsKey {
     static let repeatMode = "CocoaSpice.repeatMode"
     static let sidebarDoubleClickAction = "CocoaSpice.sidebarDoubleClickAction"
     static let playlistFollowsCursor = "CocoaSpice.playlistFollowsCursor"
+    static let playlistLinkMode = "CocoaSpice.playlistLinkMode"
     static let playlistSortColumn = "CocoaSpice.playlistSortColumn"
     static let playlistSortDirection = "CocoaSpice.playlistSortDirection"
     static let persistedPlaylistPaths = "CocoaSpice.persistedPlaylistPaths"
@@ -69,6 +70,7 @@ enum AppDefaultsKey {
 struct RestoredPlaybackPreferences {
     let longPlayEnabled: Bool
     let playlistFollowsCursor: Bool
+    let playlistLinkMode: Bool
     let manualPreFadeSeconds: Int?
     let unknownDurationSeconds: Int?
     let endFadeEnabled: Bool
@@ -174,6 +176,7 @@ enum AppSessionPersistence {
         return RestoredPlaybackPreferences(
             longPlayEnabled: defaults.bool(forKey: AppDefaultsKey.longPlayEnabled),
             playlistFollowsCursor: defaults.object(forKey: AppDefaultsKey.playlistFollowsCursor) as? Bool ?? false,
+            playlistLinkMode: defaults.object(forKey: AppDefaultsKey.playlistLinkMode) as? Bool ?? false,
             manualPreFadeSeconds: storedLongPlaySeconds > 0 ? shared.timing.longPlaySeconds : nil,
             unknownDurationSeconds: storedUnknownDurationSeconds > 0 ? shared.timing.unknownDurationSeconds : nil,
             endFadeEnabled: shared.fadeEnabled,
@@ -237,6 +240,7 @@ enum AppSessionPersistence {
     static func savePlaybackPreferences(
         longPlayEnabled: Bool,
         playlistFollowsCursor: Bool,
+        playlistLinkMode: Bool,
         manualPreFadeSeconds: Int,
         unknownDurationSeconds: Int,
         endFadeEnabled: Bool,
@@ -287,6 +291,7 @@ enum AppSessionPersistence {
         )
         defaults.set(longPlayEnabled, forKey: AppDefaultsKey.longPlayEnabled)
         defaults.set(playlistFollowsCursor, forKey: AppDefaultsKey.playlistFollowsCursor)
+        defaults.set(playlistLinkMode, forKey: AppDefaultsKey.playlistLinkMode)
         defaults.set(shared.timing.longPlaySeconds, forKey: AppDefaultsKey.manualPreFadeSeconds)
         defaults.set(shared.timing.unknownDurationSeconds, forKey: AppDefaultsKey.unknownDurationSeconds)
         defaults.set(shared.fadeEnabled, forKey: AppDefaultsKey.endFadeEnabled)

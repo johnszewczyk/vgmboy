@@ -44,7 +44,7 @@ same typed endpoint operations.
   a fade, status application, or completion handoff must discard the work when that generation
   changes; pause, seek, and output-gain ramps preserve it.
 - `PlaybackTempo` is the shared fraction representation for frontend settings. UI parsing accepts
-  decimal or fractional input and snaps it to musical 1/32 increments before the host sends the
+  decimal or fractional input and snaps it to musical 1/64 increments before the host sends the
   typed `set_tempo` multiplier; decoder-family capability remains owned by `FormatRegistry` and
   currently enables native tempo for libgme and libvgm.
 - The equalizer is CocoaSpice-compatible: ten parametric bands at 31, 62, 125, 250, 500, 1k,

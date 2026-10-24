@@ -1730,7 +1730,7 @@ body.sb2-frontend {
   --sb-titlebar-height: var(--sb-control-size);
   --sb-statusbar-height: var(--sb-control-size);
   --sb-sidebar-min-width: calc((9 * var(--sb-control-size)) + (8 * var(--sb-toolbar-gap)) + (2 * var(--sb-toolbar-inset)));
-  --sb-sidebar-track: minmax(var(--sb-sidebar-min-width), clamp(var(--sb-sidebar-min-width), calc(var(--sidebar-width-percent) * 1%), 40%));
+  --sb-sidebar-track: minmax(var(--sb-sidebar-min-width), clamp(var(--sb-sidebar-min-width), calc(var(--sidebar-width-percent) * 1%), 50%));
   --sb-control-icon-size: calc(var(--ui-font-size-pt) * 1pt);
   --sb-options-control-height: var(--sb-control-size);
   --sb-options-control-width: 24ch;

@@ -25,6 +25,7 @@
 ## Activation
 
 - Rows: double-click starts playback.
+- Rows: Link Mode optionally starts playback on a single click and shows a hand cursor over playlist rows; it is off by default.
 - Rows: Return starts playback of the primary selected row.
 - Favorites: Command-D toggles the selected track; the favorite glyph toggles the clicked track directly.
 - Favorites: Command-Shift-F opens or switches to the Favorites tab without changing the sidebar view.

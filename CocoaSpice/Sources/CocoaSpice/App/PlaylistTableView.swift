@@ -210,6 +210,7 @@ struct PlaylistTableView: NSViewRepresentable {
 
         func reload() {
             guard let tableView else { return }
+            (tableView as? PlaylistNativeTableView)?.linkModeEnabled = model.playlistLinkMode
             selectionHighlightView?.selectionColor = NSColor.controlAccentColor
             selectionHighlightView?.animationDuration = Double(model.effectiveSelectionAnimationMilliseconds) / 1_000
             selectionHighlightView?.isPrimarySelectionSolid = model.solidPlaylistSelectionBar
@@ -245,6 +246,9 @@ struct PlaylistTableView: NSViewRepresentable {
             if rowsChanged || favoritesChanged || sortChanged || fontChanged || rowGapChanged {
                 let reloadStartedAt = ContinuousClock.now
                 tableView.reloadData()
+                if rowsChanged, let nativeTableView = tableView as? PlaylistNativeTableView {
+                    nativeTableView.window?.invalidateCursorRects(for: nativeTableView)
+                }
                 let reloadElapsed = reloadStartedAt.duration(to: .now)
                 Self.playlistLoadLogger.info(
                     "playlist table reload finished: \(self.model.visiblePlaylist.count) rows in \(String(describing: reloadElapsed), privacy: .public)"
@@ -512,6 +516,7 @@ struct PlaylistTableView: NSViewRepresentable {
         @objc
         nonisolated func handleDoubleClick(_ sender: NSTableView) {
             MainActor.assumeIsolated {
+                guard (sender as? PlaylistNativeTableView)?.linkModeEnabled != true else { return }
                 let row = sender.clickedRow >= 0 ? sender.clickedRow : sender.selectedRow
                 activateRow(row)
             }
@@ -1373,6 +1378,13 @@ private final class PlaylistNativeTableView: NSTableView {
     var rowActivationHandler: ((Int) -> Void)?
     var returnActivationHandler: (() -> Void)?
     var rowMenuProvider: ((Int) -> NSMenu?)?
+    var linkModeEnabled = false {
+        didSet {
+            guard oldValue != linkModeEnabled else { return }
+            window?.invalidateCursorRects(for: self)
+        }
+    }
+    private var draggedDuringMouseDown = false
 
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {
@@ -1384,14 +1396,31 @@ private final class PlaylistNativeTableView: NSTableView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        draggedDuringMouseDown = false
         let localPoint = convert(event.locationInWindow, from: nil)
         let clickedRow = row(at: localPoint)
 
         super.mouseDown(with: event)
 
-        if event.clickCount == 2, clickedRow >= 0 {
+        guard !draggedDuringMouseDown else { return }
+        if linkModeEnabled, event.clickCount == 1, clickedRow >= 0 {
+            rowActivationHandler?(clickedRow)
+        } else if !linkModeEnabled, event.clickCount == 2, clickedRow >= 0 {
             rowActivationHandler?(clickedRow)
         }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        draggedDuringMouseDown = true
+        super.mouseDragged(with: event)
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        guard linkModeEnabled, numberOfRows > 0 else { return }
+        let rowsRect = rect(ofRow: 0).union(rect(ofRow: numberOfRows - 1))
+        guard !rowsRect.isEmpty else { return }
+        addCursorRect(rowsRect, cursor: .pointingHand)
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {

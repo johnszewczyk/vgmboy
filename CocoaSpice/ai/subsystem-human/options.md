@@ -18,7 +18,7 @@
 ## Playback
 
 - Long Play: enable shared extended playback.
-- Play Speed: independently enable and set tempo for libgme (SPC, NSF/NSFE, GBS, HES, KSS, AY) and libvgm (GYM, S98, VGM, VGZ, DRO). Decimal and fractional input is accepted and snapped to musical 1/32 increments before it is persisted through the shared VGMBoy tempo control.
+- Play Speed: independently enable and set tempo for libgme (SPC, NSF/NSFE, GBS, HES, KSS, AY) and libvgm (GYM, S98, VGM, VGZ, DRO). Decimal and fractional input is accepted and snapped to musical 1/64 increments; reduced fractions through denominator 64 display as fractions. The compact rate field commits only when Return is pressed.
 - Duration: set a manual playback target.
 - End Fade: enable or disable the fade and configure its duration (default six seconds). With it off, metadata-timed tracks use their native ending.
 - End Fade: Faded Skip is appended to this panel and optionally uses that same configured duration for Next and Previous while the live source continues playing; press again to advance immediately. It is not a separate options page.
@@ -48,6 +48,7 @@
   Return. Double-Click Enqueues remains a browser behavior control for Games.
 - Every Options panel places a horizontal rule below its heading. Checkbox options use a leading checkbox with any explanatory text aligned beneath its label.
 - Playlist Options: Column Auto-size defaults on and automatically resizes columns for content width on selection.
+- Playlist Options: Link Mode is off by default. When enabled, a single click plays the row and the pointer becomes a hand over playlist rows. Return continues to play the selected row.
 - Animations: Solid Playlist Selection Bar is off by default, showing outlined playlist and sidebar capsules; enabling it fills both. Auto-Resize and Selection Bar are independently checkbox-enabled (both default on) and retain their configured 0–1000 ms values when disabled; disabling one makes its effective duration 0 ms.
 - Shared ownership: preference persistence and cache policy come from FrontendCore; playback timing and AAC conversion come from VGMBoyKit. CocoaSpice supplies only its native controls, destination-folder choice, and archive materialization adapter.
 

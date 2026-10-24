@@ -776,6 +776,7 @@ final class PlayerViewModel {
     var repeatMode: RepeatMode = .off
     private var randomLibraryTracks: [TrackItem] = []
     var playlistFollowsCursor = false
+    var playlistLinkMode = false
     var longPlayEnabled = false
     var manualPreFadeSeconds: Int = 180
     var unknownDurationSeconds: Int = PlaybackTimingPreferences.defaultUnknownDurationSeconds
@@ -1294,6 +1295,12 @@ final class PlayerViewModel {
         }
     }
 
+    func setPlaylistLinkModeEnabled(_ enabled: Bool) {
+        guard playlistLinkMode != enabled else { return }
+        playlistLinkMode = enabled
+        savePreferencesNow()
+    }
+
     func selectDatabaseGame(_ item: DatabaseGameItem) {
         applyDatabaseGroupState(.selectGame(groupName: sidebarSystemName(for: item), gameID: item.id))
         selectedDatabaseGameID = item.id
@@ -1796,6 +1803,7 @@ final class PlayerViewModel {
         AppSessionPersistence.savePlaybackPreferences(
             longPlayEnabled: longPlayEnabled,
             playlistFollowsCursor: playlistFollowsCursor,
+            playlistLinkMode: playlistLinkMode,
             manualPreFadeSeconds: manualPreFadeSeconds,
             unknownDurationSeconds: unknownDurationSeconds,
             endFadeEnabled: endFadeEnabled,
@@ -3541,6 +3549,7 @@ final class PlayerViewModel {
     private func restorePlaybackPreferences(_ preferences: RestoredPlaybackPreferences) {
         longPlayEnabled = preferences.longPlayEnabled
         playlistFollowsCursor = preferences.playlistFollowsCursor
+        playlistLinkMode = preferences.playlistLinkMode
         if let storedManualPreFade = preferences.manualPreFadeSeconds {
             manualPreFadeSeconds = storedManualPreFade
         }
