@@ -21,13 +21,16 @@ playback family and MathBook private site.
   builds on the local macOS host, but a Linux build/runtime package has not yet
   been verified.
 - MathBook's source now has an adapter at `accounts/vgmboy_prepare.py` and
-  calls it when the packaged executable is present. Until that Linux artifact
-  is installed, the existing selected-member/UAC extractor remains a
-  compatibility fallback. The production site has not been deployed with this
-  adapter. The adapter forwards configured `tar`, `zstd`, and `7z` tool paths
-  to VGMBoy's host-tool settings. The site's `private-admin/streaming/` libvgm
-  bridge is a deployment source copy whose upstream commit and mapping are
-  recorded in `UPSTREAM.md`; it does not receive VGMBoy changes automatically.
+  calls it when the packaged executable is present. MathBook's deployment
+  stages a Linux artifact at `ops/server/artifacts/vgmboy-prepare` and installs
+  it at the persistent host path `/opt/precalc-admin/bin/vgmboy-prepare`,
+  outside the app release tree. Until that artifact is built and installed,
+  the existing selected-member/UAC extractor remains a compatibility fallback.
+  The production site has not been deployed with this adapter. The adapter
+  forwards configured `tar`, `zstd`, and `7z` tool paths to VGMBoy's host-tool
+  settings. The site's `private-admin/streaming/` libvgm bridge is a deployment
+  source copy whose upstream commit and mapping are recorded in `UPSTREAM.md`;
+  it does not receive VGMBoy changes automatically.
 - Keep the hosted integration limited to Django authentication, catalog
   metadata, quotas, HTTP streaming, and the Linux AAC/PCM host adapter. Before
   switching production, package and verify the VGMBoy executable for Linux,
