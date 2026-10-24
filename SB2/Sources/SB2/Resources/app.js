@@ -492,8 +492,9 @@ refs.optionsOverlay.addEventListener("click", (event) => {
 });
 
 refs.sidebarSearchInput.addEventListener("input", (event) => {
-  app.ui.updateSidebarSearch(event.target.value).catch((error) => console.error("[SPCBoy] sidebar search failed", error));
+  app.ui.updateSidebarSearch(event.target.value);
 });
+refs.sidebarSearchInput.addEventListener("focus", () => app.ui.prepareSidebarSearch());
 
 refs.sidebarViewToggleButton?.addEventListener("click", () => {
   app.ui.cycleSidebarMode().catch((error) => console.error("[SPCBoy] sidebar view switch failed", error));

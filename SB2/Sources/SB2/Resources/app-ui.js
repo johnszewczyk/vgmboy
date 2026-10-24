@@ -21,18 +21,34 @@ const displayedPathHintCache = new WeakMap();
 let columnMinimumWidths = new Map();
 let columnMinimumWidthsSignature = null;
 let renderedDatabaseGames = null;
+let databaseVisibleGameIDs = null;
 let galleryVisibleQuery = null;
 let galleryVisibleGallerySource = null;
 let galleryVisibleDatabaseResults = [];
+let databaseGamesByID = new Map();
+let galleryGamesByID = new Map();
 let galleryConsoleGroups = [];
 let databaseGameButtons = [];
+let databaseGameButtonsByID = new Map();
 let databaseConsoleGroups = [];
 let collapsedDatabaseConsoles = new Set();
 let databaseRowRenderGeneration = 0;
+let databaseSearchVisibilityGeneration = 0;
+let databaseSearchVisibilityFrame = 0;
 let browserClickTimer = 0;
 let databaseGameClickTimer = 0;
 let sidebarContextMenuGeneration = 0;
 let databaseGameSearchRecords = [];
+let sidebarSearchWorker = null;
+let sidebarSearchWorkerFailed = false;
+let sidebarSearchWorkerReady = new Set();
+let sidebarSearchWorkerRequestID = 0;
+let pendingSidebarSearchByScope = new Map();
+let pendingSidebarSearchRequests = new Map();
+let latestSidebarSearchByScope = new Map();
+let galleryGameSearchRecords = [];
+let sidebarSearchTimer = 0;
+let sidebarSearchGeneration = 0;
 let catalogGeneration = 0;
 let databaseGamesLoaded = false;
 let databaseFilesLoaded = false;
@@ -215,6 +231,7 @@ function restorePlaylistTabView(tab, { loadMissingGames = true, loadGalleryData 
   state.activePlaylistTabId = tab.id;
   state.activePlaylistTabKind = tab.kind === "gallery" ? "gallery" : "playlist";
   if (state.activePlaylistTabKind === "gallery") {
+    cancelPendingSidebarSearch();
     const sidebarModeChanged = state.sidebarMode !== "consoles";
     state.sidebarMode = "consoles";
     state.sidebarQuery = "";
@@ -515,9 +532,27 @@ function rebuildDatabaseGameSearchIndex(games = state.databaseGames) {
     // The WebKit list only filters it locally so typing never reopens SQLite.
     searchText: String(game.searchText || "")
   }));
+  databaseGamesByID = new Map(databaseGameSearchRecords.map(({ game }) => [databaseGameKey(game), game]));
+  refreshSidebarSearchWorkerIndex("catalog", databaseGameSearchRecords);
+}
+
+function rebuildGalleryGameSearchIndex(games = state.galleryGames) {
+  galleryGameSearchRecords = (Array.isArray(games) ? games : []).map((game) => ({
+    game,
+    searchText: String(game.searchText || "")
+  }));
+  galleryGamesByID = new Map(galleryGameSearchRecords.map(({ game }) => [databaseGameKey(game), game]));
+  galleryVisibleQuery = null;
+  galleryVisibleGallerySource = null;
+  refreshSidebarSearchWorkerIndex("gallery", galleryGameSearchRecords);
+}
+
+function normalizedSidebarQuery(query) {
+  return String(query || "").trim().toLowerCase().split(/\s+/).filter(Boolean).join(" ");
 }
 
 function invalidateDatabaseGames() {
+  cancelPendingSidebarSearch();
   catalogGeneration += 1;
   window.clearTimeout(galleryStaleRetryTimer);
   galleryStaleRetryTimer = 0;
@@ -536,17 +571,188 @@ function invalidateDatabaseGames() {
   rebuildDatabaseGameSearchIndex([]);
   state.galleryGames = [];
   galleryConsoleGroups = [];
+  rebuildGalleryGameSearchIndex([]);
   state.galleryGamesLoaded = false;
   state.galleryGamesError = "";
   galleryRenderSignature = null;
 }
 
 function localDatabaseSearch(query) {
-  const terms = String(query || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const normalizedQuery = normalizedSidebarQuery(query);
+  const terms = normalizedQuery ? normalizedQuery.split(" ") : [];
   if (!terms.length) return state.databaseGames;
   return databaseGameSearchRecords
     .filter(({ searchText }) => terms.every((term) => searchText.includes(term)))
     .map(({ game }) => game);
+}
+
+function sidebarSearchRecordsForScope(scope) {
+  return scope === "gallery" ? galleryGameSearchRecords : databaseGameSearchRecords;
+}
+
+function dispatchSidebarSearch(request) {
+  const worker = sidebarSearchWorker;
+  if (!worker || !sidebarSearchWorkerReady.has(request.scope)) {
+    pendingSidebarSearchByScope.set(request.scope, request);
+    return;
+  }
+  pendingSidebarSearchByScope.delete(request.scope);
+  pendingSidebarSearchRequests.set(request.requestID, request);
+  try {
+    worker.postMessage({
+      type: "search",
+      scope: request.scope,
+      requestID: request.requestID,
+      query: request.query
+    });
+  } catch (error) {
+    handleSidebarSearchWorkerFailure(error);
+  }
+}
+
+function handleSidebarSearchWorkerFailure(error) {
+  if (sidebarSearchWorkerFailed) return;
+  console.warn("[SPCBoy] sidebar search worker unavailable; using the local index", error);
+  sidebarSearchWorkerFailed = true;
+  sidebarSearchWorker?.terminate();
+  sidebarSearchWorker = null;
+  sidebarSearchWorkerReady.clear();
+  pendingSidebarSearchByScope.clear();
+  pendingSidebarSearchRequests.clear();
+  for (const request of latestSidebarSearchByScope.values()) {
+    if (request.generation === sidebarSearchGeneration) applySidebarSearch(request.query);
+  }
+}
+
+function ensureSidebarSearchWorker() {
+  if (sidebarSearchWorker || sidebarSearchWorkerFailed) return sidebarSearchWorker;
+  try {
+    sidebarSearchWorker = new Worker(new URL("./sidebar-search-worker.js", document.baseURI));
+    sidebarSearchWorker.addEventListener("message", (event) => {
+      const message = event.data || {};
+      if (message.type === "ready") {
+        sidebarSearchWorkerReady.add(message.scope);
+        const pending = pendingSidebarSearchByScope.get(message.scope);
+        if (pending) dispatchSidebarSearch(pending);
+        return;
+      }
+      if (message.type !== "results") return;
+      const request = pendingSidebarSearchRequests.get(message.requestID);
+      pendingSidebarSearchRequests.delete(message.requestID);
+      if (!request
+          || latestSidebarSearchByScope.get(request.scope)?.requestID !== request.requestID
+          || request.generation !== sidebarSearchGeneration) return;
+      applySidebarSearch(request.query, Array.isArray(message.ids) ? message.ids : []);
+    });
+    sidebarSearchWorker.addEventListener("error", (event) => handleSidebarSearchWorkerFailure(event.message || event));
+    for (const scope of ["catalog", "gallery"]) {
+      const records = sidebarSearchRecordsForScope(scope);
+      sidebarSearchWorkerReady.delete(scope);
+      sidebarSearchWorker.postMessage({
+        type: "index",
+        scope,
+        records: records.map(({ game, searchText }) => ({ id: databaseGameKey(game), searchText }))
+      });
+    }
+  } catch (error) {
+    handleSidebarSearchWorkerFailure(error);
+  }
+  return sidebarSearchWorker;
+}
+
+function refreshSidebarSearchWorkerIndex(scope, records) {
+  if (!sidebarSearchWorker || sidebarSearchWorkerFailed) return;
+  sidebarSearchWorkerReady.delete(scope);
+  try {
+    sidebarSearchWorker.postMessage({
+      type: "index",
+      scope,
+      records: records.map(({ game, searchText }) => ({ id: databaseGameKey(game), searchText }))
+    });
+  } catch (error) {
+    handleSidebarSearchWorkerFailure(error);
+  }
+}
+
+function prepareSidebarSearch() {
+  window.setTimeout(ensureSidebarSearchWorker, 0);
+}
+
+function requestSidebarSearch(query, scope, generation) {
+  const request = {
+    requestID: ++sidebarSearchWorkerRequestID,
+    scope,
+    query,
+    generation
+  };
+  latestSidebarSearchByScope.set(scope, request);
+  if (sidebarSearchWorkerFailed) {
+    if (normalizedSidebarQuery(state.sidebarQuery) !== normalizedSidebarQuery(query)) applySidebarSearch(query);
+    return;
+  }
+  ensureSidebarSearchWorker();
+  if (sidebarSearchWorkerFailed) {
+    if (normalizedSidebarQuery(state.sidebarQuery) !== normalizedSidebarQuery(query)) applySidebarSearch(query);
+    return;
+  }
+  dispatchSidebarSearch(request);
+}
+
+function cancelPendingSidebarSearch() {
+  sidebarSearchGeneration += 1;
+  window.clearTimeout(sidebarSearchTimer);
+  sidebarSearchTimer = 0;
+  pendingSidebarSearchByScope.clear();
+  pendingSidebarSearchRequests.clear();
+  latestSidebarSearchByScope.clear();
+}
+
+function applySidebarSearch(query, matchingIDs = null) {
+  const normalizedQuery = normalizedSidebarQuery(query);
+  if (normalizedQuery === normalizedSidebarQuery(state.sidebarQuery)) {
+    state.sidebarQuery = String(query || "");
+    state.sidebarView = Object.freeze(localSidebarView(state.sidebarMode, state.sidebarQuery));
+    return;
+  }
+  invalidateSidebarInteractions();
+  state.sidebarQuery = String(query || "");
+  state.databaseSidebarError = "";
+  if (state.sidebarMode === "consoles" && !isGalleryActive() && normalizedQuery) {
+    state.databaseSearchGames = Array.isArray(matchingIDs)
+      ? matchingIDs.map((id) => databaseGamesByID.get(id)).filter(Boolean)
+      : localDatabaseSearch(normalizedQuery);
+  } else {
+    state.databaseSearchGames = null;
+  }
+  if (isGalleryActive() && normalizedQuery && Array.isArray(matchingIDs)) {
+    galleryVisibleDatabaseResults = matchingIDs.map((id) => galleryGamesByID.get(id)).filter(Boolean);
+    galleryVisibleQuery = normalizedQuery;
+    galleryVisibleGallerySource = state.galleryGames;
+  }
+  state.sidebarView = Object.freeze(localSidebarView(state.sidebarMode, state.sidebarQuery));
+  renderSidebar();
+}
+
+function updateSidebarSearch(query) {
+  const requestedQuery = String(query || "");
+  sidebarSearchGeneration += 1;
+  const generation = sidebarSearchGeneration;
+  window.clearTimeout(sidebarSearchTimer);
+  sidebarSearchTimer = 0;
+  if (!normalizedSidebarQuery(requestedQuery)) {
+    applySidebarSearch(requestedQuery);
+    return;
+  }
+  sidebarSearchTimer = window.setTimeout(() => {
+    sidebarSearchTimer = 0;
+    if (generation !== sidebarSearchGeneration) return;
+    const normalizedQuery = normalizedSidebarQuery(requestedQuery);
+    if (normalizedQuery && state.sidebarMode === "consoles") {
+      requestSidebarSearch(requestedQuery, isGalleryActive() ? "gallery" : "catalog", generation);
+    } else {
+      applySidebarSearch(requestedQuery);
+    }
+  }, 35);
 }
 
 async function syncSidebarView() {
@@ -896,7 +1102,11 @@ function escapeHtml(value) {
 
 function resetSidebarContent() {
   databaseRowRenderGeneration += 1;
+  databaseSearchVisibilityGeneration += 1;
+  if (databaseSearchVisibilityFrame) window.cancelAnimationFrame(databaseSearchVisibilityFrame);
+  databaseSearchVisibilityFrame = 0;
   refs.treeRoot.replaceChildren();
+  databaseGameButtonsByID = new Map();
   selectedBrowserButton = null;
   selectedDatabaseSidebarButton = null;
   renderedBrowserNodes = [];
@@ -1566,6 +1776,7 @@ function filteredTree() {
 
 function renderTree() {
   renderedDatabaseGames = null;
+  databaseVisibleGameIDs = null;
   databaseGameButtons = [];
   databaseConsoleGroups = [];
   selectedBrowserButton = null;
@@ -1607,7 +1818,7 @@ function databaseConsoleName(game) {
 
 function visibleDatabaseSidebarRows() {
   return [...refs.treeRoot.querySelectorAll(
-    ".database-console-row, .database-console-games:not(.is-hidden) .database-game-row"
+    ".database-console-group:not(.is-hidden) > .database-console-row:not(.is-hidden), .database-console-games:not(.is-hidden) .database-game-row:not(.is-hidden)"
   )];
 }
 
@@ -1739,9 +1950,9 @@ function visibleDatabaseGames() {
     return Array.isArray(state.databaseSearchGames) ? state.databaseSearchGames : state.databaseGames;
   }
   if (!state.galleryGamesLoaded) return EMPTY_DATABASE_GAMES;
-  const query = state.sidebarQuery.trim().toLowerCase();
+  const query = normalizedSidebarQuery(state.sidebarQuery);
   if (query !== galleryVisibleQuery || state.galleryGames !== galleryVisibleGallerySource) {
-    const terms = query.split(/\s+/).filter(Boolean);
+    const terms = query ? query.split(" ") : [];
     galleryVisibleDatabaseResults = state.galleryGames.filter((game) =>
       terms.every((term) => String(game.searchText || "").includes(term)));
     galleryVisibleQuery = query;
@@ -1750,9 +1961,8 @@ function visibleDatabaseGames() {
   return galleryVisibleDatabaseResults;
 }
 
-function visibleDatabaseGameGroups() {
-  const gamesByKey = new Map(visibleDatabaseGames().map((game) => [databaseGameKey(game), game]));
-  const sourceGroups = isGalleryActive() ? galleryConsoleGroups : state.databaseGameGroups;
+function databaseGameGroupsFor(games, sourceGroups) {
+  const gamesByKey = new Map(games.map((game) => [databaseGameKey(game), game]));
   return (Array.isArray(sourceGroups) ? sourceGroups : [])
     .map((group) => ({
       consoleName: String(group?.name || ""),
@@ -1772,11 +1982,12 @@ function makeDatabaseGameButton(game) {
   button.type = "button";
   const isSelected = state.selectedDatabaseGameKey === databaseGameKey(game);
   button.className = `database-game-row${isSelected ? " is-selected" : ""}`;
+  button.classList.toggle("is-hidden", Boolean(databaseVisibleGameIDs && !databaseVisibleGameIDs.has(databaseGameKey(game))));
   if (isSelected) {
     selectedDatabaseSidebarButton = button;
   }
   button.dataset.databaseGameKey = databaseGameKey(game);
-  button.dataset.searchText = `${game.name} ${game.rootName || ""}`.toLowerCase();
+  button.dataset.searchText = String(game.searchText || `${game.name} ${game.rootName || ""}`).toLowerCase();
   button.insertAdjacentHTML("beforeend", `<span class="database-indent" aria-hidden="true"></span><span class="database-game-name">${escapeHtml(game.displayName || game.name)}</span>${state.sidebarPathCounts ? `<span class="database-game-meta">${game.trackCount}</span>` : ""}`);
   button.addEventListener("click", (event) => {
     if (event.detail > 1) return;
@@ -1866,6 +2077,7 @@ function appendDatabaseGameRowsInBatches() {
       const button = makeDatabaseGameButton(game);
       games.appendChild(button);
       databaseGameButtons.push(button);
+      databaseGameButtonsByID.set(databaseGameKey(game), button);
     }
     if (offset < pendingRows.length) {
       window.requestAnimationFrame(appendBatch);
@@ -1875,20 +2087,60 @@ function appendDatabaseGameRowsInBatches() {
   window.requestAnimationFrame(appendBatch);
 }
 
+function applyDatabaseGameSearchVisibility(nextVisibleIDs) {
+  databaseVisibleGameIDs = nextVisibleIDs;
+  const generation = ++databaseSearchVisibilityGeneration;
+  if (databaseSearchVisibilityFrame) window.cancelAnimationFrame(databaseSearchVisibilityFrame);
+  databaseSearchVisibilityFrame = 0;
+  const buttons = databaseGameButtonsByID.entries();
+
+  const applyBatch = () => {
+    if (generation !== databaseSearchVisibilityGeneration) return;
+    const startedAt = performance.now();
+    let result = buttons.next();
+    while (!result.done && performance.now() - startedAt < 7) {
+      const [gameID, button] = result.value;
+      const shouldHide = Boolean(nextVisibleIDs && !nextVisibleIDs.has(gameID));
+      if (button.classList.contains("is-hidden") !== shouldHide) {
+        button.classList.toggle("is-hidden", shouldHide);
+      }
+      result = buttons.next();
+    }
+    if (result.done) {
+      databaseSearchVisibilityFrame = 0;
+    } else {
+      databaseSearchVisibilityFrame = window.requestAnimationFrame(applyBatch);
+    }
+  };
+
+  applyBatch();
+}
+
 function renderDatabaseGames() {
   const galleryActive = isGalleryActive();
   refs.treeRoot.classList.toggle("is-gallery-view", galleryActive);
   if (state.databaseSidebarLoading) {
     renderedDatabaseGames = null;
+    databaseVisibleGameIDs = null;
     resetSidebarContent();
     updateSidebarStats("Loading catalog…");
     return;
   }
   const gamesForView = visibleDatabaseGames();
-  if (renderedDatabaseGames !== gamesForView) {
+  const renderSourceGames = galleryActive ? state.galleryGames : state.databaseGames;
+  const query = state.sidebarQuery.trim();
+  databaseVisibleGameIDs = !galleryActive && query
+    ? new Set(gamesForView.map(databaseGameKey))
+    : null;
+  const visibleConsoleNames = query
+    ? new Set(gamesForView.map(databaseConsoleName))
+    : null;
+  if (renderedDatabaseGames !== renderSourceGames) {
     resetSidebarContent();
     databaseConsoleGroups = [];
-    const groupsForView = visibleDatabaseGameGroups();
+    const groupsForView = galleryActive
+      ? databaseGameGroupsFor(state.galleryGames, galleryConsoleGroups)
+      : databaseGameGroupsFor(state.databaseGames, state.databaseGameGroups);
     databaseGameButtons = [];
     groupsForView.forEach(({ consoleName, gameItems }) => {
       const group = document.createElement("div");
@@ -1993,26 +2245,25 @@ function renderDatabaseGames() {
       databaseConsoleGroups.push({ group, games, consoleName, gameItems });
     });
 
-    renderedDatabaseGames = gamesForView;
+    renderedDatabaseGames = renderSourceGames;
     if (!galleryActive) appendDatabaseGameRowsInBatches();
   }
 
-  const query = state.sidebarQuery.trim();
-  for (const button of databaseGameButtons) {
-    button.classList.remove("is-hidden");
-    button.classList.toggle("is-selected", state.selectedDatabaseGameKey === button.dataset.databaseGameKey);
-  }
+  applyDatabaseGameSearchVisibility(databaseVisibleGameIDs);
 
   for (const { group, games, consoleName } of databaseConsoleGroups) {
     const heading = group.querySelector(".database-console-row");
-    const isSelected = state.selectedDatabaseConsoleName === consoleName
+    const groupIsVisible = !visibleConsoleNames || visibleConsoleNames.has(consoleName);
+    group.classList.toggle("is-hidden", !groupIsVisible);
+    const isSelected = groupIsVisible
+      && state.selectedDatabaseConsoleName === consoleName
       && (galleryActive || !state.selectedDatabaseGameKey);
     heading?.classList.toggle("is-selected", isSelected);
     if (galleryActive) {
       heading?.setAttribute("aria-pressed", String(isSelected));
       continue;
     }
-    if (query) {
+    if (query && groupIsVisible) {
       games.classList.remove("is-hidden");
     } else {
       games.classList.toggle("is-hidden", collapsedDatabaseConsoles.has(consoleName));
@@ -2144,6 +2395,7 @@ function loadDatabaseFiles() {
 async function setSidebarMode(mode) {
   if (!["paths", "consoles"].includes(mode)) return false;
   if (isGalleryActive() && mode !== "consoles") return false;
+  cancelPendingSidebarSearch();
   const targetTabID = state.activePlaylistTabId;
   const interactionGeneration = invalidateSidebarInteractions();
   await invalidatePlaylistCatalogSession();
@@ -2446,6 +2698,7 @@ async function showGalleryPlaylist() {
     await activatePlaylistTab(tab.id);
   }
   const targetTabID = state.activePlaylistTabId;
+  cancelPendingSidebarSearch();
   const interactionGeneration = invalidateSidebarInteractions();
 
   tab.kind = "gallery";
@@ -2518,6 +2771,7 @@ async function loadGalleryGames({ force = false } = {}) {
   if (typeof window.spcBoySB2?.databaseGalleryGames !== "function") {
     state.galleryGames = [];
     galleryConsoleGroups = [];
+    rebuildGalleryGameSearchIndex([]);
     state.galleryGamesLoaded = true;
     state.galleryGamesError = "Artwork indexing is unavailable in this build.";
     galleryRenderSignature = null;
@@ -2541,6 +2795,7 @@ async function loadGalleryGames({ force = false } = {}) {
         ? projection
         : (Array.isArray(projection?.games) ? projection.games : []);
       galleryConsoleGroups = Array.isArray(projection?.groups) ? projection.groups : [];
+      rebuildGalleryGameSearchIndex(state.galleryGames);
       state.galleryGamesError = "";
       state.galleryGamesLoaded = true;
       galleryStaleRetryCount = 0;
@@ -2550,6 +2805,7 @@ async function loadGalleryGames({ force = false } = {}) {
       if (generation !== catalogGeneration) return false;
       state.galleryGames = [];
       galleryConsoleGroups = [];
+      rebuildGalleryGameSearchIndex([]);
       state.galleryGamesError = `Artwork index unavailable · ${error.message}`;
       state.galleryGamesLoaded = true;
       galleryRenderSignature = null;
@@ -2577,20 +2833,6 @@ async function loadGalleryGames({ force = false } = {}) {
     }
   })();
   return galleryLoadPromise;
-}
-
-async function updateSidebarSearch(query) {
-  invalidateSidebarInteractions();
-  state.sidebarQuery = String(query || "");
-  state.databaseSidebarError = "";
-  state.databaseSearchGames = state.sidebarQuery.trim()
-    ? localDatabaseSearch(state.sidebarQuery)
-    : null;
-  // Search is a view-policy projection, not a catalog read. Keeping this
-  // synchronous removes the bridge round-trip and debounce from every keypress
-  // while preserving CatalogBrowserCore's query semantics locally.
-  state.sidebarView = Object.freeze(localSidebarView(state.sidebarMode, state.sidebarQuery));
-  renderSidebar();
 }
 
 async function loadDatabaseGame(game, options = {}) {
@@ -4904,6 +5146,7 @@ uiApp.ui = {
   invalidateDatabaseGames,
   setSidebarMode,
   cycleSidebarMode,
+  prepareSidebarSearch,
   updateSidebarSearch,
   loadDatabaseFiles,
   loadDatabaseGames,
