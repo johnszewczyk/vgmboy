@@ -75,13 +75,16 @@ are applied atomically and refused if the tag already exists on any target
 track. Collection package edits are staged until **Save changes** and can be
 discarded with **Revert changes**. **Pack Tags** contains the
 package-level tag table, a final inline draft row marked with **＋**, and the
-attachments table. Structural package attachment references remain in the
-manifest but do not appear as tag rows; their member files appear in the
-attachments table. A `.txt` document is labeled **Text File** there. A game
-title image is classified by the package-level **Title Snap** attachment; a
-member role or file extension alone does not supply that tag. Each table title
-is part of its own canonical grid rather than a separate decorative section
-heading. Non-string
+attachments table. Package attachments also appear as direct tag rows: the
+Title Case tag names the role and the value is the bundled member path, such as
+**Title Snap** → `art/title-snap.png` or **Text File** → `meta.txt`. The
+attachments table lists the member files; it is not a second attachment
+descriptor schema. Member records carry file format, size, and hashes. Readers
+may normalize legacy `documents` references for display, but writers should
+use direct role-named path values and must not emit nested
+`mediaType`/`memberPath` descriptors. A member role or file extension alone
+does not supply a **Title Snap** tag. Each table title is part of its own
+canonical grid rather than a separate decorative section heading. Non-string
 values in Pack Tags and Track Tags use `[Nested Tags]` to open the recursive
 canonical JSON table. The **Nested Tables** option controls how those tables
 appear: **Staircase** aligns each child table with its parent’s second column,
@@ -115,11 +118,14 @@ app-bar search filters package filenames in the current analyzer results;
 matching tag names and their pack/track counts update with the filter.
 
 The analyzer lists tag field names from package metadata, package extensions,
-every member's metadata, and member extensions. Structural package attachment
-references are not tags and do not appear in this list; extension names are
-shown with the `extension.` namespace. Its canonical numbered table shows the
-number of matching packs and playable tracks for each field. A pack counts once
-per field even when that field appears in multiple places in its manifest.
+every member's metadata, and member extensions. Package attachment tags such as
+**Title Snap** and **Text File** appear with their direct member-path values;
+member roles and file facts remain in the member records rather than becoming
+extra tags. Legacy attachment references may be normalized for display.
+Extension names are shown with the `extension.` namespace. Its canonical
+numbered table shows the number of matching packs and playable tracks for each
+field. A pack counts once per field even when that field appears in multiple
+places in its manifest.
 Matches are by exact field name, not by value, so one field such as **Source
 RSN** can match multiple packages with different values. Opening a matched-pack
 count expands an animated canonical table with each package filename, track

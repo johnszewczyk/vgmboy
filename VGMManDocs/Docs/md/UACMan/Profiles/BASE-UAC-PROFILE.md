@@ -51,18 +51,29 @@ the per-set ledger recording operations and checkpoints.
   MetaMan `{name, value}` records describe its reader interface, not UAC tag
   names. Do not serialize bulk native-tag maps, parser diagnostics, or reader
   dumps. Preserve source bytes unchanged.
+- **Package attachments** — A package attachment is exposed through one
+  package-level field in `game.metadata`: the Title Case tag name states the
+  attachment's role, and its value is the direct path to the bundled member.
+  Use a string for one file or an array of paths for several files with the
+  same role. Standard names include **Title Snap**, **Text File**, **Cover
+  Front**, **Cover Back**, **Cue Sheet**, and **Documents**; use a clear Title
+  Case role for other attachments. Do not encode attachment references as
+  nested `mediaType`/`memberPath` objects or duplicate file facts as tags.
+  Member format, size, and hashes belong to the member record. Writers emit
+  direct path values; readers may accept legacy descriptor forms for
+  compatibility.
 - **Text documents** — Each format or set profile states whether source text
   is mined into existing metadata/playback fields, retained as a package
-  document, or omitted after its useful information is represented elsewhere.
+  attachment, or omitted after its useful information is represented elsewhere.
   Never silently discard a source document. When a primary human-readable
-  notes document is retained, use the package member name `meta.txt` and
-  reference it through `game.metadata.documents`; preserve the source basename
-  and any path rename in the member/source provenance. Keep the document bytes
-  unchanged. Do not invent tags just to avoid retaining useful narrative notes.
+  notes document is retained, bundle it as `meta.txt` and add the direct
+  package tag `"Text File": "meta.txt"`; preserve the source basename and any
+  path rename in member/source provenance. Keep the document bytes unchanged.
+  Do not invent tags just to avoid retaining useful narrative notes.
 - **Title Snap** — When a set workflow positively identifies an exact game or
   release image, store one package-level **Title Snap** field whose value is
   the relative path to the bundled image member (for example,
-  `art/title-snap.png`). This is the standard package-level Meta attachment
+  `art/title-snap.png`). This is the standard package-level attachment
   name for title images in every UAC profile and source set. Use a direct member
   path, or an array of paths when the package intentionally retains multiple
   title snaps. Include each image as a UAC member with the normal integrity
