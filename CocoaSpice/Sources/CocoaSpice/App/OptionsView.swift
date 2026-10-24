@@ -361,8 +361,11 @@ struct OptionsView: View {
             .toggleStyle(.checkbox)
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            TempoTextField(text: text, onCommit: commit)
-                .frame(width: 56, height: 24, alignment: .trailing)
+            TextField("1", text: text)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 72, alignment: .trailing)
+                .multilineTextAlignment(.trailing)
+                .onSubmit(commit)
         }
     }
 
@@ -381,55 +384,6 @@ struct OptionsView: View {
         case .libvgm:
             libVgmTempoText = tempo.displayString
             model.setLibVgmTempo(tempo)
-        }
-    }
-
-    private struct TempoTextField: NSViewRepresentable {
-        @Binding var text: String
-        let onCommit: () -> Void
-
-        func makeCoordinator() -> Coordinator {
-            Coordinator(text: $text, onCommit: onCommit)
-        }
-
-        func makeNSView(context: Context) -> NSTextField {
-            let field = NSTextField()
-            field.placeholderString = "1"
-            field.isBordered = true
-            field.bezelStyle = .roundedBezel
-            field.alignment = .right
-            field.font = .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-            field.delegate = context.coordinator
-            return field
-        }
-
-        func updateNSView(_ field: NSTextField, context: Context) {
-            context.coordinator.text = $text
-            context.coordinator.onCommit = onCommit
-            guard field.currentEditor()?.string != text, field.stringValue != text else { return }
-            field.stringValue = text
-        }
-
-        @MainActor
-        final class Coordinator: NSObject, NSTextFieldDelegate {
-            var text: Binding<String>
-            var onCommit: () -> Void
-
-            init(text: Binding<String>, onCommit: @escaping () -> Void) {
-                self.text = text
-                self.onCommit = onCommit
-            }
-
-            func controlTextDidChange(_ notification: Notification) {
-                guard let field = notification.object as? NSTextField else { return }
-                text.wrappedValue = field.stringValue
-            }
-
-            func controlTextDidEndEditing(_ notification: Notification) {
-                guard let movement = notification.userInfo?["NSTextMovement"] as? Int,
-                      movement == NSReturnTextMovement else { return }
-                onCommit()
-            }
         }
     }
 

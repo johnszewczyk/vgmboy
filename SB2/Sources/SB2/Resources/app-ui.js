@@ -4558,8 +4558,8 @@ function commitPlaybackSpeedInput(backendId, rawValue) {
     input.value = uiApp.formatPlaybackSpeed(state[speedKey]);
     return;
   }
+  input.value = uiApp.formatPlaybackSpeed(parsedSpeed);
   if (parsedSpeed.numerator === state[speedKey].numerator && parsedSpeed.denominator === state[speedKey].denominator) {
-    input.value = uiApp.formatPlaybackSpeed(parsedSpeed);
     return;
   }
   state[speedKey] = parsedSpeed;

@@ -149,20 +149,21 @@ refs.spcFadeInput.addEventListener("blur", (event) => {
   app.ui.commitSpcFadeInput(event.target.value);
 });
 
-refs.playbackSpeedInput.addEventListener("change", (event) => {
-  app.ui.commitPlaybackSpeedInput("libgme", event.target.value);
-});
-
-refs.playbackSpeedInput.addEventListener("blur", (event) => {
-  app.ui.commitPlaybackSpeedInput("libgme", event.target.value);
+refs.playbackSpeedInput.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  app.ui.commitPlaybackSpeedInput("libgme", event.currentTarget.value);
 });
 
 refs.playbackSpeedEnabledCheckbox.addEventListener("change", (event) => {
   app.ui.setPlaybackSpeedEnabled("libgme", event.target.checked);
 });
 
-refs.libvgmPlaybackSpeedInput.addEventListener("change", (event) => app.ui.commitPlaybackSpeedInput("libvgm", event.target.value));
-refs.libvgmPlaybackSpeedInput.addEventListener("blur", (event) => app.ui.commitPlaybackSpeedInput("libvgm", event.target.value));
+refs.libvgmPlaybackSpeedInput.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  app.ui.commitPlaybackSpeedInput("libvgm", event.currentTarget.value);
+});
 refs.libvgmPlaybackSpeedEnabledCheckbox.addEventListener("change", (event) => app.ui.setPlaybackSpeedEnabled("libvgm", event.target.checked));
 
 refs.equalizerEnabledCheckbox.addEventListener("change", (event) => {
