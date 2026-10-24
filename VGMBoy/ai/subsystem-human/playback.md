@@ -1,19 +1,20 @@
 # Playback
 
-VGMBoy's command line (`vgmboy-cli`) and small native GUI (`VGMBoy`) play game-music files through
-one audio core. The GUI is intentionally an Options-style test surface: its Components sidebar
-places Playback first, followed by Audio, Diagnostics, and Core. Playback is the app's useful
-visual surface; the other pages expose shared-core controls and state without becoming a playlist
-app.
+VGMBoy's command line (`vgmboy-cli`) and standalone WebKit application (`VGMBoy`)
+play original game-music files through one native audio core. The app has Player,
+Audio, Diagnostics and Decoder formats pages, a session file sidebar and transport
+that remains visible across pages. Open multiple local files with Command-O;
+Previous/Next move through that session. The subsong field uses a one-based source
+index. Show in Finder locates the selected file.
 
-The GUI uses CocoaSpice's dark panels, horizontal rules, sidebar grouping, and compact option rows.
-It does not own a catalog, playlist, or frontend-specific library behavior.
+Player exposes Long Play, pre-fade seconds, fade and decoder-supported tempo.
+Changing timing preserves pause intent and position. The position slider uses a
+seek window, not a claimed metadata-derived total duration. Audio provides output
+volume, mono and ten-band EQ. Diagnostics shows actual native output/buffer/frame
+counters; Decoder formats uses VGMBoyKit's authoritative capability registry.
 
-The Playback page shows the selected core's controls and a per-core tempo table. Only libgme and
-libvgm expose tempo adjustment; all other registered families remain at native speed.
-
-The Core page is informational: VGMBoyKit is embedded into each frontend at build time. There is no
-runtime core executable to browse for or launch.
+The app has no catalog or persistent playlist database. WebKit presents bundled
+local controls; VGMBoyKit retains decoding, DSP, timing and the audio device.
 
 ## Play
 

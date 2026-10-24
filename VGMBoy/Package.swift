@@ -334,9 +334,11 @@ let package = Package(
         .executableTarget(
             name: "VGMBoyApp",
             dependencies: ["VGMBoyKit"],
+            resources: [.copy("Resources")],
             linkerSettings: [
                 .linkedFramework("AppKit"),
-                .linkedFramework("SwiftUI")
+                .linkedFramework("SwiftUI"),
+                .linkedFramework("WebKit")
             ]
         ),
         .testTarget(

@@ -5,6 +5,10 @@ import VGMBoyKit
 @MainActor
 @Observable
 final class PlayerViewModel {
+    var sessionFiles: [URL] = []
+    var volume = 1.0
+    var monoEnabled = false
+    var statistics = PlaybackStatistics()
     var filePath: String?
     var selectedTrack = 0
 
@@ -47,18 +51,23 @@ final class PlayerViewModel {
 
     func openDocument() {
         let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
+        panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        load(fileURL: url)
+        guard panel.runModal() == .OK else { return }
+        let supported = panel.urls.filter { FormatRegistry.family(for: $0.path) != nil }
+        guard let first = supported.first else { errorMessage = "No supported audio files selected."; return }
+        for url in supported where !sessionFiles.contains(url) { sessionFiles.append(url) }
+        load(fileURL: first)
     }
 
     func load(fileURL: URL) {
+        guard fileURL.isFileURL else { errorMessage = "Choose a local audio file."; return }
         let path = fileURL.path
         guard FormatRegistry.family(for: path) != nil else {
             errorMessage = "Unsupported format: \(path)"
             return
         }
+        if !sessionFiles.contains(fileURL) { sessionFiles.append(fileURL) }
         filePath = path
         selectedTrack = 0
         errorMessage = nil
@@ -102,7 +111,7 @@ final class PlayerViewModel {
     func applyTimingChange() {
         guard filePath != nil else { return }
         let resumeAt = elapsedSeconds
-        loadSelectedTrack(resumeAt: resumeAt)
+        loadSelectedTrack(resumeAt: resumeAt, autoplay: isPlaying)
     }
 
     func setEqualizerEnabled(_ enabled: Bool) {
@@ -124,7 +133,7 @@ final class PlayerViewModel {
         applyEqualizer()
     }
 
-    private func loadSelectedTrack(resumeAt seconds: Double = 0) {
+    private func loadSelectedTrack(resumeAt seconds: Double = 0, autoplay: Bool = true) {
         guard let filePath else { return }
         do {
             let mode: PlaybackMode = longPlayEnabled && currentFamily?.supportsLongPlay == true ? .longPlay : .fileDefault
@@ -137,9 +146,11 @@ final class PlayerViewModel {
                 let seeked = controller.perform(.init(command: .seek, payload: .init(positionMilliseconds: Int(seconds * 1_000))))
                 if seeked.kind == .error { throw PlayerControlError.rejected(seeked.message) }
             }
-            let started = controller.perform(.init(command: .play))
-            if started.kind == .error { throw PlayerControlError.rejected(started.message) }
-            apply(started.status)
+            if autoplay {
+                let started = controller.perform(.init(command: .play))
+                if started.kind == .error { throw PlayerControlError.rejected(started.message) }
+                apply(started.status)
+            } else { apply(controller.status()) }
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -152,6 +163,81 @@ final class PlayerViewModel {
         elapsedSeconds = status.elapsedSeconds
         reachedEnd = status.reachedEnd
         diagnostics = status.diagnostics
+        statistics = status.statistics
+        if let message = status.errorMessage { errorMessage = message }
+    }
+
+
+    var webSnapshot: [String: Any] {
+        [
+            "file": filePath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "Open a music file",
+            "path": filePath ?? "Local playback · original formats · native audio output",
+            "loaded": filePath != nil, "playing": isPlaying, "ended": reachedEnd,
+            "elapsed": elapsedSeconds, "window": max(displayDuration, elapsedSeconds + 1),
+            "family": currentFamily?.id ?? "No source", "track": selectedTrack + 1,
+            "supportsTempo": currentFamily?.supportsTempo ?? false,
+            "supportsLongPlay": currentFamily?.supportsLongPlay ?? false,
+            "longPlay": longPlayEnabled, "length": manualSeconds, "fade": fadeSeconds,
+            "tempo": tempo, "volume": volume, "mono": monoEnabled,
+            "eqEnabled": equalizerEnabled, "gains": equalizerBandGains.map(Double.init),
+            "frequencies": EqualizerConfiguration.bandFrequencies.map(Double.init),
+            "error": errorMessage ?? "",
+            "formats": FormatRegistry.playbackDescriptors.map { descriptor in
+                ["family": descriptor.familyID, "extensions": descriptor.extensions.sorted().joined(separator: " · "),
+                 "tempo": descriptor.supportsTempo, "longPlay": descriptor.supportsLongPlay] as [String: Any]
+            },
+            "files": sessionFiles.enumerated().map { index, url in
+                ["index": index, "name": url.lastPathComponent, "selected": url.path == filePath] as [String: Any]
+            },
+            "diagnostics": ["buffered": diagnostics.bufferedFrames, "capacity": diagnostics.capacityFrames,
+                "underruns": diagnostics.underrunCount, "requested": diagnostics.framesRequested,
+                "supplied": diagnostics.framesSupplied, "generation": diagnostics.generation,
+                "rate": diagnostics.sampleRate, "running": diagnostics.isOutputRunning,
+                "decoderRate": statistics.decoderSampleRate, "decoded": statistics.decodedFrames,
+                "positionFrames": statistics.audiblePositionFrames] as [String: Any]
+        ]
+    }
+
+    func handleWebCommand(_ command: String, value: Any?) {
+        let number = (value as? NSNumber)?.doubleValue
+        let finite = number.flatMap { $0.isFinite ? $0 : nil }
+        switch command {
+        case "open": openDocument()
+        case "toggle": if filePath != nil { togglePlay() }
+        case "stop": stop()
+        case "file":
+            if let number = finite, number.rounded() == number, number >= 0, number < Double(sessionFiles.count) {
+                load(fileURL: sessionFiles[Int(number)])
+            }
+        case "previous", "next":
+            if let index = sessionFiles.firstIndex(where: { $0.path == filePath }) {
+                let next = index + (command == "next" ? 1 : -1)
+                if sessionFiles.indices.contains(next) { load(fileURL: sessionFiles[next]) }
+            }
+        case "track": if let number = finite, (1...1000).contains(number) { selectTrack(Int(number) - 1) }
+        case "seek": if let number = finite { seek(to: min(max(0, number), max(displayDuration, elapsedSeconds))) }
+        case "longPlay": if let enabled = value as? Bool { longPlayEnabled = enabled; applyTimingChange() }
+        case "length": if let number = finite { manualSeconds = Int(min(86400, max(5, number))); applyTimingChange() }
+        case "fade": if let number = finite { fadeSeconds = Int(min(60, max(0, number))); applyTimingChange() }
+        case "tempo": if let number = finite { tempo = min(2, max(0.25, number)); applyTimingChange() }
+        case "volume":
+            if let number = finite { volume = min(1, max(0, number)); perform(.setOutputVolume, .init(outputVolume: Float(volume))) }
+        case "mono": if let enabled = value as? Bool { monoEnabled = enabled; perform(.setMonoEnabled, .init(monoEnabled: enabled)) }
+        case "eqEnabled": if let enabled = value as? Bool { setEqualizerEnabled(enabled) }
+        case "eq":
+            if let values = value as? [String: NSNumber], let band = values["band"]?.intValue,
+               let gain = values["gain"]?.floatValue, gain.isFinite { setEqualizerBandGain(gain, at: band) }
+        case "resetEQ": resetEqualizer()
+        case "reveal": if let filePath { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: filePath)]) }
+        case "dismissError": errorMessage = nil
+        default: break
+        }
+    }
+
+    private func perform(_ command: PlaybackControlCommand, _ payload: PlaybackControlPayload) {
+        let event = controller.perform(.init(command: command, payload: payload))
+        if event.kind == .error { errorMessage = event.message }
+        apply(event.status)
     }
 
     private func applyEqualizer() {
