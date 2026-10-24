@@ -5,9 +5,13 @@ play original game-music files through one native audio core. The app uses a
 charcoal/cyan two-pane interface: session files and compact transport controls on
 the left, with Player, Audio, Diagnostics and Formats pages on the right. Its
 bottom status bar keeps playback time, seek and volume visible across pages. Open
-multiple local files with Command-O;
-Previous/Next move through that session. The subsong field uses a one-based source
-index. Show in Finder locates the selected file.
+multiple local audio files or archives with Command-O, or drag them into the
+window. VGMBoy lists supported archive members and prepares the selected source
+through its shared archive core; the app does not need a catalog. The first
+item in each added batch starts playing, and Previous/Next move through the
+local session.
+The subsong field uses a one-based source index. Show in Finder locates the
+selected source.
 
 Player exposes Long Play, pre-fade seconds, fade and decoder-supported tempo.
 Changing timing preserves pause intent and position. The position slider uses a

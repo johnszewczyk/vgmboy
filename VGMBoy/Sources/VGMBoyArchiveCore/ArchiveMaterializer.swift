@@ -102,6 +102,49 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         return output
     }
 
+    /// Lists source members through the same host-tool boundary used for
+    /// playback preparation. Single-file Zstandard input has one implicit
+    /// member whose name is the source filename without its compression suffix.
+    public func listEntries(archivePath: String) throws -> [String] {
+        let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
+        guard FileManager.default.fileExists(atPath: archiveURL.path) else {
+            throw ArchiveMaterializationError.missingSource(archiveURL.path)
+        }
+        guard let kind = ArchiveContainerKind(archiveURL: archiveURL) else {
+            throw ArchiveMaterializationError.toolUnavailable("supported archive format")
+        }
+
+        let entries: [String]
+        switch kind {
+        case .singleFileZstandard:
+            entries = [archiveURL.deletingPathExtension().lastPathComponent]
+        case .uac:
+            let container = try UACContainerReader.read(
+                from: archiveURL,
+                decompressManifestFrame: decompressUACManifestFrame ?? uacZstandardCodec.manifestDecoder
+            )
+            entries = container.manifest.members.map(\.path)
+        case .tar:
+            let output = try runListingTool("tar", arguments: ["-tf", archiveURL.path])
+            entries = try ArchiveListingParser.parseTarListing(output).entries
+        case .zip, .sevenZip, .lha:
+            let output = try runListingTool("7zz", arguments: ["l", "-slt", archiveURL.path])
+            entries = try ArchiveListingParser.parseSevenZipReport(output).entries
+        case .rsn:
+            let output = try runListingTool("lsar", arguments: ["-json", archiveURL.path])
+            entries = try ArchiveListingParser.parseRSNListing(output).entries
+        }
+
+        var seen = Set<String>()
+        return entries.compactMap { entry in
+            let normalized = ArchiveEntryPath.normalized(entry)
+            guard !normalized.isEmpty,
+                  ArchiveEntryPath.isSafe(normalized),
+                  seen.insert(normalized).inserted else { return nil }
+            return normalized
+        }
+    }
+
     /// Reads a small archive member through the same bounded preparation
     /// engine without leaving a playback lease behind. Frontends use this for
     /// embedded playlist manifests that are read before playback begins.
@@ -280,6 +323,20 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         outputURL: URL
     ) throws {
         try runArchiveTool(invocation, outputURL: outputURL)
+    }
+
+    private func runListingTool(_ name: String, arguments: [String]) throws -> Data {
+        do {
+            return try processRunner.run(
+                executable: configuration.executableURL(named: name).path,
+                arguments: arguments,
+                operation: .listing
+            )
+        } catch let error as ArchiveMaterializationError {
+            throw error
+        } catch {
+            throw ArchiveMaterializationError.listFailed(Self.errorText(from: error))
+        }
     }
 
     private func runArchiveTool(
@@ -477,6 +534,7 @@ public struct ArchiveMaterializerConfiguration: Sendable {
     public var zstdCandidates: [String]
     public var sevenZipCandidates: [String]
     public var unarCandidates: [String]
+    public var lsarCandidates: [String]
 
     public static var `default`: ArchiveMaterializerConfiguration {
         let environment = ProcessInfo.processInfo.environment
@@ -497,6 +555,10 @@ public struct ArchiveMaterializerConfiguration: Sendable {
             unarCandidates: [
                 environment["VGMBOY_UNAR_BINARY"], environment["COCOASPICE_UNAR_BINARY"],
                 "/opt/homebrew/bin/unar", "/usr/local/bin/unar", "/usr/bin/unar"
+            ].compactMap { $0 },
+            lsarCandidates: [
+                environment["VGMBOY_LSAR_BINARY"], environment["COCOASPICE_LSAR_BINARY"],
+                "/opt/homebrew/bin/lsar", "/usr/local/bin/lsar", "/usr/bin/lsar"
             ].compactMap { $0 }
         )
     }
@@ -506,13 +568,15 @@ public struct ArchiveMaterializerConfiguration: Sendable {
         bsdtarCandidates: [String],
         zstdCandidates: [String],
         sevenZipCandidates: [String] = ["/opt/homebrew/bin/7zz", "/usr/local/bin/7zz", "/usr/bin/7zz"],
-        unarCandidates: [String] = ["/opt/homebrew/bin/unar", "/usr/local/bin/unar", "/usr/bin/unar"]
+        unarCandidates: [String] = ["/opt/homebrew/bin/unar", "/usr/local/bin/unar", "/usr/bin/unar"],
+        lsarCandidates: [String] = ["/opt/homebrew/bin/lsar", "/usr/local/bin/lsar", "/usr/bin/lsar"]
     ) {
         self.temporaryDirectoryName = temporaryDirectoryName
         self.bsdtarCandidates = bsdtarCandidates
         self.zstdCandidates = zstdCandidates
         self.sevenZipCandidates = sevenZipCandidates
         self.unarCandidates = unarCandidates
+        self.lsarCandidates = lsarCandidates
     }
 
     fileprivate func bsdtarURL() throws -> URL {
@@ -527,6 +591,7 @@ public struct ArchiveMaterializerConfiguration: Sendable {
         switch name {
         case "7zz": return try executableURL(from: sevenZipCandidates, name: name)
         case "unar": return try executableURL(from: unarCandidates, name: name)
+        case "lsar": return try executableURL(from: lsarCandidates, name: name)
         case "tar": return try bsdtarURL()
         case "zstd": return try zstdURL()
         default: throw ArchiveMaterializationError.toolUnavailable(name)
@@ -546,6 +611,7 @@ public enum ArchiveMaterializationError: LocalizedError, Equatable {
     case missingSource(String)
     case emptyOutput
     case toolUnavailable(String)
+    case listFailed(String)
     case extractFailed(String)
 
     public var errorDescription: String? {
@@ -554,6 +620,8 @@ public enum ArchiveMaterializationError: LocalizedError, Equatable {
         case .missingSource(let path): return "The catalog source is missing: \(path)"
         case .emptyOutput: return "The selected archive entry produced no playable file."
         case .toolUnavailable(let name): return "The archive tool is unavailable: \(name)"
+        case .listFailed(let detail):
+            return detail.isEmpty ? "Archive contents could not be listed." : "Archive contents could not be listed. \(detail)"
         case .extractFailed(let detail):
             return detail.isEmpty ? "Archive extraction failed." : "Archive extraction failed. \(detail)"
         }

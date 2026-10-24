@@ -117,7 +117,7 @@
     if (!items.length) {
       const empty = document.createElement('div');
       empty.className = 'empty-state';
-      empty.append(document.createTextNode('Open local audio files to start a session.'));
+      empty.append(document.createTextNode('Open or drop audio files and archives to start a local session.'));
       empty.append(document.createElement('br'));
       const shortcut = document.createElement('kbd');
       shortcut.textContent = '⌘ O';
