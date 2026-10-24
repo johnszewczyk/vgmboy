@@ -155,8 +155,8 @@ body.is-file-drag-over::after {
 .sidebar-resize-handle {
   position: relative;
   z-index: 10;
-  width: 0.2rem;
-  min-width: 0.2rem;
+  width: 100%;
+  min-width: 0;
   height: 100%;
   background: transparent;
   cursor: col-resize;
