@@ -38,6 +38,7 @@ scanner-specific decoding remains necessary.
   `subsystem-agent/build-integration.md`.
 - Family ownership: `subsystem-agent/app-family-boundary.md`.
 - Imported source provenance: `vendor/PROVENANCE.md`.
+- Standalone WebKit application and its local bridge: `subsystem-agent/standalone-webkit.md`.
 - User-visible playback behavior: `subsystem-human/`.
 - Decoder/dependency matrix and exact pins:
   [plugin-catalog.md](../../VGMManDocs/Docs/md/VGMBoy/plugin-catalog.md) and

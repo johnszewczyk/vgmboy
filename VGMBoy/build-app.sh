@@ -21,6 +21,7 @@ fi
 [[ -x "$BIN_DIR/VGMBoy" ]] || { echo "Missing clean-built executable: $BIN_DIR/VGMBoy" >&2; exit 1; }
 
 install -m 755 "$BIN_DIR/VGMBoy" "$APP_DIR/Contents/MacOS/VGMBoy"
+cp -R "$BIN_DIR/VGMBoy_VGMBoyApp.bundle" "$APP_DIR/Contents/Resources/"
 install -m 644 "$SCRIPT_DIR/Resources/Info.plist" "$APP_DIR/Contents/Info.plist"
 
 ICON_SOURCE=""
