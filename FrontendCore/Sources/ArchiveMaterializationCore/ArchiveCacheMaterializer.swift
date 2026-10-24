@@ -2,11 +2,12 @@ import ArchiveCacheCore
 import CryptoKit
 import Darwin
 import Foundation
+import VGMBoyArchiveCore
 
 /// Shared cache-backed orchestration for archive materialization.
 ///
-/// Archive format/tool execution remains supplied by the frontend through the
-/// extraction closures. This type owns only the common cache lifecycle:
+/// VGMBoyArchiveCore supplies archive routing and process execution through
+/// the extraction closures. This type owns the frontend cache lifecycle:
 /// warm-hit validation, atomic staging, completion markers, selection identity,
 /// and limit enforcement.
 public struct ArchiveCacheMaterializer: Sendable {

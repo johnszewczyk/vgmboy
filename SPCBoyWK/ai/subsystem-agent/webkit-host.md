@@ -126,28 +126,25 @@ Shared native code continues to select the target and compute fade policy.
 app-playback.js file, including the packaged resource. It changes only test input;
 production resources and runtime routing do not read that environment variable.
 
-Archive-backed playback must receive a clean path from
-`FrontendCore.ArchivePlaybackMaterializer`. The required selected-entry or
-complete-set preparation is a VGMBoy format capability; extraction, cache
-identity, atomic staging, dependency preparation, output validation, and lease
-protection are shared with CocoaSpice. ZIP, 7z, LHA, RSN, and UAC use the
-shared archive boundary. Amiga
-members identified by UADE filename prefixes use complete-set preparation so
-their player/sample companions remain available; an LHA member is not treated
-as a standalone suffix-only file. MDX keeps a matching PDX bank as dependency
-data and never exposes the PDX as a playlist row.
-`SPCArchiveMaterialization` is only the WK preference/cache adapter, and
-`WKPlaybackBridge` may request materialization only through that shared core;
-it must not implement archive extraction or access decoder implementations
-directly. The bridge's cache settings, summary, location, and clear commands
-must remain native and functional rather than no-op placeholders.
+Archive-backed playback passes the original archive path and member to
+VGMBoyArchiveCore through the typed transport. VGMBoyFormatCore selects
+selected-entry or complete-set preparation; VGMBoyArchiveCore validates the
+member, extracts it, stages decoder dependencies, and retains the temporary
+source until the session ends. ZIP, 7z, LHA, RSN, and UAC use that shared
+boundary. Amiga members identified by UADE filename prefixes use complete-set
+preparation so player/sample companions remain available; an LHA member is not
+treated as a standalone suffix-only file. MDX keeps a matching PDX bank as
+dependency data and never exposes the PDX as a playlist row.
+`SPCArchiveMaterialization` exposes only the retired frontend's cache settings,
+summary, location, and clear commands. The WK playback bridge must not
+materialize playback members or implement a private extractor.
 
 `nativePlaybackStart` directly decodes `PlaybackTransportStartRequest`. The
-request carries the renderer's stable track ID, source/archive reference,
-timing, tempo, and seek offset; after any adapter-owned materialization,
-`PlaybackTransportCore` performs the shared load/seek/play sequence. Do not
-reconstruct `PlaybackControlPayload` from bridge dictionaries or use the cache
-path as the transport's track identity.
+request carries the renderer's stable track ID, original source/archive and
+member reference, timing, tempo, and seek offset. `PlaybackTransportCore`
+performs the shared load/seek/play sequence; VGMBoy prepares the archive source
+before decode. Do not reconstruct `PlaybackControlPayload` from bridge
+dictionaries or replace source identity with a cache path.
 
 Playback timing is resolved by the native bridge through the shared `VGMBoyKit.PlaybackTimingPolicy`
 and `PlaybackTimingRequest` boundary used by CocoaSpice. JavaScript asks for and caches that plan
@@ -211,9 +208,9 @@ progress and terminal events to both the main and Options windows. The WebKit
 surface only renders those events and can request cancellation; VGMBoy removes
 the temporary partial file rather than exposing an incomplete `.aac` result.
 `nativeExportAAC` and `nativeExportAACCancel` decode the shared typed export
-and cancellation contracts. The WK adapter may materialize/release an archive
-member and report progress, but it must not parse export fields or construct
-the `AACExportRequest` consumed by the shared transport.
+and cancellation contracts. The WK adapter reports progress, but does not
+materialize the archive member, parse export fields, or construct the
+`AACExportRequest` consumed by the shared transport.
 
 Database search uses the shared `CatalogBrowserCore.CatalogSearchIndex` matching
 policy over the already-published native game projection. The projection carries
@@ -266,7 +263,7 @@ the completed native session also live on that shared transport coordinator.
 encodes the resulting `PlaybackContinuationResponse`; it does not reconstruct
 field dictionaries or retain a second
 `PlaybackContinuationCoordinator`. Completion retirement releases the active
-archive materialization in that serialized boundary, so there is no second
+VGMBoy temporary source in that serialized boundary, so there is no second
 JavaScript release request. WebKit then performs the intentionally UI-local
 renderer handoff: clear its presentation state and forward the typed result's
 chosen track or adjacent intent. It does not choose repeat policy or retire
@@ -279,7 +276,7 @@ the lock and invoke it after releasing the lock.
 
 The former JavaScript playback coordinator and split materialize/load/play
 workflow are removed. `nativePlaybackStart` now accepts one typed playback
-intent, performs archive materialization, shared timing normalization, stale
+intent, passes archive preparation to VGMBoy, performs shared timing normalization, stale
 request rejection, VGMBoy load/seek/play, and returns one native status
 snapshot. JavaScript retains only queue choice, user-intent forwarding, and
 DOM/status projection. Database rows are returned by the native catalog

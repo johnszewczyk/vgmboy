@@ -33,7 +33,7 @@ public final class ArchiveProcessRunner: @unchecked Sendable {
         public init(
             environment: [String: String],
             temporaryDirectory: URL = FileManager.default.temporaryDirectory,
-            temporaryFilePrefix: String = "FrontendCore-process",
+            temporaryFilePrefix: String = "VGMBoy-process",
             maxConcurrency: Int,
             listingTimeout: TimeInterval,
             extractionTimeout: TimeInterval,

@@ -1,4 +1,5 @@
 import Foundation
+import VGMBoyArchiveCore
 
 /// Public in-process facade over a single playback session. It deliberately
 /// has no queue, playlist, catalog, or persistence knowledge: a host supplies
@@ -8,6 +9,7 @@ public final class PlaybackController: @unchecked Sendable {
 
     private struct LoadedTrack {
         var path: String
+        var archiveEntry: String?
         var trackIndex: Int
         var tempo: Double
         var sourceData: Data?
@@ -16,6 +18,7 @@ public final class PlaybackController: @unchecked Sendable {
 
     private let lock = NSLock()
     private let session: PlaybackSession
+    private var activeArchiveMaterializer: ArchiveMaterializer?
     private var mode: PlaybackMode = .fileDefault
     private var explicitPlayMilliseconds: Int?
     private var explicitFadeMilliseconds: Int?
@@ -62,7 +65,23 @@ public final class PlaybackController: @unchecked Sendable {
         cancellation: AACExportCancellation? = nil,
         progress: (@Sendable (AACExportProgress) -> Void)? = nil
     ) throws -> AACExportResult {
-        try AACExporter.export(request, cancellation: cancellation, progress: progress)
+        guard let archiveEntry = request.archiveEntry, !archiveEntry.isEmpty else {
+            return try AACExporter.export(request, cancellation: cancellation, progress: progress)
+        }
+        guard let requirement = FormatRegistry.archiveMaterializationRequirement(for: [archiveEntry]) else {
+            throw PlaybackControlError.invalidPayload("VGMBoy does not admit archive member \(archiveEntry).")
+        }
+        let materializer = ArchiveMaterializer()
+        defer { materializer.release() }
+        let preparedURL = try materializer.materialize(
+            archivePath: request.sourcePath,
+            entry: archiveEntry,
+            requirement: requirement
+        )
+        var resolvedRequest = request
+        resolvedRequest.sourcePath = preparedURL.path
+        resolvedRequest.archiveEntry = nil
+        return try AACExporter.export(resolvedRequest, cancellation: cancellation, progress: progress)
     }
 
     @discardableResult
@@ -129,7 +148,12 @@ public final class PlaybackController: @unchecked Sendable {
             session.pause()
         case .stop:
             session.stop()
-            lock.lock(); loaded = nil; lock.unlock()
+            lock.lock()
+            loaded = nil
+            let materializer = activeArchiveMaterializer
+            activeArchiveMaterializer = nil
+            lock.unlock()
+            materializer?.release()
         case .seek:
             guard let milliseconds = request.payload.positionMilliseconds, milliseconds >= 0 else {
                 throw PlaybackControlError.invalidPayload("Seek requires a non-negative position in milliseconds.")
@@ -177,6 +201,7 @@ public final class PlaybackController: @unchecked Sendable {
             }
             let result = try exportAAC(AACExportRequest(
                 sourcePath: path,
+                archiveEntry: request.payload.archiveEntry,
                 trackIndex: request.payload.trackIndex ?? 0,
                 outputDirectory: URL(fileURLWithPath: directory),
                 filenameStem: filenameStem,
@@ -200,6 +225,25 @@ public final class PlaybackController: @unchecked Sendable {
         guard let path = payload.path, !path.isEmpty else {
             throw PlaybackControlError.invalidPayload("Load requires a path.")
         }
+        let archiveEntry = payload.archiveEntry?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let playablePath: String
+        var nextArchiveMaterializer: ArchiveMaterializer?
+        defer { nextArchiveMaterializer?.release() }
+        if let archiveEntry, !archiveEntry.isEmpty {
+            guard let requirement = FormatRegistry.archiveMaterializationRequirement(for: [archiveEntry]) else {
+                throw PlaybackControlError.invalidPayload("VGMBoy does not admit archive member \(archiveEntry).")
+            }
+            let materializer = ArchiveMaterializer()
+            nextArchiveMaterializer = materializer
+            playablePath = try materializer.materialize(
+                archivePath: path,
+                entry: archiveEntry,
+                requirement: requirement
+            ).path
+        } else {
+            nextArchiveMaterializer = nil
+            playablePath = path
+        }
         let trackIndex = payload.trackIndex ?? 0
         let tempo = payload.tempo ?? 1
         guard tempo.isFinite, tempo > 0 else {
@@ -208,13 +252,19 @@ public final class PlaybackController: @unchecked Sendable {
         if payload.playbackMode != nil || payload.playMilliseconds != nil || payload.fadeMilliseconds != nil || payload.unknownDurationMilliseconds != nil {
             try configurePlaybackMode(payload, reloadCurrent: false)
         }
-        guard trackIndex >= 0, let family = FormatRegistry.family(for: path) else {
+        guard trackIndex >= 0, let family = FormatRegistry.family(for: playablePath) else {
             throw PlaybackControlError.invalidPayload("Track index must be non-negative and the file format must be supported.")
         }
         let plan = makePlan(family: family)
-        let loop = payload.loop ?? (sourceData == nil ? PlaybackLoopTagReader.read(path: path) : PlaybackLoopTagReader.read(data: sourceData ?? Data(), extensionName: URL(fileURLWithPath: path).pathExtension))
-        _ = try session.load(path: path, sourceData: sourceData, trackIndex: trackIndex, plan: plan, tempo: tempo, loop: loop)
-        lock.lock(); loaded = LoadedTrack(path: path, trackIndex: trackIndex, tempo: tempo, sourceData: sourceData, loop: loop); lock.unlock()
+        let loop = payload.loop ?? (sourceData == nil ? PlaybackLoopTagReader.read(path: playablePath) : PlaybackLoopTagReader.read(data: sourceData ?? Data(), extensionName: URL(fileURLWithPath: playablePath).pathExtension))
+        _ = try session.load(path: playablePath, sourceData: sourceData, trackIndex: trackIndex, plan: plan, tempo: tempo, loop: loop)
+        lock.lock()
+        let previousMaterializer = activeArchiveMaterializer
+        activeArchiveMaterializer = nextArchiveMaterializer
+        nextArchiveMaterializer = nil
+        loaded = LoadedTrack(path: path, archiveEntry: archiveEntry, trackIndex: trackIndex, tempo: tempo, sourceData: sourceData, loop: loop)
+        lock.unlock()
+        previousMaterializer?.release()
     }
 
     private func configurePlaybackMode(_ payload: PlaybackControlPayload, reloadCurrent: Bool = true) throws {
@@ -239,7 +289,7 @@ public final class PlaybackController: @unchecked Sendable {
         guard reloadCurrent, let current else { return }
         let previousStatus = session.status()
         try load(
-            PlaybackControlPayload(path: current.path, trackIndex: current.trackIndex, tempo: current.tempo, loop: current.loop),
+            PlaybackControlPayload(path: current.path, archiveEntry: current.archiveEntry, trackIndex: current.trackIndex, tempo: current.tempo, loop: current.loop),
             sourceData: current.sourceData
         )
         if previousStatus.elapsedSeconds > 0 { try session.seek(to: previousStatus.elapsedSeconds) }

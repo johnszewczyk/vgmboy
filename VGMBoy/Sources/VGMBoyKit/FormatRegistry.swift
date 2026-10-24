@@ -293,10 +293,9 @@ public enum FormatRegistry {
         return nil
     }
 
-    /// Returns the format-owned archive preparation requirement for a set of
-    /// catalog-selected members. The returned requirement describes only the
-    /// clean filesystem input VGMBoyKit needs; archive extraction, caching,
-    /// and temporary-file lifetime remain outside the decoder core.
+    /// Returns the format-owned archive preparation requirement for a
+    /// catalog-selected member. VGMBoyArchiveCore performs extraction and
+    /// temporary-file lifetime; frontends retain durable cache policy.
     public static func archiveMaterializationRequirement(
         for entryPaths: [String]
     ) -> VGMArchiveMaterializationRequirement? {

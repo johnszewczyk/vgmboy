@@ -45,9 +45,8 @@ public struct PlaybackTransportAudioConfigurationRequest: Codable, Equatable, Se
     }
 }
 
-/// Typed offline-export input before an adapter resolves an archive member.
-/// FrontendCore owns finite render validation and AAC request construction;
-/// the app adapter owns only archive materialization and presentation events.
+/// Typed offline-export input. VGMBoy owns archive/member preparation and
+/// finite rendering; the app adapter owns presentation events.
 public struct PlaybackTransportAACExportRequest: Codable, Equatable, Sendable {
     public let sourcePath: String
     public let archivePath: String?
@@ -89,21 +88,29 @@ public struct PlaybackTransportAACExportRequest: Codable, Equatable, Sendable {
         case fadeMilliseconds
     }
 
-    public func exportRequest(resolvedPath: String) throws -> AACExportRequest {
-        guard !sourcePath.isEmpty, !resolvedPath.isEmpty,
+    public func exportRequest() throws -> AACExportRequest {
+        let inputPath = archivePath.flatMap { $0.isEmpty ? nil : $0 } ?? sourcePath
+        let member = archiveEntry.flatMap { $0.isEmpty ? nil : $0 }
+        guard !sourcePath.isEmpty, !inputPath.isEmpty,
               !outputDirectory.isEmpty, playMilliseconds > 0 else {
             throw PlaybackControlError.invalidPayload(
                 "AAC export requires a playable path, output folder, filename, and positive play length."
             )
         }
         return .init(
-            sourcePath: resolvedPath,
+            sourcePath: inputPath,
+            archiveEntry: member,
             trackIndex: trackIndex,
             outputDirectory: URL(fileURLWithPath: outputDirectory),
             filenameStem: filenameStem,
             playMilliseconds: playMilliseconds,
             fadeMilliseconds: fadeMilliseconds
         )
+    }
+
+    @available(*, deprecated, message: "VGMBoy now owns archive/member preparation; call exportRequest().")
+    public func exportRequest(resolvedPath: String) throws -> AACExportRequest {
+        try exportRequest()
     }
 }
 

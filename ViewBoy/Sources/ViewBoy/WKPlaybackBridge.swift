@@ -177,22 +177,6 @@ final class WKPlaybackBridge: @unchecked Sendable {
             }
             let archivePath = request["archivePath"] as? String
             let archiveEntry = request["archiveEntry"] as? String
-            let playbackPath: String
-            if let archivePath, !archivePath.isEmpty, let archiveEntry, !archiveEntry.isEmpty {
-                guard let requirement = FormatRegistry.archiveMaterializationRequirement(for: [archiveEntry]) else {
-                    throw PlaybackBridgeError.invalid("VGMBoy does not admit archive member \(archiveEntry).")
-                }
-                playbackPath = try SPCArchiveMaterialization.materialize(
-                    archivePath: archivePath,
-                    entry: archiveEntry,
-                    requirement: requirement
-                ).path
-            } else {
-                playbackPath = sourcePath
-            }
-            guard requestID.map(transport.isCurrentPlaybackRequest) ?? true else {
-                throw PlaybackBridgeError.superseded
-            }
             let index = max(0, int(request["trackIndex"]) ?? 0)
             let startMilliseconds = max(0, int(request["startMilliseconds"]) ?? 0)
             let requestedPlayMilliseconds = int(request["playMilliseconds"])
@@ -213,7 +197,7 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 )
             } else {
                 timing = try PlaybackTimingRequest.standard(
-                    path: playbackPath,
+                    path: archiveEntry ?? sourcePath,
                     longPlayEnabled: longPlayEnabled,
                     manualPlayMilliseconds: requestedPlayMilliseconds ?? 0,
                     fadeMilliseconds: fadeMilliseconds,
@@ -221,7 +205,8 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 )
             }
             let payload = PlaybackControlPayload(
-                path: playbackPath,
+                path: archivePath.flatMap { $0.isEmpty ? nil : $0 } ?? sourcePath,
+                archiveEntry: archiveEntry.flatMap { $0.isEmpty ? nil : $0 },
                 trackIndex: index,
                 tempo: tempo,
                 playbackMode: timing.playbackMode,
@@ -240,7 +225,6 @@ final class WKPlaybackBridge: @unchecked Sendable {
             try perform(.pause)
             return statusResponse()
         case "nativePlaybackStop", "nativePlaybackClose", "nativePlaybackUnload":
-            defer { SPCArchiveMaterialization.release() }
             try perform(.stop)
             return statusResponse()
         case "nativePlaybackSeek":
@@ -280,21 +264,6 @@ final class WKPlaybackBridge: @unchecked Sendable {
         }
         let archivePath = request["archivePath"] as? String
         let archiveEntry = request["archiveEntry"] as? String
-        let playbackPath: String
-        var materialized = false
-        if let archivePath, !archivePath.isEmpty, let archiveEntry, !archiveEntry.isEmpty {
-            guard let requirement = FormatRegistry.archiveMaterializationRequirement(for: [archiveEntry]) else {
-                throw PlaybackBridgeError.invalid("VGMBoy does not admit archive member \(archiveEntry).")
-            }
-            playbackPath = try SPCArchiveMaterialization.materializeForExport(
-                archivePath: archivePath,
-                entry: archiveEntry,
-                requirement: requirement
-            ).path
-            materialized = true
-        } else {
-            playbackPath = sourcePath
-        }
         let exportID = UUID().uuidString
         let cancellation = AACExportCancellation()
         exportLock.lock()
@@ -305,7 +274,6 @@ final class WKPlaybackBridge: @unchecked Sendable {
         activeExport = (exportID, cancellation)
         exportLock.unlock()
         defer {
-            if materialized { SPCArchiveMaterialization.releaseExport() }
             exportLock.lock()
             if activeExport?.id == exportID { activeExport = nil }
             exportLock.unlock()
@@ -313,7 +281,8 @@ final class WKPlaybackBridge: @unchecked Sendable {
         publishExport(.init(id: exportID, state: "rendering", renderedFrames: 0, totalFrames: 0, message: filenameStem))
         do {
             let outputURL = try transport.exportAAC(.init(
-                sourcePath: playbackPath,
+                sourcePath: archivePath.flatMap { $0.isEmpty ? nil : $0 } ?? sourcePath,
+                archiveEntry: archiveEntry,
                 trackIndex: max(0, int(request["trackIndex"]) ?? 0),
                 outputDirectory: URL(fileURLWithPath: outputDirectory),
                 filenameStem: filenameStem,

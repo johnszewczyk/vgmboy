@@ -12,9 +12,10 @@ and renderer distinct.
 - The pixel-style home, playlist tabs, WebKit renderer, native host adapter,
   and app-local presentation state belong to SB2.
 - CatalogReader owns read-only library access and browser projections.
-- FrontendCore owns shared archive, favorite, preference, queue, transport,
-  and startup-progress policies.
-- VGMBoy owns format admission, decoding, timing, and audio output.
+- FrontendCore owns shared archive-cache, favorite, preference, queue,
+  transport, and startup-progress policies.
+- VGMBoyArchiveCore prepares playback/export sources from archive members;
+  VGMBoyKit owns format admission, decoding, timing, and audio output.
 - ScanSong remains the only catalog writer.
 
 ## Task Routing

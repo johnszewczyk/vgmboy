@@ -2,45 +2,43 @@
 
 ## Scope
 
-UI-neutral archive listing, process execution, materialization, cache policy,
-and playable-member lifetime shared by native frontends.
+Frontend archive caching, artwork reads, and catalog-facing adapters. VGMBoy
+playback and export source preparation lives in VGMBoyArchiveCore.
 
 ## Ownership
 
-- `ArchiveListingParser` parses bounded 7-Zip, TAR, and RSN listings and
-  preserves reversible BSD-tar pathname rendering.
-- `ArchiveProcessRunner` owns bounded process output, timeouts, cancellation,
-  and injected executable invocation.
-- `ArchiveMaterializationCore` owns selected-entry or dependency-complete
-  extraction, PSF closure, lazyUSF/TXTP preparation, LHA routing, cleanup, and
-  cache-backed atomic materialization.
-- `TitleSnapArtworkReader` is the shared safe PNG boundary for Gallery previews.
-  The frontend injects a Gallery-isolated materializer and owns thumbnail
-  decoding, cache sizing, and presentation.
-- `ArchiveManifestReader` owns temporary non-cache manifest reads with frontend-
-  supplied extraction.
-- `ArchiveMaterializationCore` consumes `UACWrapperCore`, owned by
-  `UACMan/Wrapper`, to validate the wrapper manifest and route members for
-  playback. FrontendCore does not own UAC encoding or package creation.
-- `UACZstandardCLIFrameCodec` adapts the host-installed Zstandard executable
-  to UAC's bounded manifest and independent-frame decoder callbacks. It does
-  not bundle a codec; callers may inject alternate decoders for testing or a
-  host-specific executable configuration.
-- Both `ArchiveMaterializer` and `ArchivePlaybackMaterializer` use
-  `UACSeekableMemberFile` for a selected member in `tar+zstd-seekable`
-  packages, then stage only that member in bounded chunks. The seekable reader
-  decompresses only TAR frames intersecting the member's byte range. Legacy
-  `tar+zstd` packages and dependency-complete requests retain the sequential
-  extraction route.
 - `ArchiveCacheCore` owns stable source identity, durable/disposable roots,
   recovery, free-space and size policy, touching, bounded LRU pruning, and cache
   leases.
+- FrontendCore's `ArchiveMaterializationCore` adapts VGMBoyArchiveCore to
+  cache-backed artwork and frontend cache preferences. Its cached-artwork
+  adapter may materialize an image copy, but it is not the playback or AAC
+  export source path.
+- `TitleSnapArtworkReader` is the shared safe PNG boundary for Gallery previews.
+  The frontend injects a Gallery-isolated materializer and owns thumbnail
+  decoding, cache sizing, and presentation.
+- `VGMBoyArchiveCore` owns bounded archive listing/process execution, path
+  validation, archive-tool routing, selected-entry and dependency-complete
+  preparation, PSF closure, lazyUSF/TXTP preparation, and UAC frame decoding.
+  VGMBoyKit invokes it with the original archive/member for playback and AAC.
+- `UACZstandardCLIFrameCodec` is the single bounded adapter from UAC's frame
+  callbacks to the host Zstandard executable. Frontend artwork adapters may
+  inject it into VGMBoyArchiveCore; no frontend ships a separate manifest
+  decompressor.
+- `ArchiveMaterializer` uses `UACSeekableMemberFile` for selected members in
+  `tar+zstd-seekable` packages, staging only intersecting frames when possible.
+  Legacy `tar+zstd` packages and dependency-complete requests retain the
+  sequential extraction route.
 
 ## Invariants
 
 - Format requirements come from VGMBoy rather than a frontend registry.
-- Archive tools are injected operations; executable discovery and presentation
-  errors remain outside the shared policy.
+- Playback/export load requests supply either a direct file or the original
+  archive path and selected member. VGMBoy prepares the source before the
+  decoder sees it.
+- Frontend cache settings may affect artwork/cache-backed browsing only; they
+  cannot change VGMBoy's temporary playback source preparation or decoder
+  dependency policy.
 - A warm cache hit is usable only when the requested playable member exists and
   is nonempty.
 - Selected-entry and complete-set materialization remain distinct contracts.
@@ -60,8 +58,8 @@ and playable-member lifetime shared by native frontends.
 
 - Process completion, timeout, cancellation, pipe draining, permit release, and
   continuation resumption must each complete exactly once.
-- Temporary sessions and cache leases must release the previous playable member
-  before replacement.
+- The playback controller holds one temporary source lease per active session
+  and releases it on replacement or stop. Cache leases remain separate.
 
 ## Files
 
@@ -69,3 +67,4 @@ and playable-member lifetime shared by native frontends.
 - `Sources/ArchiveCacheCore/`
 - `Tests/ArchiveMaterializationCoreTests/`
 - `Tests/ArchiveCacheCoreTests/`
+- VGMBoy owns the engine under `VGMBoy/Sources/VGMBoyArchiveCore/`.

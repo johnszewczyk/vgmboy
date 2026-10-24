@@ -18,12 +18,14 @@ are maintained in [VGMBoy's README](../../../VGMBoy/README.md).
   one media file. TAR+Zstandard archive names (`.tar.zst`, `.tar.zstd`, and
   `.tzst`) are unsupported.
 - ZIP, 7z, LHA, RSN, and UAC (`.uac`) containers can contribute playable
-  members to a queue. UAC reads raw or compressed manifests. Seekable SPC
-  members are read by indexed Zstandard frame and supplied to libgme from
-  memory; other archive members use extraction/cache.
-- CocoaSpice owns archive access and materialization policy. VGMBoyKit receives
-  either a playable path or SPC bytes, never an archive or catalog connection.
-- LHA members use the same 7zz extraction route as 7z members. Amiga UADE files
+  members to a queue. UAC reads raw or compressed manifests. For seekable UAC,
+  VGMBoy decompresses only the indexed frames intersecting the selected member
+  and prepares the decoder input in temporary playback storage.
+- CocoaSpice keeps the original archive and member identity in its queue and
+  passes both to VGMBoy. VGMBoyArchiveCore validates and prepares the member
+  before VGMBoyKit decodes it; FrontendCore cache policy is separate from this
+  temporary playback source.
+- LHA members use the shared 7zz extraction route as 7z members. Amiga UADE files
   are admitted by their path prefix (for example `mod.title` or `med.song`),
   not by the final filename suffix, and their archive is expanded as a complete
   set so sibling data files remain available to the decoder.

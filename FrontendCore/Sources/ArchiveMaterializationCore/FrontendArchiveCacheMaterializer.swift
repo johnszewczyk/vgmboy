@@ -1,17 +1,14 @@
 import ArchiveCacheCore
 import Foundation
 import UACWrapperCore
+import VGMBoyArchiveCore
 import VGMBoyFormatCore
 
-/// Cache-backed materialization for a catalog-selected archive member.
-///
-/// Both frontends need the same boundary: catalog metadata identifies the
-/// archive member, VGMBoyFormatCore identifies whether that member needs a
-/// selected file or a dependency-complete set, and VGMBoy receives a normal
-/// playable path. The frontend supplies only cache preference names and a
-/// cache root; archive-tool routing, staging, and dependency preparation stay
-/// in shared native code.
-public final class ArchivePlaybackMaterializer: @unchecked Sendable {
+/// Frontend cache-backed archive staging for non-playback data, currently used
+/// by artwork reads. VGMBoyKit owns playback and AAC source preparation through
+/// VGMBoyArchiveCore. This adapter retains frontend cache policy and leases,
+/// and reuses VGMBoyArchiveCore's shared archive and UAC primitives.
+public final class FrontendArchiveCacheMaterializer: @unchecked Sendable {
     private let cacheStore: ArchiveCacheStore
     private let cacheMaterializer: ArchiveCacheMaterializer
     private let playbackLease: ArchivePlaybackLease

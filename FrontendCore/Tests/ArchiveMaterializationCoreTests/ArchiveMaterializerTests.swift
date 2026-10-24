@@ -94,7 +94,7 @@ import VGMBoyFormatCore
         default: throw UACContainerError.invalidPayloadMagic
         }
     }
-    let materializer = ArchivePlaybackMaterializer(
+    let materializer = FrontendArchiveCacheMaterializer(
         cacheRootURL: cacheURL,
         preferenceKeys: keys,
         capacityProvider: { _ in Int64.max },
@@ -306,13 +306,13 @@ import VGMBoyFormatCore
 
 @Test func playbackMaterializerReturnsPlayableMemberForSelectedAndCompleteRequirements() throws {
     let root = FileManager.default.temporaryDirectory
-        .appendingPathComponent("ArchivePlaybackMaterializerTests-\(UUID().uuidString)", isDirectory: true)
+        .appendingPathComponent("FrontendArchiveCacheMaterializerTests-\(UUID().uuidString)", isDirectory: true)
     let source = root.appendingPathComponent("source", isDirectory: true)
     let archive = root.appendingPathComponent("library.tar")
     let cache = root.appendingPathComponent("cache", isDirectory: true)
     let keys = ArchiveCachePreferenceKeys(
-        modeKey: "ArchivePlaybackMaterializerTests.\(UUID().uuidString).mode",
-        limitKey: "ArchivePlaybackMaterializerTests.\(UUID().uuidString).limit"
+        modeKey: "FrontendArchiveCacheMaterializerTests.\(UUID().uuidString).mode",
+        limitKey: "FrontendArchiveCacheMaterializerTests.\(UUID().uuidString).limit"
     )
     try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
     try Data("selected".utf8).write(to: source.appendingPathComponent("track.spc"))
@@ -330,7 +330,7 @@ import VGMBoyFormatCore
         mode: .disabled,
         maximumBytes: ArchiveCachePolicy.defaultLimitBytes
     ).save(keys: keys)
-    let materializer = ArchivePlaybackMaterializer(
+    let materializer = FrontendArchiveCacheMaterializer(
         cacheRootURL: cache,
         preferenceKeys: keys,
         capacityProvider: { _ in Int64.max }

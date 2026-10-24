@@ -9,8 +9,10 @@ The retained frontend owns its historical app identity, AppKit/WKWebView host,
 renderer, and typed bridge while sharing catalog, archive, queue, preference,
 and playback contracts with the family packages.
 
-Catalog-backed playback uses read-only CatalogReader projections and the shared
-FrontendCore archive path. VGMBoyKit owns playback, timing, and audio output.
+Catalog-backed playback uses read-only CatalogReader projections. The native
+bridge passes the original archive/member identity to VGMBoyArchiveCore, which
+prepares the source before VGMBoyKit playback. FrontendCore retains shared
+archive-cache policy for non-playback uses.
 The local-folder browser handles ordinary loose files; the app does not scan or
 write the catalog. Settings open in a separate native window with an independent
 WebKit view. The renderer presents authoritative native transport events and

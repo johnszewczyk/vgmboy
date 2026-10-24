@@ -1,6 +1,6 @@
 import Foundation
 
-/// Archive containers understood by the native CocoaSpice archive engine.
+/// Archive containers understood by VGMBoy's native archive engine.
 public enum ArchiveContainerKind: String, CaseIterable, Equatable, Sendable {
     case zip
     case sevenZip
@@ -36,9 +36,9 @@ public enum ArchiveContainerKind: String, CaseIterable, Equatable, Sendable {
     }
 }
 
-/// A format-specific process or connected-process specification. The
-/// frontend remains responsible for executable discovery, process execution,
-/// output routing, and app-specific error mapping.
+/// A format-specific process or connected-process specification consumed by
+/// VGMBoy's archive process runner. Frontends can pass these through the core
+/// for cache staging without owning decompression subprocesses.
 public enum ArchiveToolInvocation: Equatable, Sendable {
     case process(executableName: String, arguments: [String])
     case zstandardTar(
@@ -50,7 +50,7 @@ public enum ArchiveToolInvocation: Equatable, Sendable {
     )
 }
 
-/// Exact command specifications extracted from CocoaSpice's archive engine.
+/// Exact command specifications for supported archive and compression types.
 public enum ArchiveToolRouting {
     public static func selectedEntryToStdout(
         kind: ArchiveContainerKind,
@@ -123,7 +123,7 @@ public enum ArchiveToolRouting {
                 allowEarlyConsumerExit: false
             )
         case .singleFileZstandard:
-            // ArchivePlaybackMaterializer rejects this combination before
+            // ArchiveMaterializer rejects this combination before
             // execution: one payload cannot provide a decoder dependency set.
             return .process(
                 executableName: "zstd",

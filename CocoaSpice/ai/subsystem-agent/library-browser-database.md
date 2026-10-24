@@ -18,34 +18,30 @@
 - `CatalogSessionCore` supplies the read-only Games/Files bucket reader and
   the generation-guarded task owner used by the native loader.
 - `ArchiveCacheCore` owns cache-root cleanup, stable archive identity, free
-  space checks, LRU eviction mechanics, playback lease, and policy value model;
-  CocoaSpice retains only archive format/tool selection, preference keys,
-  Options presentation, user-facing error mapping, and maintenance scheduling.
+  space checks, LRU eviction, cache leases, and policy values. FrontendCore's
+  `ArchiveCacheMaterializer` owns atomic cache staging and warm-hit handling
+  for browse/import/artwork operations. CocoaSpice retains cache preference
+  keys, Options presentation, error mapping, and maintenance scheduling.
 - `VGMBoyFormatCore.VGMArchiveMaterializationRequirement` and
-  `VGMBoyKit.FormatRegistry` own the format decision about selected-entry
-  versus complete-set preparation. `ArchiveMaterializationCore` owns PSF
-  closure, complete-set staging, lazyUSF aliases, TXTP aliases, cache identity,
-  warm-hit checks, atomic staging, completion markers, and cache-limit
-  orchestration plus cache-lease activation. CocoaSpice retains only
-  archive-tool closures, archive listing/manifest reads, UAC TAR+Zstandard piping,
-  cleanup scheduling, and app-facing error mapping.
-- `ArchiveMaterializationCore.ArchiveListingParser` owns bounded
-  7-Zip/TAR/RSN listing parsing and reversible BSD-tar octal pathname
-  rendering. `ArchiveManifestReader` owns temporary, non-cache manifest reads;
-  CocoaSpice retains only process execution and tool selection.
-- `ArchiveMaterializationCore.ArchiveProcessRunner` owns bounded archive
-  process permits, cancellation/timeout observation, captured stdout limits,
-  and stderr collection. CocoaSpice retains the format-specific executable
-  topology, arguments, and connected zstd/tar pipeline.
-- `ArchiveMaterializationCore.ArchiveEntryPath` owns archive-member path
-  normalization, traversal rejection, safe destination components, and BSD
-  tar octal-display preservation. CocoaSpice delegates its existing local
-  adapters to this contract; SPCBoyWK receives the same behavior through
-  `ArchiveMaterializer`.
-- `ArchiveMaterializationCore.ArchiveContainerKind` and `ArchiveToolRouting`
-  own exact archive-container detection and extraction command specifications.
-  CocoaSpice retains executable discovery, process execution, error mapping,
-  and UAC's specialized TAR+Zstandard raw-name pipeline.
+  `VGMBoyKit.FormatRegistry` choose selected-entry versus complete-set
+  preparation. `VGMBoyArchiveCore.ArchiveMaterializer` owns playback/export
+  path validation, dependency preparation, UAC member reads, archive routing,
+  bounded process execution, and temporary source lifetime. Playback sends
+  the original archive path and member to VGMBoy; FrontendCore is not its
+  extractor.
+- `VGMBoyArchiveCore.ArchiveListingParser` owns bounded 7-Zip/TAR/RSN listing
+  parsing and reversible BSD-tar octal pathname rendering. The frontend's
+  `ArchiveManifestReader` remains a small temporary reader for browser-side
+  archive manifests and accepts a caller-provided extract operation.
+- `VGMBoyArchiveCore.ArchiveProcessRunner` owns bounded archive process
+  permits, cancellation/timeout observation, captured stdout limits, and
+  stderr collection. Host configuration supplies executable candidates and
+  application-specific error mapping.
+- `VGMBoyArchiveCore.ArchiveEntryPath`, `ArchiveContainerKind`, and
+  `ArchiveToolRouting` own archive-member path normalization, traversal
+  rejection, safe destination components, container detection, and extraction
+  command specifications. CocoaSpice retains catalog/queue mapping and
+  archive import presentation; playback preparation uses the VGMBoy engine.
 - `PlaylistQueueLoader` converts stored game/file identities into playlist rows
   without rescanning source media.
 - `CatalogPlaylistCore` owns the indexed Games playlist projection. Its
@@ -97,13 +93,13 @@
 - [ArchiveCacheLifecycle.swift](../../../FrontendCore/Sources/ArchiveCacheCore/ArchiveCacheLifecycle.swift)
 - [ArchiveCacheStore.swift](../../../FrontendCore/Sources/ArchiveCacheCore/ArchiveCacheStore.swift)
 - [ArchivePlaybackLease.swift](../../../FrontendCore/Sources/ArchiveCacheCore/ArchivePlaybackLease.swift)
-- [ArchiveProcessRunner.swift](../../../FrontendCore/Sources/ArchiveMaterializationCore/ArchiveProcessRunner.swift)
 - [ArchiveCacheMaterializer.swift](../../../FrontendCore/Sources/ArchiveMaterializationCore/ArchiveCacheMaterializer.swift)
-- [ArchiveMaterializationSession.swift](../../../FrontendCore/Sources/ArchiveMaterializationCore/ArchiveMaterializationSession.swift)
-- [ArchiveListingParser.swift](../../../FrontendCore/Sources/ArchiveMaterializationCore/ArchiveListingParser.swift)
 - [ArchiveManifestReader.swift](../../../FrontendCore/Sources/ArchiveMaterializationCore/ArchiveManifestReader.swift)
-- [ArchiveEntryPath.swift](../../../FrontendCore/Sources/ArchiveMaterializationCore/ArchiveEntryPath.swift)
-- [ArchiveToolRouting.swift](../../../FrontendCore/Sources/ArchiveMaterializationCore/ArchiveToolRouting.swift)
+- [ArchiveMaterializer.swift](../../../VGMBoy/Sources/VGMBoyArchiveCore/ArchiveMaterializer.swift)
+- [ArchiveProcessRunner.swift](../../../VGMBoy/Sources/VGMBoyArchiveCore/ArchiveProcessRunner.swift)
+- [ArchiveListingParser.swift](../../../VGMBoy/Sources/VGMBoyArchiveCore/ArchiveListingParser.swift)
+- [ArchiveEntryPath.swift](../../../VGMBoy/Sources/VGMBoyArchiveCore/ArchiveEntryPath.swift)
+- [ArchiveToolRouting.swift](../../../VGMBoy/Sources/VGMBoyArchiveCore/ArchiveToolRouting.swift)
 - [DatabaseSidebarPresentation.swift](../../Sources/CocoaSpice/App/DatabaseSidebarPresentation.swift)
 - [PlaylistQueueLoader.swift](../../Sources/CocoaSpice/App/PlaylistQueueLoader.swift)
 - [PlaybackQueueNavigation.swift](../../../FrontendCore/Sources/PlaybackQueueCore/PlaybackQueueNavigation.swift)

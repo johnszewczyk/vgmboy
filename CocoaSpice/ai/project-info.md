@@ -11,11 +11,13 @@ VGMBoyKit through a host adapter.
 - CocoaSpice owns native presentation, local UI state, and host adaptation.
 - ScanSong is the only catalog writer; CatalogReader owns shared read-only
   access and browser projections.
-- FrontendCore owns shared archive/cache, preference, queue, transport, and
+- FrontendCore owns shared archive-cache, preference, queue, transport, and
   startup-progress policy.
-- VGMBoy owns format admission, decoding, timing, and audio output.
+- VGMBoyArchiveCore owns archive/member source preparation; VGMBoyKit owns
+  format admission, decoding, timing, and audio output.
 - MetaMan owns native-format metadata. UACMan owns the UAC package contract.
-- SPCBoyWK and ViewBoy are distinct active frontend siblings.
+- SB2 and ViewBoy are active frontend siblings; SPCBoyWK is retired and kept
+  for historical builds.
 
 ## Task Routing
 
@@ -61,8 +63,9 @@ Engineering constraints:
 - Keep catalog/playlist queries separate from decoder and audio work.
 - Keep format routing, decoder integration, timing, output, and scanner-plugin
   builds in VGMBoy; do not add a second decoder/audio path here.
-- UAC manifest and seek-table semantics belong to UACMan. The host may adapt
-  bounded codec reads for playback; source member bytes remain preserved.
+- UAC manifest and seek-table semantics belong to UACMan. VGMBoyArchiveCore
+  uses that API to prepare playback sources; frontend cache policy remains in
+  FrontendCore and source member bytes remain preserved.
 - User-facing behavior belongs in `subsystem-human/`; current engineering
   invariants belong in focused `subsystem-agent/` notes.
 

@@ -6,8 +6,6 @@ let package = Package(
     name: "FrontendCore",
     platforms: [.macOS(.v26)],
     products: [
-        .library(name: "ArchiveMaterializationCore", targets: ["ArchiveMaterializationCore"]),
-        .library(name: "ArchiveCacheCore", targets: ["ArchiveCacheCore"]),
         .library(name: "LocalFileBrowserCore", targets: ["LocalFileBrowserCore"]),
         .library(name: "FavoriteTrackCore", targets: ["FavoriteTrackCore"]),
         .library(name: "PlaylistIdentityCore", targets: ["PlaylistIdentityCore"]),
@@ -18,22 +16,15 @@ let package = Package(
         .library(name: "PlaybackRequestCore", targets: ["PlaybackRequestCore"]),
         .library(name: "PlaybackQueueCore", targets: ["PlaybackQueueCore"]),
         .library(name: "PlaybackTransportCore", targets: ["PlaybackTransportCore"]),
-        .library(name: "FrontendStartupCore", targets: ["FrontendStartupCore"])
+        .library(name: "FrontendStartupCore", targets: ["FrontendStartupCore"]),
+        .library(name: "ArchiveCacheCore", targets: ["ArchiveCacheCore"]),
+        .library(name: "ArchiveMaterializationCore", targets: ["ArchiveMaterializationCore"])
     ],
     dependencies: [
         .package(path: "../VGMBoy"),
         .package(name: "UACWrapper", path: "../UACMan/Wrapper")
     ],
     targets: [
-        .target(
-            name: "ArchiveMaterializationCore",
-            dependencies: [
-                "ArchiveCacheCore",
-                .product(name: "UACWrapperCore", package: "UACWrapper"),
-                .product(name: "VGMBoyFormatCore", package: "VGMBoy")
-            ]
-        ),
-        .target(name: "ArchiveCacheCore"),
         .target(name: "LocalFileBrowserCore"),
         .target(name: "FavoriteTrackCore"),
         .target(name: "PlaylistIdentityCore"),
@@ -48,6 +39,15 @@ let package = Package(
         .target(name: "PlaybackRequestCore"),
         .target(name: "PlaybackQueueCore", dependencies: ["PlaybackRequestCore"]),
         .target(name: "FrontendStartupCore"),
+        .target(name: "ArchiveCacheCore"),
+        .target(
+            name: "ArchiveMaterializationCore",
+            dependencies: [
+                "ArchiveCacheCore",
+                .product(name: "VGMBoyArchiveCore", package: "VGMBoy"),
+                .product(name: "UACWrapperCore", package: "UACWrapper")
+            ]
+        ),
         .target(
             name: "PlaybackTransportCore",
             dependencies: [
@@ -56,14 +56,6 @@ let package = Package(
                 .product(name: "VGMBoyKit", package: "VGMBoy")
             ]
         ),
-        .testTarget(
-            name: "ArchiveMaterializationCoreTests",
-            dependencies: [
-                "ArchiveMaterializationCore",
-                .product(name: "UACWrapperCore", package: "UACWrapper")
-            ]
-        ),
-        .testTarget(name: "ArchiveCacheCoreTests", dependencies: ["ArchiveCacheCore"]),
         .testTarget(name: "LocalFileBrowserCoreTests", dependencies: ["LocalFileBrowserCore"]),
         .testTarget(name: "FavoriteTrackCoreTests", dependencies: ["FavoriteTrackCore"]),
         .testTarget(name: "PlaylistIdentityCoreTests", dependencies: ["PlaylistIdentityCore"]),
@@ -71,7 +63,9 @@ let package = Package(
         .testTarget(name: "FrontendPreferencesCoreTests", dependencies: ["FrontendPreferencesCore"]),
         .testTarget(name: "PlaybackRequestCoreTests", dependencies: ["PlaybackRequestCore"]),
         .testTarget(name: "PlaybackQueueCoreTests", dependencies: ["PlaybackQueueCore"]),
-        .testTarget(name: "PlaybackTransportCoreTests", dependencies: ["PlaybackTransportCore"])
+        .testTarget(name: "PlaybackTransportCoreTests", dependencies: ["PlaybackTransportCore"]),
+        .testTarget(name: "ArchiveCacheCoreTests", dependencies: ["ArchiveCacheCore"]),
+        .testTarget(name: "ArchiveMaterializationCoreTests", dependencies: ["ArchiveMaterializationCore"])
     ],
     swiftLanguageModes: [.v6]
 )

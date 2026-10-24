@@ -2,8 +2,8 @@ import Foundation
 import UACWrapperCore
 
 /// Stages one manifest-selected UAC member without expanding sibling members.
-enum UACSeekableMemberMaterializer {
-    static func write(_ memberFile: UACSeekableMemberFile, to outputURL: URL) throws {
+public enum UACSeekableMemberMaterializer {
+    public static func write(_ memberFile: UACSeekableMemberFile, to outputURL: URL) throws {
         guard memberFile.size > 0 else { throw ArchiveMaterializationError.emptyOutput }
         guard FileManager.default.createFile(
             atPath: outputURL.path,

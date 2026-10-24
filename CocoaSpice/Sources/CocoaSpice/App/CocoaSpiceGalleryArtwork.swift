@@ -8,13 +8,13 @@ import UniformTypeIdentifiers
 enum CocoaSpiceGalleryArtwork {
     private static let cacheRootURL = ZipArchiveSupport.cacheDirectoryURL
         .appendingPathComponent("GalleryArtwork", isDirectory: true)
-    private static let materializer = ArchivePlaybackMaterializer(
+    private static let materializer = FrontendArchiveCacheMaterializer(
         cacheRootURL: cacheRootURL,
         preferenceKeys: ArchiveCachePreferenceKeys(
             modeKey: AppDefaultsKey.archiveCacheMode,
             limitKey: AppDefaultsKey.archiveCacheLimitBytes
         ),
-        decompressUACManifestFrame: UACManifestFrameCodec.decoder
+        decompressUACManifestFrame: UACZstandardCLIFrameCodec.shared.manifestDecoder
     )
     private static let reader = TitleSnapArtworkReader(materializer: materializer)
 

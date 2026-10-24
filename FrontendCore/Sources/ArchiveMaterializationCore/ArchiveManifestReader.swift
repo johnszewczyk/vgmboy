@@ -1,7 +1,9 @@
 import Foundation
+import VGMBoyArchiveCore
 
 /// Reads one archive-side manifest into memory without creating playback-cache
-/// state. The frontend supplies the archive-specific extraction operation.
+/// state. This small helper is for frontend-owned browsing; playable sources
+/// are prepared by VGMBoyArchiveCore.
 public struct ArchiveManifestReader: Sendable {
     public init() {}
 

@@ -3,12 +3,8 @@ import ArchiveMaterializationCore
 import Foundation
 import VGMBoyFormatCore
 
-/// SPCBoyWK's archive boundary.
-///
-/// This is intentionally an adapter, not a second archive engine. VGMBoy
-/// decides whether an entry needs one file or a dependency-complete set;
-/// FrontendCore owns cache identity, staging, leases, and tool execution.
-/// SPCBoyWK supplies only its preference keys and the shared cache location.
+/// SPCBoyWK's retained archive-cache preferences. Playback and AAC export pass
+/// original source identity to VGMBoyArchiveCore.
 enum SPCArchiveMaterialization {
     private static let cacheRootURL: URL = {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
@@ -21,65 +17,10 @@ enum SPCArchiveMaterialization {
         limitKey: "SPCBoyWK.archiveCacheLimitBytes"
     )
     private static let cacheStore = ArchiveCacheStore(cacheRootURL: cacheRootURL)
-    private static let playbackMaterializer = ArchivePlaybackMaterializer(
+    private static let cacheMaterializer = FrontendArchiveCacheMaterializer(
         cacheRootURL: cacheRootURL,
         preferenceKeys: cacheKeys
     )
-    private static let exportMaterializer = ArchivePlaybackMaterializer(
-        cacheRootURL: cacheRootURL,
-        preferenceKeys: cacheKeys
-    )
-
-    static func materialize(
-        archivePath: String,
-        entry: String,
-        requirement: VGMArchiveMaterializationRequirement
-    ) throws -> URL {
-        let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
-        guard FileManager.default.fileExists(atPath: archiveURL.path) else {
-            throw ArchiveMaterializationError.missingSource(archiveURL.path)
-        }
-
-        let normalizedEntry = ArchiveEntryPath.normalized(entry)
-        guard !normalizedEntry.isEmpty, ArchiveEntryPath.isSafe(normalizedEntry) else {
-            throw ArchiveMaterializationError.invalidEntry
-        }
-
-        return try playbackMaterializer.materialize(
-            archiveURL: archiveURL,
-            entryPath: normalizedEntry,
-            requirement: requirement
-        )
-    }
-
-    static func release() {
-        playbackMaterializer.release()
-    }
-
-    static func materializeForExport(
-        archivePath: String,
-        entry: String,
-        requirement: VGMArchiveMaterializationRequirement
-    ) throws -> URL {
-        let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
-        guard FileManager.default.fileExists(atPath: archiveURL.path) else {
-            throw ArchiveMaterializationError.missingSource(archiveURL.path)
-        }
-        let normalizedEntry = ArchiveEntryPath.normalized(entry)
-        guard !normalizedEntry.isEmpty, ArchiveEntryPath.isSafe(normalizedEntry) else {
-            throw ArchiveMaterializationError.invalidEntry
-        }
-        return try exportMaterializer.materialize(
-            archiveURL: archiveURL,
-            entryPath: normalizedEntry,
-            requirement: requirement
-        )
-    }
-
-    static func releaseExport() {
-        exportMaterializer.release()
-    }
-
     static func configure(enabled: Bool, limitBytes: Int64) -> [String: Any] {
         let limit = nearestSupportedLimit(limitBytes)
         ArchiveCachePolicy(
@@ -110,7 +51,7 @@ enum SPCArchiveMaterialization {
     }
 
     static func clearCache() throws {
-        try playbackMaterializer.clearCache()
+        try cacheMaterializer.clearCache()
     }
 
     private static func cachePolicy() -> ArchiveCachePolicy {

@@ -150,7 +150,8 @@ final class PlaybackEngine: @unchecked Sendable {
         let start = PlaybackContinuationStart(
             track: playableTrack,
             payload: PlaybackControlPayload(
-                path: playableTrack.path,
+                path: playableTrack.archivePath ?? playableTrack.path,
+                archiveEntry: playableTrack.archiveEntry,
                 trackIndex: track.trackIndex,
                 tempo: tempo.multiplier,
                 playbackMode: plan.isLongPlay ? .longPlay : .fileDefault,
@@ -168,18 +169,15 @@ final class PlaybackEngine: @unchecked Sendable {
 
     private func transportTrack(for track: TrackItem) throws -> PlaybackTransportTrack {
         let loop = try ZipArchiveSupport.loopMetadata(for: track)
-        if let data = try ZipArchiveSupport.seekableUACSPCData(for: track),
-           let entryPath = track.archiveEntryPath {
-            return PlaybackTransportTrack(
-                id: track.id,
-                path: entryPath,
-                trackIndex: track.trackIndex,
-                sourceData: data,
-                loop: loop
-            )
-        }
-        let url = try ZipArchiveSupport.materializePlayableFile(for: track)
-        return PlaybackTransportTrack(id: track.id, path: url.path, trackIndex: track.trackIndex, loop: loop)
+        let archiveEntry = track.archiveEntryPath
+        return PlaybackTransportTrack(
+            id: track.id,
+            path: track.url.path,
+            trackIndex: track.trackIndex,
+            loop: loop,
+            archivePath: archiveEntry == nil ? nil : track.url.path,
+            archiveEntry: archiveEntry
+        )
     }
 
     func isCurrentGeneration(_ generation: Int) async -> Bool {
@@ -218,8 +216,8 @@ final class PlaybackEngine: @unchecked Sendable {
         try await transport.seek(to: seconds)
     }
 
-    /// Archive materialization remains a CocoaSpice concern. Once a naked
-    /// playable path is ready, VGMBoy owns the offline decode and AAC write.
+    /// CocoaSpice supplies archive/member identity and timing; VGMBoy prepares
+    /// the source, decodes it, and writes the finite AAC output.
     func exportAAC(
         track: TrackItem,
         plan: PlaybackPlan,
@@ -231,13 +229,16 @@ final class PlaybackEngine: @unchecked Sendable {
         try await withCheckedThrowingContinuation { continuation in
             exportQueue.async {
                 do {
-                    let sourceURL = try ZipArchiveSupport.materializePlayableFile(for: track)
                     let outputURL = try self.transport.exportAAC(
-                        sourcePath: sourceURL.path,
-                        trackIndex: track.trackIndex,
-                        plan: plan,
-                        outputDirectory: outputDirectory,
-                        filenameStem: filenameStem,
+                        AACExportRequest(
+                            sourcePath: track.url.path,
+                            archiveEntry: track.archiveEntryPath,
+                            trackIndex: track.trackIndex,
+                            outputDirectory: outputDirectory,
+                            filenameStem: filenameStem,
+                            playMilliseconds: plan.preFadeSeconds * 1_000,
+                            fadeMilliseconds: plan.fadeSeconds * 1_000
+                        ),
                         cancellation: cancellation,
                         progress: progress
                     )
