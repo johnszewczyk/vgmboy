@@ -1,27 +1,140 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'"><title>VGMBoy</title><link rel="stylesheet" href="player.css"><script src="player.js" defer></script></head>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>VGMBoy</title>
+  <link rel="stylesheet" href="player.css">
+  <script src="player.js" defer></script>
+</head>
 <body>
-<aside><header class="brand"><span class="brand-mark" aria-hidden="true">V</span><div><strong>VGMBoy</strong><small>NATIVE MUSIC WORKBENCH</small></div></header>
-<nav aria-label="Workspace"><button data-page="player" aria-current="page">Player <span>01</span></button><button data-page="audio">Audio <span>02</span></button><button data-page="diagnostics">Diagnostics <span>03</span></button><button data-page="formats">Decoder formats <span>04</span></button></nav>
-<div class="session-heading"><h2>SESSION FILES</h2><button class="icon" data-command="open" aria-label="Add audio files">+</button></div><div id="files" role="list" aria-label="Session files"></div><p id="empty">Open local audio files to build a session.<br><kbd>⌘ O</kbd> to browse.</p><footer class="sidebar-foot"><span class="dot"></span> IN-PROCESS AUDIO CORE</footer></aside>
-<main><header class="toolbar"><div><span class="eyebrow">WORKSPACE</span><h1 id="page-title">Player</h1></div><button data-command="open" class="accent">Open files… <kbd>⌘ O</kbd></button></header>
-<div id="error" role="alert" hidden><span></span><button data-command="dismissError" aria-label="Dismiss error">×</button></div>
-<div class="pages">
-<section id="player" class="page">
-<div class="source"><div class="source-top"><span id="family" class="badge">No source</span><span id="play-state" class="subtle">READY</span></div><h2 id="filename">Open a music file</h2><p id="path">Local playback · original formats · native audio output</p><button class="text-button" data-command="reveal" data-loaded>Show in Finder ↗</button></div>
-<div class="section-heading"><h2>TRANSPORT</h2><span>Original file · native decoder</span></div>
-<div class="setting"><label for="track">Subsong <small>1-based source index</small></label><input id="track" type="number" min="1" max="1000" value="1" data-control="track" data-loaded></div>
-<div class="section-heading"><h2>TIMING</h2><span>Changes preserve pause and position</span></div>
-<div class="setting"><label for="longPlay">Long Play</label><input id="longPlay" type="checkbox" data-control="longPlay"></div>
-<div class="setting"><label for="length">Pre-fade window <small>Seconds · used for Long Play</small></label><input id="length" type="number" min="5" max="86400" step="5" value="60" data-control="length"></div>
-<div class="setting"><label for="fade">Fade out <small>Seconds</small></label><input id="fade" type="number" min="0" max="60" value="6" data-control="fade"></div>
-<div class="setting"><label for="tempo">Playback speed</label><select id="tempo" data-control="tempo"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="0.75">¾×</option><option value="1" selected>1×</option><option value="1.25">1¼×</option><option value="1.5">1½×</option><option value="1.75">1¾×</option><option value="2">2×</option></select></div>
-<p class="hint" id="tempo-note">Speed is enabled when supported by the source decoder.</p>
-</section>
-<section id="audio" class="page" hidden><div class="section-heading"><h2>OUTPUT</h2><span>One native audio graph</span></div><div class="setting"><label for="mono">Mono output</label><input id="mono" type="checkbox" data-control="mono"></div><div class="section-heading"><h2>EQUALIZER</h2><button class="text-button" data-command="resetEQ">Reset bands</button></div><div class="setting"><label for="eqEnabled">Enable equalizer</label><input id="eqEnabled" type="checkbox" data-control="eqEnabled" checked></div><div id="equalizer"></div></section>
-<section id="diagnostics" class="page" hidden><div class="section-heading"><h2>OUTPUT HEALTH</h2><span>Live core measurements</span></div><div class="health"><div><span class="eyebrow">PCM BUFFER</span><strong id="buffer-label">0 / 0 frames</strong></div><progress id="buffer" max="1" value="0" aria-label="Buffered PCM frames"></progress></div><dl id="metrics"></dl><p class="hint">These measurements come from VGMBoyKit. WebKit presents controls; decoding, equalization and the audio device remain native.</p></section>
-<section id="formats" class="page" hidden><div class="section-heading"><h2>DECODER FORMATS</h2><span>Registered by VGMBoyKit</span></div><div id="format-list"></div><p class="hint">The embedded core chooses a decoder from the source format. Companion libraries must stay beside mini-format files.</p></section>
-</div>
-</main>
-<footer class="transport"><div class="transport-buttons"><button class="icon" data-command="previous" data-loaded aria-label="Previous file">‹</button><button id="play" data-command="toggle" class="play accent" data-loaded aria-label="Play">▶</button><button class="icon" data-command="next" data-loaded aria-label="Next file">›</button><button class="icon" data-command="stop" data-loaded aria-label="Stop">■</button></div><div class="position"><div><span id="clock">0:00</span><label for="position">POSITION <span id="window-label">SEEK WINDOW</span></label></div><input id="position" type="range" min="0" max="156" step="0.1" value="0" data-control="seek" data-loaded aria-label="Playback position"></div><label class="volume">VOL <output id="volume-label">100%</output><input id="volume" type="range" min="0" max="1" step="0.01" value="1" data-control="volume" aria-label="Output volume"></label></footer>
-</body></html>
+  <header class="titlebar" aria-label="VGMBoy session">
+    <strong class="brand">VGMBOY</strong>
+    <span class="tag" id="family-tag">LOCAL</span>
+    <span class="current-file" id="title-file">No file open</span>
+    <span class="core-badge">IN-PROCESS CORE</span>
+  </header>
+
+  <div class="workspace">
+    <aside class="sidebar" aria-label="Audio session">
+      <div class="transport-toolbar" aria-label="Playback controls">
+        <button class="tool-button" type="button" data-command="previous" data-loaded aria-label="Previous file" title="Previous file"><span aria-hidden="true">|◀</span></button>
+        <button class="tool-button" type="button" data-command="stop" data-loaded aria-label="Stop" title="Stop"><span aria-hidden="true">■</span></button>
+        <button class="tool-button play-button" id="play" type="button" data-command="toggle" data-loaded aria-label="Play" title="Play / Pause">
+          <span class="play-glyph" aria-hidden="true">▶</span>
+          <span class="playing-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        </button>
+        <button class="tool-button" type="button" data-command="next" data-loaded aria-label="Next file" title="Next file"><span aria-hidden="true">▶|</span></button>
+        <button class="tool-button" type="button" data-command="open" aria-label="Open audio files" title="Open audio files"><span aria-hidden="true">＋</span></button>
+      </div>
+      <div class="file-heading"><span>SESSION FILES</span><span id="file-count">00</span></div>
+      <div id="files" class="file-list" role="list" aria-label="Files in this session"></div>
+      <div class="sidebar-status"><span class="status-dot"></span>LOCAL SESSION</div>
+    </aside>
+
+    <main class="main-panel">
+      <nav class="page-tabs" role="tablist" aria-label="Player sections">
+        <button class="page-tab" type="button" role="tab" id="tab-player" data-page="player" aria-controls="page-player" aria-selected="true">Player</button>
+        <button class="page-tab" type="button" role="tab" id="tab-audio" data-page="audio" aria-controls="page-audio" aria-selected="false">Audio</button>
+        <button class="page-tab" type="button" role="tab" id="tab-diagnostics" data-page="diagnostics" aria-controls="page-diagnostics" aria-selected="false">Diagnostics</button>
+        <button class="page-tab" type="button" role="tab" id="tab-formats" data-page="formats" aria-controls="page-formats" aria-selected="false">Formats</button>
+      </nav>
+
+      <div id="error" class="error-message" role="alert" hidden><span></span><button type="button" data-command="dismissError" aria-label="Dismiss error">×</button></div>
+
+      <div class="page-scroll">
+        <section class="page" id="page-player" data-page-panel="player" role="tabpanel" aria-labelledby="tab-player">
+          <div class="page-title"><h1>Player</h1><span>LOCAL FILE SESSION</span></div>
+          <div class="source-note">
+            <span class="source-dot"></span><span>Original source · native decoder · local output</span>
+            <button class="quiet-button" type="button" data-command="reveal" data-loaded>Show in Finder ↗</button>
+          </div>
+          <div class="two-groups">
+            <section class="group" aria-labelledby="track-heading">
+              <h2 id="track-heading">TRACK</h2>
+              <div class="setting-row">
+                <label for="track">Subsong<small>Source track index</small></label>
+                <input class="field" id="track" type="number" min="1" max="1000" value="1" data-control="track" data-loaded>
+              </div>
+            </section>
+            <section class="group" aria-labelledby="timing-heading">
+              <h2 id="timing-heading">TIMING</h2>
+              <div class="setting-row">
+                <span class="setting-label">Long Play</span>
+                <label class="switch"><input id="longPlay" type="checkbox" data-control="longPlay"><span class="switch-track" aria-hidden="true"></span><span class="sr-only">Long Play</span></label>
+              </div>
+              <div class="setting-row">
+                <label for="length">Play length<small>Seconds · used with Long Play</small></label>
+                <input class="field" id="length" type="number" min="5" max="86400" step="5" value="60" data-control="length">
+              </div>
+              <div class="setting-row">
+                <label for="fade">Fade out<small>Seconds</small></label>
+                <input class="field" id="fade" type="number" min="0" max="60" value="6" data-control="fade">
+              </div>
+              <div class="setting-row">
+                <label for="tempo">Playback speed</label>
+                <select class="field" id="tempo" data-control="tempo">
+                  <option value="0.25">¼×</option><option value="0.5">½×</option><option value="0.75">¾×</option><option value="1" selected>1×</option>
+                  <option value="1.25">1¼×</option><option value="1.5">1½×</option><option value="1.75">1¾×</option><option value="2">2×</option>
+                </select>
+              </div>
+            </section>
+          </div>
+          <p class="hint">Timing changes preserve the current position and play state. Speed depends on decoder support.</p>
+        </section>
+
+        <section class="page" id="page-audio" data-page-panel="audio" role="tabpanel" aria-labelledby="tab-audio" hidden>
+          <div class="page-title"><h1>Audio</h1><span>NATIVE OUTPUT</span></div>
+          <section class="group" aria-labelledby="output-heading">
+            <h2 id="output-heading">OUTPUT</h2>
+            <div class="setting-row">
+              <div><span class="setting-label">Mono output</span><small>Optional channel fold-down</small></div>
+              <label class="switch"><input id="mono" type="checkbox" data-control="mono"><span class="switch-track" aria-hidden="true"></span><span class="sr-only">Mono output</span></label>
+            </div>
+          </section>
+          <section class="group" aria-labelledby="equalizer-heading">
+            <h2 id="equalizer-heading">EQUALIZER
+              <span class="eq-actions">
+                <label class="switch" title="Enable equalizer"><input id="eqEnabled" type="checkbox" data-control="eqEnabled" checked><span class="switch-track" aria-hidden="true"></span><span class="sr-only">Enable equalizer</span></label>
+                <button class="flat-button" type="button" data-command="resetEQ">FLAT</button>
+              </span>
+            </h2>
+            <div id="equalizer" class="equalizer-bands" aria-label="Ten-band equalizer"></div>
+            <p class="hint">Ten bands · 0.5 dB steps · −12 to +12 dB</p>
+          </section>
+        </section>
+
+        <section class="page" id="page-diagnostics" data-page-panel="diagnostics" role="tabpanel" aria-labelledby="tab-diagnostics" hidden>
+          <div class="page-title"><h1>Diagnostics</h1><span>LIVE CORE READOUT</span></div>
+          <section class="group" aria-labelledby="health-heading">
+            <h2 id="health-heading">OUTPUT HEALTH</h2>
+            <div class="health">
+              <div><span class="eyebrow">PCM BUFFER</span><strong id="buffer-label">0 / 0 frames</strong></div>
+              <progress id="buffer" max="1" value="0" aria-label="Buffered PCM frames"></progress>
+            </div>
+            <dl id="metrics" class="metrics"></dl>
+          </section>
+          <p class="hint">Readings come from VGMBoyKit. Decoding, equalization and audio output remain native.</p>
+        </section>
+
+        <section class="page" id="page-formats" data-page-panel="formats" role="tabpanel" aria-labelledby="tab-formats" hidden>
+          <div class="page-title"><h1>Formats</h1><span>VGMBoyKit REGISTRY</span></div>
+          <section class="group" aria-labelledby="formats-heading">
+            <h2 id="formats-heading">SOURCE ROUTES</h2>
+            <div id="format-list"></div>
+          </section>
+          <p class="hint">The installed capability registry supplies supported formats and source requirements.</p>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <footer class="statusbar" aria-label="Playback status">
+    <div class="playback-state"><span class="status-dot"></span><span id="play-state">READY</span><span class="status-separator">·</span><span>NATIVE OUTPUT</span></div>
+    <output id="clock" class="clock">0:00 / 0:00</output>
+    <input id="position" class="range position-range" type="range" min="0" max="150" step="0.1" value="0" data-control="seek" data-loaded aria-label="Playback position">
+    <label class="volume-control"><span>VOL</span><input id="volume" class="range" type="range" min="0" max="1" step="0.01" value="1" data-control="volume" aria-label="Output volume"><output id="volume-label">100%</output></label>
+  </footer>
+</body>
+</html>
