@@ -3,14 +3,14 @@
 ## Product
 
 `FrontendCore` is the shared UI-neutral policy and service package used by the
-CocoaSpice, SB2, and ViewBoy frontends. Retired SPCBoyWK remains a historical
-consumer of these interfaces.
+CocoaSpice, SB2, ViewBoy, and LineBoy frontends. Retired SPCBoyWK remains a
+historical consumer of these interfaces.
 
 ## Major Components
 
-- Archive listing, process execution, materialization, cache, and lease cores.
-- Archive playback materialization consumes the UAC wrapper API owned by
-  `VGMMan/UACMan`.
+- Archive cache identity, policy, atomic cache staging, and leases.
+- Frontend cache-backed artwork/browsing adapters that use VGMBoyArchiveCore;
+  playback and AAC source preparation belong to VGMBoy.
 - Local-file browser, favorite identity/store, playback-history store, and
   playlist identity cores.
 - Typed frontend preference validation and storage coordination.
@@ -19,7 +19,7 @@ consumer of these interfaces.
 
 ## Task Routing
 
-- Archive listing, extraction, materialization, cache, and lifetime:
+- Archive cache, artwork adapters, and lifetime:
   [archive-services.md](subsystem-agent/archive-services.md)
 - Favorites, playlist identity, preferences, requests, queues, and transport:
   [frontend-policy.md](subsystem-agent/frontend-policy.md)
@@ -31,7 +31,8 @@ consumer of these interfaces.
 - ScanSong is the only catalog writer and scanner owner.
 - CatalogReader owns read-only schema-24 access and catalog projections.
 - VGMBoy owns format admission, decoding, timing, output gain, and the audio
-  device.
+  device. VGMBoyArchiveCore owns playback and export source preparation from
+  archives and standalone compressed files.
 - Frontends own presentation, app-specific persistence keys, and user-facing
   policy not promoted into a shared typed contract.
 - Shared targets do not import frontend UI frameworks or frontend models.

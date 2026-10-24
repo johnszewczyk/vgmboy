@@ -6,13 +6,14 @@
 
 ## Ownership
 
-- VGMBoyKit owns format routing, decoder bridges, audio output, timing, Long Play, tempo, fade, and equalizer processing.
+- VGMBoyArchiveCore owns archive/member validation and temporary source
+  preparation. VGMBoyKit owns format routing, decoder bridges, audio output,
+  timing, Long Play, tempo, fade, and equalizer processing.
 - CocoaSpice owns playlist membership, queue navigation, repeat/shuffle policy,
-  database rows, archive source identity/cache presentation, UI, and macOS
-  transport registration. `FrontendCore.ArchivePlaybackMaterializer` owns the
-  shared selected-entry/complete-set materialization orchestration and
-  dependency preparation used by both CocoaSpice and SPCBoyWK; CocoaSpice does
-  not access decoder implementations.
+  database rows, archive source identity, durable cache preferences, UI, and
+  macOS transport registration. FrontendCore owns shared cache policy and
+  cache-backed browsing/artwork adapters; CocoaSpice does not prepare playback
+  members or access decoder implementations.
 - CocoaSpice owns the remembered AAC destination and the playlist context-menu
   action; the shared intake produces a naked playable file and VGMBoy owns the
   offline AAC render.
@@ -31,7 +32,7 @@
 
 - `FrontendCore.PlaybackTransportCore.PlaybackTransportCoordinator` is the
   shared native playback façade. It owns the serialized `PlaybackController`,
-  newest-request token, loaded naked-file identity, timing reconfiguration,
+  newest-request token, loaded source/member identity, timing reconfiguration,
   output controls, status, diagnostics, and the generation-checked one-shot
   natural-end event.
 - CocoaSpice's `VGMBoyPlaybackEngine` is only a TrackItem/archive-materializer
@@ -62,13 +63,15 @@
   capability gate for frontend Audio-panel mappings. Volume, Mono, EQ, timing,
   and transport commands all reach VGMBoy through that one mapping point; no
   frontend audio DSP or alternative output path exists.
-- CocoaSpice passes a materialized naked playable file path and its subtrack
-  index to VGMBoy. The format-owned materialization requirement comes from
-  `VGMBoyKit.FormatRegistry`; `FrontendCore.ArchivePlaybackMaterializer`
-  owns cache identity, warm-hit behavior, atomic staging, completion markers,
-  limit enforcement, dependency preparation, playable-output validation, and
-  cache-lease activation. CocoaSpice supplies only cache preferences and
-  catalog/playback presentation around that shared result.
+- CocoaSpice passes a direct source path or the original archive path and
+  selected member, plus its subtrack index, to VGMBoy. The format-owned source
+  preparation requirement comes from `VGMBoyKit.FormatRegistry`; VGMBoyArchiveCore
+  validates and prepares the playable source and owns its temporary session
+  lifetime. FrontendCore's `ArchiveCacheCore` owns durable cache identity,
+  warm-hit behavior, atomic cache staging, limit enforcement, and leases for
+  browsing/artwork. CocoaSpice supplies cache preferences and
+  catalog/playback presentation; its archive import and browsing paths remain
+  separate from playback preparation.
 - `PlaybackTransportCoordinator` builds the shared `PlaybackTimingRequest` from the selected path and
   Long Play state. Ordinary file-default timing sends no play length, so VGMBoy derives the
   natural window from decoder metadata. Long Play alone supplies the manual duration; a catalog

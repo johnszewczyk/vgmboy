@@ -39,10 +39,11 @@ Natural completion retires the finished native session and advances to the next
 queue target when one exists. The completion path waits for that replacement
 start, so a finished track does not leave the frontend stopped between songs.
 
-Starting a track sends one native playback intent. The native bridge materializes archive members,
-applies shared timing, loads and seeks VGMBoy, and starts playback before returning the first
-status snapshot. The WebKit layer does not run a second archive, decoder, or metadata-hydration
-task.
+Starting a track sends one native playback intent with the original archive and
+member when applicable. VGMBoyArchiveCore prepares archive members, applies
+shared timing, loads and seeks VGMBoy, and starts playback before returning the
+first status snapshot. The WebKit layer does not extract playback files or run
+a second decoder or metadata-hydration task.
 
 A newly selected track always starts at `0:00`. Only an explicit seek repositions an already-loaded
 track; changing sidebar sources or replacing a playlist never leaves a residual selection or

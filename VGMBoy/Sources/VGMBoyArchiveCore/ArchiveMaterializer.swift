@@ -32,12 +32,12 @@ public final class ArchiveMaterializer: @unchecked Sendable {
     ) {
         self.configuration = configuration
         self.session = session
-        self.decompressUACManifestFrame = decompressUACManifestFrame
-        self.decompressUACSeekableFrame = decompressUACSeekableFrame
+        self.decompressUACManifestFrame = decompressUACManifestFrame ?? uacZstandardCodec.manifestDecoder
+        self.decompressUACSeekableFrame = decompressUACSeekableFrame ?? uacZstandardCodec.seekableFrameDecoder
         self.uacZstandardCodec = uacZstandardCodec
         self.processRunner = ArchiveProcessRunner(configuration: .init(
             environment: ProcessInfo.processInfo.environment,
-            temporaryFilePrefix: "FrontendCore-materializer",
+            temporaryFilePrefix: "VGMBoy-materializer",
             maxConcurrency: max(1, ProcessInfo.processInfo.activeProcessorCount - 1),
             listingTimeout: 30,
             extractionTimeout: 600,
@@ -100,6 +100,19 @@ public final class ArchiveMaterializer: @unchecked Sendable {
 
         session.replace(with: directory)
         return output
+    }
+
+    /// Reads a small archive member through the same bounded preparation
+    /// engine without leaving a playback lease behind. Frontends use this for
+    /// embedded playlist manifests that are read before playback begins.
+    public func readEntryData(archivePath: String, entry: String) throws -> Data {
+        let url = try materialize(
+            archivePath: archivePath,
+            entry: entry,
+            requirement: .selectedEntry
+        )
+        defer { release() }
+        return try Data(contentsOf: url, options: .mappedIfSafe)
     }
 
     /// Removes the currently materialized entry, if any.
@@ -468,21 +481,21 @@ public struct ArchiveMaterializerConfiguration: Sendable {
     public static var `default`: ArchiveMaterializerConfiguration {
         let environment = ProcessInfo.processInfo.environment
         return ArchiveMaterializerConfiguration(
-            temporaryDirectoryName: "FrontendCore",
+            temporaryDirectoryName: "VGMBoy",
             bsdtarCandidates: [
-                environment["COCOASPICE_TAR_BINARY"],
+                environment["VGMBOY_TAR_BINARY"], environment["COCOASPICE_TAR_BINARY"],
                 "/usr/bin/bsdtar", "/opt/homebrew/bin/bsdtar", "/usr/local/bin/bsdtar"
             ].compactMap { $0 },
             zstdCandidates: [
-                environment["COCOASPICE_ZSTD_BINARY"],
+                environment["VGMBOY_ZSTD_BINARY"], environment["COCOASPICE_ZSTD_BINARY"],
                 "/opt/homebrew/bin/zstd", "/usr/local/bin/zstd", "/usr/bin/zstd"
             ].compactMap { $0 },
             sevenZipCandidates: [
-                environment["COCOASPICE_7Z_BINARY"],
+                environment["VGMBOY_7Z_BINARY"], environment["COCOASPICE_7Z_BINARY"],
                 "/opt/homebrew/bin/7zz", "/usr/local/bin/7zz", "/usr/bin/7zz"
             ].compactMap { $0 },
             unarCandidates: [
-                environment["COCOASPICE_UNAR_BINARY"],
+                environment["VGMBOY_UNAR_BINARY"], environment["COCOASPICE_UNAR_BINARY"],
                 "/opt/homebrew/bin/unar", "/usr/local/bin/unar", "/usr/bin/unar"
             ].compactMap { $0 }
         )

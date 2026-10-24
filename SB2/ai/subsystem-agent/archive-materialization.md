@@ -2,22 +2,19 @@
 
 ## Ownership
 
-- `SB2ArchiveMaterialization` adapts catalog-selected members to FrontendCore's
-  cache-backed `ArchivePlaybackMaterializer`.
-- `SB2UACManifestFrameCodec` is the SB2 host adapter for compressed UAC
-  manifests. UACWrapperCore requires a decoder callback; it does not choose or
-  launch a codec.
+- SB2 sends VGMBoy the source path and optional archive member. VGMBoy owns
+  validation, extraction, dependency preparation, UAC decompression, and the
+  temporary playback/export source lifetime.
+- `SB2ArchiveMaterialization` remains only for Gallery artwork and cache
+  management. It uses VGMBoy's shared `UACZstandardCLIFrameCodec`.
 
 ## Invariants
 
-- Inject the bounded manifest decoder into playback, AAC export, and artwork
-  materializers.
-- Resolve Zstandard through `ArchiveMaterializerConfiguration` so manifest
-  reads and payload extraction use the same executable candidates.
-- Leave archive membership, path validation, cache policy, and extraction
-  routing in FrontendCore and UACWrapperCore.
+- The browser bridge must pass `archivePath` and `archiveEntry` through the
+  typed transport request and must not call a frontend playback materializer.
+- Gallery cache policy remains SB2-owned; archive parsing and decompression
+  mechanics come from VGMBoy.
 
 ## Files
 
 - `Sources/SB2/SB2ArchiveMaterialization.swift`
-- `Sources/SB2/SB2UACManifestFrameCodec.swift`

@@ -1,15 +1,18 @@
 # FrontendCore
 
-`FrontendCore` contains UI-neutral services shared by CocoaSpice, SPCBoyWK, and
-ViewBoy. Its modules own bounded archive materialization/cache behavior,
-preferences, favorites and playlist identity, shared startup progress, playback
-queues, and native transport coordination. The package does not read or write
-the catalog, decode audio, or render a frontend.
+`FrontendCore` contains UI-neutral services shared by CocoaSpice, SB2, ViewBoy,
+and LineBoy; retired SPCBoyWK remains a historical consumer. Its modules own
+archive-cache identity and policy, cache leases, preferences, favorites and
+playlist identity, shared startup progress, playback queues, and native
+transport coordination. The package does not read or write the catalog,
+prepare playback/export archive sources, decode audio, or render a frontend.
 
-Archive listing and playback preparation receive tool execution from their
-hosts; `ArchiveMaterializationCore` and `ArchiveCacheCore` own the shared
-contracts, validation, lifetime, and cleanup. CatalogReader owns read-only
-catalog access. VGMBoy owns decoding, timing, and the audio device.
+`VGMBoyArchiveCore` owns archive/member validation, archive-tool execution,
+UAC frame decoding, dependency preparation, and temporary playback/export
+sources. FrontendCore's archive module adapts that engine to frontend-owned
+durable cache policy for browsing and artwork; it is not the playback
+extractor. CatalogReader owns read-only catalog access. VGMBoyKit owns
+decoding, timing, and the audio device.
 
 ## Build and test
 

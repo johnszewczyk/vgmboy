@@ -5,7 +5,8 @@ control, label, sidebar item, and track row onto an 8×16 character-cell grid,
 then paints it with full-intensity beam rows and crisp, integer-pixel black
 gaps. The filter preserves the font's fixed character advance. The native
 WebKit host connects to the shared VGMMan catalog, FrontendCore, and VGMBoy
-playback. The native app uses the live catalog; the browser preview stays on
+playback. VGMBoyArchiveCore prepares archive/member sources; FrontendCore
+retains the archive-cache policy. The native app uses the live catalog; the browser preview stays on
 its small sample library. The native file picker and window controls remain
 available.
 

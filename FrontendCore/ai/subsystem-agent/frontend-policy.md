@@ -45,10 +45,12 @@ startup contracts shared by the VGMMan player frontends.
 - `PlaybackQueueAdjacentRequest` and `PlaybackQueueAdjacentResponse` do the
   same for an explicit user navigation gesture. A renderer supplies IDs,
   direction, and wrapping preference; it does not compute the anchor or target.
-- `PlaybackTransportStartRequest` carries a stable track ID, source/archive
-  reference, timing, tempo, and seek offset into a typed host boundary. An
-  adapter may materialize an archive member, but the shared transport builds
-  the load/seek/play sequence and publishes the original track ID.
+- `PlaybackTransportStartRequest` carries a stable track ID, original
+  source/archive reference, selected member, timing, tempo, and seek offset
+  into a typed host boundary. The coordinator preserves that identity and
+  sends it to VGMBoy; VGMBoyArchiveCore prepares the source before decoding.
+  The shared transport builds the load/seek/play sequence and publishes the
+  original track ID.
 - `PlaybackTimingPreviewRequest`, `PlaybackTransportReconfigurationRequest`,
   and `PlaybackTransportTempoRequest` are the corresponding typed timing
   bridge contracts. They own policy-preview scaling, playback-mode payload
@@ -62,9 +64,10 @@ startup contracts shared by the VGMMan player frontends.
   normalizes and serializes all three control commands; presentation adapters
   must not keep a positional audio bridge or choose their own command order.
 - `PlaybackTransportAACExportRequest` and its cancellation/result contracts
-  carry a finite offline render into the shared AAC exporter. A frontend adapter
-  may materialize an archive member and publish UI progress, but it does not
-  parse export fields or reconstruct `AACExportRequest`.
+  carry a finite offline render into the shared AAC exporter. The request keeps
+  the original archive/member identity; VGMBoy prepares it. A frontend adapter
+  may publish UI progress, but it does not extract the source, parse export
+  fields, or reconstruct `AACExportRequest`.
 - `PlaybackTransportSeekRequest` and `PlaybackTransportRampGainRequest` name
   the direct session controls at the bridge boundary. Their shared
   normalization keeps a renderer from relying on scalar argument order.

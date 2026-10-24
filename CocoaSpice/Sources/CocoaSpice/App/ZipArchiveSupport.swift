@@ -38,13 +38,13 @@ enum ZipArchiveSupport {
         cacheStore: cacheStore,
         playbackLease: playbackLease
     )
-    private static let playbackMaterializer = ArchivePlaybackMaterializer(
+    private static let cacheBackedMaterializer = FrontendArchiveCacheMaterializer(
         cacheRootURL: cacheRootURL(),
         preferenceKeys: ArchiveCachePreferenceKeys(
             modeKey: AppDefaultsKey.archiveCacheMode,
             limitKey: AppDefaultsKey.archiveCacheLimitBytes
         ),
-        decompressUACManifestFrame: UACManifestFrameCodec.decoder
+        decompressUACManifestFrame: UACZstandardCLIFrameCodec.shared.manifestDecoder
     )
 
     struct ArchiveEntry: Hashable, Sendable {
@@ -116,13 +116,13 @@ enum ZipArchiveSupport {
 
     static func clearCache() throws {
         playbackLease.clear()
-        try playbackMaterializer.clearCache()
+        try cacheBackedMaterializer.clearCache()
     }
 
     static func discardDisposablePlaybackMaterialization() {
         playbackLease.clear()
         cacheLifecycle().discardDisposablePlaybackMaterialization()
-        playbackMaterializer.release()
+        cacheBackedMaterializer.release()
     }
 
     /// Launch-time recovery removes interrupted disposable playback work and
@@ -229,22 +229,6 @@ enum ZipArchiveSupport {
         }
     }
 
-    static func materializePlayableFile(for track: TrackItem) throws -> URL {
-        switch track.source {
-        case .file(let url):
-            return url
-        case .zipEntry(let archiveURL, let entryPath):
-            guard let requirement = PlaybackFormatRegistry.archiveMaterialization(for: [entryPath]) else {
-                throw ArchiveError.invalidEntryPath(entryPath)
-            }
-            return try playbackMaterializer.materialize(
-                archiveURL: archiveURL,
-                entryPath: entryPath,
-                requirement: requirement
-            )
-        }
-    }
-
     /// Returns the sample loop declared for a UAC member. UAC metadata lives
     /// at the package/member layer, so a materialized XA (or other raw member)
     /// cannot expose it through the ordinary file-tag reader. Keep this lookup
@@ -257,7 +241,7 @@ enum ZipArchiveSupport {
         }
         let container = try UACContainerReader.read(
             from: archiveURL,
-            decompressManifestFrame: UACManifestFrameCodec.decoder
+            decompressManifestFrame: UACZstandardCLIFrameCodec.shared.manifestDecoder
         )
         guard let member = container.manifest.members.first(where: { $0.path == entryPath }),
               case let .object(loop) = member.metadata["loop"],
@@ -317,7 +301,7 @@ enum ZipArchiveSupport {
             url: archiveURL,
             memberPath: entryPath,
             maximumCachedFrames: 2,
-            decompressManifestFrame: UACManifestFrameCodec.decoder,
+            decompressManifestFrame: UACZstandardCLIFrameCodec.shared.manifestDecoder,
             decompressFrame: UACZstandardCLIFrameCodec.shared.seekableFrameDecoder
         )
         guard memberFile.size > 0, memberFile.size <= 16 * 1024 * 1024 else {
@@ -372,26 +356,10 @@ enum ZipArchiveSupport {
         guard isSafeEntryPath(normalizedEntryPath) else {
             throw ArchiveError.invalidEntryPath(entryPath)
         }
-        try validateUACIfNeeded(archiveURL, memberPaths: [normalizedEntryPath])
-
-        return try ArchiveManifestReader().read(entryPath: normalizedEntryPath) { rootURL, memberURL in
-            if archiveKind(for: archiveURL) == .uac {
-                try extractUACEntries(
-                    from: archiveURL,
-                    entryPaths: [normalizedEntryPath],
-                    into: rootURL
-                )
-            } else {
-                try runArchiveTool(
-                    ArchiveToolRouting.selectedEntryToStdout(
-                        kind: archiveKind(for: archiveURL),
-                        archiveURL: archiveURL,
-                        entryPath: normalizedEntryPath
-                    ),
-                    outputURL: memberURL
-                )
-            }
-        }
+        return try ArchiveMaterializer().readEntryData(
+            archivePath: archiveURL.path,
+            entry: normalizedEntryPath
+        )
     }
 
     static func materializeArchive(at archiveURL: URL) throws -> URL {
@@ -549,7 +517,7 @@ enum ZipArchiveSupport {
         case .uac:
             let container = try UACContainerReader.read(
                 from: archiveURL,
-                decompressManifestFrame: UACManifestFrameCodec.decoder
+                decompressManifestFrame: UACZstandardCLIFrameCodec.shared.manifestDecoder
             )
             let entries = container.manifest.members.map(\.path)
             guard entries.count <= ArchiveListingParser.maximumEntries,
@@ -589,7 +557,7 @@ enum ZipArchiveSupport {
         guard archiveKind(for: archiveURL) == .uac else { return }
         let container = try UACContainerReader.read(
             from: archiveURL,
-            decompressManifestFrame: UACManifestFrameCodec.decoder
+            decompressManifestFrame: UACZstandardCLIFrameCodec.shared.manifestDecoder
         )
         let declaredMembers = Set(container.manifest.members.map(\.path))
         guard memberPaths.allSatisfy(declaredMembers.contains) else {

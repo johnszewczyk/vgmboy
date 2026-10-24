@@ -427,13 +427,12 @@ through a seekable backing source. `UACSeekableMemberFile` exposes an indexed
 member as a read-only virtual byte file: it reads only intersecting compressed
 frames, caches at most four by default and no more than 64 MiB total in memory,
 and writes no extracted audio to disk. Its injected frame decoder must validate
-any optional seek-table checksum. FrontendCore supplies a bounded adapter for
-the host-installed Zstandard CLI and uses that virtual file to materialize only
-the selected member for path-based playback in seekable packages. Legacy
-`tar+zstd` streams and dependency-complete formats retain sequential extraction.
-CocoaSpice also reads SPC members through the virtual file and supplies bounded
-member bytes to libgme's in-memory open API; decompressed SPC bytes are not
-written to playback cache. The UACMan wrapper CLI accepts a JSON
+any optional seek-table checksum. VGMBoyArchiveCore supplies the bounded
+adapter for the host-installed Zstandard CLI and uses this virtual file to
+prepare only the selected member for path-based playback in seekable packages.
+Legacy `tar+zstd` streams and dependency-complete formats retain sequential
+extraction. FrontendCore may use the same core for cached artwork/browsing, but
+it does not prepare playback sources. The UACMan wrapper CLI accepts a JSON
 recipe and can invoke MetaManCore through UACManMetadataCLI. SPC uses its
 soundtrack-aware projection; single-track formats use the common member
 projection, and track-aware formats use ordered subsong playlist entries. A
@@ -458,7 +457,8 @@ does not synthesize an M3U when no original playlist member was included.
   the manifest. AudioMan is one downstream operator: it chooses source sets
   and recipes and invokes UACMan's CLI; it does not own or implement UAC.
 - CocoaSpice owns presentation and queue policy; it consumes manifest metadata
-  and delegates archive materialization to FrontendCore.
+  and delegates playback source preparation to VGMBoyArchiveCore. FrontendCore
+  owns durable cache policy for browsing and artwork.
 - MetaManCore owns UAC package/member metadata documents and consumes the
   shared UACWrapperCore parser. ScanSong projects those documents and owns
   catalog publication; player apps do not write catalog records.

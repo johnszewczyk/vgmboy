@@ -3,12 +3,8 @@ import ArchiveMaterializationCore
 import Foundation
 import VGMBoyFormatCore
 
-/// SB2's archive boundary.
-///
-/// This is intentionally an adapter, not a second archive engine. VGMBoy
-/// decides whether an entry needs one file or a dependency-complete set;
-/// FrontendCore owns cache identity, staging, leases, and tool execution.
-/// SB2 supplies only its preference keys and the shared cache location.
+/// SB2's Gallery artwork and archive-cache preferences. Playback and AAC
+/// export pass original source identity to VGMBoyArchiveCore.
 enum SB2ArchiveMaterialization {
     private static let cacheRootURL: URL = {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
@@ -21,76 +17,21 @@ enum SB2ArchiveMaterialization {
         limitKey: "SB2.archiveCacheLimitBytes"
     )
     private static let cacheStore = ArchiveCacheStore(cacheRootURL: cacheRootURL)
-    private static let playbackMaterializer = ArchivePlaybackMaterializer(
+    private static let cacheMaterializer = FrontendArchiveCacheMaterializer(
         cacheRootURL: cacheRootURL,
         preferenceKeys: cacheKeys,
-        decompressUACManifestFrame: SB2UACManifestFrameCodec.decoder
+        decompressUACManifestFrame: UACZstandardCLIFrameCodec.shared.manifestDecoder
     )
-    private static let exportMaterializer = ArchivePlaybackMaterializer(
-        cacheRootURL: cacheRootURL,
-        preferenceKeys: cacheKeys,
-        decompressUACManifestFrame: SB2UACManifestFrameCodec.decoder
-    )
-    private static let artworkMaterializer = ArchivePlaybackMaterializer(
+    private static let artworkMaterializer = FrontendArchiveCacheMaterializer(
         cacheRootURL: cacheRootURL.appendingPathComponent("GalleryArtwork", isDirectory: true),
         preferenceKeys: cacheKeys,
-        decompressUACManifestFrame: SB2UACManifestFrameCodec.decoder
+        decompressUACManifestFrame: UACZstandardCLIFrameCodec.shared.manifestDecoder
     )
     private static let artworkReader = TitleSnapArtworkReader(materializer: artworkMaterializer)
 
     static func titleSnapDataURL(sourcePath: String, titleSnap: String) throws -> String {
         let imageData = try artworkReader.readPNG(sourcePath: sourcePath, locator: titleSnap)
         return "data:image/png;base64,\(imageData.base64EncodedString())"
-    }
-
-    static func materialize(
-        archivePath: String,
-        entry: String,
-        requirement: VGMArchiveMaterializationRequirement
-    ) throws -> URL {
-        let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
-        guard FileManager.default.fileExists(atPath: archiveURL.path) else {
-            throw ArchiveMaterializationError.missingSource(archiveURL.path)
-        }
-
-        let normalizedEntry = ArchiveEntryPath.normalized(entry)
-        guard !normalizedEntry.isEmpty, ArchiveEntryPath.isSafe(normalizedEntry) else {
-            throw ArchiveMaterializationError.invalidEntry
-        }
-
-        return try playbackMaterializer.materialize(
-            archiveURL: archiveURL,
-            entryPath: normalizedEntry,
-            requirement: requirement
-        )
-    }
-
-    static func release() {
-        playbackMaterializer.release()
-    }
-
-    static func materializeForExport(
-        archivePath: String,
-        entry: String,
-        requirement: VGMArchiveMaterializationRequirement
-    ) throws -> URL {
-        let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
-        guard FileManager.default.fileExists(atPath: archiveURL.path) else {
-            throw ArchiveMaterializationError.missingSource(archiveURL.path)
-        }
-        let normalizedEntry = ArchiveEntryPath.normalized(entry)
-        guard !normalizedEntry.isEmpty, ArchiveEntryPath.isSafe(normalizedEntry) else {
-            throw ArchiveMaterializationError.invalidEntry
-        }
-        return try exportMaterializer.materialize(
-            archiveURL: archiveURL,
-            entryPath: normalizedEntry,
-            requirement: requirement
-        )
-    }
-
-    static func releaseExport() {
-        exportMaterializer.release()
     }
 
     static func configure(enabled: Bool, limitBytes: Int64) -> [String: Any] {
@@ -123,7 +64,7 @@ enum SB2ArchiveMaterialization {
     }
 
     static func clearCache() throws {
-        try playbackMaterializer.clearCache()
+        try cacheMaterializer.clearCache()
     }
 
     private static func cachePolicy() -> ArchiveCachePolicy {

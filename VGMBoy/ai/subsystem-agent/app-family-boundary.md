@@ -2,8 +2,9 @@
 
 ## Scope
 
-VGMBoy owns the shared playback core, decoder integration, dependency staging, and scanner-facing
-inspection builds for the CocoaSpice, SB2, SBONLINE, ViewBoy, and ScanSong products.
+VGMBoy owns the shared playback core, decoder integration, archive preparation, dependency staging,
+and scanner-facing inspection builds for the CocoaSpice, SB2, SBONLINE, ViewBoy,
+LineBoy, and ScanSong products.
 
 ## Ownership
 
@@ -26,9 +27,13 @@ inspection builds for the CocoaSpice, SB2, SBONLINE, ViewBoy, and ScanSong produ
 
 - CocoaSpice, SB2, ViewBoy, and retained legacy SPCBoyWK source open the selected
   catalog read-only; all catalog writes belong to ScanSong.
-- Frontends own queue policy, presentation, archive materialization, and host-specific process
-  boundaries. VGMBoy owns format admission, decoder selection, timing, transport, equalization,
-  and audio output.
+- Frontends own catalog selection, queue policy, presentation, durable settings, and cache policy.
+  They pass VGMBoy a direct source path or an archive path plus selected member. VGMBoy owns
+  archive inspection and preparation, UAC frame decompression, format admission, decoder
+  selection, timing, transport, equalization, and audio output.
+- `VGMBoyArchiveCore` is the one archive process, path-safety, UAC, and materialization engine used
+  by playback and finite AAC export. FrontendCore's archive modules retain cache and artwork
+  adapters; they are not alternate playback extractors.
 - ScanSong receives scanner executables from VGMBoy and never invokes a player frontend or a
   frontend-owned plugin helper.
 - ScanSong consumes complete decoder-independent format metadata through

@@ -3,7 +3,7 @@
 ## Rule
 
 Equivalent player behavior should use the same shared policy and VGMBoy command
-contract. CocoaSpice, SB2, and ViewBoy retain separate renderers, app
+contract. CocoaSpice, SB2, ViewBoy, and LineBoy retain separate renderers, app
 identities, persistence keys, and host adapters; shared contracts do not promise
 pixel-identical UI. SPCBoyWK is retired and is not an active parity target.
 
@@ -15,7 +15,8 @@ pixel-identical UI. SPCBoyWK is retired and is not an active parity target.
 | Playlist sorting | `CatalogPlaylistPresentationCore.CatalogPlaylistSorting` | Submit current row records and retain selection while applying ordered IDs. |
 | Catalog grouping and search | `CatalogBrowserCore` | Render projected groups and map matching IDs into the sidebar. |
 | Playlist-tab order transitions | `FrontendCore.PlaylistTabsPersistenceCore` | Adapt local tab payloads, storage, focus, and final-tab behavior. |
-| Archive preparation | FrontendCore | Request playback through each native bridge. |
+| Playback/export archive preparation | VGMBoyArchiveCore | Preserve original archive/member identity in the typed request. |
+| Durable archive cache and cache-backed browsing/artwork | FrontendCore | Apply frontend cache preferences outside the playback source lifecycle. |
 | Decoder session, timing, and output | VGMBoy | Render status and issue named commands. |
 | Queue, transitions, fade eligibility | FrontendCore | Present queue state and local animation. |
 | Preferences and playlist layout policy | FrontendCore | Persist local keys and adapt shared values to each renderer. |

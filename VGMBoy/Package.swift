@@ -33,6 +33,7 @@ let package = Package(
     platforms: [.macOS("26.0")],
     products: [
         .library(name: "VGMBoyFormatCore", targets: ["VGMBoyFormatCore"]),
+        .library(name: "VGMBoyArchiveCore", targets: ["VGMBoyArchiveCore"]),
         .library(name: "VGMBoySNDH", targets: ["VGMBoySNDH"]),
         .library(name: "VGMBoyKit", targets: ["VGMBoyKit"]),
         // Exposes libVGM only to downstream parity-test targets. Production
@@ -44,8 +45,19 @@ let package = Package(
         .executable(name: "vgmboy-amiga-inspect", targets: ["VGMBoyAmigaInspect"]),
         .executable(name: "VGMBoy", targets: ["VGMBoyApp"])
     ],
+    dependencies: [
+        .package(name: "UACWrapper", path: "../UACMan/Wrapper")
+    ],
     targets: [
         .target(name: "VGMBoyFormatCore", path: "Sources/VGMBoyFormatCore"),
+        .target(
+            name: "VGMBoyArchiveCore",
+            dependencies: [
+                .product(name: "UACWrapperCore", package: "UACWrapper"),
+                "VGMBoyFormatCore"
+            ],
+            path: "Sources/VGMBoyArchiveCore"
+        ),
         .target(name: "VGMBoyEndpointCore", path: "Sources/VGMBoyEndpointCore"),
         .target(
             name: "VGMBoyCPSGPlay",
@@ -313,7 +325,7 @@ let package = Package(
         ),
         .target(
             name: "VGMBoyKit",
-            dependencies: ["VGMBoyFormatCore", "VGMBoySNDH", "VGMBoyCPSGPlay", "VGMBoyCMDX", "VGMBoyCGameMusicEmu", "VGMBoyCASAP", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCFFmpeg", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCQSF", "VGMBoyCSIDPlayFP", "VGMBoyCOpenMPT", "VGMBoyCUADE", "VGMBoyCAudioUnit"],
+            dependencies: ["VGMBoyFormatCore", "VGMBoyArchiveCore", "VGMBoySNDH", "VGMBoyCPSGPlay", "VGMBoyCMDX", "VGMBoyCGameMusicEmu", "VGMBoyCASAP", "VGMBoyCLibVGM", "VGMBoyCHighlyComplete", "VGMBoyC2SF", "VGMBoyCVGmstream", "VGMBoyCFFmpeg", "VGMBoyCLazyUSF", "VGMBoyCPlayPSF", "VGMBoyCQSF", "VGMBoyCSIDPlayFP", "VGMBoyCOpenMPT", "VGMBoyCUADE", "VGMBoyCAudioUnit"],
             linkerSettings: [
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("AudioToolbox")

@@ -14,8 +14,9 @@ ViewBoy implementation target; `LocalRecovery/ViewBoy/` contains historical
 archives, not current source. Use ViewBoy's native bridge and preference
 types; do not route work based on stale `SPCBoyWK` identifiers in older builds.
 
-Use CatalogReader for read-only catalogs, FrontendCore for shared frontend
-policy and archive materialization, and VGMBoy for decoding and playback.
+Use CatalogReader for read-only catalogs, FrontendCore for shared frontend and
+archive-cache policy, and VGMBoy for playback-source preparation, decoding,
+and playback.
 
 `launch.sh` must clean-build and package before each launch. Verify renderer
 contracts and the packaged app after changes that affect the host boundary.

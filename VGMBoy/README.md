@@ -1,10 +1,10 @@
 # VGMBoy
 
-VGMBoy is the shared macOS game-music playback and inspection-plugin core for
-the VGMMan family. It owns format routing, decoder integration, timing, Long
-Play, tempo, fade, ten-band EQ, and the audio device. Its command-line and
-SwiftUI test clients exercise the same `VGMBoyKit` used by CocoaSpice, SPCBoyWK,
-and ViewBoy.
+VGMBoy is the shared macOS game-music playback, archive-preparation, and
+inspection-plugin core for the VGMMan family. It owns archive/member source
+preparation, format routing, decoder integration, timing, Long Play, tempo,
+fade, ten-band EQ, and the audio device. Its command-line and SwiftUI clients
+exercise the same `VGMBoyKit` used by CocoaSpice, SB2, and ViewBoy.
 
 `VGMBoyEndpointCore` is the small, platform-neutral endpoint map for those
 clients. It names the shared playback, audio, diagnostics, and export routes;
@@ -20,13 +20,17 @@ executables where a direct MetaMan reader is not sufficient.
 | Component | Responsibility |
 | --- | --- |
 | ScanSong | Publishes the shared SQLite catalog and stored sidebar/playlist projections; bundles VGMBoy inspection plugins for intake. |
-| CocoaSpice | Reads that catalog, owns playlist and queue policy, materializes selected archive members, and forwards playback controls to bundled VGMBoyKit. |
-| VGMBoyKit | Decodes a supplied playable path, owns timing/EQ/audio output, and reports status and natural end. |
-| SPCBoyWK and ViewBoy | Read the same catalog independently and use shared archive and playback contracts through their native bridges. |
+| Frontends | Read the catalog, own presentation and queue policy, and send a direct source path or original archive path plus selected member to VGMBoy. |
+| VGMBoyArchiveCore | Validates and prepares direct compressed-file and archive/member sources, including UAC frame decompression and decoder dependency sets. |
+| VGMBoyKit | Decodes the prepared playable path, owns timing/EQ/audio output, and reports status and natural end. |
+| CocoaSpice, SB2, ViewBoy, and LineBoy | Active frontends. They bundle VGMBoyKit behind host adapters; none has its own playback extractor. |
 
-VGMBoy is not a daemon. Every host bundles the core into its own process. A host supplies a path
-and subtrack index through PlaybackControl v1; VGMBoy never reads or writes catalogs and never
-chooses the next queue item.
+VGMBoy is not a daemon. Every host bundles the core into its own process. A
+host supplies either a direct path or the original archive path and member,
+plus a subtrack index, through PlaybackControl v1. VGMBoy prepares archive
+sources before decoding; it never reads or writes catalogs and never chooses
+the next queue item. FrontendCore retains durable cache policy for browsing and
+artwork, separate from VGMBoy's temporary playback/export source lifetime.
 
 ## Active decoder plugins
 
@@ -155,8 +159,11 @@ checks before changing the manifest's `lastReviewed` date.
 - `VGMBoyKit` owns decoding, playback timing, and the macOS audio device.
 - The CLI and SwiftUI app are test skins over that one core.
 - ScanSong remains the only schema-24 catalog writer.
-- CocoaSpice, SPCBoyWK, and ViewBoy bundle the same VGMBoyKit behind
-  host-specific adapters. None has a second playback engine.
+- CocoaSpice, SB2, ViewBoy, and LineBoy bundle the same VGMBoyKit behind
+  host-specific adapters. None has a second playback engine or playback
+  extractor.
+- `VGMBoyArchiveCore` owns playback and AAC source preparation; FrontendCore
+  owns frontend cache policy and cache-backed browsing/artwork adapters.
 
 For current engineering constraints and routing, see
 [ai/project-info.md](ai/project-info.md) and

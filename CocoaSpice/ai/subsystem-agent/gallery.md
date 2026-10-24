@@ -10,8 +10,9 @@
 - `CatalogReader.CatalogSidebarReader.titleSnapGalleryGames` owns the read-only
   catalog projection and console-preference ordering.
 - `FrontendCore.ArchiveMaterializationCore.TitleSnapArtworkReader` validates
-  catalog PNG locators, reads loose artwork safely, and materializes selected
-  archive members through the frontend-supplied isolated materializer.
+  catalog PNG locators and reads loose artwork safely. Archive-member artwork
+  uses VGMBoyArchiveCore for extraction; FrontendCore supplies an isolated
+  cache policy for the artwork copy.
 - CocoaSpice owns the Gallery tab, native grid, thumbnail downsampling, bounded
   image cache, and game activation.
 

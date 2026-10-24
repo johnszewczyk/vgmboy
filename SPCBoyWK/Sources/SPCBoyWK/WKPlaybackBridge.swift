@@ -145,25 +145,8 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 args,
                 errorMessage: "Playback start requires a complete track request."
             )
-            let playbackPath: String
-            if let archivePath = request.archivePath, !archivePath.isEmpty,
-               let archiveEntry = request.archiveEntry, !archiveEntry.isEmpty {
-                guard let requirement = FormatRegistry.archiveMaterializationRequirement(for: [archiveEntry]) else {
-                    throw PlaybackBridgeError.invalid("VGMBoy does not admit archive member \(archiveEntry).")
-                }
-                playbackPath = try SPCArchiveMaterialization.materialize(
-                    archivePath: archivePath,
-                    entry: archiveEntry,
-                    requirement: requirement
-                ).path
-            } else {
-                playbackPath = request.sourcePath
-            }
-            guard requestID.map(transport.isCurrentPlaybackRequest) ?? true else {
-                throw PlaybackBridgeError.superseded
-            }
             try transport.start(try request.continuationStart(
-                resolvedPath: playbackPath,
+                resolvedPath: request.sourcePath,
                 requestID: requestID ?? transport.reservePlaybackRequest()
             ))
             return statusResponse()
@@ -174,7 +157,6 @@ final class WKPlaybackBridge: @unchecked Sendable {
             try perform(.pause)
             return statusResponse()
         case "nativePlaybackStop", "nativePlaybackClose", "nativePlaybackUnload":
-            defer { SPCArchiveMaterialization.release() }
             try perform(.stop)
             return statusResponse()
         case "nativePlaybackSeek":
@@ -220,22 +202,6 @@ final class WKPlaybackBridge: @unchecked Sendable {
     private func exportAAC(
         _ request: PlaybackTransportAACExportRequest
     ) throws -> PlaybackTransportAACExportResponse {
-        let playbackPath: String
-        var materialized = false
-        if let archivePath = request.archivePath, !archivePath.isEmpty,
-           let archiveEntry = request.archiveEntry, !archiveEntry.isEmpty {
-            guard let requirement = FormatRegistry.archiveMaterializationRequirement(for: [archiveEntry]) else {
-                throw PlaybackBridgeError.invalid("VGMBoy does not admit archive member \(archiveEntry).")
-            }
-            playbackPath = try SPCArchiveMaterialization.materializeForExport(
-                archivePath: archivePath,
-                entry: archiveEntry,
-                requirement: requirement
-            ).path
-            materialized = true
-        } else {
-            playbackPath = request.sourcePath
-        }
         let exportID = UUID().uuidString
         let cancellation = AACExportCancellation()
         exportLock.lock()
@@ -246,7 +212,6 @@ final class WKPlaybackBridge: @unchecked Sendable {
         activeExport = (exportID, cancellation)
         exportLock.unlock()
         defer {
-            if materialized { SPCArchiveMaterialization.releaseExport() }
             exportLock.lock()
             if activeExport?.id == exportID { activeExport = nil }
             exportLock.unlock()
@@ -254,7 +219,7 @@ final class WKPlaybackBridge: @unchecked Sendable {
         publishExport(.init(id: exportID, state: "rendering", renderedFrames: 0, totalFrames: 0, message: request.filenameStem))
         do {
             let outputURL = try transport.exportAAC(
-                try request.exportRequest(resolvedPath: playbackPath),
+                try request.exportRequest(),
                 cancellation: cancellation,
                 progress: { [weak self] progress in
                     self?.publishExport(.init(

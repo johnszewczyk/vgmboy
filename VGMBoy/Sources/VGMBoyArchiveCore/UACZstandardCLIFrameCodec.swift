@@ -17,7 +17,7 @@ public final class UACZstandardCLIFrameCodec: @unchecked Sendable {
         self.zstdCandidates = configuration.zstdCandidates
         self.processRunner = processRunner ?? ArchiveProcessRunner(configuration: .init(
             environment: ProcessInfo.processInfo.environment,
-            temporaryFilePrefix: "FrontendCore-uac-frame",
+            temporaryFilePrefix: "VGMBoy-uac-frame",
             maxConcurrency: min(4, max(1, ProcessInfo.processInfo.activeProcessorCount - 1)),
             listingTimeout: 30,
             extractionTimeout: 60,

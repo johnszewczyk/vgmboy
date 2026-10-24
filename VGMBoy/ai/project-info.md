@@ -6,15 +6,18 @@ VGMBoy owns playback format admission, decoder integration, timing, output gain,
 transport, and the macOS audio device for the VGMMan family. It is a shared
 in-process kit, not a daemon or catalog service.
 
-CocoaSpice, SB2, and ViewBoy are maintained player clients. Each bundles the
-shared playback core behind its own host adapter. Retired SPCBoyWK remains a
-historical client. ScanSong consumes
+CocoaSpice, SB2, ViewBoy, and LineBoy are maintained player clients. Each
+bundles the shared playback core behind its own host adapter. Retired SPCBoyWK
+remains a historical client. ScanSong consumes
 VGMBoy-built inspection helpers, but does not link the playback kit or invoke
 a player app.
 
 ## Major Components
 
 - `Sources/VGMBoyKit/` — playback core, decoder boundaries, and timing.
+- `Sources/VGMBoyArchiveCore/` — bounded archive inspection, safe member
+  selection, UAC decompression, and temporary playback/export source
+  preparation.
 - `Sources/VGMBoyEndpointCore/` — versioned endpoint and capability map.
 - `Sources/VGMBoyMDXInspect/` and `Sources/VGMBoyAmigaInspect/` — focused
   scanner inspection boundaries.
@@ -30,6 +33,8 @@ scanner-specific decoding remains necessary.
 
 - Playback control protocol and host contract:
   `subsystem-agent/playback-control-v1.md`.
+- Archive/member preparation and temporary-source lifetime:
+  `subsystem-agent/archive-preparation.md`.
 - Audio output, transport, de-click, and diagnostics:
   `subsystem-agent/audio-output-transport.md`.
 - Format admission, decoder routes, and adding a playback core:
@@ -46,8 +51,10 @@ scanner-specific decoding remains necessary.
 
 ## Local Rules
 
-- VGMBoy owns decoded transport and audio output; frontends own queue policy,
-  persistence keys, and user interfaces.
+- VGMBoyArchiveCore and VGMBoyKit own playback/export source preparation,
+  decoded transport, and audio output. Frontends own queue policy, durable
+  cache preferences for browsing/artwork, persistence keys, and user
+  interfaces.
 - ScanSong is the only schema-24 catalog writer. It consumes MetaMan results
   and any required VGMBoy-built inspection executables.
 - Never fork an upstream decoder per app. Keep host bridges and build staging

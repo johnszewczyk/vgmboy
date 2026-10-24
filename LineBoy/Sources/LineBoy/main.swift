@@ -1,6 +1,4 @@
 import AppKit
-import ArchiveCacheCore
-import ArchiveMaterializationCore
 import CatalogBrowserCore
 import CatalogPlaylistCore
 import CatalogPlaylistPresentationCore
@@ -431,14 +429,6 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
     private let catalogURL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/CocoaSpice/Library.sqlite")
     private let transport = PlaybackTransportCoordinator(label: "LineBoy.vgmboy-playback")
-    private let materializer = ArchivePlaybackMaterializer(
-        cacheRootURL: FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
-            .appendingPathComponent("LineBoy/ArchiveCache", isDirectory: true),
-        preferenceKeys: ArchiveCachePreferenceKeys(
-            modeKey: "LineBoy.archiveCacheMode",
-            limitKey: "LineBoy.archiveCacheLimitBytes"
-        )
-    )
     private let playlistTabsStore = PlaylistTabsJSONFileStore(
         fileURL: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("LineBoy", isDirectory: true)
@@ -473,7 +463,6 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
 
     func shutdown() async {
         await transport.stop()
-        materializer.release()
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -787,18 +776,8 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         let catalogTrack = catalogTracks[id]
         var historySnapshot: FavoriteTrackSnapshot?
         if let track = catalogTracks[id] {
-            resolvedPath = track.sourcePath
-            if let archivePath = track.archivePath, let archiveEntry = track.archiveEntry {
-                guard let requirement = FormatRegistry.archiveMaterializationRequirement(for: [archiveEntry]) else {
-                    throw LineBoyBridgeError.unsupportedArchiveEntry(archiveEntry)
-                }
-                resolvedPath = try materializer.materialize(
-                    archiveURL: URL(fileURLWithPath: archivePath),
-                    entryPath: archiveEntry,
-                    requirement: requirement
-                ).path
-            }
-            family = FormatRegistry.family(for: resolvedPath)
+            resolvedPath = track.archivePath ?? track.sourcePath
+            family = FormatRegistry.family(for: track.archiveEntry ?? resolvedPath)
             metadata = PlaybackTimingMetadata(
                 playMilliseconds: track.lengthMilliseconds,
                 introMilliseconds: track.introLengthMilliseconds,
@@ -843,7 +822,7 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         let tempo = playbackSettings.tempo(for: family)
         let configuredRequest = PlaybackTransportStartRequest(
             trackID: id,
-            sourcePath: catalogTrack?.sourcePath ?? resolvedPath,
+            sourcePath: resolvedPath,
             archivePath: catalogTrack?.archivePath,
             archiveEntry: catalogTrack?.archiveEntry,
             trackIndex: catalogTrack?.trackIndex ?? 0,

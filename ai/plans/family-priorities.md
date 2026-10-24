@@ -14,10 +14,10 @@ unit; the monorepo is the only source tree for maintained family code.
 | Source discovery, inspection routing, and schema-24 catalog writes | ScanSong |
 | UAC manifest, seek table, and reversible wrapper | UACMan |
 | Read-only catalog access and browser projections | CatalogReader |
-| Shared archive/cache, preferences, queue, and transport policy | FrontendCore |
-| Playback admission, decoders, timing, transport, and audio output | VGMBoy |
+| Archive/member source preparation, playback admission, decoders, timing, transport, and audio output | VGMBoy |
+| Durable archive-cache policy, preferences, queue, and frontend transport coordination | FrontendCore |
 | AppKit/SwiftUI presentation | CocoaSpice |
-| Native WebKit presentation | SPCBoyWK |
+| Native WebKit presentation | SB2; SPCBoyWK is retired |
 | Screen-first Yoga LCD presentation | ViewBoy |
 
 ## Format decisions

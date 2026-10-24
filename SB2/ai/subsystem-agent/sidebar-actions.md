@@ -13,8 +13,9 @@ in the SB2 home view.
 - `app-core.js` exposes the control reference.
 - `WKNativeBridge.swift` serves read-only Gallery metadata and artwork through
   CatalogReader and FrontendCore. `TitleSnapArtworkReader` in
-  `ArchiveMaterializationCore` owns the shared safe PNG locator boundary; SB2
-  keeps its app-specific materializer and data-URL bridge.
+  `ArchiveMaterializationCore` owns the safe PNG locator boundary; VGMBoyArchiveCore
+  reads archive members, while SB2 keeps its app-specific artwork cache and
+  data-URL bridge.
 
 ## Invariants
 

@@ -10,12 +10,12 @@ ownership and preservation rules.
 
 | Project | Responsibility |
 | --- | --- |
-| [VGMBoy](VGMBoy/README.md) | Decoder routing, timing, playback, audio output, and scanner helpers. |
+| [VGMBoy](VGMBoy/README.md) | Archive/member preparation, decoder routing, timing, playback, audio output, and scanner helpers. |
 | [ScanSong](ScanSong/README.md) | Source discovery, format inspection, and schema-24 catalog writing. |
 | [MetaMan](MetaMan/README.md) | Decoder-independent metadata reading and typed source facts. |
 | [UACMan](UACMan/README.md) | UAC package metadata browser/editor and reversible wrapper tools. |
 | [CatalogReader](CatalogReader/README.md) | Read-only catalog access and shared browser projections. |
-| [FrontendCore](FrontendCore/README.md) | Shared archive, preference, queue, and transport policy. |
+| [FrontendCore](FrontendCore/README.md) | Shared archive-cache, preference, queue, and transport policy. |
 | [CocoaSpice](CocoaSpice/README.md) | Native AppKit/SwiftUI player frontend. |
 | [SPCBOY SB2](SB2/README.md) | Current SPCBOY pixel-style WebKit frontend under development. |
 | [SBONLINE](SBONLINE/README.md) | Hosted SPCBOY web player; production site integration currently lives in MathBook. |

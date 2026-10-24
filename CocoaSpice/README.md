@@ -1,9 +1,11 @@
 # CocoaSpice
 
 CocoaSpice is the native AppKit/SwiftUI player frontend for the VGMMan family.
-It reads ScanSong’s schema-24/25 catalog, builds editable playlists, materializes
-archive members for playback, and bundles VGMBoyKit in-process. ScanSong owns
-catalog writes; VGMBoy owns decoding, timing, transport, and audio output.
+It reads ScanSong’s schema-24/25 catalog, builds editable playlists, and bundles
+VGMBoyKit in-process. Playback requests retain the original archive/member
+identity; VGMBoyArchiveCore prepares the source before decoding. ScanSong owns
+catalog writes, FrontendCore owns durable archive-cache policy, and VGMBoy owns
+decoding, timing, transport, and audio output.
 
 ## App-family boundaries
 
@@ -12,11 +14,12 @@ catalog writes; VGMBoy owns decoding, timing, transport, and audio output.
 | ScanSong | Source discovery, inspection orchestration, and catalog publication. |
 | MetaMan | Decoder-independent metadata readers used by ScanSong and UACMan. |
 | CatalogReader | Read-only catalog access and shared browser projections. |
-| FrontendCore | Shared archive, preference, queue, and transport policy. |
-| VGMBoy | Playback admission, decoding, timing, and audio output. |
+| FrontendCore | Shared archive-cache, preference, queue, and transport policy. |
+| VGMBoy | Playback-source preparation, playback admission, decoding, timing, and audio output. |
 | CocoaSpice | Native presentation, local UI state, and host adapters. |
 
-SPCBoyWK and ViewBoy are separate WebKit frontends in this same family.
+SB2 and ViewBoy are separate WebKit frontends in this same family; SPCBoyWK is
+retired and retained for historical builds.
 
 ## Build and run
 

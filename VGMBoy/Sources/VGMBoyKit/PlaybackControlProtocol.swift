@@ -170,7 +170,11 @@ public enum PlaybackControlError: LocalizedError, Equatable {
 
 /// The finite parameters used by v1 commands. Fields not consumed by a command\n/// are rejected by the control boundary, rather than interpreted as playlist\n/// state or silently stored by the core.
 public struct PlaybackControlPayload: Codable, Sendable, Equatable {
+    /// Direct playable path, or the archive container when `archiveEntry` is set.
     public var path: String?
+    /// Selected playable member within `path`. Archive admission, extraction,
+    /// dependency preparation, and temporary-file lifetime belong to VGMBoy.
+    public var archiveEntry: String?
     public var trackIndex: Int?
     public var positionMilliseconds: Int?
     public var tempo: Double?
@@ -191,6 +195,7 @@ public struct PlaybackControlPayload: Codable, Sendable, Equatable {
 
     public init(
         path: String? = nil,
+        archiveEntry: String? = nil,
         trackIndex: Int? = nil,
         positionMilliseconds: Int? = nil,
         tempo: Double? = nil,
@@ -208,6 +213,7 @@ public struct PlaybackControlPayload: Codable, Sendable, Equatable {
         loop: PlaybackLoopMetadata? = nil
     ) {
         self.path = path
+        self.archiveEntry = archiveEntry
         self.trackIndex = trackIndex
         self.positionMilliseconds = positionMilliseconds
         self.tempo = tempo

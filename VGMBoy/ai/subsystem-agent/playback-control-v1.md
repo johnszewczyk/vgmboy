@@ -36,6 +36,11 @@ same typed endpoint operations.
   changes, and `status`; `subscribe` is its callback-registration API rather than a command, and
   process shutdown stays with the hosting app. There are deliberately no queue, next, previous,
   repeat, shuffle, catalog-write, or playlist-mutation commands.
+- A load payload with only `path` is a direct playable file. When `archiveEntry` is present,
+  `path` is the archive container and the entry is a manifest-relative member name. VGMBoy validates
+  the member, chooses the format-owned preparation requirement, extracts the selected member or
+  dependency set, and retains the temporary source for that session. Hosts do not extract a playback
+  member before calling `load`.
 - `PlaybackStatus.statistics` is the shared diagnostic payload for decoder family, decoder/output
   rates, decoded frames, audible position frames, and tempo. It deliberately excludes title,
   filename, and other frontend “now playing” presentation fields. Device counters remain in
@@ -53,13 +58,13 @@ same typed endpoint operations.
   the final de-click envelope.
 - Decoder header facts stay internal to session setup for subtrack validation and timing. VGMBoy
   never exposes, writes, or looks up frontend playlist or ScanSong catalog metadata.
-- `AACExporter` is a separate offline decoder session. It takes a frontend-provided naked playable
-  path, subtrack, finite playback window, output folder, and display filename; it writes ADTS AAC
-  (`.aac`) without touching the live transport/device or any catalog. VGMBoy sanitizes the stem and
-  chooses a non-overwriting collision suffix. It reports frame progress, observes a host cancellation
-  token between decode blocks, renders to a hidden partial path, and moves that file to its final name
-  only after the encoder closes successfully. A frontend owns its persisted destination preference and
-  archive materialization before making this call.
+- `AACExporter` is a separate offline decoder session. It takes a direct path or archive/member
+  source, subtrack, finite playback window, output folder, and display filename. VGMBoy prepares an
+  archive source before export. It writes ADTS AAC (`.aac`) without touching the live transport/device
+  or any catalog. VGMBoy sanitizes the stem and chooses a non-overwriting collision suffix. It reports
+  frame progress, observes a host cancellation token between decode blocks, renders to a hidden
+  partial path, and moves that file to its final name only after the encoder closes successfully. A
+  frontend owns its persisted destination preference.
 - AAC progress is rate-limited to four updates per second. It is a latest-state presentation channel,
   so a realtime decoder cannot monopolize a frontend executor by emitting one UI task per decode block.
 - `PlaybackStructureReader` is the narrow exception for raw disk browsing: it returns only

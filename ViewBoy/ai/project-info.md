@@ -18,6 +18,7 @@ ViewBoy is the VGMMan family's native macOS player with a screen-first Yoga pixe
 
 - ViewBoy owns layout, hit testing, the bitmap font, framebuffer, AppKit host, and its preference namespace.
 - CatalogReader reads the ScanSong catalog. ViewBoy never writes it.
-- FrontendCore owns shared queue, transport, and startup-progress policy;
-  VGMBoy owns decoding, timing, and audio output.
+- FrontendCore owns shared archive-cache, queue, transport, and startup-progress
+  policy; VGMBoyArchiveCore prepares playback sources, and VGMBoyKit owns
+  decoding, timing, and audio output.
 - `launch.sh` builds, packages, signs, and opens the application.

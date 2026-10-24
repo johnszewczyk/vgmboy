@@ -5,6 +5,7 @@ import Foundation
 /// display name and timing policy; VGMBoy never looks up catalog metadata.
 public struct AACExportRequest: Sendable, Equatable {
     public var sourcePath: String
+    public var archiveEntry: String?
     public var trackIndex: Int
     public var outputDirectory: URL
     public var filenameStem: String
@@ -13,6 +14,7 @@ public struct AACExportRequest: Sendable, Equatable {
 
     public init(
         sourcePath: String,
+        archiveEntry: String? = nil,
         trackIndex: Int = 0,
         outputDirectory: URL,
         filenameStem: String,
@@ -20,6 +22,7 @@ public struct AACExportRequest: Sendable, Equatable {
         fadeMilliseconds: Int
     ) {
         self.sourcePath = sourcePath
+        self.archiveEntry = archiveEntry
         self.trackIndex = trackIndex
         self.outputDirectory = outputDirectory
         self.filenameStem = filenameStem

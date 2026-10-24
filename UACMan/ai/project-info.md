@@ -49,6 +49,9 @@ runtime dependency.
 - Collection browsing reads the UAC manifest and seek-table index through
   `UACWrapperCore`; it never decompresses or extracts TAR/audio payload data.
   The folder scan is in-memory and does not create another catalog.
+- VGMBoyArchiveCore is the playback consumer that validates selected members
+  and decompresses seekable or legacy payload data for VGMBoy. UACMan remains
+  the package-contract owner; it is not the playback extractor.
 - Metadata edits may replace manifest data only; compressed payload bytes and
   original member bytes remain unchanged.
 - MetaManCore owns native SPC tag reading. UACMan does not write ID666/xID6

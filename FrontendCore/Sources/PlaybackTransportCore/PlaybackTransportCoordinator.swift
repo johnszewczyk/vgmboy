@@ -3,27 +3,40 @@ import PlaybackQueueCore
 import PlaybackRequestCore
 import VGMBoyKit
 
-/// A playable source supplied by a frontend after archive resolution. Most
-/// formats use a path; bounded in-memory bytes are available to capable decoders.
-/// It contains transport identity, but no catalog or UI model.
+/// A source selected by the frontend. VGMBoy receives either a direct path or
+/// an archive/member pair and owns the preparation needed by the decoder.
+/// Bounded in-memory bytes remain available to capable decoders.
 public struct PlaybackTransportTrack: Equatable, Sendable {
     public let id: String
     public let path: String
     public let trackIndex: Int
     public let sourceData: Data?
     public let loop: PlaybackLoopMetadata?
+    public let archivePath: String?
+    public let archiveEntry: String?
 
-    public init(id: String, path: String, trackIndex: Int = 0, sourceData: Data? = nil, loop: PlaybackLoopMetadata? = nil) {
+    public init(
+        id: String,
+        path: String,
+        trackIndex: Int = 0,
+        sourceData: Data? = nil,
+        loop: PlaybackLoopMetadata? = nil,
+        archivePath: String? = nil,
+        archiveEntry: String? = nil
+    ) {
         self.id = id
         self.path = path
         self.trackIndex = max(0, trackIndex)
         self.sourceData = sourceData
         self.loop = loop
+        self.archivePath = archivePath
+        self.archiveEntry = archiveEntry
     }
 }
 
-/// Native continuation input after a frontend has resolved the source and
-/// timing policy. The track may carry a path or decoder-supported member bytes.
+/// Native continuation input after the frontend applies timing policy. The
+/// selected source may be a direct path, an archive/member pair, or
+/// decoder-supported member bytes.
 public struct PlaybackContinuationStart: Equatable, Sendable {
     public let track: PlaybackTransportTrack
     public let payload: PlaybackControlPayload
@@ -43,10 +56,9 @@ public struct PlaybackContinuationStart: Equatable, Sendable {
     }
 }
 
-/// Typed frontend request for starting playback before an adapter resolves an
-/// archive member to a playable path or in-memory source. It carries stable identity and
-/// timing/tempo intent, but deliberately leaves extraction and UI state to the
-/// frontend-specific archive and presentation adapters.
+/// Typed frontend request for starting playback. It carries stable identity,
+/// optional archive/member identity, and timing/tempo intent. VGMBoy prepares
+/// the source before dispatching it to the decoder.
 public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
     public let trackID: String
     public let sourcePath: String
@@ -108,15 +120,21 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
         case loop
     }
 
-    /// Resolves the common transport input only after the adapter has supplied
-    /// its direct or archive-materialized playable path.
+    /// Builds the common transport input while preserving archive/member
+    /// identity for VGMBoy's source-preparation boundary. `resolvedPath` stays
+    /// available for callers that already have a direct playable path.
     public func continuationStart(
-        resolvedPath: String,
+        resolvedPath: String? = nil,
         requestID: Int
     ) throws -> PlaybackContinuationStart {
-        guard !trackID.isEmpty, !sourcePath.isEmpty, !resolvedPath.isEmpty else {
+        let archiveSourcePath = archivePath.flatMap { $0.isEmpty ? nil : $0 }
+        let archiveMember = archiveEntry.flatMap { $0.isEmpty ? nil : $0 }
+        let usesArchiveMember = archiveSourcePath != nil && archiveMember != nil
+        let playbackPath = usesArchiveMember ? archiveSourcePath! : (resolvedPath ?? sourcePath)
+        guard !trackID.isEmpty, !sourcePath.isEmpty, !playbackPath.isEmpty else {
             throw PlaybackControlError.invalidPayload("Playback start requires a track ID and file path.")
         }
+        let timingPath = usesArchiveMember ? archiveMember! : playbackPath
         let timing: PlaybackTimingRequest
         if timedOverride {
             timing = try .timed(
@@ -125,7 +143,7 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
             )
         } else {
             timing = try .standard(
-                path: resolvedPath,
+                path: timingPath,
                 longPlayEnabled: longPlayEnabled,
                 manualPlayMilliseconds: playMilliseconds,
                 fadeMilliseconds: fadeMilliseconds,
@@ -134,9 +152,17 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
         }
         let normalizedTempo = PlaybackTempo(numerator: tempo.numerator, denominator: tempo.denominator)
         return PlaybackContinuationStart(
-            track: .init(id: trackID, path: resolvedPath, trackIndex: trackIndex, loop: loop),
+            track: .init(
+                id: trackID,
+                path: playbackPath,
+                trackIndex: trackIndex,
+                loop: loop,
+                archivePath: usesArchiveMember ? archiveSourcePath : nil,
+                archiveEntry: usesArchiveMember ? archiveMember : nil
+            ),
             payload: .init(
-                path: resolvedPath,
+                path: playbackPath,
+                archiveEntry: usesArchiveMember ? archiveMember : nil,
                 trackIndex: trackIndex,
                 tempo: normalizedTempo.multiplier,
                 playbackMode: timing.playbackMode,
@@ -287,12 +313,12 @@ public struct PlaybackNaturalEndGate: Sendable {
 
 /// The single native transport façade shared by CocoaSpice and SPCBoyWK.
 ///
-/// Frontends provide a naked playable path and stable identity. This type owns
-/// command serialization, request invalidation, the in-process VGMBoy
-/// controller, timing reconfiguration, output controls, and native status.
-/// Queue selection, catalog rows, archive extraction, and presentation stay
-/// outside this boundary; the shared queue policy is consulted only for the
-/// generation-checked completion retirement operation.
+/// Frontends provide a direct path or archive/member identity plus stable
+/// identity. This type owns command serialization, request invalidation, the
+/// in-process VGMBoy controller, source preparation, timing reconfiguration,
+/// output controls, and native status. Queue selection, catalog rows, and
+/// presentation stay outside this boundary; shared queue policy is consulted
+/// only for generation-checked completion retirement.
 public final class PlaybackTransportCoordinator: @unchecked Sendable {
     public typealias StatusHandler = @Sendable (PlaybackTransportStatus) -> Void
     public typealias NaturalEndHandler = @Sendable (PlaybackTransportStatus) -> Void
@@ -389,7 +415,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     public func setTempo(_ tempo: PlaybackTempo) async throws {
         try await run {
             guard let track = self.currentTrack,
-                  FormatRegistry.family(for: track.path)?.supportsTempo == true else { return }
+                  FormatRegistry.family(for: track.archiveEntry ?? track.path)?.supportsTempo == true else { return }
             try self.requireSuccess(self.controller.perform(.init(
                 command: .setTempo,
                 payload: .init(tempo: tempo.multiplier)
@@ -471,10 +497,9 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         }
     }
 
-    /// Starts an already-resolved continuation after the caller has retired
-    /// completion and prepared any archive-backed playable path. Archive
-    /// extraction and cache leases stay in the adapter; the native load/play
-    /// operation remains serialized here.
+    /// Starts a continuation after the caller has retired completion. The
+    /// request retains archive/member identity so VGMBoy prepares the source
+    /// before its serialized native load/play operation.
     public func startContinuation(_ start: PlaybackContinuationStart) async throws {
         try await run {
             try self.startContinuationLocked(start)
@@ -685,7 +710,8 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
                     currentTrack = PlaybackTransportTrack(
                         id: path,
                         path: path,
-                        trackIndex: request.payload.trackIndex ?? 0
+                        trackIndex: request.payload.trackIndex ?? 0,
+                        archiveEntry: request.payload.archiveEntry
                     )
                 }
             case .stop, .shutdown:
@@ -711,7 +737,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         autoplay: Bool
     ) throws {
         let timing = try PlaybackTimingRequest.standard(
-            path: track.path,
+            path: track.archiveEntry ?? track.path,
             longPlayEnabled: plan.isLongPlay,
             manualPlayMilliseconds: plan.preFadeSeconds * 1_000,
             fadeMilliseconds: plan.fadeSeconds * 1_000,
@@ -720,7 +746,8 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         naturalEndGate.reset()
         continuationCoordinator.reset()
         let payload = PlaybackControlPayload(
-            path: track.path,
+            path: track.archivePath ?? track.path,
+            archiveEntry: track.archiveEntry,
             trackIndex: track.trackIndex,
             tempo: tempo.multiplier,
             playbackMode: timing.playbackMode,

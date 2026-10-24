@@ -1,4 +1,5 @@
 import Foundation
+import VGMBoyArchiveCore
 
 /// Reads a catalog-selected PNG preview without giving frontends archive or
 /// path-resolution rules of their own.
@@ -7,10 +8,10 @@ import Foundation
 /// decoding, caching, and presentation. Archive reads are serialized because
 /// the materializer keeps a short-lived lease until `release()`.
 public final class TitleSnapArtworkReader: @unchecked Sendable {
-    private let materializer: ArchivePlaybackMaterializer
+    private let materializer: FrontendArchiveCacheMaterializer
     private let archiveReadLock = NSLock()
 
-    public init(materializer: ArchivePlaybackMaterializer) {
+    public init(materializer: FrontendArchiveCacheMaterializer) {
         self.materializer = materializer
     }
 

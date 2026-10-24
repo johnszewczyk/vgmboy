@@ -4,8 +4,9 @@ Read [`ai/AGENTS.md`](ai/AGENTS.md), then
 [`ai/project-info.md`](ai/project-info.md), then the narrow subsystem note
 routed by the task.
 
-VGMBoy owns playback admission, decoder integration, timing, native transport,
-and the macOS audio device. The maintained player frontends—CocoaSpice, SB2,
+VGMBoy owns playback/export source preparation, playback admission, decoder
+integration, timing, native transport, and the macOS audio device. The
+maintained player frontends—CocoaSpice, SB2,
 and ViewBoy—are clients of the shared kit and family service packages. Retired
 SPCBoyWK remains a historical client; cross-app behavior belongs with its
 shared owner.

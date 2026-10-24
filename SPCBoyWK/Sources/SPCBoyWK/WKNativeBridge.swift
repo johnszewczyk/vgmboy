@@ -449,7 +449,6 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         guard let decision = WKPlaybackBridge.shared.retireCompletedPlayback(lifecycleRequest) else {
             return NSNull()
         }
-        SPCArchiveMaterialization.release()
         return try Self.object(PlaybackContinuationResponse(decision: decision))
     }
 

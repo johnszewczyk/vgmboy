@@ -17,8 +17,8 @@ SPCBoyWK is not listed as an active app and receives no feature work.
 - In-process VGMBoy playback through the native bridge.
 - Shared versioned VGMBoy endpoint capability map (`VGMBoyEndpointCore`).
 - Shared VGMBoy tempo contract for libgme and libvgm playback settings.
-- Shared selected-entry or dependency-complete archive materialization through
-  FrontendCore.
+- Playback/export archive-member preparation through VGMBoyArchiveCore;
+  FrontendCore retains shared archive-cache policy and artwork adapters.
 - Shared `PlaybackRequestCore` lifecycle and serial VGMBoy command execution.
 - Shared `PlaybackTransportCore` native transport lifecycle and
   `PlaybackTransportStatusPayload` bridge projection.
@@ -61,8 +61,10 @@ Agent engineering notes:
 - Keep playback ownership in VGMBoy; this project owns presentation and host integration.
 - Do not add decoder, metadata-inspection, or format-admission implementations
   here; use VGMBoyKit/VGMBoyFormatCore and the packaged endpoint surface.
-- Keep queue construction and presentation in the frontend adapter, while archive-member materialization runs through the native bridge and shared `ArchiveMaterializationCore`.
-- Do not add a private archive extractor; use `ArchiveMaterializationCore`.
+- Keep queue construction and presentation in the frontend adapter. Pass the
+  original archive/member to VGMBoy for playback and AAC preparation.
+- Do not add a private playback extractor; use VGMBoyArchiveCore. Use
+  FrontendCore only for shared cache and artwork policy.
 - Keep Settings as a separate native window; do not restore the in-pane overlay
   as the root window's primary Settings surface.
 - Do not add renderer-runtime dependencies or a second catalog implementation.

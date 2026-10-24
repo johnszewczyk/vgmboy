@@ -13,13 +13,15 @@ and manifest contract.
 - ScanSong owns catalog publication. It passes `.uac` file URLs to
   `MetaManCore.readResult`, projects the returned member documents to schema
   23, and uses the declared member hash for member identity.
-- FrontendCore owns shared path-based archive materialization and cache policy;
-  it consumes `UACWrapperCore` but does not implement UAC parsing.
-- CocoaSpice owns UAC playback adaptation. For SPC playback it passes a
-  seekable UAC member to the in-memory decoder path. Path-based selected-member
-  playback in active frontends uses FrontendCore's indexed member materializer
-  for `tar+zstd-seekable`; legacy streams and dependency-complete formats keep
-  the sequential extraction route.
+- FrontendCore owns durable archive-cache policy and cache-backed browsing or
+  artwork adapters; it consumes `UACWrapperCore` but does not implement UAC
+  parsing.
+- Active frontends pass VGMBoy the original UAC path and selected member.
+  VGMBoyArchiveCore uses `UACWrapperCore` to validate the manifest and seek
+  table, then prepares the member or required dependency set. For
+  `tar+zstd-seekable`, it decompresses only the frames intersecting the
+  selected member; legacy streams and complete-set formats use the sequential
+  archive route.
 - VGMBoy owns decoder admission and playback behavior. AudioMan is a downstream
   `/audio` operator that chooses source sets and package recipes; it does not
   own, link, or implement UACMan.
@@ -35,11 +37,12 @@ and manifest contract.
   `UACWrapperCore` for framing, manifest, and seek-table parsing. Other
   consumers may use `UACWrapperCore` for container operations; do not fork UAC
   parsing in ScanSong, FrontendCore, or players.
-- Seekable SPC playback reads only the frames intersecting the selected member
-  and does not write the decompressed SPC to a playback cache.
-- Path-based playback remains materialized through FrontendCore when a decoder
-  cannot accept an in-memory member. Do not treat path materialization as
-  permission for catalog scanning to inspect native tags.
+- Seekable selected-member playback reads only the intersecting frames and
+  stages the decoder input in VGMBoy's temporary playback area. It does not use
+  the frontend's durable browsing/artwork cache.
+- Playback source preparation belongs to VGMBoyArchiveCore when a decoder needs
+  a filesystem path. Do not treat it as permission for catalog scanning to
+  inspect native tags.
 - Full payload/member hashing is explicit verification work, not an implicit
   metadata-enrichment step during catalog scanning.
 
@@ -49,10 +52,11 @@ and manifest contract.
   `.uac` as TAR, ZIP, or standalone audio.
 - Compressed manifest and member-frame decoding must use the bounded shared
   Zstandard CLI adapter or a host-injected equivalent. UACWrapperCore owns
-  format bounds and validation; FrontendCore owns the bounded external-process
-  adapter for local playback.
-- If the selected decoder requires a filesystem path, use the existing shared
-  materialization route. Do not add another archive extractor to a frontend.
+  format bounds and validation; VGMBoyArchiveCore owns the playback adapter
+  and archive preparation.
+- If the selected decoder requires a filesystem path, pass the original
+  archive/member to VGMBoy. Do not add another playback extractor to a
+  frontend.
 
 ## Files
 
@@ -60,6 +64,8 @@ and manifest contract.
 - `ScanSong/Sources/ScanSongKit/CatalogScanner.swift`
 - `ScanSong/Sources/ScanSongKit/UACCatalogMetadataAdapter.swift`
 - `ScanSong/Tests/ScanSongKitTests/ScanSongContractTests.swift`
-- `FrontendCore/Sources/ArchiveMaterializationCore/ArchivePlaybackMaterializer.swift`
+- `VGMBoy/Sources/VGMBoyArchiveCore/ArchiveMaterializer.swift`
+- `VGMBoy/Sources/VGMBoyArchiveCore/UACZstandardCLIFrameCodec.swift`
+- `FrontendCore/Sources/ArchiveMaterializationCore/FrontendArchiveCacheMaterializer.swift` (cache-backed artwork adapter only)
 - `CocoaSpice/Sources/CocoaSpice/App/ZipArchiveSupport.swift`
 - `CocoaSpice/Sources/CocoaSpice/App/VGMBoyPlaybackEngine.swift`
