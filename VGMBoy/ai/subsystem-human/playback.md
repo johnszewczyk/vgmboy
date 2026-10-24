@@ -1,9 +1,11 @@
 # Playback
 
 VGMBoy's command line (`vgmboy-cli`) and standalone WebKit application (`VGMBoy`)
-play original game-music files through one native audio core. The app has Player,
-Audio, Diagnostics and Decoder formats pages, a session file sidebar and transport
-that remains visible across pages. Open multiple local files with Command-O;
+play original game-music files through one native audio core. The app uses a
+charcoal/cyan two-pane interface: session files and compact transport controls on
+the left, with Player, Audio, Diagnostics and Formats pages on the right. Its
+bottom status bar keeps playback time, seek and volume visible across pages. Open
+multiple local files with Command-O;
 Previous/Next move through that session. The subsong field uses a one-based source
 index. Show in Finder locates the selected file.
 
