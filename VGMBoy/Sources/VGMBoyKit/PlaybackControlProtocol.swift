@@ -12,7 +12,7 @@ public struct PlaybackTempo: Codable, Equatable, Sendable {
     public static let defaultValue = PlaybackTempo(numerator: 1, denominator: 1)
     public static let maxComponent = 1_000_000
     public static let maxDecimalPlaces = 6
-    private static let maxDisplayFractionDenominator = 64
+    private static let maxDisplayFractionDenominator = 32
 
     public let numerator: Int
     public let denominator: Int
@@ -39,7 +39,7 @@ public struct PlaybackTempo: Codable, Equatable, Sendable {
                   let denominator = Int(text[text.index(after: slash)...].trimmingCharacters(in: .whitespaces)),
                   numerator >= 1, denominator >= 1,
                   numerator <= maxComponent, denominator <= maxComponent else { return nil }
-            return Self.snappedToSixtyFourths(Self(numerator: numerator, denominator: denominator))
+            return Self.snappedToThirtySeconds(Self(numerator: numerator, denominator: denominator))
         }
 
         let parts = text.split(separator: ".", omittingEmptySubsequences: false)
@@ -53,17 +53,17 @@ public struct PlaybackTempo: Codable, Equatable, Sendable {
         let denominator = Int(pow(10.0, Double(fraction.count)))
         let numerator = whole * denominator + fractional
         guard numerator >= 1, numerator <= maxComponent, denominator <= maxComponent else { return nil }
-        return Self.snappedToSixtyFourths(Self(numerator: numerator, denominator: denominator))
+        return Self.snappedToThirtySeconds(Self(numerator: numerator, denominator: denominator))
     }
 
-    /// UI-entered tempo values use musical 1/64 steps. The stored fraction is
+    /// UI-entered tempo values use musical 1/32 steps. The stored fraction is
     /// reduced after snapping so decimal and fractional input share one value.
-    private static func snappedToSixtyFourths(_ value: Self) -> Self {
+    private static func snappedToThirtySeconds(_ value: Self) -> Self {
         let steps = min(
             maxComponent,
-            max(1, Int((value.multiplier * 64).rounded()))
+            max(1, Int((value.multiplier * 32).rounded()))
         )
-        return Self(numerator: steps, denominator: 64)
+        return Self(numerator: steps, denominator: 32)
     }
 
     public var displayString: String {

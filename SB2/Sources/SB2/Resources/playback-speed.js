@@ -2,7 +2,8 @@
   const DEFAULT = Object.freeze({ numerator: 1, denominator: 1 });
   const MAX_COMPONENT = 1_000_000;
   const MAX_DECIMAL_PLACES = 6;
-  const MAX_DISPLAY_FRACTION_DENOMINATOR = 32;
+  const PLAYBACK_SPEED_STEPS_PER_UNIT = 64;
+  const MAX_DISPLAY_FRACTION_DENOMINATOR = PLAYBACK_SPEED_STEPS_PER_UNIT;
 
   function greatestCommonDivisor(left, right) {
     let a = Math.abs(Math.trunc(left));
@@ -27,12 +28,23 @@
     return { numerator: numerator / divisor, denominator: denominator / divisor };
   }
 
+  function snapToSixtyFourths(value) {
+    const multiplier = value.numerator / value.denominator;
+    const numerator = Math.min(
+      MAX_COMPONENT,
+      Math.max(1, Math.round(multiplier * PLAYBACK_SPEED_STEPS_PER_UNIT))
+    );
+    return normalize({ numerator, denominator: PLAYBACK_SPEED_STEPS_PER_UNIT });
+  }
+
   function parse(value) {
     const text = String(value || "").trim();
     const fraction = /^(\d+)\s*\/\s*(\d+)$/.exec(text);
     if (fraction) {
       const candidate = { numerator: Number(fraction[1]), denominator: Number(fraction[2]) };
-      return isValidComponents(candidate.numerator, candidate.denominator) ? normalize(candidate) : null;
+      return isValidComponents(candidate.numerator, candidate.denominator)
+        ? snapToSixtyFourths(normalize(candidate))
+        : null;
     }
     const decimal = new RegExp(`^(?:(\\d+)(?:\\.(\\d{0,${MAX_DECIMAL_PLACES}}))?|\\.(\\d{1,${MAX_DECIMAL_PLACES}}))$`).exec(text);
     if (!decimal) return null;
@@ -40,7 +52,7 @@
     const denominator = 10 ** decimals.length;
     const numerator = Number(decimal[1] || 0) * denominator + Number(decimals || 0);
     if (!isValidComponents(numerator, denominator)) return null;
-    return normalize({ numerator, denominator });
+    return snapToSixtyFourths(normalize({ numerator, denominator }));
   }
 
   function format(value) {

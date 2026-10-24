@@ -2525,6 +2525,8 @@ body.sb2-frontend .options-input:focus-visible { outline: 2px solid var(--accent
 body.sb2-frontend .options-inline-trailing { flex: 0 0 var(--sb-options-control-width); width: var(--sb-options-control-width); min-width: 0; }
 body.sb2-frontend .options-inline-trailing.options-color-trailing { flex: 0 0 20ch; width: 20ch; min-width: 20ch; }
 body.sb2-frontend .options-color-text-input { box-sizing: border-box; flex: 0 0 20ch; width: 20ch; max-width: 20ch; }
+body.sb2-frontend .playback-speed-field .options-inline-trailing { flex: 0 0 8ch; width: 8ch; min-width: 8ch; }
+body.sb2-frontend .playback-speed-field .options-speed-input { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; padding-inline: .25rem; font-family: var(--mono-font-family); font-variant-numeric: tabular-nums; }
 body.sb2-frontend .options-subpanel .tool-button {
   height: var(--sb-control-size);
   min-height: var(--sb-control-size);
