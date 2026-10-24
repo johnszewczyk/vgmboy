@@ -77,11 +77,11 @@ gzip-compressed `.vgz` members. See
   not extra metadata tags.
 - **VGMRIPS text and artwork** — The curated per-game TXT is a readable package
   note, not a second tag catalog. Include its unchanged bytes as `meta.txt` and
-  reference it through package `documents`; preserve its source filename in
-  provenance. Do not duplicate its track list, package history, or reader
-  diagnostics as tags. The native GD3 fields remain the tag source. VGMRIPS
-  artwork is a pack-level **Title Snap** attachment, with one reference for
-  each in-archive image. Report loose image sidecars separately; do not silently
+  expose it through the direct package tag `"Text File": "meta.txt"`; preserve
+  its source filename in provenance. Do not duplicate its track list, package
+  history, or reader diagnostics as tags. The native GD3 fields remain the tag
+  source. VGMRIPS artwork is a pack-level **Title Snap** attachment, with one
+  reference for each in-archive image. Report loose image sidecars separately; do not silently
   substitute them for the source ZIP artwork or add duplicate copies.
 - **No invented fields** — Do not add blank tags, `nativeMetadata`, parser
   dumps, technical statistics, a versionless `Format` tag, or duplicate

@@ -46,9 +46,10 @@ Apply these rules together with the [VGM format profile](../VGM.md) and the
   choosing the nearest artwork. Do not label artwork as a front cover unless
   the source identifies it that way.
 - **Package notes** — Preserve each curated source TXT byte-for-byte inside its
-  UAC as `meta.txt`, referenced by `game.metadata.documents`. Record its source
-  filename and the member-name normalization in provenance. Keep the note as a
-  document; do not duplicate its track list or package history as tags.
+  UAC as `meta.txt` and expose it through the direct package tag
+  `"Text File": "meta.txt"`. Record its source filename and the member-name
+  normalization in provenance. Keep the note as an attachment; do not duplicate
+  its track list or package history as tags.
 - **Package set tags** — Use **Set Name** `VGMRIPS` and **Set URL** for the
   official snapshot/source page. Do not add **Set Collection**; `sources[]`
   retains the collection identity and package-level source file.
