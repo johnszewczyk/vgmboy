@@ -4,7 +4,8 @@
 
 ScanSong is the VGMMan family's native catalog-management app and command-line
 scanner. It writes schema-25 catalogs read by CocoaSpice, SB2, and ViewBoy.
-Retired SPCBoyWK remains a historical catalog consumer.
+The retired SPCBoyWK source snapshot is archived locally and is no longer a
+maintained catalog consumer.
 
 ## Major Components
 

@@ -52,7 +52,8 @@
   adjacency, completion, and replacement-state transitions. Its
   `PlaybackQueueState` value contract also carries current/selected/pending
   identity. CocoaSpice keeps only TrackItem adapters around those ID-based
-  rules; SPCBoyWK consumes the same module through its native bridge.
+  rules; the retired SPCBoyWK frontend consumed the same module through its
+  native bridge.
 
 ## Invariants
 

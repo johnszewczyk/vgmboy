@@ -3,7 +3,7 @@
 ## Product
 
 `FrontendCore` is the shared UI-neutral policy and service package used by the
-historical consumer of these interfaces.
+archived outside the active tree and is no longer a maintained consumer.
 
 ## Major Components
 

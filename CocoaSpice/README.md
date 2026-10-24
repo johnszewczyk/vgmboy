@@ -18,8 +18,8 @@ decoding, timing, transport, and audio output.
 | VGMBoy | Playback-source preparation, playback admission, decoding, timing, and audio output. |
 | CocoaSpice | Native presentation, local UI state, and host adapters. |
 
-SB2 and ViewBoy are separate WebKit frontends in this same family; SPCBoyWK is
-retired and retained for historical builds.
+SB2 and ViewBoy are separate WebKit frontends in this same family. SPCBoyWK is
+retired; its source is preserved in a local ZIP and Git history.
 
 ## Build and run
 

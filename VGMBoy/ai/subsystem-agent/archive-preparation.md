@@ -26,6 +26,12 @@ finite AAC export; it has no catalog, queue, or UI policy.
 - `FrontendCore.ArchiveCacheCore` owns durable/disposable frontend cache roots,
   limits, leases, and eviction. Its archive adapters support cached browsing
   and artwork; they do not prepare VGMBoy playback or AAC inputs.
+- The `vgmboy-prepare` executable is a narrow process bridge for hosts that
+  cannot link `VGMBoyArchiveCore` in-process. It accepts the original archive
+  path and selected member path, writes only prepared member bytes to stdout,
+  and writes diagnostics to stderr. It uses the same `.selectedEntry`
+  materialization path as native playback. Its local macOS build is verified;
+  a Linux build and runtime package are not yet verified.
 
 ## Invariants
 
@@ -46,6 +52,10 @@ finite AAC export; it has no catalog, queue, or UI policy.
 - Archive-tool discovery/configuration is host-specific input to the shared
   engine. The engine owns command routing, bounded process execution, member
   safety, preparation, and error semantics.
+- A foreign-host adapter must pass source/member identity to
+  `vgmboy-prepare`; it must not implement its own archive or UAC extraction.
+  Package the executable for the target Linux runtime and verify its external
+  archive-tool configuration before switching the hosted player.
 
 ## Failure Boundaries
 
@@ -64,6 +74,7 @@ finite AAC export; it has no catalog, queue, or UI policy.
 - `Sources/VGMBoyArchiveCore/ArchiveEntryPath.swift`
 - `Sources/VGMBoyArchiveCore/UACSeekableMemberMaterializer.swift`
 - `Sources/VGMBoyArchiveCore/UACZstandardCLIFrameCodec.swift`
+- `Sources/VGMBoyPrepareCLI/main.swift`
 - `Sources/VGMBoyKit/PlaybackController.swift`
 - `Sources/VGMBoyKit/AACExport.swift`
 - `Sources/VGMBoyKit/PlaybackControlProtocol.swift`

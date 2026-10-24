@@ -23,7 +23,7 @@ and reader behavior live in
   host process adapter and app-bundle assembly for those products.
 - `scansong` owns ordered JSONL serialization, exit status, and process-signal
   cancellation. `ScanSongApp` owns catalog management and user-facing progress.
-- CocoaSpice and SPCBoyWK own playback and presentation. They open catalogs
+- Maintained player frontends own playback and presentation. They open catalogs
   query-only and never receive scanner write access.
 
 ## Catalog and Resume Invariants

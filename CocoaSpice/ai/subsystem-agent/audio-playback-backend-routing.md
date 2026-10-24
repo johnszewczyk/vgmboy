@@ -36,9 +36,9 @@
   output controls, status, diagnostics, and the generation-checked one-shot
   natural-end event.
 - CocoaSpice's `VGMBoyPlaybackEngine` is only a TrackItem/archive-materializer
-  adapter around that coordinator. SPCBoyWK's `WKPlaybackBridge` is only a
-  JSON request adapter around the same coordinator. Neither frontend owns a
-  second controller or serial executor.
+  adapter around that coordinator. The retired SPCBoyWK `WKPlaybackBridge` was
+  a JSON request adapter around the same coordinator. Neither implementation
+  owns a second controller or serial executor.
 - `VGMBoyPlaybackEngine` retains its frontend `TrackItem` snapshot behind a
   lock because async playback requests and transport callbacks use different
   executors. Callback identity comes from the coordinator's queue-confined
@@ -53,7 +53,7 @@
 - User-selected playlist targets, including Return activation, and adjacent
   transport targets pass through one `PlayerViewModel.requestFadedTrackChange`
   policy boundary. It uses FrontendCore's `PlaybackQueuedSkipFadeRequest`, the
-  same eligibility and duration policy used by SPCBoyWK. CocoaSpice keeps its
+  same eligibility and duration policy used by the retired SPCBoyWK frontend. CocoaSpice keeps its
   own delayed target handoff; `VGMBoyPlaybackEngine.beginFadedSkip` sends the
   ramp through the shared `PlaybackTransportCoordinator` and VGMBoy command
   path. Keep `requestPlayback` as the low-level start path for resume, playlist

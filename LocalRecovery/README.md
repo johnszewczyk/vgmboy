@@ -9,6 +9,7 @@ history; the ignored payloads below preserve unique local archives and fixtures.
 | --- | --- | --- |
 | `CocoaSpice/CocoaSpice-project-backup-2026-07-08.tar.gz` | `a77d7731e01823cbf2d3771354e67920eb8889e6b1892a540b3dbf088f44a4b9` | Earlier CocoaSpice source backup; maintained source is `../CocoaSpice/`. |
 | `ViewBoy/ViewBoy-legacy-2026-09-01.zip` | `8ffa7797888aa131e2a087755d01266e9ff11e509af2cb5507b90369a30d9b6d` | Earlier ViewBoy backup; maintained source is `../ViewBoy/`, and imported history is `archive/ViewBoy/heads/main`. |
+| `SPCBoyWK/SPCBoyWK-79ec1c71.zip` | `d87b7c049c422411304c75d14d5dba1279447bd9ac6dae71e647f14bedce6e99` | Retired SPCBoyWK source snapshot at its last source change (`79ec1c71`); generated `.build` products were excluded. The maintained SPCBOY frontend is `../SB2/`. |
 | `fixtures/Silent Hill 2 (EMU).zophar.zip` | `c4f1579ffbcf2199cbb6b4cc5a6d2be2a3cf8cbb155fdfe51a9db15bd02f3007` | Unique local playback/test fixture retained from the legacy checkout staging tree. |
 | [`legacy-documentation/CocoaSpice-container-proposal.md.txt`](legacy-documentation/CocoaSpice-container-proposal.md.txt) | `b8b0162702041f2c108210d8203746c19c8b5979261d3db8d0bfe49a8ad6770e` | Superseded proposal preserved verbatim from `VGMMan-legacy-checkouts-2026-09-15/CocoaSpice/container-proposal.md`; its retirement is explained in `legacy-documentation/README.md`. |
 
