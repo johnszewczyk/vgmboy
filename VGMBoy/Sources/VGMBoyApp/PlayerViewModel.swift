@@ -1,11 +1,23 @@
 import AppKit
 import Observation
+import VGMBoyArchiveCore
 import VGMBoyKit
+
+private struct SessionFile: Hashable {
+    let sourceURL: URL
+    let archiveEntry: String?
+
+    var name: String { archiveEntry ?? sourceURL.lastPathComponent }
+    var location: String {
+        guard let archiveEntry else { return sourceURL.path }
+        return "\(sourceURL.path) :: \(archiveEntry)"
+    }
+}
 
 @MainActor
 @Observable
 final class PlayerViewModel {
-    var sessionFiles: [URL] = []
+    private var sessionFiles: [SessionFile] = []
     var volume = 1.0
     var monoEnabled = false
     var statistics = PlaybackStatistics()
@@ -17,6 +29,9 @@ final class PlayerViewModel {
     var elapsedSeconds = 0.0
     var errorMessage: String?
     var diagnostics = PlaybackDiagnostics()
+
+    private var currentSource: SessionFile?
+    private var archiveEntry: String?
 
     var longPlayEnabled = false
     var manualSeconds = 60
@@ -36,7 +51,8 @@ final class PlayerViewModel {
     }
 
     private var currentFamily: DecoderFamily? {
-        filePath.flatMap(FormatRegistry.family)
+        if let archiveEntry { return FormatRegistry.family(for: archiveEntry) }
+        return filePath.flatMap(FormatRegistry.family)
     }
 
     init() {
@@ -54,21 +70,73 @@ final class PlayerViewModel {
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
         guard panel.runModal() == .OK else { return }
-        let supported = panel.urls.filter { FormatRegistry.family(for: $0.path) != nil }
-        guard let first = supported.first else { errorMessage = "No supported audio files selected."; return }
-        for url in supported where !sessionFiles.contains(url) { sessionFiles.append(url) }
-        load(fileURL: first)
+        addFiles(panel.urls)
     }
 
     func load(fileURL: URL) {
-        guard fileURL.isFileURL else { errorMessage = "Choose a local audio file."; return }
-        let path = fileURL.path
-        guard FormatRegistry.family(for: path) != nil else {
-            errorMessage = "Unsupported format: \(path)"
+        addFiles([fileURL])
+    }
+
+    func addFiles(_ urls: [URL]) {
+        let materializer = ArchiveMaterializer()
+        var incoming: [SessionFile] = []
+        var listingError: String?
+
+        for rawURL in urls {
+            let url = rawURL.standardizedFileURL
+            guard url.isFileURL else {
+                listingError = "Choose a local file."
+                continue
+            }
+            if FormatRegistry.family(for: url.path) != nil {
+                incoming.append(SessionFile(sourceURL: url, archiveEntry: nil))
+                continue
+            }
+            guard ArchiveContainerKind(archiveURL: url) != nil else {
+                listingError = "Unsupported format: \(url.lastPathComponent)"
+                continue
+            }
+            do {
+                let playableEntries = try materializer.listEntries(archivePath: url.path).filter {
+                    FormatRegistry.archiveMaterializationRequirement(for: [$0]) != nil
+                }
+                if playableEntries.isEmpty {
+                    listingError = "No supported audio tracks were found in \(url.lastPathComponent)."
+                } else {
+                    incoming.append(contentsOf: playableEntries.map {
+                        SessionFile(sourceURL: url, archiveEntry: $0)
+                    })
+                }
+            } catch {
+                listingError = error.localizedDescription
+            }
+        }
+        materializer.release()
+
+        guard !incoming.isEmpty else {
+            errorMessage = listingError ?? "No supported audio files selected."
             return
         }
-        if !sessionFiles.contains(fileURL) { sessionFiles.append(fileURL) }
-        filePath = path
+
+        var seen = Set(sessionFiles)
+        let uniqueIncoming = incoming.filter { seen.insert($0).inserted }
+        let capacity = max(0, 2_000 - sessionFiles.count)
+        let additions = Array(uniqueIncoming.prefix(capacity))
+        sessionFiles.append(contentsOf: additions)
+        guard let first = additions.first ?? incoming.first(where: { sessionFiles.contains($0) }) else {
+            errorMessage = "This local session is full. Restart VGMBoy to clear it."
+            return
+        }
+        load(source: first)
+        if uniqueIncoming.count > additions.count {
+            errorMessage = "Local session limit reached; only the first 2,000 files are kept."
+        }
+    }
+
+    private func load(source: SessionFile) {
+        currentSource = source
+        archiveEntry = source.archiveEntry
+        filePath = source.sourceURL.path
         selectedTrack = 0
         errorMessage = nil
         loadSelectedTrack()
@@ -138,7 +206,7 @@ final class PlayerViewModel {
         do {
             let mode: PlaybackMode = longPlayEnabled && currentFamily?.supportsLongPlay == true ? .longPlay : .fileDefault
             let loaded = controller.perform(.init(command: .load, payload: .init(
-                path: filePath, trackIndex: selectedTrack, tempo: tempo, playbackMode: mode,
+                path: filePath, archiveEntry: archiveEntry, trackIndex: selectedTrack, tempo: tempo, playbackMode: mode,
                 playMilliseconds: manualSeconds * 1_000, fadeMilliseconds: fadeSeconds * 1_000
             )))
             if loaded.kind == .error { throw PlayerControlError.rejected(loaded.message) }
@@ -170,8 +238,8 @@ final class PlayerViewModel {
 
     var webSnapshot: [String: Any] {
         [
-            "file": filePath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "Open a music file",
-            "path": filePath ?? "Local playback · original formats · native audio output",
+            "file": currentSource?.name ?? "Open a music file",
+            "path": currentSource?.location ?? "Local playback · original formats · native audio output",
             "loaded": filePath != nil, "playing": isPlaying, "ended": reachedEnd,
             "elapsed": elapsedSeconds, "window": max(displayDuration, elapsedSeconds + 1),
             "family": currentFamily?.id ?? "No source", "track": selectedTrack + 1,
@@ -186,8 +254,8 @@ final class PlayerViewModel {
                 ["family": descriptor.familyID, "extensions": descriptor.extensions.sorted().joined(separator: " · "),
                  "tempo": descriptor.supportsTempo, "longPlay": descriptor.supportsLongPlay] as [String: Any]
             },
-            "files": sessionFiles.enumerated().map { index, url in
-                ["index": index, "name": url.lastPathComponent, "selected": url.path == filePath] as [String: Any]
+            "files": sessionFiles.enumerated().map { index, source in
+                ["index": index, "name": source.name, "selected": source == currentSource] as [String: Any]
             },
             "diagnostics": ["buffered": diagnostics.bufferedFrames, "capacity": diagnostics.capacityFrames,
                 "underruns": diagnostics.underrunCount, "requested": diagnostics.framesRequested,
@@ -207,12 +275,12 @@ final class PlayerViewModel {
         case "stop": stop()
         case "file":
             if let number = finite, number.rounded() == number, number >= 0, number < Double(sessionFiles.count) {
-                load(fileURL: sessionFiles[Int(number)])
+                load(source: sessionFiles[Int(number)])
             }
         case "previous", "next":
-            if let index = sessionFiles.firstIndex(where: { $0.path == filePath }) {
+            if let currentSource, let index = sessionFiles.firstIndex(of: currentSource) {
                 let next = index + (command == "next" ? 1 : -1)
-                if sessionFiles.indices.contains(next) { load(fileURL: sessionFiles[next]) }
+                if sessionFiles.indices.contains(next) { load(source: sessionFiles[next]) }
             }
         case "track": if let number = finite, (1...1000).contains(number) { selectTrack(Int(number) - 1) }
         case "seek": if let number = finite { seek(to: min(max(0, number), max(displayDuration, elapsedSeconds))) }
