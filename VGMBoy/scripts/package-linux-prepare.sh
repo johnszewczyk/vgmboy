@@ -18,5 +18,7 @@ export VGMBOY_TAR_BINARY="$(command -v tar)"
 export VGMBOY_ZSTD_BINARY="$(command -v zstd)"
 LD_LIBRARY_PATH="$output/runtime/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
   python3 "$root/scripts/check-prepare.py" "$output/runtime/bin/vgmboy-prepare"
-printf '%s\n' "$(git -C "$root" rev-parse HEAD)" > "$output/runtime/SOURCE_REVISION"
+revision="${GITHUB_SHA:-$(git -C "$root" rev-parse HEAD)}"
+[[ "$revision" =~ ^[0-9a-f]{40}$ ]] || { echo 'Missing source revision.' >&2; exit 1; }
+printf '%s\n' "$revision" > "$output/runtime/SOURCE_REVISION"
 tar -czf "$output/vgmboy-prepare-linux.tar.gz" -C "$output/runtime" .
