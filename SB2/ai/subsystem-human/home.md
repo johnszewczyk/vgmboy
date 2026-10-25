@@ -88,7 +88,8 @@
   height as square buttons; their width follows the label. Column headers use
   that same block height and state colors. Column auto-size fits the complete
   playlist content and keeps each header aligned with its column, including in
-  long virtualized playlists. Each tab retains its own title and tracks; async
+  long virtualized playlists, and reruns when columns are shown or hidden. Each
+  tab retains its own title and tracks; async
   sidebar loads and sorts only update the tab and playlist they started from.
   Closing a tab targets its current stable tab ID; a stale close target cannot
   close the last remaining window. Column resizing follows display frames while

@@ -47,6 +47,8 @@ projection field names (`fileText`, `titleText`, `authorText`, and related
 fields) to SB2 column IDs. Playlists without hints measure every row; do not
 estimate width from a sample. Keep an ordered `<colgroup>` on both header and
 body tables so virtual-row spacer cells cannot change body column widths.
+Invalidate auto-size when column visibility changes so newly shown content is
+measured before it is displayed.
 
 ## Trusted web content
 
