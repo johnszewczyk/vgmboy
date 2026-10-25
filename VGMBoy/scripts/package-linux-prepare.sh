@@ -13,6 +13,9 @@ if grep -q 'not found' "$output/linkage.txt"; then cat "$output/linkage.txt" >&2
 awk '/=> \/.*swift/ {print $3}' "$output/linkage.txt" | while IFS= read -r library; do
   cp -L "$library" "$output/runtime/lib/"
 done
+export VGMBOY_7Z_BINARY="$(command -v 7zz || command -v 7z)"
+export VGMBOY_TAR_BINARY="$(command -v tar)"
+export VGMBOY_ZSTD_BINARY="$(command -v zstd)"
 LD_LIBRARY_PATH="$output/runtime/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
   python3 "$root/scripts/check-prepare.py" "$output/runtime/bin/vgmboy-prepare"
 printf '%s\n' "$(git -C "$root" rev-parse HEAD)" > "$output/runtime/SOURCE_REVISION"
