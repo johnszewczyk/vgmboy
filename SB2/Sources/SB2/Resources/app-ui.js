@@ -3152,14 +3152,39 @@ function hasMeaningfulColumnContent(value) {
   return normalized.length > 0 && normalized !== "—" && normalized !== "-";
 }
 
+function playlistColumnContentHintKeys(columnId) {
+  const catalogKeys = {
+    index: "indexText",
+    filename: "fileText",
+    title: "titleText",
+    game: "gameText",
+    artist: "authorText",
+    system: "systemText",
+    year: "yearText",
+    dumper: "dumperText",
+    path: "pathText",
+    lengthLabel: "lengthText",
+    timestamp: "timestampText"
+  };
+  return [columnId, catalogKeys[columnId]].filter(Boolean);
+}
+
+function playlistColumnContentHint(columnId) {
+  const hints = state.catalogPlaylistColumnContentHints;
+  if (!hints) return undefined;
+  for (const key of playlistColumnContentHintKeys(columnId)) {
+    if (typeof hints[key] === "string") return hints[key];
+  }
+  return undefined;
+}
+
 function columnHasContent(column) {
   if (column.id === "favorite" || column.id === "index") return true;
-  const sharedHint = state.catalogPlaylistColumnContentHints?.[column.id];
+  const sharedHint = playlistColumnContentHint(column.id);
   if (sharedHint !== undefined) return hasMeaningfulColumnContent(sharedHint);
-  const sample = state.playlist.length > 1200
-    ? [...state.playlist.slice(0, 600), ...state.playlist.slice(-600)]
-    : state.playlist;
-  return sample.some((track, rowIndex) => hasMeaningfulColumnContent(playlistColumnValue(track, column, rowIndex)));
+  return state.playlist.some((track, rowIndex) => (
+    hasMeaningfulColumnContent(playlistColumnValue(track, column, rowIndex))
+  ));
 }
 
 function updateAutomaticColumnVisibility() {
@@ -3196,9 +3221,11 @@ function playlistDisplayPath(track) {
 
 function normalizePlaylistColumnContentHints(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const hints = Object.fromEntries(COLUMN_DEFS.flatMap((column) => (
-    typeof value[column.id] === "string" ? [[column.id, value[column.id]]] : []
-  )));
+  const hints = Object.fromEntries(COLUMN_DEFS.flatMap((column) => {
+    const sourceKey = playlistColumnContentHintKeys(column.id)
+      .find((key) => typeof value[key] === "string");
+    return sourceKey ? [[column.id, value[sourceKey]]] : [];
+  }));
   return Object.keys(hints).length ? hints : null;
 }
 
@@ -3396,6 +3423,9 @@ function beginColumnResize(event, columnId, header) {
   const resizeCells = [...playlistRowsByTrackId.values()]
     .map((row) => row.querySelector(`[data-column-id="${CSS.escape(columnId)}"]`))
     .filter(Boolean);
+  const resizeColumns = [refs.playlistHeaderTable, refs.playlistBodyTable]
+    .map((playlistTable) => playlistTable?.querySelector(`col[data-column-id="${CSS.escape(columnId)}"]`))
+    .filter(Boolean);
   let pendingClientX = startX;
   columnResizePointerId = pointerId;
   document.body.classList.add("playlist-columns-resizing");
@@ -3406,6 +3436,7 @@ function beginColumnResize(event, columnId, header) {
     );
     state.columnWidths[columnId] = nextWidth;
     header.style.width = `${nextWidth}%`;
+    for (const column of resizeColumns) column.style.width = `${nextWidth}%`;
     for (const cell of resizeCells) cell.style.width = `${nextWidth}%`;
   };
   const flushResize = (clientX) => {
@@ -3459,10 +3490,7 @@ function columnContentWidth(columnId) {
   const bodyCell = refs.playlistBody.querySelector(`[data-column-id="${CSS.escape(columnId)}"]`);
   const bodyStyle = getComputedStyle(bodyCell || refs.playlistBodyTable || refs.playlistBody);
   textMeasureContext.font = `${bodyStyle.fontWeight} ${bodyStyle.fontSize} ${bodyStyle.fontFamily}`;
-  const sharedHint = state.catalogPlaylistColumnContentHints?.[columnId];
-  const sample = state.playlist.length > 1200
-    ? [...state.playlist.slice(0, 600), ...state.playlist.slice(-600)]
-    : state.playlist;
+  const sharedHint = playlistColumnContentHint(columnId);
   // Measure the exact path text rendered by this frontend. The shared catalog
   // hint contains source paths, which can differ from the root-relative path
   // shown in playlist cells.
@@ -3478,15 +3506,19 @@ function columnContentWidth(columnId) {
       persistPlaylistTabs();
     }
   }
-  const values = pathValue !== null
-    ? [pathValue]
-    : sharedHint
-      ? [sharedHint]
-      : sample.map((track, rowIndex) => String(playlistColumnValue(track, column, rowIndex)));
-  const contentWidth = values.reduce(
-    (widest, value) => Math.max(widest, textMeasureContext.measureText(value).width),
-    0
-  );
+  let contentWidth = 0;
+  if (pathValue !== null) {
+    contentWidth = textMeasureContext.measureText(pathValue).width;
+  } else if (sharedHint !== undefined) {
+    contentWidth = textMeasureContext.measureText(sharedHint).width;
+  } else {
+    // Playlists without catalog hints are measured end to end so an outlier
+    // between sampled rows cannot leave its column clipped.
+    for (let rowIndex = 0; rowIndex < state.playlist.length; rowIndex += 1) {
+      const value = String(playlistColumnValue(state.playlist[rowIndex], column, rowIndex));
+      contentWidth = Math.max(contentWidth, textMeasureContext.measureText(value).width);
+    }
+  }
   const width = Math.max(headerWidth, contentWidth) + playlistColumnHorizontalPadding();
   return columnId === "favorite" || columnId === "index"
     ? Math.max(width, playlistColumnSquareMinimumWidth())
@@ -3739,16 +3771,24 @@ function playlistAutoSizeSignature() {
   const columns = orderedColumns();
   const firstID = state.playlist[0]?.id || "";
   const lastID = state.playlist.at(-1)?.id || "";
+  const headerLabel = refs.playlistHeaderRow.querySelector(".playlist-header-label")
+    || refs.playlistHeaderTable;
+  const headerStyle = getComputedStyle(headerLabel);
+  const bodyStyle = getComputedStyle(refs.playlistBodyTable);
   const longestPath = columns.some((column) => column.id === "path")
     ? longestDisplayedPlaylistPath(COLUMN_DEFS.find((column) => column.id === "path"))
     : "";
   return JSON.stringify([
-    columns.map((column) => column.id),
+    columns.map((column) => [column.id, playlistColumnHeaderLabel(column.id)]),
     state.playlist.length,
     firstID,
     lastID,
     state.rootPath || "",
-    longestPath
+    longestPath,
+    [headerStyle.fontFamily, headerStyle.fontSize, headerStyle.fontWeight, headerStyle.letterSpacing],
+    [bodyStyle.fontFamily, bodyStyle.fontSize, bodyStyle.fontWeight, bodyStyle.letterSpacing],
+    playlistColumnHorizontalPadding(),
+    state.catalogPlaylistColumnContentHints || null
   ]);
 }
 
@@ -3863,8 +3903,34 @@ function playlistSortDependsOnMetadata() {
     && ["title", "game", "artist", "system", "lengthLabel"].includes(state.sortColumn);
 }
 
+function syncPlaylistTableColumnGroups(columns) {
+  for (const table of [refs.playlistHeaderTable, refs.playlistBodyTable]) {
+    if (!table) continue;
+    let group = [...table.children].find((child) => child.tagName === "COLGROUP");
+    if (!group) {
+      group = document.createElement("colgroup");
+      table.insertBefore(group, table.firstElementChild);
+    }
+    const currentColumns = [...group.children];
+    if (currentColumns.length !== columns.length
+        || currentColumns.some((column, index) => column.dataset.columnId !== columns[index]?.id)) {
+      group.replaceChildren(...columns.map((column) => {
+        const element = document.createElement("col");
+        element.dataset.columnId = column.id;
+        return element;
+      }));
+    }
+    for (const column of columns) {
+      const element = group.querySelector(`col[data-column-id="${CSS.escape(column.id)}"]`);
+      if (element) element.style.width = `${state.columnWidths[column.id]}%`;
+    }
+  }
+}
+
 function syncPlaylistColumnWidths() {
-  for (const column of orderedColumns()) {
+  const columns = orderedColumns();
+  syncPlaylistTableColumnGroups(columns);
+  for (const column of columns) {
     const header = refs.playlistHeaderRow.querySelector(`[data-column-id="${CSS.escape(column.id)}"]`);
     if (header) {
       header.style.width = `${state.columnWidths[column.id]}%`;

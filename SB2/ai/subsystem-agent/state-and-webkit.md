@@ -42,6 +42,12 @@ or recomputing column visibility. Selection membership sets are cached by the
 immutable selected-ID array, so Select All does not add a full-list scan to each
 visible row update. Replace selected-ID arrays rather than mutating them.
 
+Column sizing uses the complete CatalogReader content hints, mapping their
+projection field names (`fileText`, `titleText`, `authorText`, and related
+fields) to SB2 column IDs. Playlists without hints measure every row; do not
+estimate width from a sample. Keep an ordered `<colgroup>` on both header and
+body tables so virtual-row spacer cells cannot change body column widths.
+
 ## Trusted web content
 
 `SB2WebContentPolicy` allows only the bundled index document as a main-frame

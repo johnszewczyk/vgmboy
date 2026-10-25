@@ -86,13 +86,14 @@
   use the same height and 0.25rem inline padding; glyph buttons center their icons.
   Playlist tabs are separate rounded blocks with a visible gap and the same
   height as square buttons; their width follows the label. Column headers use
-  that same block height and state colors. Each tab retains its own title and
-  tracks; async sidebar loads and sorts only update the tab and playlist they
-  started from. Closing a tab targets its current stable tab ID; a stale close
-  target cannot close the last remaining window. Column
-  resizing follows display frames while dragging and resumes configured easing
-  after release. Setting inputs may use the full
-  control height; they are fields rather than action buttons.
+  that same block height and state colors. Column auto-size fits the complete
+  playlist content and keeps each header aligned with its column, including in
+  long virtualized playlists. Each tab retains its own title and tracks; async
+  sidebar loads and sorts only update the tab and playlist they started from.
+  Closing a tab targets its current stable tab ID; a stale close target cannot
+  close the last remaining window. Column resizing follows display frames while
+  dragging and resumes configured easing after release. Setting inputs may use
+  the full control height; they are fields rather than action buttons.
 
 Tab changes are saved during use. Closing a window or quitting waits for pending
 workspace and preference writes; a failed save leaves the window open.
