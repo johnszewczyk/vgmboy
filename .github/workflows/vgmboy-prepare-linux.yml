@@ -1,0 +1,20 @@
+name: VGMBoy preparation for Linux
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    container: swift:6.3.3-noble
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install archive tools
+        run: apt-get update -qq && apt-get install -y -qq 7zip zstd
+      - name: Build and package the shared preparation engine
+        run: bash VGMBoy/scripts/package-linux-prepare.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vgmboy-prepare-linux-x86_64
+          path: VGMBoy/.build/linux-prepare/vgmboy-prepare-linux.tar.gz
+          retention-days: 14
