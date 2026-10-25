@@ -17,6 +17,7 @@ let columnMenu = null;
 let autoSizedPlaylistSignature = null;
 let playlistRenderGeneration = 0;
 let textMeasureContext = null;
+let playlistTextMeasureProbe = null;
 const displayedPathHintCache = new WeakMap();
 let columnMinimumWidths = new Map();
 let columnMinimumWidthsSignature = null;
@@ -2927,6 +2928,8 @@ function databaseRowsToPlaylistTracks(response, { adoptProjection = true } = {})
     game: row.gameText,
     artist: row.authorText,
     system: row.systemText,
+    year: row.yearText || row.year || "",
+    dumper: row.dumperText || row.dumper || "",
     lengthLabel: row.lengthText,
     basePlaybackSeconds: row.playLengthMs > 0 ? row.playLengthMs / 1000 : 0,
     metadataLoaded: row.metadataLoaded === true,
@@ -3152,6 +3155,36 @@ function hasMeaningfulColumnContent(value) {
   return normalized.length > 0 && normalized !== "—" && normalized !== "-";
 }
 
+function measurePlaylistTextWidth(value, sourceStyle) {
+  if (!playlistTextMeasureProbe) {
+    playlistTextMeasureProbe = document.createElement("span");
+    Object.assign(playlistTextMeasureProbe.style, {
+      position: "fixed",
+      left: "-100000px",
+      top: "0",
+      display: "inline-block",
+      width: "max-content",
+      maxWidth: "none",
+      whiteSpace: "pre",
+      overflow: "visible",
+      visibility: "hidden",
+      lineHeight: "normal",
+      padding: "0",
+      border: "0"
+    });
+    document.body.appendChild(playlistTextMeasureProbe);
+  }
+  for (const property of [
+    "fontFamily", "fontSize", "fontWeight", "fontStyle", "fontStretch",
+    "fontVariant", "fontVariantLigatures", "fontVariantNumeric", "fontKerning",
+    "fontFeatureSettings", "fontVariationSettings", "letterSpacing", "textTransform"
+  ]) {
+    playlistTextMeasureProbe.style[property] = sourceStyle?.[property] || "";
+  }
+  playlistTextMeasureProbe.textContent = String(value ?? "");
+  return playlistTextMeasureProbe.getBoundingClientRect().width;
+}
+
 function playlistColumnContentHintKeys(columnId) {
   const catalogKeys = {
     index: "indexText",
@@ -3181,7 +3214,7 @@ function playlistColumnContentHint(columnId) {
 function columnHasContent(column) {
   if (column.id === "favorite" || column.id === "index") return true;
   const sharedHint = playlistColumnContentHint(column.id);
-  if (sharedHint !== undefined) return hasMeaningfulColumnContent(sharedHint);
+  if (sharedHint !== undefined && hasMeaningfulColumnContent(sharedHint)) return true;
   return state.playlist.some((track, rowIndex) => (
     hasMeaningfulColumnContent(playlistColumnValue(track, column, rowIndex))
   ));
@@ -3485,7 +3518,7 @@ function columnContentWidth(columnId) {
   const headerStyle = getComputedStyle(headerLabel || header || refs.playlistHeaderTable);
   const renderedHeader = playlistColumnHeaderLabel(columnId);
   textMeasureContext.font = `${headerStyle.fontWeight} ${headerStyle.fontSize} ${headerStyle.fontFamily}`;
-  const headerWidth = textMeasureContext.measureText(renderedHeader).width;
+  const headerWidth = measurePlaylistTextWidth(renderedHeader, headerStyle);
 
   const bodyCell = refs.playlistBody.querySelector(`[data-column-id="${CSS.escape(columnId)}"]`);
   const bodyStyle = getComputedStyle(bodyCell || refs.playlistBodyTable || refs.playlistBody);
@@ -3508,9 +3541,17 @@ function columnContentWidth(columnId) {
   }
   let contentWidth = 0;
   if (pathValue !== null) {
-    contentWidth = textMeasureContext.measureText(pathValue).width;
+    contentWidth = measurePlaylistTextWidth(pathValue, bodyStyle);
   } else if (sharedHint !== undefined) {
-    contentWidth = textMeasureContext.measureText(sharedHint).width;
+    contentWidth = measurePlaylistTextWidth(sharedHint, bodyStyle);
+    if (!hasMeaningfulColumnContent(sharedHint)) {
+      for (let rowIndex = 0; rowIndex < state.playlist.length; rowIndex += 1) {
+        const value = String(playlistColumnValue(state.playlist[rowIndex], column, rowIndex));
+        if (hasMeaningfulColumnContent(value)) {
+          contentWidth = Math.max(contentWidth, measurePlaylistTextWidth(value, bodyStyle));
+        }
+      }
+    }
   } else {
     // Playlists without catalog hints are measured end to end so an outlier
     // between sampled rows cannot leave its column clipped.
@@ -3519,7 +3560,7 @@ function columnContentWidth(columnId) {
       contentWidth = Math.max(contentWidth, textMeasureContext.measureText(value).width);
     }
   }
-  const width = Math.max(headerWidth, contentWidth) + playlistColumnHorizontalPadding();
+  const width = Math.max(headerWidth, contentWidth) + playlistColumnHorizontalPadding() + 1;
   return columnId === "favorite" || columnId === "index"
     ? Math.max(width, playlistColumnSquareMinimumWidth())
     : width;
@@ -3549,12 +3590,11 @@ function refreshColumnMinimumWidths(columns = orderedColumns()) {
   const font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
   const padding = playlistColumnHorizontalPadding();
   const labels = columns.map((column) => [column.id, playlistColumnHeaderLabel(column.id)]);
-  const signature = JSON.stringify([font, padding, labels]);
+  const signature = JSON.stringify([font, style.letterSpacing, style.fontVariantNumeric, padding, labels]);
   if (signature === columnMinimumWidthsSignature) return;
-  textMeasureContext.font = font;
   columnMinimumWidths = new Map(labels.map(([columnId, label]) => [
     columnId,
-    textMeasureContext.measureText(label).width + padding
+    measurePlaylistTextWidth(label, style) + padding + 1
   ]));
   columnMinimumWidthsSignature = signature;
 }
@@ -3612,26 +3652,14 @@ function autoSizeColumns({ persist = true } = {}) {
   if (!contentWidth) return;
   const table = refs.playlistHeaderTable;
   const availableWidth = refs.playlistScrollWrap?.clientWidth || table.clientWidth || contentWidth;
-  const flexibleColumnIndex = columns.findIndex((column) => column.id === "path");
-  const fixedWidth = preferredWidths.reduce(
-    (sum, width, index) => sum + (index === flexibleColumnIndex ? 0 : width),
-    0
-  );
-  const fittedWidths = [...preferredWidths];
-  if (flexibleColumnIndex >= 0) {
-    fittedWidths[flexibleColumnIndex] = Math.max(
-      preferredWidths[flexibleColumnIndex],
-      availableWidth - fixedWidth
-    );
-  }
-  const fittedTotalWidth = fittedWidths.reduce((sum, width) => sum + width, 0);
+  const fittedTotalWidth = contentWidth;
   const width = `${fittedTotalWidth}px`;
   [refs.playlistHeaderTable, refs.playlistBodyTable].forEach((playlistTable) => {
     playlistTable.style.width = width;
     playlistTable.style.minWidth = width;
   });
   columns.forEach((column, index) => {
-    state.columnWidths[column.id] = (fittedWidths[index] / fittedTotalWidth) * 100;
+    state.columnWidths[column.id] = (preferredWidths[index] / fittedTotalWidth) * 100;
   });
   applyColumnMinimumWidths(columns);
   lastPlaylistAutoSizeAvailableWidth = availableWidth;
