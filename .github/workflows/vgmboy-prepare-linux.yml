@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install archive tools
-        run: apt-get update -qq && apt-get install -y -qq 7zip zstd
+        run: apt-get update -qq && apt-get install -y -qq 7zip zstd python3
       - name: Build and package the shared preparation engine
         run: bash VGMBoy/scripts/package-linux-prepare.sh
       - uses: actions/upload-artifact@v4
