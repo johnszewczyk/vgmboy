@@ -288,28 +288,6 @@ enum ZipArchiveSupport {
         }
     }
 
-    /// Reads one SPC directly from an indexed UAC TAR+Zstandard payload.
-    /// The selected member and its intersecting frames are held in memory;
-    /// this path creates no decompressed playback-cache file.
-    static func seekableUACSPCData(for track: TrackItem) throws -> Data? {
-        guard track.playablePathExtension == "spc",
-              case let .zipEntry(archiveURL, entryPath) = track.source,
-              archiveURL.pathExtension.lowercased() == "uac" else {
-            return nil
-        }
-        let memberFile = try UACSeekableMemberFile(
-            url: archiveURL,
-            memberPath: entryPath,
-            maximumCachedFrames: 2,
-            decompressManifestFrame: UACZstandardCLIFrameCodec.shared.manifestDecoder,
-            decompressFrame: UACZstandardCLIFrameCodec.shared.seekableFrameDecoder
-        )
-        guard memberFile.size > 0, memberFile.size <= 16 * 1024 * 1024 else {
-            throw ArchiveError.listingLimitExceeded("The selected SPC member is empty or exceeds the 16 MiB in-memory playback limit.")
-        }
-        return try memberFile.read(at: 0, byteCount: Int(memberFile.size))
-    }
-
     static func materializeEntry(archiveURL: URL, entryPath: String) throws -> URL {
         let archiveURL = archiveURL.standardizedFileURL
         let normalizedEntryPath = normalizeEntryPath(entryPath)

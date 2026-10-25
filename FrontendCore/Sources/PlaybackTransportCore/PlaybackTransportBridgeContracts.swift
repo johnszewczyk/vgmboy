@@ -108,10 +108,7 @@ public struct PlaybackTransportAACExportRequest: Codable, Equatable, Sendable {
         )
     }
 
-    @available(*, deprecated, message: "VGMBoy now owns archive/member preparation; call exportRequest().")
-    public func exportRequest(resolvedPath: String) throws -> AACExportRequest {
-        try exportRequest()
-    }
+
 }
 
 public struct PlaybackTransportAACExportResponse: Codable, Equatable, Sendable {

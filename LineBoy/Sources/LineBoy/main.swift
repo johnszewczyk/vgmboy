@@ -832,7 +832,7 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
             longPlayEnabled: plan.isLongPlay,
             unknownDurationMilliseconds: plan.unknownDurationSeconds * 1_000
         )
-        let continuation = try configuredRequest.continuationStart(resolvedPath: resolvedPath, requestID: requestID)
+        let continuation = try configuredRequest.continuationStart(requestID: requestID)
         try transport.start(continuation)
         if let historySnapshot {
             Task.detached(priority: .utility) {

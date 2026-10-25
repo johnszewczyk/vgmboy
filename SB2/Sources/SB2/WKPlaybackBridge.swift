@@ -146,7 +146,6 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 errorMessage: "Playback start requires a complete track request."
             )
             try transport.start(try request.continuationStart(
-                resolvedPath: request.sourcePath,
                 requestID: requestID ?? transport.reservePlaybackRequest()
             ))
             return statusResponse()

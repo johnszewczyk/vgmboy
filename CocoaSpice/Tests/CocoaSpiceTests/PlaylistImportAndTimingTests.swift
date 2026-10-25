@@ -119,13 +119,13 @@ func realAmigaLHAArchiveListsPrefixLedModule() async throws {
 }
 
 @Test(
-    "A real seekable UAC SPC member decodes through VGMBoy without a playback file",
+    "A real seekable UAC SPC member is prepared by VGMBoy",
     .enabled(
         if: ProcessInfo.processInfo.environment["COCOASPICE_REAL_SPC_UAC"] != nil,
         "Set COCOASPICE_REAL_SPC_UAC to run the real UAC-to-SPC playback check."
     )
 )
-func realSPCUACMemberStreamsIntoVGMBoyWithoutMaterialization() throws {
+func realSPCUACMemberUsesVGMBoyPreparation() throws {
     let packagePath = try #require(ProcessInfo.processInfo.environment["COCOASPICE_REAL_SPC_UAC"])
     let archiveURL = URL(fileURLWithPath: packagePath).standardizedFileURL
     let memberPath = "variants/original/ssf2-01.spc"
@@ -136,36 +136,14 @@ func realSPCUACMemberStreamsIntoVGMBoyWithoutMaterialization() throws {
     #expect(listedPaths.contains(memberPath))
     #expect(try ZipArchiveSupport.scanSignature(for: archiveURL)?.hasPrefix("uac-manifest-sha256:") == true)
 
-    let track = TrackItem(archiveURL: archiveURL, entryPath: memberPath)
-    let maybeMemberData = try ZipArchiveSupport.seekableUACSPCData(for: track)
-    let memberData = try #require(maybeMemberData)
-    #expect(memberData.count > 65_000)
-
     let controller = PlaybackController()
-    let loaded = controller.loadInMemory(
-        sourceData: memberData,
-        payload: PlaybackControlPayload(
-            path: memberPath,
-            trackIndex: 0,
-            tempo: 1,
-            playbackMode: .fileDefault,
-            fadeMilliseconds: 0
-        )
-    )
+    let loaded = controller.perform(.init(command: .load, payload: .init(
+        path: archiveURL.path, archiveEntry: memberPath,
+        trackIndex: 0, tempo: 1, playbackMode: .fileDefault, fadeMilliseconds: 0
+    )))
     #expect(loaded.kind == .response)
     #expect(loaded.status?.errorMessage == nil)
     _ = controller.perform(.init(command: .stop))
-
-    let decoder = try GMEDecoder(data: memberData)
-    defer { decoder.close() }
-
-    #expect(decoder.trackCount > 0)
-    try decoder.startTrack(0)
-    let metadata = try decoder.metadata(for: 0)
-    #expect(metadata.lengthMs > 0 || metadata.playMs > 0)
-    let frames = decoder.readFrames(44_100)
-    #expect(frames.left.count == 44_100)
-    #expect(frames.left.contains(where: { $0 != 0 }) || frames.right.contains(where: { $0 != 0 }))
 }
 
 @Test func droppedZipImportCreatesArchiveTracks() async throws {
