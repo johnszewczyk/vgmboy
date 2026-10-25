@@ -49,6 +49,10 @@ estimate width from a sample. Keep an ordered `<colgroup>` on both header and
 body tables so virtual-row spacer cells cannot change body column widths.
 Invalidate auto-size when column visibility changes so newly shown content is
 measured before it is displayed.
+Copy Year and Dumper from the native playlist-row projection into the track
+model; hints alone can keep an empty column visible without rendering values.
+Measure Path from its displayed root-relative values and do not stretch it to
+fill unused pane width.
 
 ## Trusted web content
 
