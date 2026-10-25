@@ -53,7 +53,7 @@ SB2's shared animated selector and custom range-control motion.
 ## Portable player presentation
 
 `Sources/SB2/Resources/sb-presentation.{css,js}` is the canonical source for
-bottom scroll fades, the playing-bar icon animation, and FLIP column reorder
+rendered text measurement, bottom scroll fades, the playing-bar icon animation, and FLIP column reorder
 motion. SB2 and SBONLINE supply their own DOM adapters and persistence; the
 shared module must remain free of audio/catalog/account logic. Reorders update
 all cached local playlist rows, including detached virtual rows.
