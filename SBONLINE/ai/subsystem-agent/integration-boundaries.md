@@ -16,27 +16,22 @@ playback family and MathBook private site.
 - VGMBoy owns shared playback admission, archive/source preparation, decoder
   source, and timing. Its `VGMBoyArchiveCore` accepts the original source plus
   selected member and prepares playable input in the core.
-- VGMBoy now exposes an initial `vgmboy-prepare <archive> <member>` executable
-  bridge that emits the selected prepared member on stdout. The executable
-  builds on the local macOS host, but a Linux build/runtime package has not yet
-  been verified.
-- MathBook's source now has an adapter at `accounts/vgmboy_prepare.py` and
-  calls it when the packaged executable is present. MathBook's deployment
-  stages a Linux artifact at `ops/server/artifacts/vgmboy-prepare` and installs
-  it at the persistent host path `/opt/precalc-admin/bin/vgmboy-prepare`,
-  outside the app release tree. Until that artifact is built and installed,
-  the existing selected-member/UAC extractor remains a compatibility fallback.
-  The production site has not been deployed with this adapter. The adapter
-  forwards configured `tar`, `zstd`, and `7z` tool paths to VGMBoy's host-tool
-  settings. The site's `private-admin/streaming/` libvgm bridge is a deployment
-  source copy whose upstream commit and mapping are recorded in `UPSTREAM.md`;
-  it does not receive VGMBoy changes automatically.
-- Keep the hosted integration limited to Django authentication, catalog
-  metadata, quotas, HTTP streaming, and the Linux AAC/PCM host adapter. Before
-  switching production, package and verify the VGMBoy executable for Linux,
-  then have MathBook invoke it instead of maintaining archive behavior in
-  parallel. Decoder parity remains a separate future boundary; the current
-  Linux streamer still owns PCM decoding.
+- Hosted source preparation uses VGMBoy's Linux `vgmboy-prepare` process bridge.
+  MathBook's `accounts/vgmboy_prepare.py` passes the selected original
+  archive/member, configured archive tools and request-owned scratch directory.
+  The old independent UAC/ZIP/7z playback extractor has been removed. Missing
+  runtimes and failed preparation are explicit failures; do not add a fallback.
+- The manual `vgmboy-prepare-linux.yml` workflow builds on Ubuntu 24.04 x86_64.
+  MathBook stages its `vgmboy-prepare-linux.tar.gz` artifact and installs immutable
+  runtime versions under `/opt/precalc-admin/lib/vgmboy-prepare/`. The persistent
+  wrapper `/opt/precalc-admin/bin/vgmboy-prepare` switches atomically. Source
+  revision and artifact digest identify the installed package; no Swift compiler
+  is installed on the production host. App deployments retain this runtime.
+- Django owns authentication, catalog validation, quotas, HTTP streaming and
+  AAC delivery. Its bounded adapter limits helper output and lifetime and
+  reclaims nested tools/scratch on failure. The Linux PCM decoder remains in
+  `private-admin/streaming/`; pinned upstream sources are recorded in
+  `UPSTREAM.md`. Shared preparation does not imply a full native decoder port.
 - ScanSong is the catalog writer. SBONLINE consumes only the published catalog.
 
 ## Invariants
@@ -47,9 +42,8 @@ playback family and MathBook private site.
 - Keep source music compressed on the server. Materialize a selected member
   only for a playback request and stream AAC directly to the browser; do not
   create per-track AAC files or an extracted playback tree.
-- Do not extend MathBook's compatibility archive extractor or parallel decoder
-  implementation for new VGMBoy behavior. Remove the extraction fallback after
-  the Linux executable is packaged and production playback is verified.
+- Archive preparation changes belong in VGMBoy and require a new Linux runtime
+  artifact. Do not recreate an archive extractor inside the hosted adapter.
 - Return hosted track identifiers and display metadata to the browser; keep
   package paths and archive member paths server-side.
 - Do not copy the production implementation into this folder while MathBook
