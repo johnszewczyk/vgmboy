@@ -678,6 +678,10 @@ body.options-window .tool-button:hover {
   font-size: calc(var(--playlist-font-size-pt) * 1pt);
 }
 
+.playlist-table col {
+  transition: width var(--column-resize-duration) var(--column-resize-easing);
+}
+
 .playlist-header-table {
   background: transparent;
 }
@@ -726,6 +730,7 @@ body.options-window .tool-button:hover {
 /* Pointer resizing writes once per display frame. Keep the dragged seam
    directly under the pointer; configured width easing resumes on release. */
 body.playlist-columns-resizing .playlist-table,
+body.playlist-columns-resizing .playlist-table col,
 body.playlist-columns-resizing .playlist-table th,
 body.playlist-columns-resizing .playlist-table td {
   transition: none;
