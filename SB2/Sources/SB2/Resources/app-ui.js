@@ -3381,9 +3381,9 @@ function showColumnMenu(event) {
         checkbox.checked = true;
       }
       persistSettings();
-      // Visibility changes must be immediate. Full content measurement belongs
-      // to playlist population or an explicit header-seam auto-size action.
-      autoSizedPlaylistSignature = playlistAutoSizeSignature();
+      // The visible set changes the required widths. Leave sizing invalidated
+      // so the next playlist render measures every newly visible column.
+      autoSizedPlaylistSignature = null;
       closeColumnMenu();
       renderPlaylistHeader();
       renderPlaylist();
@@ -4083,8 +4083,8 @@ function renderPlaylist({ sort = true, persistTab = true } = {}) {
       .then((didSort) => { if (didSort) renderPlaylist({ sort: false }); })
       .catch((error) => console.error(error));
   }
-  // columnContentWidth uses catalog hints or a bounded sample, so virtualized
-  // playlists can still fit their columns without mounting every row.
+  // Catalog hints cover full projections; playlists without hints are measured
+  // from their complete in-memory content without mounting every row.
   const playlistSignature = playlistAutoSizeSignature();
   const shouldAutoSize = columnResizePointerId === null
     && state.columnAutoSize
