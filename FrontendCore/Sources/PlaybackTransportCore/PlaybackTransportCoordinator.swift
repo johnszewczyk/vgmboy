@@ -121,16 +121,15 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
     }
 
     /// Builds the common transport input while preserving archive/member
-    /// identity for VGMBoy's source-preparation boundary. `resolvedPath` stays
-    /// available for callers that already have a direct playable path.
+    /// identity for VGMBoy's source-preparation boundary. Frontends cannot
+    /// substitute a pre-extracted cache path for the selected source.
     public func continuationStart(
-        resolvedPath: String? = nil,
         requestID: Int
     ) throws -> PlaybackContinuationStart {
         let archiveSourcePath = archivePath.flatMap { $0.isEmpty ? nil : $0 }
         let archiveMember = archiveEntry.flatMap { $0.isEmpty ? nil : $0 }
         let usesArchiveMember = archiveSourcePath != nil && archiveMember != nil
-        let playbackPath = usesArchiveMember ? archiveSourcePath! : (resolvedPath ?? sourcePath)
+        let playbackPath = usesArchiveMember ? archiveSourcePath! : sourcePath
         guard !trackID.isEmpty, !sourcePath.isEmpty, !playbackPath.isEmpty else {
             throw PlaybackControlError.invalidPayload("Playback start requires a track ID and file path.")
         }

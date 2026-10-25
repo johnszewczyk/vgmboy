@@ -111,3 +111,7 @@
 
 - [VGMBoyPlaybackEngine.swift](../../Sources/CocoaSpice/App/VGMBoyPlaybackEngine.swift)
 - [PlayerViewModel.swift](../../Sources/CocoaSpice/App/PlayerViewModel.swift)
+
+The playback adapter does not release frontend scratch caches during transport
+changes and has no in-memory UAC/SPC preparation path. Source leases and selected
+SPC materialization are owned by VGMBoy; cache controls remain for browsing/art.

@@ -96,7 +96,6 @@ final class PlaybackEngine: @unchecked Sendable {
     func stopPlayback() async {
         await transport.stop()
         currentTrack = nil
-        ZipArchiveSupport.discardDisposablePlaybackMaterialization()
     }
 
     func stop() async { await stopPlayback() }
@@ -114,7 +113,6 @@ final class PlaybackEngine: @unchecked Sendable {
             playlistIDs: playlistIDs,
             repeatMode: repeatMode
         ) else { return nil }
-        ZipArchiveSupport.discardDisposablePlaybackMaterialization()
         currentTrack = nil
         return decision
     }
@@ -137,10 +135,7 @@ final class PlaybackEngine: @unchecked Sendable {
             repeatMode: repeatMode
         ) else { return nil }
 
-        // The completed native session is gone before archive extraction starts.
-        // This prevents a slow next-member materialization from replacing the
-        // lease for a still-playing decoder.
-        ZipArchiveSupport.discardDisposablePlaybackMaterialization()
+        // The core retires its previous source lease before replacement.
         currentTrack = nil
         guard case let .play(targetID) = decision.action, targetID == track.id else {
             return decision

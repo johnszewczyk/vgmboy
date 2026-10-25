@@ -105,3 +105,7 @@ startup contracts shared by the VGMMan player frontends.
 - `Sources/PlaybackTransportCore/`
 - `Sources/FrontendStartupCore/`
 - corresponding directories under `Tests/`
+
+Playback/export bridge requests preserve the original source/member identity.
+There is no resolved-cache-path override or deprecated AAC-export overload;
+VGMBoy owns preparation. Artwork and browse caches remain independent.

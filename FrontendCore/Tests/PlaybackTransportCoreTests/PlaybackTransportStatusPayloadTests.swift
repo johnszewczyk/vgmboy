@@ -82,7 +82,6 @@ func transportStartRequestKeepsStableIdentityAndTypedTimingAtTheBridge() throws 
     let decoded = try JSONDecoder().decode(PlaybackTransportStartRequest.self, from: encoded)
     let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
     let start = try request.continuationStart(
-        resolvedPath: "/cache/Game/07 - Start.spc",
         requestID: 12
     )
 
@@ -90,7 +89,9 @@ func transportStartRequestKeepsStableIdentityAndTypedTimingAtTheBridge() throws 
     #expect(object["trackId"] as? String == "catalog-track-7")
     #expect(object["trackID"] == nil)
     #expect(start.track.id == "catalog-track-7")
-    #expect(start.track.path == "/cache/Game/07 - Start.spc")
+    #expect(start.track.path == "/music/archive.zip")
+    #expect(start.payload.path == "/music/archive.zip")
+    #expect(start.payload.archiveEntry == "Game/07 - Start.spc")
     #expect(start.startMilliseconds == 1_250)
     #expect(start.payload.trackIndex == 2)
     #expect(start.payload.playbackMode == .timed)
@@ -189,13 +190,14 @@ func aacExportBridgeContractRetainsArchiveReferenceAndBuildsTheCoreRequest() thr
     let encoded = try JSONEncoder().encode(request)
     let decoded = try JSONDecoder().decode(PlaybackTransportAACExportRequest.self, from: encoded)
     let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
-    let coreRequest = try request.exportRequest(resolvedPath: "/cache/Game/Ending.spc")
+    let coreRequest = try request.exportRequest()
     let cancellation = PlaybackTransportAACExportCancellationRequest(id: "export-7")
 
     #expect(decoded == request)
     #expect(object["path"] as? String == "/music/archive.zip")
     #expect(object["sourcePath"] == nil)
-    #expect(coreRequest.sourcePath == "/cache/Game/Ending.spc")
+    #expect(coreRequest.sourcePath == "/music/archive.zip")
+    #expect(coreRequest.archiveEntry == "Game/Ending.spc")
     #expect(coreRequest.trackIndex == 2)
     #expect(coreRequest.outputDirectory.path == "/exports")
     #expect(coreRequest.filenameStem == "Ending")
