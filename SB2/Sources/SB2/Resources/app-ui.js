@@ -16,8 +16,6 @@ const metadataRefreshTrackIds = new Set();
 let columnMenu = null;
 let autoSizedPlaylistSignature = null;
 let playlistRenderGeneration = 0;
-let textMeasureContext = null;
-let playlistTextMeasureProbe = null;
 const displayedPathHintCache = new WeakMap();
 let columnMinimumWidths = new Map();
 let columnMinimumWidthsSignature = null;
@@ -3156,33 +3154,7 @@ function hasMeaningfulColumnContent(value) {
 }
 
 function measurePlaylistTextWidth(value, sourceStyle) {
-  if (!playlistTextMeasureProbe) {
-    playlistTextMeasureProbe = document.createElement("span");
-    Object.assign(playlistTextMeasureProbe.style, {
-      position: "fixed",
-      left: "-100000px",
-      top: "0",
-      display: "inline-block",
-      width: "max-content",
-      maxWidth: "none",
-      whiteSpace: "pre",
-      overflow: "visible",
-      visibility: "hidden",
-      lineHeight: "normal",
-      padding: "0",
-      border: "0"
-    });
-    document.body.appendChild(playlistTextMeasureProbe);
-  }
-  for (const property of [
-    "fontFamily", "fontSize", "fontWeight", "fontStyle", "fontStretch",
-    "fontVariant", "fontVariantLigatures", "fontVariantNumeric", "fontKerning",
-    "fontFeatureSettings", "fontVariationSettings", "letterSpacing", "textTransform"
-  ]) {
-    playlistTextMeasureProbe.style[property] = sourceStyle?.[property] || "";
-  }
-  playlistTextMeasureProbe.textContent = String(value ?? "");
-  return playlistTextMeasureProbe.getBoundingClientRect().width;
+  return window.SBPresentation.measureText(value, sourceStyle);
 }
 
 function playlistColumnContentHintKeys(columnId) {
@@ -3488,12 +3460,13 @@ function beginColumnResize(event, columnId, header) {
     });
   };
   const finish = (finishEvent) => {
-    if (finishEvent?.pointerId !== pointerId) return;
-    flushResize(Number.isFinite(finishEvent.clientX) ? finishEvent.clientX : pendingClientX);
+    if (finishEvent?.pointerId !== pointerId || columnResizePointerId !== pointerId) return;
+    flushResize(finishEvent.type === "pointerup" && Number.isFinite(finishEvent.clientX) ? finishEvent.clientX : pendingClientX);
     document.removeEventListener("pointermove", onMove);
     document.removeEventListener("pointerup", onUp);
     document.removeEventListener("pointercancel", finish);
-    handle?.releasePointerCapture?.(pointerId);
+    handle?.removeEventListener("lostpointercapture", finish);
+    if (handle?.hasPointerCapture?.(pointerId)) handle.releasePointerCapture(pointerId);
     columnResizePointerId = null;
     document.body.classList.remove("playlist-columns-resizing");
     const draggedWidth = state.columnWidths[columnId];
@@ -3507,22 +3480,20 @@ function beginColumnResize(event, columnId, header) {
   document.addEventListener("pointermove", onMove);
   document.addEventListener("pointerup", onUp);
   document.addEventListener("pointercancel", finish);
+  handle?.addEventListener("lostpointercapture", finish);
 }
 
 function columnContentWidth(columnId) {
   const header = refs.playlistHeaderRow.querySelector(`[data-column-id="${CSS.escape(columnId)}"]`);
   const column = COLUMN_DEFS.find((candidate) => candidate.id === columnId);
   if (!column) return 0;
-  textMeasureContext ||= document.createElement("canvas").getContext("2d");
   const headerLabel = header?.querySelector(".playlist-header-label");
   const headerStyle = getComputedStyle(headerLabel || header || refs.playlistHeaderTable);
   const renderedHeader = playlistColumnHeaderLabel(columnId);
-  textMeasureContext.font = `${headerStyle.fontWeight} ${headerStyle.fontSize} ${headerStyle.fontFamily}`;
   const headerWidth = measurePlaylistTextWidth(renderedHeader, headerStyle);
 
   const bodyCell = refs.playlistBody.querySelector(`[data-column-id="${CSS.escape(columnId)}"]`);
   const bodyStyle = getComputedStyle(bodyCell || refs.playlistBodyTable || refs.playlistBody);
-  textMeasureContext.font = `${bodyStyle.fontWeight} ${bodyStyle.fontSize} ${bodyStyle.fontFamily}`;
   const sharedHint = playlistColumnContentHint(columnId);
   // Measure the exact path text rendered by this frontend. The shared catalog
   // hint contains source paths, which can differ from the root-relative path
@@ -3553,12 +3524,11 @@ function columnContentWidth(columnId) {
       }
     }
   } else {
-    // Playlists without catalog hints are measured end to end so an outlier
-    // between sampled rows cannot leave its column clipped.
-    for (let rowIndex = 0; rowIndex < state.playlist.length; rowIndex += 1) {
-      const value = String(playlistColumnValue(state.playlist[rowIndex], column, rowIndex));
-      contentWidth = Math.max(contentWidth, textMeasureContext.measureText(value).width);
-    }
+    // Include every rendered value and the same typography used by the cells.
+    contentWidth = window.SBPresentation.measureTexts(
+      state.playlist.map((track, rowIndex) => playlistColumnValue(track, column, rowIndex)),
+      bodyStyle
+    );
   }
   const width = Math.max(headerWidth, contentWidth) + playlistColumnHorizontalPadding() + 1;
   return columnId === "favorite" || columnId === "index"
@@ -3584,7 +3554,6 @@ function columnHeaderContentWidth(columnId) {
 }
 
 function refreshColumnMinimumWidths(columns = orderedColumns()) {
-  textMeasureContext ||= document.createElement("canvas").getContext("2d");
   const styleSource = refs.playlistHeaderRow.querySelector(".playlist-header-label") || refs.playlistHeaderTable;
   const style = getComputedStyle(styleSource);
   const font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;

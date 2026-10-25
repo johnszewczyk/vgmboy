@@ -52,7 +52,10 @@ measured before it is displayed.
 Copy Year and Dumper from the native playlist-row projection into the track
 model; hints alone can keep an empty column visible without rendering values.
 Measure Path from its displayed root-relative values and do not stretch it to
-fill unused pane width.
+fill unused pane width. `SBPresentation.measureText(s)` owns rendered typography
+measurement for both SB2 and SBO, including transforms and font features. Its
+cache is bounded and invalidates on font load; no-hint playlists use batches of
+at most 256 probe nodes. Do not substitute canvas-only metrics for cell text.
 
 ## Trusted web content
 
