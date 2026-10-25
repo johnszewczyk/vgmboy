@@ -13,7 +13,8 @@ with tempfile.TemporaryDirectory(prefix="vgmboy-prepare-check-") as folder:
     expected = b"native-source-bytes\x00" * 256
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as source:
         source.writestr("Game/Track.spc", expected)
-    result = subprocess.run([binary, str(archive), "Game/Track.spc"], capture_output=True, check=True)
+    result = subprocess.run([binary, str(archive), "Game/Track.spc"], capture_output=True)
+    assert result.returncode == 0, result.stderr.decode(errors="replace")
     assert result.stdout == expected, "selected member bytes changed"
     for member in ("../escape.spc", "/escape.spc", "Game/missing.spc"):
         result = subprocess.run([binary, str(archive), member], capture_output=True)
