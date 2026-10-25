@@ -35,8 +35,10 @@ finite AAC export; it has no catalog, queue, or UI policy.
   cannot link `VGMBoyArchiveCore` in-process. It accepts the original archive
   path and selected member path, writes only prepared member bytes to stdout,
   and writes diagnostics to stderr. It uses the same `.selectedEntry`
-  materialization path as native playback. Its local macOS build is verified;
-  a Linux build and runtime package are not yet verified.
+  materialization path as native playback. The manual Ubuntu 24.04 workflow
+  packages the x86_64 executable and required Swift libraries with a source
+  revision. Selected ZIP bytes, traversal rejection and real hosted UAC byte
+  parity are verified on Linux. MathBook stages the runtime outside app releases.
 
 ## Invariants
 
@@ -59,8 +61,9 @@ finite AAC export; it has no catalog, queue, or UI policy.
   safety, preparation, and error semantics.
 - A foreign-host adapter must pass source/member identity to
   `vgmboy-prepare`; it must not implement its own archive or UAC extraction.
-  Package the executable for the target Linux runtime and verify its external
-  archive-tool configuration before switching the hosted player.
+  Supply the target host's archive-tool paths explicitly. Package the runtime
+  with `scripts/package-linux-prepare.sh` and verify selected-member bytes before
+  replacing a production helper. Do not install a Swift toolchain on the player host.
 
 ## Failure Boundaries
 
