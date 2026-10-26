@@ -70,6 +70,16 @@ in the SB2 home view.
   tabs. Loaded empty results are cached. Search filters those snapshots locally;
   switching tabs or entering search must not refresh Games, Files, or Gallery.
   Explicit Reload Library invalidates their generations.
+- Favorites and Recent are collection projections in the existing two-pane
+  workspace. Their sidebar contains only albums present in the collection,
+  grouped by system and ordered by first appearance in the playlist; selecting
+  an album scopes the playlist to that album. The collection shortcut clears
+  the scope. Favorites default to FavoriteStore insertion order (the existing
+  option can choose alphabetical order) and carry each row's
+  `addedAtMilliseconds`; Recent preserves newest-first history order and
+  carries each play's timestamp. The shared timestamp column is labeled Added
+  or Played by projection. Persist the unfiltered collection and selected album
+  with the workspace tab so tab restoration does not lose sibling albums.
 
 ## Album favorite margin
 

@@ -1117,7 +1117,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 game: (row["game"] as? String) ?? "",
                 author: (row["artist"] as? String) ?? (row["author"] as? String) ?? "",
                 system: (row["system"] as? String) ?? "",
-                playLengthMilliseconds: lengthMilliseconds
+                playLengthMilliseconds: lengthMilliseconds,
+                addedAtMilliseconds: (row["addedAtMilliseconds"] as? NSNumber)?.int64Value
             )
         }
     }
@@ -1159,6 +1160,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 "scanVersion": 0,
                 "lengthLabel": formatDuration(seconds),
                 "basePlaybackSeconds": seconds,
+                "addedAtMilliseconds": snapshot.addedAtMilliseconds.map { NSNumber(value: $0) } ?? NSNumber(value: 0),
                 "metadataLoaded": true
             ]
         }

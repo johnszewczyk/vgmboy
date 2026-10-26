@@ -436,6 +436,11 @@ refs.libraryDatabaseDefaultButton.addEventListener("click", () => {
 
 refs.favoriteHistoricalSortCheckbox.addEventListener("change", (event) => {
   state.favoriteSortOrder = event.target.checked ? "historical" : "alphabetical";
+  if (state.playlistTitle === "Favorites") {
+    state.playlistSortEnabled = event.target.checked;
+    state.sortColumn = event.target.checked ? "timestamp" : null;
+    state.sortDirection = "ascending";
+  }
   app.persistSettings();
   app.ui.refreshFavorites()
     .then(() => app.ui.renderAll())

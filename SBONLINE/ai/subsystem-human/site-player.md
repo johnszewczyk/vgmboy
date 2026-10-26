@@ -12,6 +12,12 @@ Phones retain the top playback bar, saved-tab strip, larger track targets, and
 responsive drawers. Desktop and phone site navigation retain the shared player.
 Interface options adjust playlist/sidebar font sizes and SB2-style motion timing.
 Site Favorites uses dense desktop rows and phone cards.
+On desktop, Favorites and Recent share the SB2 collection layout: the sidebar
+shows only albums represented in the collection, grouped by console; selecting
+an album scopes the playlist to its matching titles. Favorites are ordered by
+when items were added and expose an Added column. Recent remains newest-played
+first and labels the date column Played. The collection shortcut clears the
+album scope; pagination remains bounded.
 
 The toolbar uses the existing hosted player for previous/next, Play/Pause, Stop,
 EQ, Long Play, volume, queue, and Options. Stop resets the selected track to the

@@ -2061,6 +2061,9 @@ body.sb2-frontend .database-game-row {
   gap: 0;
   padding-left: calc(var(--sb-space-050) + 1rem + 2ch);
 }
+body.sb2-frontend .projection-album-row,
+body.sb2-frontend .projection-all-albums { padding-left: var(--sb-space-050); }
+body.sb2-frontend .projection-console-heading { color: var(--muted); cursor: default; }
 body.sb2-frontend .sidebar-resize-handle::before { background: #29303a; }
 body.sb2-frontend .tree-group { margin-left: var(--sb-space-075); padding-left: var(--sb-space-025); }
 body.sb2-frontend .database-console-games { padding-left: 0; padding-top: var(--item-spacing-px); }
