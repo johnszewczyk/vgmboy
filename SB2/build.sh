@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT_DIR"
 BUILD_DIR="${SB2_BUILD_DIR:-$ROOT_DIR/.build}"
 APP_DIR="${SB2_APP_DIR:-$BUILD_DIR/SPCBoy SB2.app}"
 BUNDLE_IDENTIFIER="com.john.spcboy.sb2"
