@@ -99,3 +99,10 @@
 
 Tab changes are saved during use. Closing a window or quitting waits for pending
 workspace and preference writes; a failed save leaves the window open.
+
+## Album sidebar actions
+
+Console-view albums have a right-aligned track count and an adjacent star button.
+The count follows the sidebar count setting. The star favorites all tracks in the
+album, fills when the entire album is favorited, and removes the group on the
+next click. Clicking the star does not select or play the album.

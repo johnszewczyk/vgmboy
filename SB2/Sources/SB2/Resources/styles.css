@@ -2683,3 +2683,11 @@ body.sb2-frontend .favorite-toggle .ui-icon { width: var(--sb-playlist-font-size
 
 /* One status typography for library counts, state and playback clock. */
 body.sb2-frontend .sb-status :is(.sb-sidebar-stats,.sb-status-state,.sb-times) { color: #858aa7; font: var(--sb-playlist-font-size)/1 var(--mono-font-family); letter-spacing: .08em; text-transform: uppercase; }
+
+/* Album actions share fixed margin columns; the title remains a separate button. */
+body.sb2-frontend .database-game-item { display: grid; grid-template-columns: minmax(0, 1fr) var(--sb-sidebar-font-size); align-items: center; gap: var(--sb-space-025); min-width: 0; }
+body.sb2-frontend .database-game-item:has(> .database-game-row.is-hidden) { display: none; }
+body.sb2-frontend .database-game-meta { min-width: 4ch; text-align: right; padding-left: 1ch; }
+body.sb2-frontend .database-album-favorite { display: grid; place-items: center; width: var(--sb-sidebar-font-size); height: var(--sb-sidebar-font-size); min-width: 0; padding: 0; font-size: var(--sb-sidebar-font-size); color: var(--sidebar-text-color); }
+body.sb2-frontend .database-album-favorite .ui-icon { width: 1em; height: 1em; transform: none; }
+body.sb2-frontend .database-album-favorite.is-favorite { color: var(--accent); }

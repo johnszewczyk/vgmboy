@@ -569,6 +569,7 @@ function invalidateDatabaseGames() {
   state.databaseFiles = [];
   state.databaseFileTree = [];
   state.databaseGames = [];
+  databaseAlbumTrackIDs.clear();
   state.databaseGameGroups = [];
   state.databaseSearchGames = null;
   rebuildDatabaseGameSearchIndex([]);
@@ -764,13 +765,44 @@ async function syncSidebarView() {
   return state.sidebarView;
 }
 
+const favoritePresentationIDs = new Set();
+let favoriteAlbumsByMetadata = new Map();
+const databaseAlbumFavoriteButtons = new Map();
+const databaseAlbumTrackIDs = new Map();
+
+function albumMetadataKey(game, system) {
+  return JSON.stringify([String(game || ""), String(system || "")]);
+}
+
+function syncDatabaseAlbumFavorite(button, game) {
+  const knownIDs = databaseAlbumTrackIDs.get(databaseGameKey(game));
+  const root = String(game.rootPath || "").replace(/\/+$/, "") + "/";
+  const matches = favoriteAlbumsByMetadata.get(albumMetadataKey(game.name, game.system)) || [];
+  const complete = knownIDs
+    ? knownIDs.length > 0 && knownIDs.every(id => favoritePresentationIDs.has(id))
+    : Number(game.trackCount) > 0 && matches.filter(track => String(track.archivePath || track.path || "").startsWith(root)).length >= Number(game.trackCount);
+  button.classList.toggle("is-favorite", complete);
+  button.setAttribute("aria-pressed", String(complete));
+  button.setAttribute("aria-label", `${complete ? "Remove" : "Add"} ${game.displayName || game.name} ${complete ? "from" : "to"} favorites`);
+  button.title = complete ? "Remove album from Favorites" : "Favorite entire album";
+}
+
 function applyFavoriteSnapshot(favorites) {
   state.favorites = Array.isArray(favorites) ? favorites : [];
   state.favoriteIds = state.favorites.map((track) => track.favoriteId).filter(Boolean);
+  favoritePresentationIDs.clear();
+  state.favoriteIds.forEach(id => favoritePresentationIDs.add(id));
+  favoriteAlbumsByMetadata = new Map();
+  for (const track of state.favorites) {
+    const key = albumMetadataKey(track.game, track.system);
+    if (!favoriteAlbumsByMetadata.has(key)) favoriteAlbumsByMetadata.set(key, []);
+    favoriteAlbumsByMetadata.get(key).push(track);
+  }
+  for (const { button, game } of databaseAlbumFavoriteButtons.values()) syncDatabaseAlbumFavorite(button, game);
 }
 
 function isFavoritePresentation(track) {
-  return Boolean(track?.favoriteId) && state.favoriteIds.includes(track.favoriteId);
+  return Boolean(track?.favoriteId) && favoritePresentationIDs.has(track.favoriteId);
 }
 
 async function refreshFavorites() {
@@ -1104,6 +1136,7 @@ function escapeHtml(value) {
 }
 
 function resetSidebarContent() {
+  databaseAlbumFavoriteButtons.clear();
   databaseRowRenderGeneration += 1;
   databaseSearchVisibilityGeneration += 1;
   if (databaseSearchVisibilityFrame) window.cancelAnimationFrame(databaseSearchVisibilityFrame);
@@ -2016,7 +2049,7 @@ function makeDatabaseGameButton(game) {
   }
   button.dataset.databaseGameKey = databaseGameKey(game);
   button.dataset.searchText = String(game.searchText || `${game.name} ${game.rootName || ""}`).toLowerCase();
-  button.insertAdjacentHTML("beforeend", `<span class="database-indent" aria-hidden="true"></span><span class="database-game-name">${escapeHtml(game.displayName || game.name)}</span>${state.sidebarPathCounts ? `<span class="database-game-meta">${game.trackCount}</span>` : ""}`);
+  button.insertAdjacentHTML("beforeend", `<span class="database-indent" aria-hidden="true"></span><span class="database-game-name">${escapeHtml(game.displayName || game.name)}</span><span class="database-game-meta${state.sidebarPathCounts ? "" : " is-hidden"}">${game.trackCount}</span>`);
   button.addEventListener("click", (event) => {
     if (event.detail > 1) return;
     selectDatabaseSidebarRow(button, { focus: true, preview: !isGalleryActive() });
@@ -2087,6 +2120,35 @@ function makeDatabaseGameButton(game) {
       }]
     ]);
   });
+  const item = document.createElement("div");
+  item.className = "database-game-item";
+  const favorite = document.createElement("button");
+  favorite.type = "button";
+  favorite.className = "favorite-toggle database-album-favorite";
+  favorite.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="#icon-star"></use></svg>';
+  syncDatabaseAlbumFavorite(favorite, game);
+  databaseAlbumFavoriteButtons.set(databaseGameKey(game), { button: favorite, game });
+  favorite.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    if (favorite.disabled) return;
+    favorite.disabled = true;
+    try {
+      const rows = await window.spcBoySB2.databaseGameTracks([game]);
+      if (rows?.stale === true) return;
+      const tracks = databaseRowsToPlaylistTracks(rows, { adoptProjection: false });
+      databaseAlbumTrackIDs.set(databaseGameKey(game), tracks.map(track => track.favoriteId).filter(Boolean));
+      await toggleFavorites(tracks);
+      refreshPlaylistFavoriteRows();
+    } catch (error) {
+      reportDatabaseSidebarError("update album favorites", error);
+    } finally {
+      favorite.disabled = false;
+      syncDatabaseAlbumFavorite(favorite, game);
+    }
+  });
+  item.append(button, favorite);
+  // Selection/navigation continues to target the label button, never a nested control.
+  button.albumSidebarItem = item;
   return button;
 }
 
@@ -2103,7 +2165,7 @@ function appendDatabaseGameRowsInBatches() {
     while (offset < pendingRows.length && performance.now() - startedAt < 8) {
       const { games, game } = pendingRows[offset++];
       const button = makeDatabaseGameButton(game);
-      games.appendChild(button);
+      games.appendChild(button.albumSidebarItem || button);
       databaseGameButtons.push(button);
       databaseGameButtonsByID.set(databaseGameKey(game), button);
     }
@@ -4698,7 +4760,7 @@ function setSidebarMonospace(enabled) {
 function setSidebarPathCounts(enabled) {
   state.sidebarPathCounts = Boolean(enabled);
   persistSettings();
-  renderedDatabaseGames = null;
+  for (const count of refs.treeRoot.querySelectorAll(".database-game-meta")) count.classList.toggle("is-hidden", !state.sidebarPathCounts);
   renderSidebar();
 }
 
