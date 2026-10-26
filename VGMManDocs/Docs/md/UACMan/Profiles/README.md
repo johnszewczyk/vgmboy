@@ -9,14 +9,15 @@ and required checks. The base profile defines the shared UACMan, MetaMan,
 ScanSong, Songbase, and dashboard contract; a format profile records only its
 application-specific differences.
 
-These profiles are input rules for constructing and reviewing UAC packages;
-they are not ROM-set inventory or completeness protocols. AudioMan owns
-source-set membership, No-Intro matching, source-tree locations, and ROM/game
-set reports. For each conversion, actual UAC tag coverage, package counts,
-exceptions, and completed changes belong in AudioMan's per-set UAC dashboard.
-Dated field evidence belongs in `UACMan/ai/reports/`; published profile
-pages carry reusable format mappings. Do not use reports as duplicate status
-for a live UAC set.
+These profiles define source-format parsing and UAC metadata mappings; they are
+not ROM-set inventory or completeness protocols. AudioMan owns source-set
+membership, No-Intro matching, source-tree locations, and ROM/game set reports.
+Existing UACs can be filtered and compared from their embedded metadata and
+hashes without waiting for every reader profile to be complete. The profiles
+are the subgoal for making new packages and richer metadata extraction
+consistent across the major file types. Actual tag coverage and package
+disposition belong in AudioMan's per-set reports. Dated field evidence belongs
+in `UACMan/ai/reports/`; published profile pages carry reusable mappings.
 
 Platform identity uses one canonical package-level value. Apply the approved
 names and source-label mappings in [`PLATFORMS.md`](PLATFORMS.md).
@@ -34,7 +35,7 @@ been reviewed.
 | `ay` | Profile pending | AY subtune and timing behavior needs UAC mapping. |
 | `sap` | Profile pending | SAP header directives, songs, and timings need UAC mapping. |
 | `nsf` | Proposed; conversion held | See [`NSF.md`](NSF.md); MetaMan M3U parsing and fallback-timing fixes are required before UAC creation. |
-| `gbs` | Reader/writer/consumer mappings aligned; package review pending | See [`GBS.md`](GBS.md); header identity stays at package scope; each logical track carries `Format` and one nested `M3U` value. Only authored positive timing is projected. Review a packaged fixture in UACMan, ScanSong, and Songbase before approving production conversion. |
+| `gbs` | Reader/writer/consumer mappings aligned; package review pending | See [`GBS.md`](GBS.md); header identity stays at package scope; each logical track carries `Format`, source index, and approved title/order. M3Us remain byte-exact attachments; timing is not surfaced. Review a packaged fixture in UACMan, ScanSong, and Songbase before approving production conversion. |
 | `nsfe` | Profile pending | Separate from NSF; excluded from the current JoshW NSF profile. |
 | `hes` | Draft profile | See [`HES.md`](HES.md); fixture validation pending. |
 | `sndh` | Profile pending | Document subtune and timing projection. |
@@ -44,7 +45,7 @@ been reviewed.
 | `mdx` | Profile pending | Document Shift-JIS title and PDX dependency. |
 | `mod-protracker` | Profile pending | Document recognized MOD dialect boundaries. |
 | `uac` | Wrapper profile | Container manifest reader; use the UAC wrapper contract, not a native-audio conversion profile. |
-| `psf-family` | Profile pending | Document PSF, PSF2, SSF, USF, and 2SF tags and dependencies. |
+| `psf-family` | Profile complete for USF; others pending | See [`USF.md`](USF.md) for Nintendo 64. USF has a real-source UAC fixture and a validated 389-package header/tag scan; source-set conversion remains pending. PSF, PSF2, SSF, and 2SF are pending. |
 | `gsf` | Profile pending | Document tags, PSFLib dependencies, and GBA header facts. |
 | `qsf` | Profile pending | Document tags, QSound blocks, and QSFLib dependencies. |
 | `spc` | Profile complete | See [`SPC.md`](SPC.md); live set coverage and tag outcomes are reported by AudioMan per set. |
@@ -72,6 +73,19 @@ been reviewed.
 | `agsc` | Profile pending | Document AGSC header and sequence facts. |
 | `genh` | Profile pending | Document GENH-derived fields and external configuration. |
 | `standard-audio` | Profile pending | Document each supported codec and selected canonical-field projection. |
+
+## Completion goal
+
+Complete a reusable profile for every major native game-audio reader in
+`MetaManCore.supportedFormats`, then finish the remaining console-derived and
+standard audio readers. Work first on formats already represented in
+AudioMan's Garden and Master collections. Keep this register current as each
+profile advances. A complete profile states the reader and version facts,
+package/member/asset roles, field mappings and scope, dependency or playlist
+rules, preservation limits, and only the checks supported by recorded format
+evidence. Keep unknown fields unknown; do not claim a profile or fixture is
+validated when the evidence has not been recorded. This backlog does not block
+fast matching or metadata tagging of existing UACs.
 
 ## Profile and report workflow
 
@@ -135,10 +149,12 @@ in `sources[]`; profile a direct metadata field only when it is useful to UAC
 users.
 
 For No-Intro-backed identities, package **Game ID** is the canonical displayed
-game-root title string. The numeric DAT `dat_id` is an internal AudioMan join
-key and must not be copied into UAC metadata or structural canonical-ID arrays.
-The title root identifies the game, not a region or revision; retain
-source-backed **Region** separately.
+game-root title string. The numeric DAT `dat_id` is an internal join key held
+by AudioMan's Museum reference-DAT catalog; do not copy it into UAC metadata or
+structural canonical-ID arrays. The title root identifies the game, not a
+region or revision. Set package **Region** to a supported territory or `--`
+when the fast title/system filter leaves territory unknown. Keep `--` out of
+filenames.
 
 ## Set-Based Profiles
 
