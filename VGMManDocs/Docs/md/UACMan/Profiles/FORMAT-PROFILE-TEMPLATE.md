@@ -8,7 +8,7 @@ to reader-supported source fields, format-specific procedures, and checks.
 - **Reader** — MetaManCore reader ID and implementation.
 - **Source members** — Supported extensions and companion files.
 - **Coverage** — Supported variants and known limits.
-- **Status** — Draft or approved; include an approval reference when available.
+- **Status** — Mapping documented or draft; state fixture/package approval separately and cite evidence when approved.
 
 ## Field Mapping
 

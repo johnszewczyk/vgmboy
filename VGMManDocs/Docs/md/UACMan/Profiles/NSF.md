@@ -14,11 +14,15 @@ playlist rows follow the
 
 - **Reader** — MetaMan reads the fixed NSF header and NSFPlay extended-M3U
   rows. UACMan projects those rows into its native playlist entries.
-- **Members** — One physical `.nsf`, its applicable byte-exact `.m3u`
+- **Source members** — One physical `.nsf`, its applicable byte-exact `.m3u`
   playlists, and any useful source documents belonging to that NSF.
+- **Coverage** — Fixed-header identity and version, ordered M3U songs, authored
+  titles and timing, package credits, and exact playlist-source retention.
 - **Track model** — Store the physical NSF once; represent its songs as
   ordered playlist entries pointing to that member. Never fabricate a
   separate audio file for a subsong.
+- **Status** — Mapping documented. Fixture and package approval remain
+  separate; use the checks below before approving a new conversion.
 
 ## Field Mapping
 
