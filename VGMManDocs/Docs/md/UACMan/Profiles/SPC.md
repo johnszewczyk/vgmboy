@@ -12,8 +12,9 @@ ID666 and xID6 metadata without starting an emulator. See
 - **Source members** — `.spc`.
 - **Coverage** — Populated ID666 and xID6 fields; xID6 takes precedence when
   both blocks provide the same field.
-- **Status** — Approved against collection fixtures; set-specific findings
-  remain in dated reports.
+- **Status** — The source `Game` field is retained as `Game Title`, distinct
+  from canonical `Game ID`. Recheck the UAC projection fixture before approving
+  new bulk conversions; older manifests may retain the former `Album` mapping.
 
 ## Field Mapping
 
@@ -23,24 +24,32 @@ sub-container and version together, such as `SPC v.30` or `SPC v.10`.
 
 | Source Tag | UAC Tag | UAC Coded Tag | Tag Notes |
 | --- | --- | --- | --- |
-| ID666/xID6 `Game` | Album | `members[].metadata["Album"]` or `playlists[].entries[].extraFields["Album"]` | Preserve the source game name on each corresponding track. Do not substitute package identity or a database title. |
+| ID666/xID6 `Game` | Game Title | `members[].metadata["Game Title"]` or `playlists[].entries[].extraFields["Game Title"]` | Preserve the source game name on its corresponding track. Keep it distinct from package `Game ID`; do not map it to Album. |
 | ID666/xID6 `Song` | Title | `members[].metadata["Title"]` | Title for this SPC member. |
 | xID6 `0x10` `Official Soundtrack Title` | OST Title | `members[].metadata["OST Title"]` | Distinct soundtrack title. |
 | xID6 `0x11` `OST Disc` | Disc Number | `members[].metadata["Disc Number"]` | Soundtrack disc index. |
-| xID6 `0x12` `OST Track` | — | — | Do not expose this encoded source code as Track Number; use the established member/file order for visible Track Number. |
-| ID666/xID6 `Artist` | Artist | `members[].metadata["Artist"]` or `playlists[].entries[].extraFields["Artist"]` | Preserve the populated source value on its track, even when repeated across tracks. |
+| xID6 `0x12` `OST Track` | — | — | Keep the raw value in the unchanged SPC member. It is not the visible Track Number; use established member/file order for that value. |
+| ID666/xID6 `Artist` | Artist / Album Artist | `members[].metadata["Artist"]` or `game.metadata["Album Artist"]` | Keep track-specific values on members. Promote a unanimous non-empty value to package `Album Artist` and remove matching member copies. |
 | ID666/xID6 `Dumper` | Dumper | `members[].metadata["Dumper"]` or `playlists[].entries[].extraFields["Dumper"]` | Preserve the populated source value on its track; prefer the full xID6 value over a shortened duplicate ID666 value. |
 | xID6 `Publisher` | Publisher | `members[].metadata["Publisher"]` or `playlists[].entries[].extraFields["Publisher"]` | Preserve the populated source value on its track. |
 | SPC source `Developer` | Developer | `members[].metadata["Developer"]` or `playlists[].entries[].extraFields["Developer"]` | Preserve only when present in source metadata; do not infer it from Publisher. |
-| ID666/xID6 `Comment` | Comment | `members[].metadata["Comment"]` or `playlists[].entries[].extraFields["Comment"]` | Preserve a populated source comment on its track; omit blanks. |
-| ID666/xID6 `Date` | Date | `members[].metadata["Date"]` or `playlists[].entries[].extraFields["Date"]` | Preserve the explicit source date on its track. |
-| xID6 `0x14` `Copyright Year` | Year | `members[].metadata["Year"]` or `playlists[].entries[].extraFields["Year"]` | Preserve the source copyright year on its track. |
+| ID666/xID6 `Comment` | Comment | `members[].metadata["Comment"]` or `game.metadata["Comment"]` | Keep track-level values when they differ or are incomplete. Promote only a unanimous non-empty value. |
+| ID666/xID6 `Date` | Date | `members[].metadata["Date"]` or `game.metadata["Date"]` | Keep track-level values when they differ or are incomplete. Promote only a unanimous non-empty value. |
+| xID6 `0x14` `Copyright Year` | Year | `members[].metadata["Year"]` or `game.metadata["Year"]` | Keep track-level values when they differ or are incomplete. Promote only a unanimous non-empty value. |
 | SPC revision byte | Format | `members[].metadata["Format"]` or `playlists[].entries[].extraFields["Format"]` | Store the actual version per track, including repeated `SPC v.30` and any valid `SPC v.10`; do not summarize it or treat a different version as a bad tag. |
 
 ## Format Procedures
 
 - **OST fields** — `OST Title`, `OST Disc`, and `OST Track` are defined xID6
   fields (`0x10`, `0x11`, and `0x12`), not arbitrary user-defined tags.
+  Preserve `OST Title` separately; never derive `Album` from `Game` or `OST
+  Title`. Keep xID6 `OST Track` as source bytes and use the established member
+  order for UAC `Track Number`.
+- **Shared metadata** — Promote `Artist` to package `Album Artist` when every
+  SPC agrees. Promote `Date`, `Year`, `Genre`, `Comment`, `Copyright`, and
+  `Encoded By` only when every track has the same populated value. Remove
+  matching member copies after promotion; retain differing or partially
+  populated values at member scope.
 - **No-Intro title snaps** — For a positively identified SNES release with an
   unambiguous matching image in the selected No-Intro title-snap pack, retain
   the PNG byte-for-byte as an ordinary `asset` member with format `png` and

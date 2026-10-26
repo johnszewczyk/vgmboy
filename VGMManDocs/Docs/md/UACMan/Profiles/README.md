@@ -49,7 +49,7 @@ been reviewed.
 | `psf-family` | Shared mapping documented; extension review pending | See [PSF family](PSF-FAMILY.md) and [USF](USF.md). Existing USF fixture and scan evidence is recorded there; source-set conversion remains pending. |
 | `gsf` | Mapping documented; fixture review pending | See [GSF profile](GSF.md). |
 | `qsf` | Mapping documented; fixture review pending | See [QSF profile](QSF.md). |
-| `spc` | Profile complete | See [`SPC.md`](SPC.md); live set coverage and tag outcomes are reported by AudioMan per set. |
+| `spc` | Mapping updated; projection fixture review pending | See [`SPC.md`](SPC.md); source `Game` is `Game Title`, and xID6 `OST Track` is not UAC `Track Number`. Older manifest cleanup remains a separate AudioMan operation. |
 | `sid` | Mapping documented; fixture review pending | See [SID profile](SID.md). |
 | `ape` | Mapping documented; fixture review pending | See [APE profile](APE.md). |
 | `adx` | Mapping documented; fixture review pending | See [console streams](CONSOLE-STREAMS.md). |

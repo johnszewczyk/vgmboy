@@ -21,6 +21,7 @@ import UACWrapperCore
     #expect(projection.memberFields["nativeMetadata"] == nil)
     #expect(projection.memberFields["Intro Length (ms)"] == .integer(1200))
     #expect(projection.memberFields["Game"] == nil)
+    #expect(projection.memberFields["Game Title"] == .string("Game"))
     #expect(projection.memberFields["System"] == nil)
     #expect(projection.memberFields["Album"] == nil)
     #expect(projection.sharedCandidates["Album"] == nil)
@@ -47,13 +48,13 @@ import UACWrapperCore
     #expect(!result.conflicts.contains("Album"))
 }
 
-@Test func spcOstTrackBecomesTrackNumber() {
+@Test func spcOstTrackCodeIsNotTrackNumber() {
     let document = MetadataDocument(
         format: "spc",
         fields: MetadataFields(),
         technicalFacts: ["soundtrackTrack": "0007"]
     )
-    #expect(SPCMetadataProjector.project(document).memberFields["Track Number"] == .integer(7))
+    #expect(SPCMetadataProjector.project(document).memberFields["Track Number"] == nil)
 }
 
 @Test func spcImportKeepsManualFieldsAndPromotesSharedMetadataWithoutDuplication() throws {
