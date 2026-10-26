@@ -10,6 +10,7 @@ public struct FavoriteTrackSnapshot: Codable, Equatable, Sendable {
     public let author: String
     public let system: String
     public let playLengthMilliseconds: Int
+    public let addedAtMilliseconds: Int64?
 
     public init(
         identity: FavoriteTrackIdentity,
@@ -18,7 +19,8 @@ public struct FavoriteTrackSnapshot: Codable, Equatable, Sendable {
         game: String = "",
         author: String = "",
         system: String = "",
-        playLengthMilliseconds: Int = 0
+        playLengthMilliseconds: Int = 0,
+        addedAtMilliseconds: Int64? = nil
     ) {
         self.identity = identity
         self.filename = filename
@@ -27,6 +29,17 @@ public struct FavoriteTrackSnapshot: Codable, Equatable, Sendable {
         self.author = author
         self.system = system
         self.playLengthMilliseconds = max(0, playLengthMilliseconds)
+        self.addedAtMilliseconds = addedAtMilliseconds
+    }
+
+    fileprivate func hasSameTrackMetadata(as other: FavoriteTrackSnapshot) -> Bool {
+        identity == other.identity
+            && filename == other.filename
+            && title == other.title
+            && game == other.game
+            && author == other.author
+            && system == other.system
+            && playLengthMilliseconds == other.playLengthMilliseconds
     }
 }
 
@@ -141,7 +154,7 @@ public enum FavoriteStoreError: LocalizedError {
 /// Every operation opens a short-lived SQLite connection so no app owns a
 /// process-global writer. SQLite serializes mutations with BEGIN IMMEDIATE.
 public final class FavoriteStore: @unchecked Sendable {
-    public static let schemaVersion = 1
+    public static let schemaVersion = 2
     public let databaseURL: URL
 
     public init(databaseURL: URL = FavoriteStore.defaultDatabaseURL()) throws {
@@ -185,7 +198,7 @@ public final class FavoriteStore: @unchecked Sendable {
                 var nextPosition = try Self.nextPosition(handle)
                 for snapshot in unique {
                     if let existing = try Self.snapshot(handle, id: snapshot.identity.id) {
-                        if existing != snapshot {
+                        if !existing.hasSameTrackMetadata(as: snapshot) {
                             try Self.updateSnapshot(handle, snapshot)
                             changed = true
                         }
@@ -268,17 +281,23 @@ public final class FavoriteStore: @unchecked Sendable {
                         author TEXT NOT NULL,
                         system TEXT NOT NULL,
                         play_length_ms INTEGER NOT NULL CHECK(play_length_ms >= 0),
-                        position INTEGER NOT NULL UNIQUE
+                        position INTEGER NOT NULL UNIQUE,
+                        added_at_ms INTEGER NOT NULL DEFAULT 0
                     );
                     """)
                 try setMetadataInt(handle, key: "schema_version", value: Int64(schemaVersion))
                 try setMetadataInt(handle, key: "revision", value: 0)
             }
+        } else if version == 1 {
+            try transaction(handle) {
+                try execute(handle, "ALTER TABLE favorite_tracks ADD COLUMN added_at_ms INTEGER NOT NULL DEFAULT 0;")
+                try setMetadataInt(handle, key: "schema_version", value: Int64(schemaVersion))
+            }
         }
     }
 
     private static func readSnapshots(_ handle: OpaquePointer) throws -> [FavoriteTrackSnapshot] {
-        let statement = try prepare(handle, "SELECT source_path, archive_entry, track_index, track_count, filename, title, game, author, system, play_length_ms FROM favorite_tracks ORDER BY position;")
+        let statement = try prepare(handle, "SELECT source_path, archive_entry, track_index, track_count, filename, title, game, author, system, play_length_ms, added_at_ms FROM favorite_tracks ORDER BY position;")
         defer { sqlite3_finalize(statement) }
         var result: [FavoriteTrackSnapshot] = []
         while sqlite3_step(statement) == SQLITE_ROW {
@@ -294,7 +313,8 @@ public final class FavoriteStore: @unchecked Sendable {
                 game: text(statement, 6),
                 author: text(statement, 7),
                 system: text(statement, 8),
-                playLengthMilliseconds: Int(sqlite3_column_int64(statement, 9))
+                playLengthMilliseconds: Int(sqlite3_column_int64(statement, 9)),
+                addedAtMilliseconds: sqlite3_column_int64(statement, 10) > 0 ? sqlite3_column_int64(statement, 10) : nil
             ))
         }
         return result
@@ -313,7 +333,7 @@ public final class FavoriteStore: @unchecked Sendable {
     }
 
     private static func snapshot(_ handle: OpaquePointer, id: String) throws -> FavoriteTrackSnapshot? {
-        let statement = try prepare(handle, "SELECT source_path, archive_entry, track_index, track_count, filename, title, game, author, system, play_length_ms FROM favorite_tracks WHERE id=? LIMIT 1;")
+        let statement = try prepare(handle, "SELECT source_path, archive_entry, track_index, track_count, filename, title, game, author, system, play_length_ms, added_at_ms FROM favorite_tracks WHERE id=? LIMIT 1;")
         defer { sqlite3_finalize(statement) }
         bind(id, statement, 1)
         guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
@@ -329,7 +349,8 @@ public final class FavoriteStore: @unchecked Sendable {
             game: text(statement, 6),
             author: text(statement, 7),
             system: text(statement, 8),
-            playLengthMilliseconds: Int(sqlite3_column_int64(statement, 9))
+            playLengthMilliseconds: Int(sqlite3_column_int64(statement, 9)),
+            addedAtMilliseconds: sqlite3_column_int64(statement, 10) > 0 ? sqlite3_column_int64(statement, 10) : nil
         )
     }
 
@@ -341,7 +362,7 @@ public final class FavoriteStore: @unchecked Sendable {
     }
 
     private static func insertSnapshot(_ handle: OpaquePointer, _ snapshot: FavoriteTrackSnapshot, position: Int64) throws {
-        let statement = try prepare(handle, "INSERT INTO favorite_tracks (id, source_path, archive_entry, track_index, track_count, filename, title, game, author, system, play_length_ms, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);")
+        let statement = try prepare(handle, "INSERT INTO favorite_tracks (id, source_path, archive_entry, track_index, track_count, filename, title, game, author, system, play_length_ms, position, added_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);")
         defer { sqlite3_finalize(statement) }
         bind(snapshot.identity.id, statement, 1)
         bind(snapshot.identity.sourcePath, statement, 2)
@@ -355,6 +376,8 @@ public final class FavoriteStore: @unchecked Sendable {
         bind(snapshot.system, statement, 10)
         sqlite3_bind_int64(statement, 11, Int64(snapshot.playLengthMilliseconds))
         sqlite3_bind_int64(statement, 12, position)
+        let addedAt = snapshot.addedAtMilliseconds ?? Int64((Date().timeIntervalSince1970 * 1_000).rounded())
+        sqlite3_bind_int64(statement, 13, addedAt)
         guard sqlite3_step(statement) == SQLITE_DONE else { throw sqliteError(handle) }
     }
 
