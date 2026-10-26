@@ -12,8 +12,10 @@ The original Redump BIN/CUE remains the source of record.
 Use the declared Redump BIN and its matching CUE. Record the Redump release
 identity and URL plus the published checksums for the original BIN once in the
 package source record. Keep the original CUE as a byte-exact package member
-when making a UAC. Reuse exact-scope checksum records already in the database;
-do not add per-track hash arrays or repeat disc facts on each member. Do not
+when making a UAC. Reuse exact-scope checksums from the Redump/source inventory
+when available; keep the values in the UAC source record without copying
+UAC-embedded hashes into Songbase or the Museum. Do not add per-track hash
+arrays or repeat disc facts on each member. Do not
 infer loop points from a third-party rip, filename, or decoded waveform when
 the game has a native playback table.
 

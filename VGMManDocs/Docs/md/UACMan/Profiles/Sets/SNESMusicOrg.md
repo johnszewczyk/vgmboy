@@ -28,10 +28,11 @@ profile defines only how confirmed values are represented in UAC packages.
 - **Source archive** — The original `.rsn`; it contains SPC entries but is not
   itself a UAC member.
 - **Archive hashes** — Keep BLAKE3-256, CRC32/ISO-HDLC, SHA-1, and MD5 for
-  each complete source RSN in the permanent source-state database and the
-  package-level **Source .rsn Hashes** list. Repeat that exact four-item list
-  on every track extracted from the RSN, so each track carries a positive
-  source identity.
+  each complete source RSN in the package-level **Source .rsn Hashes** list.
+  Repeat that exact four-item list on every track extracted from the RSN, so
+  each track carries a positive source identity. Do not copy UAC-embedded
+  member or source hashes into Songbase or the Museum; read the current UAC for
+  these comparisons.
 - **SPC hashes** — Record the same four hashes for each complete, unchanged
   `.spc` under `uac-playable-payload-v1`; UACMan presents these as Stream
   Hashes.
@@ -44,9 +45,10 @@ profile defines only how confirmed values are represented in UAC packages.
 - **Document-derived metadata** — Inspect informational documents and report
   recurring key/value fields before proposing UAC tags. Do not generically
   promote colon-delimited lines, overwrite SPC-native tags, or create blank
-  fields. Any AudioMan database ingestion must preserve source-document/member
-  identity and checksums, and ingest only fields shown to be uniform and useful.
-  Record findings and tag proposals in the per-set dashboard, not here.
+  fields. Keep source-document/member identity in the UAC and index only
+  descriptive fields shown to be uniform and useful. Do not copy UAC member or
+  source hashes into AudioMan databases. Record findings and tag proposals in
+  the per-set dashboard, not here.
 - **Informational document fields** — Map `Dumped by` to package-level
   **Dumper** and `ID666 tags by` to package-level **Taggers**, retaining the
   exact values. Keep member-level SPC **Dumper** tags unchanged; the two scopes
