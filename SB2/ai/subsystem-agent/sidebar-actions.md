@@ -71,6 +71,19 @@ in the SB2 home view.
   switching tabs or entering search must not refresh Games, Files, or Gallery.
   Explicit Reload Library invalidates their generations.
 
+## Album favorite margin
+
+- Album rows wrap the existing selection button and a sibling favorite button;
+  never nest buttons or change the selection/navigation target. Search hides the
+  wrapper whenever its label is hidden. Count and star margins stay aligned.
+- FavoriteStore's existing group toggle is authoritative: partial groups add
+  missing members and complete groups remove all members. Fetch album rows only
+  on an explicit star click, without adopting the playlist projection or starting
+  playback. Disable the button until its mutation completes.
+- Favorite snapshots maintain an ID set and metadata lookup for rendered stars.
+  Explicitly fetched album IDs provide exact completion checks; invalidate those
+  IDs on catalog reload. Do not issue per-album database reads during startup.
+
 ## Files
 
 - `Sources/SB2/Resources/index.html`
