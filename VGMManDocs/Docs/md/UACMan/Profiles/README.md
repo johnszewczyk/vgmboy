@@ -5,17 +5,18 @@ The UACMan GUI reads and edits `.uac` manifests only. The UACMan tool can use
 MetaManCore during explicit package creation to read source formats. Apply the shared
 [`BASE-UAC-PROFILE.md`](BASE-UAC-PROFILE.md); each format profile records only
 its reader, field mapping, format-specific exceptions, application behavior,
-and required checks. The base profile defines the shared UACMan, MetaMan,
-ScanSong, Songbase, and dashboard contract; a format profile records only its
-application-specific differences.
+and required checks. The base profile defines shared UACMan, MetaMan, ScanSong,
+hash-free Songbase, and dashboard boundaries; a format profile records only
+its application-specific differences.
 
 These profiles define source-format parsing and UAC metadata mappings; they are
 not ROM-set inventory or completeness protocols. AudioMan owns source-set
 membership, No-Intro matching, source-tree locations, and ROM/game set reports.
-Existing UACs can be filtered and compared from their embedded metadata and
-hashes without waiting for every reader profile to be complete. The profiles
-are the subgoal for making new packages and richer metadata extraction
-consistent across the major file types. Actual tag coverage and package
+The register covers all 41 reader IDs in the current
+`MetaManCore.supportedFormats` list. Existing UACs can be filtered and compared
+from embedded metadata and hashes without waiting for fixture or package
+approval. The profiles make new packages and richer metadata extraction
+consistent across the supported file types. Actual tag coverage and package
 disposition belong in AudioMan's per-set reports. Dated field evidence belongs
 in `UACMan/ai/reports/`; published profile pages carry reusable mappings.
 
@@ -74,15 +75,15 @@ been reviewed.
 | `genh` | Mapping documented; fixture review pending | See [GENH profile](GENH.md). |
 | `standard-audio` | Mapping documented; fixture review pending | See [standard audio profile](STANDARD-AUDIO.md). |
 
-## Completion goal
+## Mapping coverage
 
-Document the reader-to-UAC mapping for every major native game-audio reader in
-`MetaManCore.supportedFormats`, including console-derived and standard
-audio readers. A complete mapping states reader/version facts,
-package/member/asset roles, field scope, dependency or playlist rules, and
-preservation limits. Track fixture and package approval separately. Do not
-claim a fixture or package is validated without recorded evidence. This
-backlog does not block fast matching or metadata tagging of existing UACs.
+The register includes every current `MetaManCore.supportedFormats` reader
+exactly once. A mapping states reader/version facts, package/member/asset
+roles, field scope, dependency or playlist rules, and preservation limits.
+When MetaMan adds a reader ID, add its mapping before claiming profile coverage
+for that format. Track fixture and package approval separately; do not claim
+validation without recorded evidence. This mapping work does not block fast
+matching or metadata tagging of existing UACs.
 
 ## Profile and report workflow
 
@@ -174,7 +175,8 @@ source relationship between collections from title or content overlap alone.
 - VGM/VGZ profile: [`VGM.md`](VGM.md)
 - HES profile: [`HES.md`](HES.md)
 - KSS profile: [`KSS.md`](KSS.md)
-- NSF profile: [`NSF.md`](NSF.md); NSFE remains a separate pending profile.
+- NSF profile: [`NSF.md`](NSF.md); NSFE is mapped separately in
+  [`AY-SAP-NSFE-SNDH-S98.md`](AY-SAP-NSFE-SNDH-S98.md#nsfe).
 - GBS profile: [`GBS.md`](GBS.md)
 - PlayStation CD-XA and Red Book profile: [`PSX-CDXA.md`](PSX-CDXA.md)
 - Current PSX beta-package review:

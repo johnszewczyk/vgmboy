@@ -45,9 +45,9 @@ sub-container and version together, such as `SPC v.30` or `SPC v.10`.
   unambiguous matching image in the selected No-Intro title-snap pack, retain
   the PNG byte-for-byte as an ordinary `asset` member with format `png` and
   expose it with package tag `Title Snap`, whose value is the member path
-  (for example, `art/title.png`). Match through the Songbase No-Intro identity
-  link and canonical game-root title; keep its numeric DAT ID in AudioMan and
-  use separate region evidence to choose among regional images. A
+  (for example, `art/title.png`). Match through the Museum's imported No-Intro
+  DAT and the positive UAC `Game ID` title root; keep numeric DAT IDs in the
+  Museum and use separate region evidence to choose among regional images. A
   title-only guess, multiple candidate images, or an absent image stays out of
   the package and is reported for review. Record the image-pack source and
   source-member path in `sources[]` and the attachment transformation. Keep
@@ -59,8 +59,9 @@ sub-container and version together, such as `SPC v.30` or `SPC v.10`.
 - **Source hashes** — Keep the four **Stream Hashes** for each SPC track. For
   SNESMusic.org, also repeat that track's parent-archive **Source .rsn Hashes**
   list on the track as a positive source-identity tag, as specified by the set
-  profile. Keep the four RSN digests in the permanent source-state database;
-  embedding them in UAC does not replace that record.
+  profile. The UAC manifest carries these member and source hashes; do not copy
+  them into Songbase or the Museum. Read the current UAC when comparing tracks
+  or checking source identity.
 - **Playback timing** — Surface a positive ID666 `Length (seconds)` as integer
   `Play Length (ms)` (`seconds × 1,000`). When ID666 has no positive length,
   derive it from xID6 `Intro Length (ms) + Loop Length (ms) × Loop Count + End

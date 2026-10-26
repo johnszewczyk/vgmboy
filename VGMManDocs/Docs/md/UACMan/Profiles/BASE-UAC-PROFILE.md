@@ -36,13 +36,13 @@ the per-set ledger recording operations and checkpoints.
   No-Intro's numeric `dat_id` in AudioMan's Museum reference-DAT catalog. Do
   not put it in UAC metadata, `game.canonicalIDs`, or
   `variants[].canonicalReleaseIDs`. A known title root does not establish
-  region or revision; keep **Region** separate. After the quick title/system
-  filter establishes a supported title root, write package **Region** as `--`
-  when territory remains unknown. Do not
-  use `--` as a filename suffix, region code, or release identifier. Before
-  the title root is identified, leave Region absent. If a title is not
-  represented in No-Intro or its root remains ambiguous, omit **Game ID** and
-  leave the identity for focused research.
+  region or revision; keep **Region** separate. When the system or regional
+  scope is established but territory remains unknown, write package
+  **Region** as `--`, even while title identity remains under review. Leave
+  **Region** absent only when its scope is not established or the field does
+  not apply. Do not use `--` as a filename suffix, region code, or release
+  identifier. If a title is not represented in No-Intro or its root remains
+  ambiguous, omit **Game ID** and leave the identity for focused research.
 - **Non-DAT release identity** — Keep externally documented non-DAT releases
   distinct from No-Intro retail identities. Distinguish fan-made homebrew,
   unlicensed/bootleg releases, demos, and officially published releases; do not
@@ -165,10 +165,12 @@ the per-set ledger recording operations and checkpoints.
   where they are stored. Expand subsong playlist entries into logical track
   rows, expose their track metadata, and project wrapper timing into the
   playback timing interface without inventing absent values.
-- **AudioMan Songbase** — Keep the complete UAC manifest and ordered playlist
-  JSON for exact retrieval. Index first-class playlist titles and entry
-  `extraFields` separately from physical member rows. Songbase ingestion reads
-  embedded hashes and does not rehash contained payloads.
+- **AudioMan Songbase** — Index package paths, title roots, regions, status, and
+  searchable member/playlist metadata in the hash-free UAC projection. The
+  outer package BLAKE3 may locate exact UAC bytes; do not copy embedded member,
+  stream, payload, CRC, or source hashes into Songbase or the Museum. Read the
+  current UAC manifest directly for content comparisons. Indexing metadata does
+  not validate the payload or establish completeness or authorization.
 - **Dashboard** — Record observed set coverage, conflicts, failures, and
   verification in per-set reports. A profile describes the input mapping and
   app contract; it is not a report of completed output.
