@@ -46,16 +46,16 @@ public enum SPCMetadataProjector {
         } else {
             member.removeValue(forKey: "Play Length (ms)")
         }
-        // The package's canonical title belongs in Game ID. Keep the
-        // SPC-authored game name as a distinct source fact on its track.
-        if let sourceGameTitle = member.removeValue(forKey: "Game"),
-           member["Game Title"] == nil {
-            member["Game Title"] = sourceGameTitle
-        }
+        // The canonical package identity belongs in Game ID. Preserve the
+        // SPC source Game value as track Album under the approved SPC profile.
+        let sourceGameTitle = member.removeValue(forKey: "Game")
         member.removeValue(forKey: "System")
-        // Do not turn MetaMan's normalized xID6 soundtrack title into Album.
-        // The exact source bytes remain in the byte-identical SPC member.
-        member.removeValue(forKey: "Album")
+        // MetaMan normalizes xID6 Official Soundtrack Title as Album. Keep that
+        // distinct source fact under OST Title instead of replacing the source
+        // Game value above.
+        let sourceOSTTitle = member.removeValue(forKey: "Album")
+        if let sourceGameTitle { member["Album"] = sourceGameTitle }
+        if let sourceOSTTitle { member["OST Title"] = sourceOSTTitle }
 
         var shared: [String: UACJSONValue] = [:]
         for key in ["Date", "Year", "Genre", "Comment", "Copyright", "Encoded By"] {

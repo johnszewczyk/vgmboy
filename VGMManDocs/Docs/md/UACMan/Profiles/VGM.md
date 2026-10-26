@@ -15,6 +15,9 @@ gzip-compressed `.vgz` members. See
   in Title Case UAC metadata.
 - **Source bytes** — Keep the original VGZ or VGM package in source state. UAC
   members use raw VGM after removing one VGZ gzip layer.
+- **Status** — Mapping and wrapper pack/unpack fixtures passed on 2026-10-26,
+  including per-member VGM versions and stream hashes. Set conversion and
+  consumer review remain per-set decisions.
 
 ## Field Mapping
 
@@ -47,9 +50,14 @@ gzip-compressed `.vgz` members. See
   output stream hashes and the field change in the UAC transformation. Leave
   the source ZIP byte-identical and preserve the Japanese System value unless
   a per-set report documents a proven correction.
-  Also normalize the approved device aliases `NeoGeo Pocket Color` to `Neo Geo
-  Pocket Color` and `Bandai WonderSwan` to `WonderSwan`. Keep distinct
-  compatible systems, such as Othello Multivision, distinct.
+  Normalize exact SNK platform aliases to the official `NEOGEO` family
+  spellings in [Platforms](PLATFORMS.md): `NEOGEO`, `NEOGEO MVS`,
+  `NEOGEO CD`, `NEOGEO Pocket`, and `NEOGEO Pocket Color`. Keep those hardware
+  variants distinct. Do not flatten a composite system label such as
+  `B System / Neo Geo`; hold it until set evidence establishes one platform.
+  Also normalize the approved device alias `Bandai WonderSwan` to
+  `WonderSwan`. Keep distinct compatible systems, such as Othello Multivision,
+  distinct.
 - **GD3 field preservation** — GD3 v1.00 defines eleven ordered strings. When
   changing a known standard field, preserve any additional serialized strings
   and report the member's nonstandard string count. Do not promote unnamed
@@ -58,6 +66,16 @@ gzip-compressed `.vgz` members. See
   populated and uniform for every track. If values vary or some tracks omit
   the field, preserve populated values at member scope so package metadata does
   not imply a value on tracks that lack it.
+- **MetaMan VGM projection cleanup** — The generic reader may also project
+  source fields as `Game`, `System`, or `Encoded By`, and can repeat uniform
+  credits or derive `Year` from `Date`. Before finalizing the UAC, map `Game`
+  to **Game Title**, use structural `game.console` instead of a duplicate
+  per-track **System**, and map `Encoded By` to **Dumper**. Remove a per-track
+  value only when the same source value is already present at package scope;
+  this includes **Artist** matching **Album Artist**, and a derived **Year**
+  already represented by **Date**. Keep differing track values. If the generic
+  projection conflicts with the explicit GD3 mapping, hold the package for
+  review instead of dropping either value.
 - **VGZ packaging** — The UAC payload stores raw `.vgm`. Detect gzip by magic,
   not the suffix: remove exactly one gzip layer without changing the VGM header
   version or command stream, then update playlist references to `.vgm`. If a
@@ -65,6 +83,18 @@ gzip-compressed `.vgz` members. See
   unchanged, rename that UAC member to `.vgm`, and report the source suffix
   mismatch. Record these transformations and keep the original source archive
   unchanged. Hold a second gzip layer or invalid VGM header for review.
+- **Source ROM attribution** — GD3 does not identify the ROM used to produce a
+  VGM log. Apply the shared **Source ROM** rule only from an explicit rip log,
+  source note, or verified ROM hash. Game-title tags, Title Snaps, and track
+  order can identify a game or title variant, but they do not prove the ROM
+  origin or which ROM produced an individual track. Leave unrecorded origins
+  unknown and report them; do not create a guessed source-ROM tag.
+- **Non-DAT game titles** — A Title Snap and source title can support a named
+  game-level identification while No-Intro still has no retail title root.
+  Record external evidence and classify the release as homebrew, unlicensed/
+  bootleg, demo, or official only when that status is independently supported.
+  Do not add a No-Intro `Game ID`, infer a source ROM, or move a source-specific
+  VGMRIPS package into the canonical Master solely from the title or image.
 - **M3U playlists** — Preserve every source playlist as its own UAC playlist and
   member. A playlist may be a partial queue; keep exactly its listed entries and
   retain every unqueued VGM track in the package. Preserve playlist order,
@@ -110,6 +140,25 @@ gzip-compressed `.vgz` members. See
   is understood; otherwise hold the package for review instead of dropping
   them.
 - **Platform** — Hold missing, mixed, or ambiguous system identities for
-  review. For an approved alias, verify that each affected embedded VGM English
-  System value exactly matches `game.console`; keep original source tags in the
-  unchanged source ZIP and Songbase record.
+  review. Map exact Nintendo aliases to their distinct canonical consoles:
+  NES/Famicom → `Nintendo NES`; Game Boy Color → `Nintendo Game Boy Color`;
+  Game Boy Advance → `Nintendo Game Boy Advance`; and Famicom/Family Computer
+  Disk System → `Nintendo Family Computer Disk System`. Do not infer one
+  platform from another or flatten a genuinely mixed package. For an approved
+  alias, update the embedded VGM English System value and `game.console` to the
+  same canonical name, preserve Japanese System and all other GD3 fields, and
+  record the original and output stream hashes in the transformation. The
+  unchanged source ZIP and Songbase source metadata retain the original label.
+  For NES packages specifically, always use the concise `Nintendo NES` value
+  for the platform folder, `game.console`, playlist-facing console display,
+  and English GD3 System. Normalize exact English `Nintendo Entertainment System`,
+  `Family Computer`, and `Famicom` aliases after trimming surrounding
+  whitespace.
+  In VGM GD3 only, normalize the misspellings `Nintendo Enterainment System`,
+  `Nintendo Entertaiment System`, and `Nintendo Entertainemnt System` to
+  `Nintendo NES`. Treat source-labeled Dendy as its own Famicom-clone platform,
+  not as a Nintendo NES alias; preserve composite or mixed platform labels for
+  review.
+  For the SNK family, use the exact canonical names `NEOGEO`, `NEOGEO MVS`,
+  `NEOGEO CD`, `NEOGEO Pocket`, and `NEOGEO Pocket Color` from
+  [Platforms](PLATFORMS.md); preserve Japanese System and all other GD3 fields.

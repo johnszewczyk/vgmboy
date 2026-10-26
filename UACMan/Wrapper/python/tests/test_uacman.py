@@ -34,6 +34,31 @@ def minimal_vgm(version: int, commands: bytes = b"\x66") -> bytes:
     return bytes(header) + commands
 
 
+def write_spc_metadata_helper(root: Path, member_metadata: dict[str, dict]) -> Path:
+    timed_paths = [
+        path for path, fields in member_metadata.items()
+        if int(fields.get("Play Length (ms)", 0)) > 0
+    ]
+    response = {
+        "schemaVersion": 1,
+        "memberMetadata": member_metadata,
+        "sourceTimedMemberPaths": timed_paths,
+        "gameMetadata": {},
+        "sharedFieldConflicts": [],
+        "diagnosticCount": 0,
+        "failures": [],
+    }
+    helper = root / "spc-metadata-helper"
+    helper.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json\n"
+        "print(json.dumps(" + repr(response) + "))\n",
+        encoding="utf-8",
+    )
+    helper.chmod(0o755)
+    return helper
+
+
 class AuthoredTagNamingTests(unittest.TestCase):
     def test_new_recipe_tags_are_title_case_and_set_fields_are_direct_tags(self) -> None:
         recipe = uacman.normalize_recipe({
@@ -71,7 +96,7 @@ class AuthoredTagNamingTests(unittest.TestCase):
 
         self.assertEqual(recipe["game"]["metadata"]["Game ID"], "ABCD")
         self.assertEqual(recipe["game"]["metadata"]["Play Length (ms)"], 1234)
-        self.assertEqual(recipe["game"]["metadata"]["cue_sheet"], {"memberPath": "disc.cue"})
+        self.assertEqual(recipe["game"]["metadata"]["Cue Sheet"], "disc.cue")
         self.assertNotIn("set", recipe["game"]["metadata"])
         self.assertNotIn("Set Collection", recipe["game"]["metadata"])
         self.assertEqual(recipe["game"]["metadata"]["Set Name"], "Test Set")
@@ -123,10 +148,10 @@ class UACManRoundTripTests(unittest.TestCase):
             root = Path(temporary)
             source = root / "source"
             source.mkdir()
-            (source / "track.spc").write_bytes(make_spc_fixture())
+            (source / "track.vgm").write_bytes(minimal_vgm(0x171))
             recipe_path = root / "recipe.json"
             recipe_path.write_text(json.dumps({
-                "game": {"id": "game", "title": "Game", "console": "Nintendo SNES"},
+                "game": {"id": "game", "title": "Game", "console": "Sega Genesis"},
                 "variants": [{"id": "original", "label": "Original", "kind": "release"}],
                 "sources": [{
                     "id": source_id,
@@ -217,10 +242,10 @@ class UACManRoundTripTests(unittest.TestCase):
                     "track 01.spc": {
                         "metadata": {
                             "system": "Super Nintendo",
-                            "game": "Fixture Game",
-                            "song": "Track 01",
-                            "playLengthMs": 154000,
-                            "fadeLengthMs": 5000,
+                            "Album": "Fixture Game",
+                            "Title": "Track 01",
+                            "Play Length (ms)": 154000,
+                            "Fade Length (ms)": 5000,
                         },
                     },
                     "scans/front.png": {"role": "artwork"},
@@ -230,7 +255,18 @@ class UACManRoundTripTests(unittest.TestCase):
             }), encoding="utf-8")
 
             container = root / "fixture.uac"
-            self.run_uacman("pack", str(source), str(recipe_path), str(container), "--frame-size", "65536")
+            helper = write_spc_metadata_helper(root, {
+                "track 01.spc": {
+                    "Album": "Fixture Game",
+                    "Title": "Track 01",
+                    "Play Length (ms)": 154000,
+                    "Fade Length (ms)": 5000,
+                },
+            })
+            self.run_uacman(
+                "pack", str(source), str(recipe_path), str(container),
+                "--frame-size", "65536", "--harvest-spc-metadata", str(helper),
+            )
             inspect = self.run_uacman("inspect", str(container), "--verify")
             inspected = json.loads(inspect.stdout)
             self.assertEqual(inspected["compressionProfile"], "uac-zstd-seekable-level-3-frame-65536-v1")
@@ -274,7 +310,8 @@ class UACManRoundTripTests(unittest.TestCase):
             package_step = manifest["transformations"][0]
             self.assertEqual(member["format"], "spc")
             self.assertEqual(member["role"], "playable")
-            self.assertEqual(member["metadata"]["Song"], "Track 01")
+            self.assertEqual(member["metadata"]["Album"], "Fixture Game")
+            self.assertEqual(member["metadata"]["Title"], "Track 01")
             self.assertEqual(member["metadata"]["Play Length (ms)"], 154000)
             self.assertEqual(entry["targetMemberBlake3"], member["blake3"])
             self.assertEqual(entry["lengthRaw"], "2:34")
@@ -284,7 +321,9 @@ class UACManRoundTripTests(unittest.TestCase):
             self.assertEqual(len(package_step["inputs"]), 5)
             self.assertEqual(len(package_step["outputs"]), 5)
             self.assertEqual(package_step["inputs"][0]["sourceID"], "fixture-source")
-            self.assertEqual(manifest["game"]["metadata"]["cover_front"][0]["memberPath"], "scans/front.png")
+            self.assertEqual(manifest["game"]["metadata"]["Cover Front"], "scans/front.png")
+            self.assertEqual(manifest["game"]["metadata"]["Cue Sheet"], "audio/disc.cue")
+            self.assertEqual(manifest["game"]["metadata"]["Documents"], "notes.md")
             member_by_path = {item["path"]: item for item in manifest["members"]}
             self.assertEqual(member_by_path["scans/front.png"]["role"], "artwork")
             self.assertEqual(member_by_path["audio/disc.cue"]["role"], "cue-sheet")
@@ -299,16 +338,9 @@ class UACManRoundTripTests(unittest.TestCase):
             tampered_hash["digest"] = "0" * 32
             tampered_container = root / "tampered.uac"
             shutil.copy2(container, tampered_container)
-            uacman.rewrite_uac_manifest(tampered_container, tampered_manifest, original_manifest)
-            failed_output = root / "tampered-unpacked"
-            failed_unpack = subprocess.run(
-                [sys.executable, "-B", str(UACMAN), "unpack", str(tampered_container), str(failed_output)],
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(failed_unpack.returncode, 2)
-            self.assertIn("Playable-payload md5 mismatch", failed_unpack.stderr)
-            self.assertFalse(failed_output.exists())
+            with self.assertRaisesRegex(uacman.UACError, "may not change member paths, ranges, or byte identities"):
+                uacman.rewrite_uac_manifest(tampered_container, tampered_manifest, original_manifest)
+            self.assertEqual(uacman.read_uac(tampered_container, verify_payload=False)[0], original_manifest)
             self.assertEqual(member_by_path["notes.md"]["role"], "documentation")
 
             legacy_manifest = json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -739,6 +771,10 @@ class UACManRoundTripTests(unittest.TestCase):
             }
             for name, contents in members.items():
                 (source / name).write_bytes(contents)
+            helper = write_spc_metadata_helper(root, {
+                name: {"Play Length (ms)": 154000}
+                for name in members
+            })
             recipe_path = root / "recipe.json"
             recipe_path.write_text(json.dumps({
                 "game": {"id": "spc-fixture", "title": "SPC Fixture", "console": "Nintendo SNES"},
@@ -746,7 +782,10 @@ class UACManRoundTripTests(unittest.TestCase):
                 "sources": [], "transformations": [], "playlists": [],
             }), encoding="utf-8")
             container = root / "spc-fixture.uac"
-            self.run_uacman("pack", str(source), str(recipe_path), str(container))
+            self.run_uacman(
+                "pack", str(source), str(recipe_path), str(container),
+                "--harvest-spc-metadata", str(helper),
+            )
             unpacked = root / "unpacked"
             self.run_uacman("unpack", str(container), str(unpacked))
             manifest = json.loads((unpacked / "manifest.json").read_text(encoding="utf-8"))
@@ -772,6 +811,47 @@ class UACManRoundTripTests(unittest.TestCase):
             })
             with self.assertRaisesRegex(uacman.UACError, "Invalid or truncated SPC"):
                 uacman.apply_contained_container_versions(source, recipe)
+
+    def test_package_records_usf_psf_version_and_validates_library_members(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="uacman-usf-version-test-") as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            source.mkdir()
+            (source / "track.miniusf").write_bytes(make_usf_fixture(tags=b"[TAG]title=Track\n"))
+            (source / "NUS-TEST-USA.usflib").write_bytes(make_usf_fixture(reserved=b"sample bank"))
+            recipe = uacman.normalize_recipe({
+                "game": {"id": "usf-fixture", "title": "USF Fixture", "console": "Nintendo 64"},
+                "variants": [{"id": "original", "label": "Original", "kind": "release"}],
+                "sources": [], "transformations": [], "playlists": [],
+            })
+            recipe.setdefault("memberOverrides", {})
+
+            inventory, versioned = uacman.scan_contained_container_versions(source)
+
+            self.assertEqual(inventory["formatsScanned"], ["usf"])
+            self.assertEqual(inventory["versions"]["usf"][0]["version"], "21")
+            self.assertEqual(versioned["track.miniusf"]["Format"], "USF v.21")
+            self.assertNotIn("NUS-TEST-USA.usflib", versioned)
+
+            uacman.apply_contained_container_versions(source, recipe)
+            self.assertEqual(
+                recipe["memberOverrides"]["track.miniusf"]["metadata"]["Format"],
+                "USF v.21",
+            )
+
+    def test_usf_scanner_rejects_bad_crc_and_bad_tag_boundary(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="uacman-usf-invalid-test-") as temporary:
+            root = Path(temporary)
+            bad_crc = root / "bad-crc.miniusf"
+            bad_crc.write_bytes(make_usf_fixture(compressed=b"compressed", crc=1))
+            with self.assertRaisesRegex(uacman.UACError, "CRC32 mismatch"):
+                uacman.scan_contained_container_versions(root)
+
+            bad_crc.unlink()
+            bad_tag = root / "bad-tag.miniusf"
+            bad_tag.write_bytes(make_usf_fixture(trailing=b"unexpected"))
+            with self.assertRaisesRegex(uacman.UACError, "Unexpected bytes"):
+                uacman.scan_contained_container_versions(root)
 
     def test_standard_audio_and_ape_are_playable_without_native_metadata_dump(self) -> None:
         with tempfile.TemporaryDirectory(prefix="uacman-audio-test-") as temporary:
@@ -935,7 +1015,7 @@ class SetMetadataTests(unittest.TestCase):
             root = Path(temporary)
             source = root / "source"
             source.mkdir()
-            (source / "track.spc").write_bytes(make_spc_fixture())
+            (source / "notes.txt").write_bytes(b"payload preserved by manifest rewrite")
             recipe = {
                 "game": {"id": "set-test", "title": "Set Test", "console": "Nintendo SNES"},
                 "variants": [{"id": "original", "label": "Original", "kind": "release"}],
@@ -1119,7 +1199,7 @@ class MetaManMetadataImportTests(unittest.TestCase):
     def test_track_aware_harvest_rejects_duplicate_decoder_indexes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="uacman-metaman-test-") as temporary:
             root = Path(temporary)
-            source = root / "track.nsf"
+            source = root / "track.gbs"
             source.write_bytes(b"unchanged")
             helper = root / "metadata-helper"
             helper.write_text(
@@ -1127,8 +1207,8 @@ class MetaManMetadataImportTests(unittest.TestCase):
                 "import json\n"
                 "print(json.dumps({"
                 "'schemaVersion': 1,"
-                "'memberMetadata': {'track.nsf': {}},"
-                "'trackMetadata': {'track.nsf': ["
+                "'memberMetadata': {'track.gbs': {}},"
+                "'trackMetadata': {'track.gbs': ["
                 "{'sourceTrackIndex': 0, 'metadata': {}},"
                 "{'sourceTrackIndex': 0, 'metadata': {}}]},"
                 "'gameMetadata': {}, 'sharedFieldConflicts': [], 'diagnosticCount': 0, 'failures': []"
@@ -1140,10 +1220,30 @@ class MetaManMetadataImportTests(unittest.TestCase):
                 uacman.harvest_format_metadata(
                     root,
                     helper,
-                    {"memberOverrides": {}, "extensions": {}, "playlists": []},
-                    "nsf",
+                    {
+                        "game": {"id": "fixture", "title": "Fixture", "console": "Nintendo Game Boy"},
+                        "variants": [{"id": "original", "label": "Original", "kind": "release"}],
+                        "memberOverrides": {}, "extensions": {}, "playlists": [],
+                    },
+                    "gbs",
                 )
             self.assertEqual(source.read_bytes(), b"unchanged")
+
+def make_usf_fixture(
+    *,
+    version_byte: int = 0x21,
+    reserved: bytes = b"",
+    compressed: bytes = b"",
+    tags: bytes = b"",
+    trailing: bytes = b"",
+    crc: int | None = None,
+) -> bytes:
+    checksum = zlib.crc32(compressed) & 0xFFFFFFFF if crc is None else crc
+    header = b"PSF" + bytes([version_byte]) + struct.pack(
+        "<III", len(reserved), len(compressed), checksum
+    )
+    return header + reserved + compressed + tags + trailing
+
 
 def make_spc_fixture(version_minor: int = 30, header_version: str = "0.30") -> bytes:
     """Build a minimal-size SPC with a text-layout ID666 header."""

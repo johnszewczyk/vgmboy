@@ -44,11 +44,19 @@ enum GBSM3UMetadataReader {
                 continue
             }
             let sourceEncoding = String(data: companion.data, encoding: .utf8) == nil ? "Windows-1252" : "UTF-8"
+            let lines = text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+            let oneBasedIndexes = lines.contains {
+                String($0).localizedCaseInsensitiveContains("1-indexed playlist")
+            }
             var comments: [MetadataTag] = []
             var parsedRows = 0
-            for rawLine in text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline) {
+            for rawLine in lines {
                 let line = rawLine.hasSuffix("\r") ? String(rawLine.dropLast()) : String(rawLine)
                 if line.hasPrefix("#") {
+                    // Game_Emu_Player M3Us can explicitly declare their rows
+                    // one-based. Treat this as an indexing directive, not a
+                    // native COMMENT tag; the original M3U bytes are retained.
+                    if line.localizedCaseInsensitiveContains("1-indexed playlist") { continue }
                     if let tag = parseTagComment(line) { comments.append(tag) }
                     continue
                 }
@@ -56,10 +64,11 @@ enum GBSM3UMetadataReader {
                       row.fileName.lowercased() == targetName
                         || row.fileName.lowercased() == targetStem else { continue }
                 parsedRows += 1
+                let sourceIndex = row.index - (oneBasedIndexes ? 1 : 0)
                 guard entries.count < maximumPlaylistRows,
-                      validIndexes.contains(row.index) else { continue }
+                      validIndexes.contains(sourceIndex) else { continue }
                 entries.append(Entry(
-                    index: row.index,
+                    index: sourceIndex,
                     title: row.title,
                     tags: comments,
                     relativePath: companion.relativePath,

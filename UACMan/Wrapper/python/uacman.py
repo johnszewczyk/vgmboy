@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """UAC pack, inspect, unpack, and source-archive conversion tools.
 
-Native metadata import is delegated to UACManMetadataCLI/MetaManCore; this
-module never implements a native format parser.
+Native descriptive metadata import is delegated to UACManMetadataCLI/MetaManCore.
+This module reads only the structural header facts needed for wrapper tags and
+integrity checks.
 """
 
 from __future__ import annotations
@@ -70,8 +71,9 @@ SOURCE_ARCHIVE_URLS = {
 }
 PLAYABLE_EXTENSIONS = {
     ".spc", ".vgm", ".vgz", ".nsf", ".nsfe", ".gbs", ".hes", ".kss",
-    ".sid", ".s98", ".mdx", ".usf", ".gsf", ".snsf", ".wsr", ".sap",
-    ".ay", ".ym", ".xgm", ".psf", ".minipsf", ".2sf", ".minigsf",
+    ".sid", ".s98", ".mdx", ".usf", ".miniusf", ".gsf", ".minigsf", ".snsf", ".wsr", ".sap",
+    ".ay", ".ym", ".xgm", ".psf", ".minipsf", ".psf2", ".minipsf2", ".2sf", ".mini2sf",
+    ".ssf", ".minissf",
     ".aif", ".aiff", ".ape", ".flac", ".m4a", ".mp3", ".ogg", ".wav",
 }
 
@@ -243,6 +245,7 @@ def normalize_recipe(recipe: dict) -> dict:
     member_overrides = recipe.get("memberOverrides", {})
     if not isinstance(member_overrides, dict):
         raise UACError("Recipe memberOverrides must be an object keyed by input-relative path.")
+    recipe["memberOverrides"] = member_overrides
     for member_path, override in member_overrides.items():
         if not isinstance(override, dict):
             raise UACError(f"Member override must be an object: {member_path}")
@@ -706,9 +709,52 @@ def spc_version_text(value: int) -> str:
     return f"0.{value:02d}"
 
 
+def inspect_usf_member(path: Path) -> tuple[int, str | None]:
+    """Validate a USF PSF-v0x21 member and return its header byte and tag state."""
+    try:
+        size = path.stat().st_size
+        with path.open("rb") as source:
+            header = source.read(16)
+            if len(header) != 16 or header[:3] != b"PSF":
+                raise UACError(f"Invalid or truncated USF PSF header: {path.name}")
+            version_byte = header[3]
+            if version_byte != 0x21:
+                raise UACError(
+                    f"USF member has unsupported PSF version 0x{version_byte:02X}: {path.name}"
+                )
+            reserved_size = int.from_bytes(header[4:8], "little")
+            compressed_size = int.from_bytes(header[8:12], "little")
+            expected_crc = int.from_bytes(header[12:16], "little")
+            payload_start = 16 + reserved_size
+            tag_offset = payload_start + compressed_size
+            if tag_offset > size:
+                raise UACError(f"USF payload sizes exceed the member boundary: {path.name}")
+
+            source.seek(payload_start)
+            remaining = compressed_size
+            checksum = 0
+            while remaining:
+                block = source.read(min(1024 * 1024, remaining))
+                if not block:
+                    raise UACError(f"Truncated USF compressed payload: {path.name}")
+                checksum = zlib.crc32(block, checksum)
+                remaining -= len(block)
+            if (checksum & 0xFFFFFFFF) != expected_crc:
+                raise UACError(f"USF compressed-payload CRC32 mismatch: {path.name}")
+
+            source.seek(tag_offset)
+            marker = source.read(5) if tag_offset < size else b""
+            if marker and marker != b"[TAG]":
+                raise UACError(f"Unexpected bytes after USF payload boundary: {path.name}")
+            return version_byte, "present" if marker else None
+    except OSError as error:
+        raise UACError(f"Cannot read contained USF header in {path.name}: {error}") from error
+
+
 def scan_contained_container_versions(root: Path) -> tuple[dict, dict[str, dict]]:
-    """Read SPC/VGM version facts without changing any source member."""
+    """Read SPC/VGM/USF version facts without changing any source member."""
     spc_versions: dict[int, dict] = {}
+    usf_versions: dict[int, dict] = {}
     versioned_members: dict[str, dict] = {}
     versions: dict[int, int] = {}
     for path in sorted(root.rglob("*"), key=lambda item: item.as_posix().casefold()):
@@ -738,6 +784,22 @@ def scan_contained_container_versions(root: Path) -> tuple[dict, dict[str, dict]
             group["headerVersions"][header_version] = group["headerVersions"].get(header_version, 0) + 1
             relative = path.relative_to(root).as_posix()
             versioned_members[relative] = {"Format": f"SPC v.{version_byte:02d}"}
+            continue
+        if suffix in (".usf", ".miniusf", ".usflib"):
+            version_byte, _tag_state = inspect_usf_member(path)
+            group = usf_versions.setdefault(
+                version_byte,
+                {"memberCount": 0, "playableCount": 0, "libraryCount": 0},
+            )
+            group["memberCount"] += 1
+            relative = path.relative_to(root).as_posix()
+            if suffix == ".usflib":
+                group["libraryCount"] += 1
+            else:
+                group["playableCount"] += 1
+                versioned_members[relative] = {
+                    "Format": f"USF v.{version_byte:02X}"
+                }
             continue
         if suffix not in (".vgm", ".vgz"):
             continue
@@ -778,9 +840,19 @@ def scan_contained_container_versions(root: Path) -> tuple[dict, dict[str, dict]
         }
         for version, count in sorted(versions.items())
     ]
+    usf_groups = [
+        {
+            "version": f"{version_byte:02X}",
+            "versionByte": version_byte,
+            **group,
+        }
+        for version_byte, group in sorted(usf_versions.items())
+    ]
     formats_scanned = [
         format_name
-        for format_name, groups in (("spc", spc_groups), ("vgm", vgm_groups))
+        for format_name, groups in (
+            ("spc", spc_groups), ("vgm", vgm_groups), ("usf", usf_groups)
+        )
         if groups
     ]
     inventory = None
@@ -790,7 +862,9 @@ def scan_contained_container_versions(root: Path) -> tuple[dict, dict[str, dict]
             "formatsScanned": formats_scanned,
             "versions": {
                 format_name: groups
-                for format_name, groups in (("spc", spc_groups), ("vgm", vgm_groups))
+                for format_name, groups in (
+                    ("spc", spc_groups), ("vgm", vgm_groups), ("usf", usf_groups)
+                )
                 if groups
             },
         }
@@ -798,7 +872,7 @@ def scan_contained_container_versions(root: Path) -> tuple[dict, dict[str, dict]
 
 
 def contained_container_versions(root: Path) -> dict | None:
-    """Summarize present SPC/VGM versions without changing source members."""
+    """Summarize SPC/VGM/USF versions without changing source members."""
     inventory, _ = scan_contained_container_versions(root)
     return inventory
 
@@ -2356,6 +2430,84 @@ def enrich_set_metadata(args: argparse.Namespace) -> None:
     print(json.dumps({"root": str(root), "mode": "apply" if args.apply else "dry-run", **counts, "errors": errors}, ensure_ascii=False, indent=2))
 
 
+def parse_game_metadata_assignment(value: str) -> tuple[str, str]:
+    name, separator, tag_value = value.partition("=")
+    name = name.strip()
+    if not separator or not name or not tag_value:
+        raise argparse.ArgumentTypeError("expected TAG=VALUE with a non-empty tag name and value")
+    return name, tag_value
+
+
+def set_game_metadata(args: argparse.Namespace) -> None:
+    """Set or remove package-level game metadata without touching the UAC payload."""
+    path = Path(args.container).expanduser().absolute()
+    if path.is_symlink() or not path.is_file():
+        raise UACError(f"Refusing to edit a symlink or non-file: {path}")
+    manifest, _, payload_size, _, _, _ = read_uac(path, verify_payload=True)
+    verify_uac_members(path, manifest)
+    original_manifest = json.loads(json.dumps(manifest, ensure_ascii=False))
+
+    game = manifest.get("game")
+    if not isinstance(game, dict):
+        raise UACError("UAC manifest has no game metadata object.")
+    metadata = game.get("metadata")
+    if metadata is None:
+        metadata = {}
+        game["metadata"] = metadata
+    if not isinstance(metadata, dict):
+        raise UACError("Package-level game metadata must be an object.")
+
+    requested_sets = list(args.set_tag or [])
+    requested_removals = [name.strip() for name in (args.remove_tag or [])]
+    if any(not name for name in requested_removals):
+        raise UACError("Package metadata tag names to remove must be non-empty.")
+    set_names = [name for name, _ in requested_sets]
+    if len(set(set_names)) != len(set_names):
+        raise UACError("A package metadata tag may be set only once per command.")
+    if len(set(requested_removals)) != len(requested_removals):
+        raise UACError("A package metadata tag may be removed only once per command.")
+    if set(set_names) & set(requested_removals):
+        raise UACError("The same package metadata tag cannot be set and removed in one command.")
+    if not requested_sets and not requested_removals:
+        raise UACError("Specify at least one --set or --remove operation.")
+
+    changes: list[dict[str, object]] = []
+    for name, value in requested_sets:
+        old_value = metadata.get(name)
+        if old_value != value:
+            metadata[name] = value
+            changes.append({"tag": name, "before": old_value, "after": value})
+    for name in requested_removals:
+        if name in metadata:
+            old_value = metadata.pop(name)
+            changes.append({"tag": name, "before": old_value, "after": None})
+
+    payload_hash = original_manifest.get("payload", {}).get("blake3")
+    before_hash = b3_file_from_offset(path)
+    after_hash = before_hash
+    mode = "unchanged" if not changes else ("apply" if args.apply else "dry-run")
+    if changes and args.apply:
+        rewrite_uac_manifest(path, manifest, original_manifest)
+        saved_manifest, _, saved_payload_size, _, _, _ = read_uac(path, verify_payload=True)
+        verify_uac_members(path, saved_manifest)
+        if (saved_manifest.get("payload", {}).get("blake3") != payload_hash
+                or saved_payload_size != payload_size
+                or saved_manifest.get("members") != original_manifest.get("members")):
+            raise UACError("Manifest edit changed payload or member identity after save.")
+        after_hash = b3_file_from_offset(path)
+
+    print(json.dumps({
+        "container": str(path),
+        "mode": mode,
+        "metadataChanges": changes,
+        "outerBlake3Before": before_hash,
+        "outerBlake3After": after_hash,
+        "payloadBlake3": payload_hash,
+        "payloadBytes": payload_size,
+        "payloadAndMembersVerified": True,
+    }, ensure_ascii=False, indent=2, sort_keys=True))
+
+
 def inspect(args: argparse.Namespace) -> None:
     path = Path(args.container).expanduser().resolve()
     manifest, _, payload_size, manifest_encoding, manifest_bytes, stored_manifest_bytes = read_uac(
@@ -2567,6 +2719,24 @@ def parser() -> argparse.ArgumentParser:
     enrich_sets_parser.add_argument("root", help="Collection directory to scan recursively for .uac files.")
     enrich_sets_parser.add_argument("--apply", action="store_true", help="Apply updates; without this flag, report a dry run.")
     enrich_sets_parser.set_defaults(run=enrich_set_metadata)
+
+    metadata_parser = commands.add_parser(
+        "set-game-metadata",
+        help="Set or remove package-level game metadata while preserving the UAC payload.",
+    )
+    metadata_parser.add_argument("container", help="One existing .uac package to edit.")
+    metadata_parser.add_argument(
+        "--set", dest="set_tag", action="append", type=parse_game_metadata_assignment,
+        metavar="TAG=VALUE", help="Set a package-level game metadata tag; may be repeated.",
+    )
+    metadata_parser.add_argument(
+        "--remove", dest="remove_tag", action="append", default=[], metavar="TAG",
+        help="Remove a package-level game metadata tag; may be repeated.",
+    )
+    metadata_parser.add_argument(
+        "--apply", action="store_true", help="Write the manifest-only update; default is a dry run.",
+    )
+    metadata_parser.set_defaults(run=set_game_metadata)
 
     unpack_parser = commands.add_parser("unpack", help="Verify and extract every listed member; metadata is emitted by default.")
     unpack_parser.add_argument("container")
