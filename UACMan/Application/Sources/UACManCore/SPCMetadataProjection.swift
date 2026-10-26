@@ -46,18 +46,16 @@ public enum SPCMetadataProjector {
         } else {
             member.removeValue(forKey: "Play Length (ms)")
         }
-        // The package title and canonical console belong to the game record.
-        // Their exact source bytes remain in the byte-identical SPC member.
-        member.removeValue(forKey: "Game")
-        member.removeValue(forKey: "System")
-        // SPC soundtracks describe a game, not an album. Preserve the raw
-        // soundtrack-title bytes in the SPC member, but do not project Album.
-        member.removeValue(forKey: "Album")
-        if let rawTrack = document.technicalFacts["soundtrackTrack"],
-           let trackNumber = UInt16(rawTrack, radix: 16),
-           trackNumber > 0 {
-            member["Track Number"] = .integer(Int64(trackNumber))
+        // The package's canonical title belongs in Game ID. Keep the
+        // SPC-authored game name as a distinct source fact on its track.
+        if let sourceGameTitle = member.removeValue(forKey: "Game"),
+           member["Game Title"] == nil {
+            member["Game Title"] = sourceGameTitle
         }
+        member.removeValue(forKey: "System")
+        // Do not turn MetaMan's normalized xID6 soundtrack title into Album.
+        // The exact source bytes remain in the byte-identical SPC member.
+        member.removeValue(forKey: "Album")
 
         var shared: [String: UACJSONValue] = [:]
         for key in ["Date", "Year", "Genre", "Comment", "Copyright", "Encoded By"] {
