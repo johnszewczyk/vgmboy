@@ -35,7 +35,7 @@ the procedure for each package's source format.
   profile. Keep selected canonical UAC fields; do not add database enrichment.
 - **Identity pass** — For a positive No-Intro match, put the canonical DAT
   game-root title in package **Game ID** as one string. Keep numeric DAT IDs
-  and release candidates in AudioMan's database only; never duplicate them in
+  and release candidates in AudioMan's Museum only; never duplicate them in
   UAC metadata or structural canonical-ID arrays. Keep **Region** separate.
 - **Unresolved release** — This is normal after the source pass. Keep the
   known base title in `game.title` and omit **Game ID** when the game root is

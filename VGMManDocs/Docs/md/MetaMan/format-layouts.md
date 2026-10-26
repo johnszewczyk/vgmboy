@@ -155,8 +155,12 @@ Shared comments are compared by source track index, so a sidecar that omits a
 master playlist's repeated comment does not create a false missing-value
 conflict. Conflicting populated values for one index remain ambiguous and are
 not promoted. Decimal and
-`$hex` track indexes follow NEZplug's zero-based GBS convention. No Game Boy
-CPU emulation is used to invent per-track titles or timing. The final
+`$hex` track indexes follow NEZplug's zero-based GBS convention unless that
+M3U explicitly contains a `1-indexed playlist` comment. For that M3U only,
+MetaMan subtracts one before matching rows to the GBS header tracks. The
+indexing comment is a directive rather than a `COMMENT` tag; its bytes remain
+in the unchanged M3U attachment. No Game Boy CPU emulation is used to invent
+per-track titles or timing. The final
 colon-delimited time component accepts up to three decimal digits and converts
 them exactly to milliseconds for play, loop, and fade timing. A plain loop
 value is a loop duration; a trailing hyphen marks the loop start and maps to

@@ -388,7 +388,11 @@ unchanged—never recompress solely to edit metadata.
 
 The Python wrapper checks TAR member names and indexed byte ranges before
 publishing a newly packed package. `uacman inspect --verify` verifies the
-compressed payload hash, TAR paths/ranges, and supported raw-member hashes. For legacy
+compressed payload hash, TAR paths/ranges, and supported raw-member hashes. The
+`uacman set-game-metadata` command applies explicit package-level
+`game.metadata` set/remove operations. It is a dry run unless `--apply` is
+given; it verifies the existing payload and members, uses the manifest-only
+writer, then revalidates the payload and member identities. For legacy
 packages whose ordered TAR entries and stored member hashes prove that only
 header paths disagree with the manifest, `uacman repair-member-paths` reports
 the mismatch and `--apply` corrects those TAR header names atomically. It

@@ -12,9 +12,12 @@ ID666 and xID6 metadata without starting an emulator. See
 - **Source members** — `.spc`.
 - **Coverage** — Populated ID666 and xID6 fields; xID6 takes precedence when
   both blocks provide the same field.
-- **Status** — The source `Game` field is retained as `Game Title`, distinct
-  from canonical `Game ID`. Recheck the UAC projection fixture before approving
-  new bulk conversions; older manifests may retain the former `Album` mapping.
+- **Status** — Preserve SPC source `Game` as track `Album`, separate from
+  canonical `Game ID` and xID6 `OST Title`. The UAC projection now follows this
+  mapping. Projection fixtures and a real UAC manifest-only rewrite passed on
+  2026-10-26 with playable payload bytes preserved. Existing manifests are not
+  rewritten by the profile change; set conversion remains governed by its
+  source-specific review.
 
 ## Field Mapping
 
@@ -24,7 +27,7 @@ sub-container and version together, such as `SPC v.30` or `SPC v.10`.
 
 | Source Tag | UAC Tag | UAC Coded Tag | Tag Notes |
 | --- | --- | --- | --- |
-| ID666/xID6 `Game` | Game Title | `members[].metadata["Game Title"]` or `playlists[].entries[].extraFields["Game Title"]` | Preserve the source game name on its corresponding track. Keep it distinct from package `Game ID`; do not map it to Album. |
+| ID666/xID6 `Game` | Album | `members[].metadata["Album"]` or `playlists[].entries[].extraFields["Album"]` | Preserve the source game name on its corresponding track. Keep it distinct from package `Game ID`; preserve a separate xID6 soundtrack title as `OST Title`. |
 | ID666/xID6 `Song` | Title | `members[].metadata["Title"]` | Title for this SPC member. |
 | xID6 `0x10` `Official Soundtrack Title` | OST Title | `members[].metadata["OST Title"]` | Distinct soundtrack title. |
 | xID6 `0x11` `OST Disc` | Disc Number | `members[].metadata["Disc Number"]` | Soundtrack disc index. |
@@ -42,9 +45,9 @@ sub-container and version together, such as `SPC v.30` or `SPC v.10`.
 
 - **OST fields** — `OST Title`, `OST Disc`, and `OST Track` are defined xID6
   fields (`0x10`, `0x11`, and `0x12`), not arbitrary user-defined tags.
-  Preserve `OST Title` separately; never derive `Album` from `Game` or `OST
-  Title`. Keep xID6 `OST Track` as source bytes and use the established member
-  order for UAC `Track Number`.
+  Map source `Game` to track `Album` as specified above. Preserve `OST Title`
+  separately; do not derive `Album` from `OST Title`. Keep xID6 `OST Track` as
+  source bytes and use the established member order for UAC `Track Number`.
 - **Shared metadata** — Promote `Artist` to package `Album Artist` when every
   SPC agrees. Promote `Date`, `Year`, `Genre`, `Comment`, `Copyright`, and
   `Encoded By` only when every track has the same populated value. Remove

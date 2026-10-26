@@ -28,8 +28,24 @@ From the `UACMan/` project root, run the wrapper CLI with:
 python3 -B Wrapper/python/uacman.py --help
 python3 -B Wrapper/python/uacman.py pack --help
 python3 -B Wrapper/python/uacman.py enrich-sets <uac-collection>
+python3 -B Wrapper/python/uacman.py set-game-metadata <package.uac> --set 'Region=JP'
 python3 -B -m unittest discover -s Wrapper/python/tests
 swift test --package-path Wrapper
+```
+
+`set-game-metadata` edits package-level `game.metadata` tags on one existing
+package. It reports a dry run by default; add `--apply` to write the change.
+Repeat `--set TAG=VALUE` to add or replace tags, and `--remove TAG` to remove
+one. The command validates the UAC payload and members, writes only the
+manifest, then validates payload and member identity again.
+
+```sh
+python3 -B Wrapper/python/uacman.py set-game-metadata <package.uac> \
+  --set 'Region=JP' \
+  --set 'Developer=Example Studio' \
+  --set 'Publisher=Example Publisher'
+python3 -B Wrapper/python/uacman.py set-game-metadata <package.uac> \
+  --set 'Region=JP' --apply
 ```
 
 Typical reversible workflow:

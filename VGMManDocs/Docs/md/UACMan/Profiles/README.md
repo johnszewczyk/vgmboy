@@ -36,20 +36,20 @@ been reviewed.
 | `ay` | Mapping documented; fixture review pending | See [AY/SAP/NSFE/SNDH/S98](AY-SAP-NSFE-SNDH-S98.md#ay). |
 | `sap` | Mapping documented; fixture review pending | See [AY/SAP/NSFE/SNDH/S98](AY-SAP-NSFE-SNDH-S98.md#sap). |
 | `nsf` | Mapping documented; fixture review pending | See [`NSF.md`](NSF.md); reader mappings are documented, while new package conversion still requires fixture and consumer review. |
-| `gbs` | Reader/writer/consumer mappings aligned; package review pending | See [`GBS.md`](GBS.md); header identity stays at package scope; each logical track carries `Format`, source index, and approved title/order. M3Us remain byte-exact attachments; timing is not surfaced. Review a packaged fixture in UACMan, ScanSong, and Songbase before approving production conversion. |
+| `gbs` | Mapping and pack/unpack fixtures verified; set review remains required | See [`GBS.md`](GBS.md) and the [2026-10-26 major-format review](../../../../../UACMan/ai/reports/Major-Audio-Profile-Review-2026-10-26.md); header identity stays at package scope; each logical track carries `Format`, source index, and approved title/order. M3Us remain byte-exact attachments; timing is not surfaced. |
 | `nsfe` | Mapping documented; fixture review pending | Separate from NSF; see [NSFE profile](AY-SAP-NSFE-SNDH-S98.md#nsfe). |
 | `hes` | Mapping documented; fixture review pending | See [HES.md](HES.md). |
 | `sndh` | Mapping documented; fixture review pending | See [SNDH profile](AY-SAP-NSFE-SNDH-S98.md#sndh). |
 | `kss` | Mapping documented; fixture review pending | See [KSS.md](KSS.md). |
 | `s98` | Mapping documented; fixture review pending | See [S98 profile](AY-SAP-NSFE-SNDH-S98.md#s98). |
-| `vgm` | Mapping documented; fixture review pending | See [VGM.md](VGM.md). |
+| `vgm` | Mapping and wrapper package fixtures verified; set review remains required | See [VGM.md](VGM.md) and the [2026-10-26 major-format review](../../../../../UACMan/ai/reports/Major-Audio-Profile-Review-2026-10-26.md). |
 | `mdx` | Mapping documented; fixture review pending | See [MDX and MOD](MDX-MOD.md). |
 | `mod-protracker` | Mapping documented; fixture review pending | See [MDX and MOD](MDX-MOD.md). |
 | `uac` | Wrapper profile | Container manifest reader; use the UAC wrapper contract, not a native-audio conversion profile. |
-| `psf-family` | Shared mapping documented; extension review pending | See [PSF family](PSF-FAMILY.md) and [USF](USF.md). Existing USF fixture and scan evidence is recorded there; source-set conversion remains pending. |
+| `psf-family` | USF mapping and fixtures verified; other extensions remain pending | See [PSF family](PSF-FAMILY.md), [USF](USF.md), and the [2026-10-26 major-format review](../../../../../UACMan/ai/reports/Major-Audio-Profile-Review-2026-10-26.md). |
 | `gsf` | Mapping documented; fixture review pending | See [GSF profile](GSF.md). |
 | `qsf` | Mapping documented; fixture review pending | See [QSF profile](QSF.md). |
-| `spc` | Mapping updated; projection fixture review pending | See [`SPC.md`](SPC.md); source `Game` is `Game Title`, and xID6 `OST Track` is not UAC `Track Number`. Older manifest cleanup remains a separate AudioMan operation. |
+| `spc` | Mapping and projection fixtures verified; set review remains required | See [`SPC.md`](SPC.md) and the [2026-10-26 major-format review](../../../../../UACMan/ai/reports/Major-Audio-Profile-Review-2026-10-26.md); source `Game` maps to track `Album`, xID6 `OST Title` remains separate, and xID6 `OST Track` is not UAC `Track Number`. Existing UAC cleanup remains separate. |
 | `sid` | Mapping documented; fixture review pending | See [SID profile](SID.md). |
 | `ape` | Mapping documented; fixture review pending | See [APE profile](APE.md). |
 | `adx` | Mapping documented; fixture review pending | See [console streams](CONSOLE-STREAMS.md). |
