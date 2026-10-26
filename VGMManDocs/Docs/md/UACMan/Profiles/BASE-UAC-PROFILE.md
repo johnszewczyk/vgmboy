@@ -33,12 +33,37 @@ the per-set ledger recording operations and checkpoints.
 - **No-Intro Game ID** — Store the canonical No-Intro game-root title as one
   package-level string in `game.metadata["Game ID"]`. Use the DAT's displayed
   title root, without its region, revision, or dump-status suffix. Keep
-  No-Intro's numeric `dat_id` only in AudioMan's identity database; do not put
-  it in UAC metadata, `game.canonicalIDs`, or
+  No-Intro's numeric `dat_id` in AudioMan's Museum reference-DAT catalog. Do
+  not put it in UAC metadata, `game.canonicalIDs`, or
   `variants[].canonicalReleaseIDs`. A known title root does not establish
-  region or revision; keep **Region** separate and omit it when unknown. If a
-  title is not represented in No-Intro or its root remains ambiguous, omit
-  **Game ID** and leave the identity for review.
+  region or revision; keep **Region** separate. After the quick title/system
+  filter establishes a supported title root, write package **Region** as `--`
+  when territory remains unknown. Do not
+  use `--` as a filename suffix, region code, or release identifier. Before
+  the title root is identified, leave Region absent. If a title is not
+  represented in No-Intro or its root remains ambiguous, omit **Game ID** and
+  leave the identity for focused research.
+- **Non-DAT release identity** — Keep externally documented non-DAT releases
+  distinct from No-Intro retail identities. Distinguish fan-made homebrew,
+  unlicensed/bootleg releases, demos, and officially published releases; do not
+  use “homebrew” as a generic label for every unlicensed game. Do not invent a
+  No-Intro **Game ID**. In a canonical Master workflow, route an unlicensed
+  game to the platform's `Review/Non-DAT Unlicensed` bucket and record the
+  cited title/platform evidence in the set report. A source-specific UAC set
+  that is intentionally retained on its own remains in that set, with the
+  non-DAT disposition documented in its per-set report.
+- **Source ROM** — For a console-music rip, use the package-level **Source
+  ROM** field only when every included track is traced to the same exact ROM;
+  when known track origins differ, put the field on each affected member.
+  Identify the exact DAT filename and its available file hashes in the field
+  value. This is distinct from canonical **Game ID** and does not belong in
+  `game.canonicalIDs`. Require a rip log, source note, or verified source-ROM
+  hash match; never infer the ROM from GD3 game titles, a Title Snap, track
+  order, or an assumed regional equivalence. If the source does not document
+  it, omit the field and record the gap in the set report. Do not split a
+  regional aggregate unless each moved track is attributable to a source ROM;
+  keep unassigned tracks together for review and mark deliberately partial
+  regional packages **Status: Incomplete**.
 - **Artist scope** — Store a package-wide artist as **Album Artist** in
   `game.metadata`. Store a track-specific performer, artist, author, or
   composer as **Artist** on that logical track. Do not repeat a shared album
