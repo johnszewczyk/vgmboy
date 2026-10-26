@@ -32,60 +32,57 @@ been reviewed.
 
 | MetaManCore reader ID | UAC profile status | Notes |
 | --- | --- | --- |
-| `ay` | Profile pending | AY subtune and timing behavior needs UAC mapping. |
-| `sap` | Profile pending | SAP header directives, songs, and timings need UAC mapping. |
-| `nsf` | Proposed; conversion held | See [`NSF.md`](NSF.md); MetaMan M3U parsing and fallback-timing fixes are required before UAC creation. |
+| `ay` | Mapping documented; fixture review pending | See [AY/SAP/NSFE/SNDH/S98](AY-SAP-NSFE-SNDH-S98.md#ay). |
+| `sap` | Mapping documented; fixture review pending | See [AY/SAP/NSFE/SNDH/S98](AY-SAP-NSFE-SNDH-S98.md#sap). |
+| `nsf` | Mapping documented; fixture review pending | See [`NSF.md`](NSF.md); reader mappings are documented, while new package conversion still requires fixture and consumer review. |
 | `gbs` | Reader/writer/consumer mappings aligned; package review pending | See [`GBS.md`](GBS.md); header identity stays at package scope; each logical track carries `Format`, source index, and approved title/order. M3Us remain byte-exact attachments; timing is not surfaced. Review a packaged fixture in UACMan, ScanSong, and Songbase before approving production conversion. |
-| `nsfe` | Profile pending | Separate from NSF; excluded from the current JoshW NSF profile. |
-| `hes` | Draft profile | See [`HES.md`](HES.md); fixture validation pending. |
-| `sndh` | Profile pending | Document subtune and timing projection. |
-| `kss` | Draft profile | See [`KSS.md`](KSS.md); fixture validation pending. |
-| `s98` | Profile pending | Document device table, tags, and timing fields. |
-| `vgm` | Draft profile | See [`VGM.md`](VGM.md); fixture validation pending. |
-| `mdx` | Profile pending | Document Shift-JIS title and PDX dependency. |
-| `mod-protracker` | Profile pending | Document recognized MOD dialect boundaries. |
+| `nsfe` | Mapping documented; fixture review pending | Separate from NSF; see [NSFE profile](AY-SAP-NSFE-SNDH-S98.md#nsfe). |
+| `hes` | Mapping documented; fixture review pending | See [HES.md](HES.md). |
+| `sndh` | Mapping documented; fixture review pending | See [SNDH profile](AY-SAP-NSFE-SNDH-S98.md#sndh). |
+| `kss` | Mapping documented; fixture review pending | See [KSS.md](KSS.md). |
+| `s98` | Mapping documented; fixture review pending | See [S98 profile](AY-SAP-NSFE-SNDH-S98.md#s98). |
+| `vgm` | Mapping documented; fixture review pending | See [VGM.md](VGM.md). |
+| `mdx` | Mapping documented; fixture review pending | See [MDX and MOD](MDX-MOD.md). |
+| `mod-protracker` | Mapping documented; fixture review pending | See [MDX and MOD](MDX-MOD.md). |
 | `uac` | Wrapper profile | Container manifest reader; use the UAC wrapper contract, not a native-audio conversion profile. |
-| `psf-family` | Profile complete for USF; others pending | See [`USF.md`](USF.md) for Nintendo 64. USF has a real-source UAC fixture and a validated 389-package header/tag scan; source-set conversion remains pending. PSF, PSF2, SSF, and 2SF are pending. |
-| `gsf` | Profile pending | Document tags, PSFLib dependencies, and GBA header facts. |
-| `qsf` | Profile pending | Document tags, QSound blocks, and QSFLib dependencies. |
+| `psf-family` | Shared mapping documented; extension review pending | See [PSF family](PSF-FAMILY.md) and [USF](USF.md). Existing USF fixture and scan evidence is recorded there; source-set conversion remains pending. |
+| `gsf` | Mapping documented; fixture review pending | See [GSF profile](GSF.md). |
+| `qsf` | Mapping documented; fixture review pending | See [QSF profile](QSF.md). |
 | `spc` | Profile complete | See [`SPC.md`](SPC.md); live set coverage and tag outcomes are reported by AudioMan per set. |
-| `sid` | Profile pending | Document PSID/RSID header and raw-header retention. |
-| `ape` | Profile pending | Document APEv2/ID3 tags, seek table, and sample-count duration. |
-| `adx` | Profile pending | Document ADX header and loop timing. |
-| `aus` | Profile pending | Document Atomic Planet header and timing. |
-| `at3` | Profile pending | Document RIFF chunks, INFO tags, and loop timing. |
-| `msf` | Profile pending | Document Sony MSF variants and MPEG/frame timing. |
-| `svag` | Profile pending | Document SVAG header and sample/loop facts. |
-| `xmd` | Profile pending | Document XMD revisions and frame timing. |
-| `sony-sshd` | Profile pending | Covers `.ads` and `.ss2`; document supported header variants. |
-| `ps-headerless-mib` | Profile pending | Document headerless PlayStation MIB inference limits. |
-| `bink-audio` | Profile pending | Document Bink audio header facts and stream scope. |
-| `ngc-dtk-adp` | Profile pending | Document GameCube DTK ADPCM stream facts. |
-| `txth-ima-adp` | Profile pending | Document TXTH-specified IMA ADPCM source requirements. |
-| `ahx` | Profile pending | Document AHX header, version, and timing fields. |
-| `dvi` | Profile pending | Document DVI/IMA block facts and timing. |
+| `sid` | Mapping documented; fixture review pending | See [SID profile](SID.md). |
+| `ape` | Mapping documented; fixture review pending | See [APE profile](APE.md). |
+| `adx` | Mapping documented; fixture review pending | See [console streams](CONSOLE-STREAMS.md). |
+| `aus` | Mapping documented; fixture review pending | See [console streams](CONSOLE-STREAMS.md). |
+| `at3` | Mapping documented; fixture review pending | See [console streams](CONSOLE-STREAMS.md). |
+| `msf` | Mapping documented; fixture review pending | See [console streams](CONSOLE-STREAMS.md). |
+| `svag` | Mapping documented; fixture review pending | See [console streams](CONSOLE-STREAMS.md). |
+| `xmd` | Mapping documented; fixture review pending | See [console streams](CONSOLE-STREAMS.md). |
+| `sony-sshd` | Mapping documented; fixture review pending | Includes `.ads` and `.ss2`; see [console streams](CONSOLE-STREAMS.md). |
+| `ps-headerless-mib` | Mapping documented; fixture review pending | See [console streams](CONSOLE-STREAMS.md). |
+| `bink-audio` | Mapping documented; fixture review pending | See [console streams](CONSOLE-STREAMS.md). |
+| `ngc-dtk-adp` | Mapping documented; fixture review pending | See [Nintendo streams](NINTENDO-STREAMS.md). |
+| `txth-ima-adp` | Mapping documented; fixture review pending | See [Nintendo streams](NINTENDO-STREAMS.md). |
+| `ahx` | Mapping documented; fixture review pending | See [console streams](CONSOLE-STREAMS.md). |
+| `dvi` | Mapping documented; fixture review pending | See [console streams](CONSOLE-STREAMS.md). |
 | `xa` | Profile complete | See [`PSX-CDXA.md`](PSX-CDXA.md); the PSX-specific workflow is also defined in the [protocol](../protocols/PSX-CDXA.protocol.md). |
-| `nds-strm` | Profile pending | Document Nintendo DS STRM header and channel facts. |
-| `nds-strm-ffta2` | Profile pending | Document the FFTA2-specific STRM extension. |
-| `ngc-dsp-standard` | Profile pending | Document Nintendo DSP header and loop/sample fields. |
-| `rs03` | Profile pending | Document RS03 metadata and supported member scope. |
-| `ngc-thp-audio` | Profile pending | Document THP audio stream and timing fields. |
-| `agsc` | Profile pending | Document AGSC header and sequence facts. |
-| `genh` | Profile pending | Document GENH-derived fields and external configuration. |
-| `standard-audio` | Profile pending | Document each supported codec and selected canonical-field projection. |
+| `nds-strm` | Mapping documented; fixture review pending | See [Nintendo streams](NINTENDO-STREAMS.md). |
+| `nds-strm-ffta2` | Mapping documented; fixture review pending | See [Nintendo streams](NINTENDO-STREAMS.md). |
+| `ngc-dsp-standard` | Mapping documented; fixture review pending | See [Nintendo streams](NINTENDO-STREAMS.md). |
+| `rs03` | Mapping documented; fixture review pending | See [Nintendo streams](NINTENDO-STREAMS.md). |
+| `ngc-thp-audio` | Mapping documented; fixture review pending | See [Nintendo streams](NINTENDO-STREAMS.md). |
+| `agsc` | Mapping documented; fixture review pending | See [Nintendo streams](NINTENDO-STREAMS.md). |
+| `genh` | Mapping documented; fixture review pending | See [GENH profile](GENH.md). |
+| `standard-audio` | Mapping documented; fixture review pending | See [standard audio profile](STANDARD-AUDIO.md). |
 
 ## Completion goal
 
-Complete a reusable profile for every major native game-audio reader in
-`MetaManCore.supportedFormats`, then finish the remaining console-derived and
-standard audio readers. Work first on formats already represented in
-AudioMan's Garden and Master collections. Keep this register current as each
-profile advances. A complete profile states the reader and version facts,
-package/member/asset roles, field mappings and scope, dependency or playlist
-rules, preservation limits, and only the checks supported by recorded format
-evidence. Keep unknown fields unknown; do not claim a profile or fixture is
-validated when the evidence has not been recorded. This backlog does not block
-fast matching or metadata tagging of existing UACs.
+Document the reader-to-UAC mapping for every major native game-audio reader in
+`MetaManCore.supportedFormats`, including console-derived and standard
+audio readers. A complete mapping states reader/version facts,
+package/member/asset roles, field scope, dependency or playlist rules, and
+preservation limits. Track fixture and package approval separately. Do not
+claim a fixture or package is validated without recorded evidence. This
+backlog does not block fast matching or metadata tagging of existing UACs.
 
 ## Profile and report workflow
 
@@ -109,9 +106,10 @@ fast matching or metadata tagging of existing UACs.
    checks, review findings, and validation evidence. Do not put live-set
    output counts in an evergreen format procedure or duplicate them as a
    UACMan status report.
-6. Promote a register row from pending only after its profile describes the
-   complete reader-to-UAC mapping and has a verified collection report or
-   an explicit format fixture report.
+6. Mark a profile mapping documented when it specifies the complete
+   reader-to-UAC mapping. Track fixture and package approval independently;
+   those checks are required before approving new conversions, not before
+   tagging or comparing an existing UAC.
 
 ## Hash and timing scope
 
