@@ -19,7 +19,25 @@ writable SwiftPM, Clang, and XDG caches under its evidence directory unless
 the caller supplies other paths. It does not stage, commit, stash, reset, or
 change Git configuration.
 
-## Current evidence
+## Latest working-tree sweep
+
+The family check recorded `a08aebe6` plus pre-existing uncommitted changes in
+`/private/tmp/vgmman-oversight-20261027/source-state/`. Documentation, dependency
+preparation, CatalogReader, VGMBoy, MetaMan, UACWrapper, UACMan, and ViewBoy
+checks passed. The initial run failed FrontendCore, ScanSong, and CocoaSpice.
+After correcting stale test expectations, the full FrontendCore and CocoaSpice
+package suites and the focused GBS scanner test passed. ScanSong still has two
+failing synthetic fixtures: a schema-24 fixture is compared to schema 25, and
+an NSF header omits a valid first-track index. Optional real-source fixtures
+were skipped. The family command itself was not rerun after these corrections.
+
+VGMBoy's 76 tests, including AAC export and live transport tests, passed on
+this host. These results use a dirty working tree and do not establish packaged
+UI or audible playback. The linker warned that several Homebrew libraries were
+built for macOS 27 while the app targets macOS 26; deployment to macOS 26 has
+not been verified.
+
+## Earlier clean-source evidence
 
 The current worktree check included the active ScanSong UI/progress and
 documentation changes plus other already-dirty family work. At committed
