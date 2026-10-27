@@ -16,7 +16,7 @@ VGMSTREAM* init_vgmstream_hd_bd(STREAMFILE* sf) {
 
     // .hd: standard
     // .hdb: found in PrincessSoft's PS2 games (.PAC bigfiles don't seem to have names but exe does refers to HDB)
-    if (!check_extensions(sf, "hd,hbd,iecs"))
+    if (!check_extensions(sf, "hd,hbd"))
         return NULL;
 
     // bank format mainly for sequences, sometimes used for sfx/voices or pseudo-streams with bgm.
@@ -70,15 +70,22 @@ VGMSTREAM* init_vgmstream_hd_bd(STREAMFILE* sf) {
         return NULL;
     }
 
-    // calc size via next offset
-    uint32_t next_offset;
-    if (h.target_subsong == h.total_subsongs) {
-        next_offset = bd_size;
+    // calc size via next offset (assumes that offsets are ordered)
+    uint32_t next_offset = 0;
+    {
+        // rarely several offsets point to the same wave, so find next-next offset (except for last subsong)
+        for (int i = h.target_subsong - 1; i < h.total_subsongs - 1; i++) {
+            uint32_t nextinfo_offset = read_u32le(vagi_offset + 0x10 + 0x04 * (i + 1), sf) + vagi_offset;
+            next_offset = read_u32le(nextinfo_offset + 0x00, sf);
+            if (next_offset != h.stream_offset)
+                break;
+        }
+
+        // max subsongs reached
+        if (next_offset == 0 || next_offset == h.stream_offset)
+            next_offset = bd_size;
     }
-    else {
-        uint32_t nextinfo_offset = read_u32le(vagi_offset + 0x10 + 0x04 * (h.target_subsong - 1 + 1), sf) + vagi_offset;
-        next_offset = read_u32le(nextinfo_offset + 0x00, sf);
-    }
+
     h.stream_size = next_offset - h.stream_offset;
 
     h.channels = 1;
@@ -92,19 +99,8 @@ VGMSTREAM* init_vgmstream_hd_bd(STREAMFILE* sf) {
     h.open_stream = true;
     h.has_subsongs = true;
 
-    // Silent Hill 2's IECS files contain a header plus a pasted BD body, but
-    // their header reports only the BD size. The body begins at the end of the
-    // file minus that reported size (with any leading bank sections retained).
-    if (check_extensions(sf, "iecs")) {
-        if (get_streamfile_size(sf) < bd_size)
-            goto fail;
-
-        h.sf_head = sf;
-        h.sf_body = sf;
-        h.stream_offset += get_streamfile_size(sf) - bd_size;
-    }
     // detect hdb pasted together (handle as a separate meta?)
-    else if (get_streamfile_size(sf) == hd_size + bd_size) {
+    if (get_streamfile_size(sf) == hd_size + bd_size) {
         if (!check_extensions(sf, "hbd"))
             goto fail;
 

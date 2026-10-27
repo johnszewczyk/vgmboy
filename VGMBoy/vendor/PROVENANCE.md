@@ -11,7 +11,7 @@ inputs under `VGMBoy/patches/`.
 | `libvgm` | `867223e7c33d63de115d1ab955f784c44f19040a` | `745dd264f520bc3814c39c9b8455e59e893d2d24a270c3f3d2a261af247337b0` | [ValleyBell/libvgm](https://github.com/ValleyBell/libvgm) |
 | `lazyusf2` | `421f00bcaa1988b8e1825e91780129f24fbd1aa0` | `9a7c1c47d2f57c56cd32e8a920c589a7c6b4f06075214e56edc9aa115f50c8f0` | [kode54/lazyusf2](https://gitlab.com/kode54/lazyusf2) |
 | `Play!` | `50aedca2639521bc498ace0b2be1ea012801a86a` | `e9ae6c4e998725fc7ba402cd6c2c1ea3ec20210b5443ac474078a2dd9aed251c` | [jpd002/Play-](https://github.com/jpd002/Play-); required nested source included |
-| `vgmstream` | `807b4948cfc1de0cd90e377e9c56f74664c54a1c` | `03e6faa4b00c2d3d7ec2367cf523f34e00611d15d8187ec51db50bbfafa3804f` | [vgmstream/vgmstream](https://github.com/vgmstream/vgmstream); compatibility patch remains separate |
+| `vgmstream` | `d9875b1fff307e4759dfb85e49e3d5e6fb196f7c` (`r2168`) | `d080635776a4ac8d45d77fe7b1cc3e7b8248baaf3bf3320ee5cdd608d22e903e` | [vgmstream/vgmstream](https://github.com/vgmstream/vgmstream); compatibility patch remains separate |
 | `aosdk` | `e359a6e5154b2ba8499fb1f24a1f5f8a18538a61` | `148dd78f273a056da67e80596d603ab001adaf96c9e1c68cf731d486922190b7` | [nmlgc/aosdk](https://github.com/nmlgc/aosdk); QSF lifecycle patch remains separate |
 | `highly_quixotic` | `d730174d436e8cabca90fabdb3ad4ddf614d31cc` | `91732a4d37b2acf32323e2d960ddab0916910c0c8d666fa07d1f1d5637373b42` | [kode54/highly_quixotic](https://gitlab.com/kode54/highly_quixotic) |
 | `mGBA` | `0.11.0`; upstream revision not recorded | `27e65466e606a38b0098e94e4636dab2e5028b0d5bb0341f7b59a4ea630b3cbe` | [mgba-emu/mgba](https://github.com/mgba-emu/mgba); used by the Highly Complete playback bridge |
@@ -27,3 +27,8 @@ identifies the source base where available; the SHA-256 covers the exact checked
 Compatibility patches are separately versioned under `VGMBoy/patches/` and applied to disposable
 build copies where required. Missing upstream revisions remain explicitly marked rather than
 being inferred from a local snapshot hash.
+
+For the `vgmstream` digest, sort tracked paths relative to `vendor/vgmstream/`,
+write each as `<file SHA-256><two spaces><relative path><newline>`, and SHA-256
+the resulting UTF-8 records. The checked-in tree includes its compatibility
+patch in `cmake/dependencies/ffmpeg.cmake`.

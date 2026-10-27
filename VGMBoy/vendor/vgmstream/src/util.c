@@ -32,6 +32,13 @@ uint32_t clamp_u32(uint32_t v, uint32_t min, uint32_t max) {
     return v;
 }
 
+/* math helpers */
+int32_t clamp_s32(int32_t v, int32_t min, int32_t max) {
+    if (v < min) return min;
+    if (v > max) return max;
+    return v;
+}
+
 size_t align_size_to_block(size_t value, size_t block_align) {
     if (!block_align)
         return 0;
@@ -39,17 +46,6 @@ size_t align_size_to_block(size_t value, size_t block_align) {
     size_t extra_size = value % block_align;
     if (extra_size == 0) return value;
     return (value + block_align - extra_size);
-}
-
-/* length is maximum length of dst. dst will always be null-terminated if
- * length > 0 */
-void concatn(int length, char * dst, const char * src) {
-    int i,j;
-    if (length <= 0) return;
-    for (i=0;i<length-1 && dst[i];i++);   /* find end of dst */
-    for (j=0;i<length-1 && src[j];i++,j++)
-        dst[i]=src[j];
-    dst[i]='\0';
 }
 
 bool check_subsongs(int* target_subsong, int total_subsongs) {

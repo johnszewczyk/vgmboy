@@ -23,7 +23,10 @@
 
 /* ************************************* */
 
-#define XMPLAY_MAX_PATH  32768
+#define XMPLAY_MAX_PATH  4096
+#define XMPLAY_INFO_DESCRIPTION_MAX 1024
+#define XMPLAY_INFO_FORMAT_MAX 256
+#define XMPLAY_INFO_LENGTH_MAX 32
 
 /* XMPlay function library */
 static XMPFUNC_IN* xmpf_in;
@@ -230,44 +233,46 @@ void WINAPI xmplay_GetInfoText(char* format, char* length) {
     int tmin = t / 60;
     int tsec = t % 60;
 
-    sprintf(format, "%s", vgmstream->format->codec_name);
-    sprintf(length, "%d:%02d - %dKb/s - %dHz", tmin, tsec, bps, rate);
+    size_t format_size = XMPLAY_INFO_FORMAT_MAX; // no idea 
+    size_t length_size = XMPLAY_INFO_LENGTH_MAX;
+    snprintf(format, format_size, "%s", vgmstream->format->codec_name);
+    snprintf(length, length_size, "%d:%02d - %dHz - %dKb/s", tmin, tsec, rate, bps);
 }
 
 /* info for the "General" window/tab (buf is ~40K) */
 void WINAPI xmplay_GetGeneralInfo(char* buf) {
-
     if (!buf)
         return;
     if (!vgmstream)
         return;
 
-    
-    char description[1024];
+    char description[XMPLAY_INFO_DESCRIPTION_MAX];
     libvgmstream_format_describe(vgmstream, description, sizeof(description));
 
     /* tags are divided with a tab and lines with carriage return so we'll do some guetto fixin' */
-	int tag_done = 0;
+	bool tag_done = false;
 	description[0] -= 32; //Replace small letter with capital for consistency with XMPlay's output
     for (int i = 0; i < 1024; i++) {
         if (description[i] == '\0')
             break;
 
-        if (description[i] == ':' && !tag_done) { /* to ignore multiple ':' in a line*/
+        if (description[i] == ':' && !tag_done) { // to ignore multiple ':' in a line
             description[i] = ' ';
-            description[i+1] = '\t';
-            tag_done = 1;
+            if (description[i+1] != '\0')
+                description[i+1] = '\t';
+            tag_done = true;
         }
 
         if (description[i] == '\n') {
             description[i] = '\r';
-			if (description[i+1])
-				description[i+1] -= 32; //Replace small letter with capital for consistency with XMPlay's output
-            tag_done = 0;
+			if (description[i+1] != '\0')
+				description[i+1] -= 32; // replace small letter with capital for consistency with XMPlay's output
+            tag_done = false;
         }
     }
 
-    sprintf(buf,"%s", description);
+    size_t buf_size = sizeof(description); // "buf is ~40K"... hopefully.
+    snprintf(buf, buf_size, "%s", description);
 }
 
 /* get the seeking granularity in seconds */

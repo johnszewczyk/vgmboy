@@ -7,6 +7,7 @@
 #include "../util/endianness.h"
 #include "../util/paths.h"
 #include "../util/companion_files.h"
+#include "../util/string_utils.h"
 
 #define TXT_LINE_MAX 2048 /* probably ~1000 would be ok */
 #define TXT_LINE_KEY_MAX 128
@@ -18,6 +19,9 @@
 // multitxth
 #define TXT_PATH_LIMIT_MAX 4096 //PATH_LIMIT
 #define TXT_PATH_LIMIT_STR "4095"
+
+#define TXTH_COEF_TABLE_CHANNELS 16
+
 
 /* known TXTH types */
 typedef enum {
@@ -119,7 +123,7 @@ typedef struct {
     uint32_t coef_big_endian;
     uint32_t coef_mode;
     bool coef_table_set;
-    uint8_t coef_table[0x02*16 * 16]; /* reasonable max */
+    uint8_t coef_table[sizeof(short) * 16 * TXTH_COEF_TABLE_CHANNELS]; /* reasonable max */
 
     bool hist_set;
     uint32_t hist_offset;
@@ -584,8 +588,15 @@ VGMSTREAM* init_vgmstream_txth(STREAMFILE* sf) {
                 read_s16_t read_s16 = txth.coef_big_endian ? read_s16be : read_s16le;
                 get_s16_t get_s16 =txth.coef_big_endian ? get_s16be : get_s16le;
 
+                if (txth.coef_table_set && (
+                        vgmstream->channels > TXTH_COEF_TABLE_CHANNELS || 
+                        txth.coef_spacing > 16 * 0x02)) {
+                    goto fail;
+                }
+
                 for (int i = 0; i < vgmstream->channels; i++) {
-                    if (txth.coef_mode == 0) { /* normal coefs */
+                    if (txth.coef_mode == 0) {
+                        /* normal coefs */
                         for (int j = 0; j < 16; j++) {
                             int16_t coef;
                             if (txth.coef_table_set)
@@ -595,7 +606,8 @@ VGMSTREAM* init_vgmstream_txth(STREAMFILE* sf) {
                             vgmstream->ch[i].adpcm_coef[j] = coef;
                         }
                     }
-                    else { /* split coefs (first all 8 positive, then all 8 negative [P.N.03 (GC), Viewtiful Joe (GC)] */
+                    else {
+                        /* split coefs (first all 8 positive, then all 8 negative [P.N.03 (GC), Viewtiful Joe (GC)] */
                         for (int j = 0; j < 8; j++) {
                             vgmstream->ch[i].adpcm_coef[j*2+0] = read_s16(txth.coef_offset + i*txth.coef_spacing + j*2 + 0x00, txth.sf_head);
                             vgmstream->ch[i].adpcm_coef[j*2+1] = read_s16(txth.coef_offset + i*txth.coef_spacing + j*2 + 0x10, txth.sf_head);
@@ -745,7 +757,7 @@ fail:
 
 static VGMSTREAM* init_subfile(txth_header* txth) {
     VGMSTREAM* vgmstream = NULL;
-    char extension[PATH_LIMIT];
+    char extension[256];
     STREAMFILE* sf_sub = NULL;
 
 
@@ -768,8 +780,8 @@ static VGMSTREAM* init_subfile(txth_header* txth) {
      * - etc
      * to avoid it we set a particular fake extension and detect it when reading .txth
      */
-    strcpy(extension, ".subfile_txth.");
-    strcat(extension, txth->subfile_extension);
+    strcpy_v(extension, sizeof(extension), ".subfile_txth.");
+    strcat_v(extension, sizeof(extension), txth->subfile_extension);
 
     if (txth->debug)
         vgm_logi("TXTH: subfile offset=%x, size=%x\n", txth->subfile_offset, txth->subfile_size);
@@ -860,7 +872,7 @@ static STREAMFILE* open_txth(STREAMFILE* sf) {
         return NULL; /* detect special case of subfile-within-subfile */
 
     base_ext = filename_extension(filename);
-    concatn(sizeof(filename), filename, ".txth");
+    strcat_v(filename, sizeof(filename), ".txth");
     txth_ext = filename_extension(filename);
 
     /* try "(path/)(name.ext).txth" */
@@ -873,7 +885,7 @@ static STREAMFILE* open_txth(STREAMFILE* sf) {
 
     /* try "(path/)(.ext).txth" */
     if (base_ext) {
-        base_ext--; //get_streamfile_path(sf, filename, sizeof(filename));
+        base_ext--;
 
         sf_text = open_streamfile_by_filename(sf, base_ext);
         if (sf_text) return sf_text;
@@ -1138,21 +1150,6 @@ static int parse_endianness(txth_header* txth, const char* val, uint32_t* p_valu
     return 1;
 fail:
     return 0;
-}
-
-static int is_absolute(const char* fn) {
-    return fn[0] == '/' || fn[0] == '\\'  || fn[1] == ':';
-}
-
-static STREAMFILE* open_path_streamfile(STREAMFILE* sf, char* path) {
-    fix_dir_separators(path); /* clean paths */
-
-    /* absolute paths are detected for convenience, but since it's hard to unify all OSs
-    * and plugins, they aren't "officially" supported nor documented, thus may or may not work */
-    if (is_absolute(path))
-        return open_streamfile(sf, path); /* from path as is */
-    else
-        return open_streamfile_by_pathname(sf, path); /* from current path */
 }
 
 static int parse_keyval(STREAMFILE* sf_, txth_header* txth, const char* key, char* val) {
@@ -1551,7 +1548,7 @@ static int parse_keyval(STREAMFILE* sf_, txth_header* txth, const char* key, cha
             txth->sf_head_opened = true;
         }
         else { /* open file */
-            txth->sf_head = open_path_streamfile(txth->sf, val);
+            txth->sf_head = open_streamfile_by_absname(txth->sf, val);
             if (!txth->sf_head) goto fail;
             txth->sf_head_opened = true;
         }
@@ -1587,7 +1584,7 @@ static int parse_keyval(STREAMFILE* sf_, txth_header* txth, const char* key, cha
             txth->sf_body_opened = true;
         }
         else { /* open file */
-            txth->sf_body = open_path_streamfile(txth->sf, val);
+            txth->sf_body = open_streamfile_by_absname(txth->sf, val);
             if (!txth->sf_body) goto fail;
             txth->sf_body_opened = true;
         }
@@ -1840,7 +1837,7 @@ static int parse_string(STREAMFILE* sf, txth_header* txth, const char* val, char
     return n;
 }
 
-static bool parse_coef_table(STREAMFILE* sf, txth_header* txth, const char* val, uint8_t* out_value, size_t out_size) {
+static bool parse_coef_table(STREAMFILE* sf, txth_header* txth, const char* val, uint8_t* coef_table, size_t coef_table_size) {
     if (!sf) { //not needed but...
         VGM_LOG("TXTH: wrong header SF\n");
         return false;
@@ -1860,10 +1857,10 @@ static bool parse_coef_table(STREAMFILE* sf, txth_header* txth, const char* val,
             val += 2;
         if (sscanf(val, " %2x", &byte) != 1)
             return false;
-        if (done + 1 >= out_size)
+        if (done + 1 >= coef_table_size)
             return false;
 
-        out_value[done] = (uint8_t)byte;
+        coef_table[done] = (uint8_t)byte;
         done++;
         val += 2;
     }
@@ -1902,15 +1899,15 @@ static int read_name_table_keyval(txth_header* txth, const char* line, char* key
     /* try "(name)#subsong: (val))" */
     ok = sscanf(line, " %"TXT_LINE_KEY_STR"[^\t#:]#%i : %"TXT_LINE_VAL_STR"[^\t#\r\n] ", key, &subsong, val);
     if (ok == 3 && subsong == txth->target_subsong) {
-        //;VGM_LOG("TXTH: name %s + subsong %i get\n", key, subsong);
+        //;VGM_LOG("TXTH: name %s + subsong %i get + val=%s\n", key, subsong, val);
         return 1;
     }
 
     /* try "(empty)#subsong: (val))" */
     key[0] = '\0';
-    ok = sscanf(line, " #%i: %"TXT_LINE_VAL_STR"[^\t#\r\n] ", &subsong, val);
+    ok = sscanf(line, " #%i : %"TXT_LINE_VAL_STR"[^\t#\r\n] ", &subsong, val);
     if (ok == 2 && subsong == txth->target_subsong) {
-        //;VGM_LOG("TXTH: default + subsong %i get\n", subsong);
+        //;VGM_LOG("TXTH: default + subsong %i get + val=%s\n", subsong, val);
         return 1;
     }
 
@@ -1944,6 +1941,7 @@ static bool parse_name_table(txth_header* txth, char* set_name) {
     char filename[PATH_LIMIT];
     char basename[PATH_LIMIT];
     const char* table_name;
+    const char* table_ext;
 
     /* just in case */
     if (!txth->sf_text || !txth->sf_body)
@@ -1955,6 +1953,12 @@ static bool parse_name_table(txth_header* txth, char* set_name) {
         table_name = ".names.txt";
     else
         table_name = set_name;
+
+    // just in case enforce extension
+    table_ext = filename_extension(table_name);
+    if (!table_ext || (strcasecmp(table_ext, "txth") != 0 && strcasecmp(table_ext, "txt") != 0))
+        goto fail;
+
 
     /* open companion file near .txth */
     sf_names = open_streamfile_by_filename(txth->sf_text, table_name);
@@ -1998,7 +2002,7 @@ static bool parse_name_table(txth_header* txth, char* set_name) {
                     || is_string_match(fullname, key)) {
                 int n;
                 char subval[TXT_LINE_MAX];
-                const char *current = val;
+                const char* current = val;
 
                 while (current[0] != '\0') {
                     ok = sscanf(current, " %"TXT_LINE_STR"[^\t#\r\n,]%n ", subval, &n);
@@ -2045,10 +2049,16 @@ static bool parse_multi_txth(txth_header* txth, char* names) {
 
     while (names[0] != '\0') {
         STREAMFILE* sf_test = NULL;
-        int found;
+        const char* multi_ext;
+        bool found;
 
         ok = sscanf(names, " %"TXT_PATH_LIMIT_STR"[^\t#\r\n,]%n ", name, &n);
         if (ok != 1)
+            goto fail;
+
+        // just in case enforce extension
+        multi_ext = filename_extension(name);
+        if (!multi_ext || strcasecmp(multi_ext, "txth") != 0)
             goto fail;
 
         //;VGM_LOG("TXTH: multi name %s\n", name);
@@ -2159,8 +2169,6 @@ static bool parse_num(STREAMFILE* sf, txth_header* txth, const char* val, uint32
             if (subsong_spacing)
                 offset = offset + subsong_spacing * (txth->target_subsong - 1);
 
-            if (txth->debug)
-                vgm_logi("TXTH:  use value at 0x%x (%s %ib)\n", offset, big_endian ? "BE" : "LE", size * 8);
 
             switch(size) {
                 case 1: value = read_u8(offset,sf); break;
@@ -2169,6 +2177,10 @@ static bool parse_num(STREAMFILE* sf, txth_header* txth, const char* val, uint32
                 case 4: value = big_endian ? read_u32be(offset,sf) : read_u32le(offset,sf); break;
                 default: goto fail;
             }
+
+            if (txth->debug)
+                vgm_logi("TXTH:  use value at 0x%x = 0x%x (%s %ib)\n", offset, value, big_endian ? "BE" : "LE", size * 8);
+
             value_read = 1;
         }
         else if (type >= '0' && type <= '9') { /* unsigned constant */
@@ -2300,9 +2312,14 @@ static int get_bytes_to_samples(txth_header* txth, uint32_t bytes) {
         return 0;
     }
 
+    // div-by-zero check is done by most helpers but just in case
+    if (txth->channels == 0) {
+        return 0;
+    }
+
     switch(txth->codec) {
         case MS_IMA:
-            if (txth->interleave && txth->frame_size) /* mono mode */ //TODO maybe some helper instead
+            if (txth->interleave && txth->frame_size && txth->channels) /* mono mode */ //TODO maybe some helper instead
                 return ms_ima_bytes_to_samples(bytes / txth->channels, txth->frame_size, 1);
             return ms_ima_bytes_to_samples(bytes, txth->frame_size ? txth->frame_size : txth->interleave, txth->channels);
         case XBOX:

@@ -69,6 +69,10 @@ for ScanSong's external inspection executables.
   unpinned snapshots; it never changes a checkout or build product.
 - Native dependency products are keyed by source revision/diff, build script,
   compatibility patch, compiler, CMake version, SDK, and deployment target.
+  The vgmstream playback and scanner builders clean derived CMake objects when
+  their input signature changes; imported source timestamps can be older than
+  the objects they replace. A rebuilt dependency is restaged even if its
+  signature matches the previously staged product.
   `build-app.sh` removes only
   its clean Swift release directory and app staging directory; it preserves the
   validated dependency products and stamps.

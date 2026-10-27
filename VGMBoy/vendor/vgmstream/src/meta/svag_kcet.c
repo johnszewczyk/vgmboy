@@ -21,7 +21,6 @@ VGMSTREAM* init_vgmstream_svag_kcet(STREAMFILE* sf) {
     /* test padding (a set "KCE-Tokyo ..." phrase) after 0x1c to catch bad rips,
      * at 0x400 may be header  again (Silent Hill 2) or more padding (Silent Scope 2) */
     if (channel_count > 1 && 
-        read_32bitBE(0x400,sf) != 0 &&
         read_32bitBE(0x400,sf) != 0x53766167 &&     /* "Svag" */
         read_32bitBE(0x400,sf) != 0x44657369)       /* "Desi" */
         goto fail;

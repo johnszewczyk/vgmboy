@@ -76,7 +76,8 @@
       "name": "vgmstream",
       "kind": "git",
       "source": "vendor/vgmstream",
-      "current": "807b4948cfc1de0cd90e377e9c56f74664c54a1c",
+      "current": "d9875b1fff307e4759dfb85e49e3d5e6fb196f7c",
+      "sourceIdentity": "upstream r2168 release commit plus compatibility patch",
       "upstream": "https://github.com/vgmstream/vgmstream.git",
       "milestoneCheck": "release-or-tag",
       "formats": ["ADX", "XA", "AT3", "FSB", "VAG", "AIFC", "OGG"]
@@ -154,7 +155,7 @@
       "name": "libsidplayfp",
       "kind": "homebrew",
       "formula": "libsidplayfp",
-      "current": "3.1.0",
+      "current": "3.1.2",
       "upstream": "https://github.com/libsidplayfp/libsidplayfp",
       "milestoneCheck": "release-or-tag",
       "formats": ["SID"]
@@ -174,7 +175,7 @@
       "name": "FFmpeg",
       "kind": "homebrew",
       "formula": "ffmpeg",
-      "current": "8.1.2_1",
+      "current": "9.0.2_1",
       "upstream": "https://ffmpeg.org/",
       "milestoneCheck": "release-or-tag",
       "formats": ["APE", "MP2", "TAK"]

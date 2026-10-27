@@ -108,8 +108,8 @@ ifneq ($(VGM_X64),0)
 endif
 
 ifeq ($(TARGET_OS),Windows_NT)
-  VGM_UNICODE ?= 1
-  ifneq ($(VGM_UNICODE),0)
+  VGM_WINAMP_UNICODE ?= 0
+  ifneq ($(VGM_WINAMP_UNICODE),0)
     # -DUNICODE/_UNICODE forces certain APIs to use UTF-16
     DEF_CFLAGS  += -DUNICODE -D_UNICODE -DVGM_STDIO_UNICODE -municode
   endif
@@ -119,6 +119,16 @@ endif
 VGM_G7221 ?= 1
 ifneq ($(VGM_G7221),0)
   LIBS_CFLAGS  += -DVGM_USE_G7221
+endif
+
+VGM_G7221 ?= 1
+ifneq ($(VGM_G7221),0)
+  LIBS_CFLAGS  += -DVGM_USE_G719
+endif
+
+VGM_ATRAC9 ?= 1
+ifneq ($(VGM_ATRAC9),0)
+  LIBS_CFLAGS  += -DVGM_USE_ATRAC9
 endif
 
 
@@ -141,25 +151,11 @@ ifeq ($(TARGET_OS),Windows_NT)
     LIBS_TARGET_EXT_LIBS += libmpg123-0.dll.a
   endif
 
-  VGM_G719 ?= 1
-  ifneq ($(VGM_G719),0)
-    LIBS_CFLAGS  += -DVGM_USE_G719
-    LIBS_LDFLAGS += -lg719_decode
-    LIBS_TARGET_EXT_LIBS += libg719_decode.dll.a
-  endif
-
   VGM_FFMPEG ?= 1
   ifneq ($(VGM_FFMPEG),0)
     LIBS_CFLAGS  += -DVGM_USE_FFMPEG -I../ext_includes/ffmpeg
-    LIBS_LDFLAGS += -lavcodec-vgmstream-59 -lavformat-vgmstream-59 -lavutil-vgmstream-57 -lswresample-vgmstream-4
-    LIBS_TARGET_EXT_LIBS += avcodec-vgmstream-59.dll.a avformat-vgmstream-59.dll.a avutil-vgmstream-57.dll.a swresample-vgmstream-4.dll.a
-  endif
-
-  VGM_ATRAC9 ?= 1
-  ifneq ($(VGM_ATRAC9),0)
-    LIBS_CFLAGS  += -DVGM_USE_ATRAC9
-    LIBS_LDFLAGS += -latrac9
-    LIBS_TARGET_EXT_LIBS += libatrac9.dll.a
+    LIBS_LDFLAGS += -lavcodec-vgmstream-63 -lavformat-vgmstream-63 -lavutil-vgmstream-61 -lswresample-vgmstream-7
+    LIBS_TARGET_EXT_LIBS += avcodec-vgmstream-63.dll.a avformat-vgmstream-63.dll.a avutil-vgmstream-61.dll.a swresample-vgmstream-7.dll.a
   endif
 
   VGM_CELT ?= 1
@@ -201,17 +197,6 @@ else
   ifneq ($(VGM_FFMPEG),0)
     LIBS_CFLAGS  += -DVGM_USE_FFMPEG
     LIBS_LDFLAGS += -lavcodec -lavformat -lavutil -lswresample
-  endif
-
-  VGM_ATRAC9 ?= 0
-  ifneq ($(VGM_ATRAC9),0)
-    LIBS_CFLAGS  += -DVGM_USE_ATRAC9
-    ifeq ($(VGM_ATRAC9),1)
-      LIBS_LDFLAGS += -latrac9
-    endif
-    ifeq ($(VGM_ATRAC9),2)
-      LIBS_LDFLAGS += -l:libatrac9.a
-    endif
   endif
 
   VGM_CELT ?= 0

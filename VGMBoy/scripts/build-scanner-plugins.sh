@@ -32,9 +32,9 @@ command -v cmake >/dev/null 2>&1 || { echo "Missing cmake" >&2; exit 1; }
 # as part of its vgmstream build. Apply it here too, without invoking or staging
 # unrelated playback decoders for a ScanSong build.
 if [[ -e "$VGMSTREAM_SOURCE/.git" ]]; then
-    if git -C "$VGMSTREAM_SOURCE" apply --check "$VGMSTREAM_PATCH" >/dev/null 2>&1; then
-        git -C "$VGMSTREAM_SOURCE" apply "$VGMSTREAM_PATCH"
-    elif ! git -C "$VGMSTREAM_SOURCE" apply --reverse --check "$VGMSTREAM_PATCH" >/dev/null 2>&1; then
+    if git -C "$VGMSTREAM_SOURCE" apply --unidiff-zero --check "$VGMSTREAM_PATCH" >/dev/null 2>&1; then
+        git -C "$VGMSTREAM_SOURCE" apply --unidiff-zero "$VGMSTREAM_PATCH"
+    elif ! git -C "$VGMSTREAM_SOURCE" apply --unidiff-zero --reverse --check "$VGMSTREAM_PATCH" >/dev/null 2>&1; then
         echo "vgmstream source does not match the VGMBoy compatibility patch" >&2
         exit 1
     fi
@@ -137,6 +137,9 @@ cmake -S "$VGMSTREAM_SOURCE" -B "$VGMSTREAM_BUILD" \
     -DUSE_ATRAC9=OFF \
     -DUSE_CELT=OFF \
     -DUSE_SPEEX=OFF
+# The source signature changed, so discard old objects even if a newly
+# imported snapshot has older file timestamps.
+cmake --build "$VGMSTREAM_BUILD" --target clean
 cmake --build "$VGMSTREAM_BUILD" --target vgmstream_cli --parallel "${VGMBoy_BUILD_JOBS:-4}"
 
 VGMSTREAM_BUILT="$VGMSTREAM_BUILD/cli/vgmstream-cli"

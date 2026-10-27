@@ -32,7 +32,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y yasm libopus-dev
+          sudo apt-get install -y nasm libopus-dev
   
       - name: Create build environment
         # Some projects don't allow in-source building, so create a separate build directory
@@ -58,20 +58,6 @@ jobs:
             ${{runner.workspace}}/build/dependencies/ffmpeg/bin/usr/local/include
             ${{runner.workspace}}/build/dependencies/ffmpeg/bin/usr/local/lib
           key: linux-${{ env.RELEASE }}-ffmpeg-${{ hashFiles('cmake/dependencies/ffmpeg.cmake') }}
-  
-      - name: Cache atrac9
-        uses: actions/cache@v5
-        with:
-          path: |
-            ${{runner.workspace}}/build/dependencies/LibAtrac9/bin
-          key: linux-${{ env.RELEASE }}-atrac9-${{ hashFiles('cmake/dependencies/atrac9.cmake') }}
-  
-      - name: Cache g719
-        uses: actions/cache@v5
-        with:
-          path: |
-            ${{runner.workspace}}/build/dependencies/libg719_decode/libg719_decode.a
-          key: linux-${{ env.RELEASE }}-g719-${{ hashFiles('cmake/dependencies/g719.cmake') }}
   
       - name: Cache mpg123
         uses: actions/cache@v5
