@@ -11,8 +11,8 @@ private func temporaryStore() throws -> FavoriteStore {
 @Test
 func storePreservesOrderAndPersistsAcrossInstances() throws {
     let store = try temporaryStore()
-    let first = FavoriteTrackSnapshot(identity: FavoriteTrackIdentity(sourcePath: "/music/a.spc"), title: "A")
-    let second = FavoriteTrackSnapshot(identity: FavoriteTrackIdentity(sourcePath: "/music/b.spc"), title: "B")
+    let first = FavoriteTrackSnapshot(identity: FavoriteTrackIdentity(sourcePath: "/music/a.spc"), title: "A", addedAtMilliseconds: 1_000)
+    let second = FavoriteTrackSnapshot(identity: FavoriteTrackIdentity(sourcePath: "/music/b.spc"), title: "B", addedAtMilliseconds: 2_000)
 
     let mutation = try store.toggle([first, second])
     #expect(mutation.added)
@@ -30,15 +30,16 @@ func storePreservesOrderAndPersistsAcrossInstances() throws {
 @Test
 func legacyImportIsIdempotentAndDoesNotRestoreRemovedEntries() throws {
     let store = try temporaryStore()
-    let first = FavoriteTrackSnapshot(identity: FavoriteTrackIdentity(sourcePath: "/music/a.spc"), title: "A")
-    let second = FavoriteTrackSnapshot(identity: FavoriteTrackIdentity(sourcePath: "/music/b.spc"), title: "B")
+    let first = FavoriteTrackSnapshot(identity: FavoriteTrackIdentity(sourcePath: "/music/a.spc"), title: "A", addedAtMilliseconds: 1_000)
+    let second = FavoriteTrackSnapshot(identity: FavoriteTrackIdentity(sourcePath: "/music/b.spc"), title: "B", addedAtMilliseconds: 2_000)
 
     #expect(try store.importLegacy([first, second, first]) == 1)
     #expect(try store.importLegacy([first, second]) == 1)
-    let refreshedSecond = FavoriteTrackSnapshot(identity: second.identity, title: "Updated B")
+    let refreshedSecond = FavoriteTrackSnapshot(identity: second.identity, title: "Updated B", addedAtMilliseconds: 3_000)
     #expect(try store.importLegacy([refreshedSecond]) == 2)
     _ = try store.toggle([first])
-    #expect(try store.snapshots() == [refreshedSecond])
+    let persistedSecond = FavoriteTrackSnapshot(identity: second.identity, title: "Updated B", addedAtMilliseconds: 2_000)
+    #expect(try store.snapshots() == [persistedSecond])
 }
 
 @Test
@@ -51,7 +52,9 @@ func twoStoreInstancesSerializeGroupMutations() async throws {
     async let firstMutation = Task.detached { try store.toggle([first]) }.value
     async let secondMutation = Task.detached { try other.toggle([second]) }.value
     _ = try await (firstMutation, secondMutation)
-    #expect(Set(try store.snapshots().map(\.identity)) == Set([first.identity, second.identity]))
+    let saved = try store.snapshots()
+    #expect(Set(saved.map(\.identity)) == Set([first.identity, second.identity]))
+    #expect(saved.allSatisfy { ($0.addedAtMilliseconds ?? 0) > 0 })
     #expect(try store.revision() == 2)
 }
 
