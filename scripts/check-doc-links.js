@@ -40,9 +40,14 @@ for (const file of files) {
       continue;
     }
     if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) {
-      if (decoded.startsWith("../DocMan/")) {
+      const workspaceRoot = path.dirname(root);
+      const sibling = ["DocMan", "MathBook", "AudioMan"].find((name) => {
+        const siblingRoot = path.join(workspaceRoot, name);
+        return resolved === siblingRoot || resolved.startsWith(`${siblingRoot}${path.sep}`);
+      });
+      if (sibling) {
         workspaceLinks += 1;
-        if (fs.existsSync(path.resolve(root, "../DocMan")) && !fs.existsSync(resolved)) {
+        if (fs.existsSync(path.join(workspaceRoot, sibling)) && !fs.existsSync(resolved)) {
           broken.push(`${file}:${line}: ${target}`);
         }
       } else {

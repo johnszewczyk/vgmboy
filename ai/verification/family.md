@@ -41,7 +41,7 @@ The two VGMBoy integration paths still need a host with working audio output
 and AAC encoding. The ScanSong fixture proves a small native source-to-catalog
 path, not responsiveness under a large archive or a live playback boundary.
 The documentation link checker covers tracked and newly added maintained
-Markdown files, reports optional DocMan workspace links separately, and
+Markdown files, reports optional DocMan, MathBook, and AudioMan workspace links separately, and
 excludes archived, recovery, and vendored documents.
 
 ## Clean checkout procedure
