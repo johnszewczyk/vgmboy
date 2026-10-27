@@ -56,8 +56,6 @@ const state = {
   selectedFolderPath: null,
   selectedBrowserPath: null,
   playlist: [],
-  projectionSourcePlaylist: null,
-  projectionAlbumKey: null,
   catalogPlaylistColumnContentHints: null,
   catalogPlaylistSortSessionId: null,
   selectedTrackId: null,

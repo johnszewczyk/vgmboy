@@ -30,13 +30,11 @@
 - Command-Shift-F opens or switches to Favorites; Command-Shift-H opens or
   switches to Recent; Command-Shift-G or the Gallery toolbar button
   opens or switches to Gallery.
-- Favorites and Recent use the same two-pane collection layout as SBO: the
-  sidebar lists only albums represented in the collection, grouped by system;
-  selecting an album filters the playlist to its tracks. Favorites default to
-  insertion order and show an Added column (Options can choose alphabetical
-  order); Recent stays newest-played first
-  and labels that column Played. Clicking the collection shortcut restores all
-  albums and tracks.
+- Favorites and Recent are playlist shortcuts in the normal two-pane workspace;
+  the sidebar keeps its selected Console or Path library view while either is
+  active. Favorites default to insertion order and show an Added column
+  (Options can choose alphabetical order); Recent stays newest-played first and
+  labels that column Played.
 - Gallery is a playlist tab with an artwork-only grid. Its own sidebar toolbar
   button opens Gallery. The sidebar automatically uses Console View and shows
   only consoles with indexed `Title Snap` artwork. Console rows use the normal
