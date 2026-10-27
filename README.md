@@ -11,7 +11,7 @@ ownership and preservation rules.
 | Project | Responsibility |
 | --- | --- |
 | [VGMBoy](VGMBoy/README.md) | Archive/member preparation, decoder routing, timing, playback, audio output, and scanner helpers. |
-| [ScanSong](ScanSong/README.md) | Source discovery, format inspection, and schema-24 catalog writing. |
+| [ScanSong](ScanSong/README.md) | Source discovery, format inspection, and schema-25 catalog writing. |
 | [MetaMan](MetaMan/README.md) | Decoder-independent metadata reading and typed source facts. |
 | [UACMan](UACMan/README.md) | UAC package metadata browser/editor and reversible wrapper tools. |
 | [CatalogReader](CatalogReader/README.md) | Read-only catalog access and shared browser projections. |
