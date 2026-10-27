@@ -30,7 +30,7 @@ func gbsScannerUsesMetaManTrackDocuments() async throws {
     #expect(inspection.tracks.allSatisfy { $0.metadata?.playLengthMs == -1 })
 }
 
-@Test("GBS scanner projects fractional timing from an extensionless M3U member stem")
+@Test("GBS scanner preserves unknown timing for an extensionless M3U member stem")
 func gbsScannerProjectsFractionalPlaylistTiming() async throws {
     let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("scansong-metaman-gbs-m3u-\(UUID().uuidString)", isDirectory: true)
@@ -53,8 +53,8 @@ func gbsScannerProjectsFractionalPlaylistTiming() async throws {
     let track = try #require(inspection.tracks.first?.metadata)
 
     #expect(track.song == "Opening")
-    #expect(track.playLengthMs == 83_456)
-    #expect(track.introLengthMs == 10_500)
+    #expect(track.playLengthMs == -1)
+    #expect(track.introLengthMs == -1)
     #expect(track.loopLengthMs == -1)
-    #expect(track.fadeLengthMs == 2_250)
+    #expect(track.fadeLengthMs == -1)
 }

@@ -22,7 +22,7 @@ public enum MetaManCore {
         MetadataFormatDescriptor(
             identifier: "gbs",
             fileExtensions: ["gbs"],
-            methodology: "Direct fixed-header reader plus bounded NEZplug M3U sidecar projection for track names/timing; no playback decoder or Game Boy emulation is started."
+            methodology: "Direct fixed-header reader plus bounded NEZplug M3U sidecars for track names and retained raw timing; no timing projection, playback decoder, or Game Boy emulation."
         ),
         MetadataFormatDescriptor(
             identifier: "nsfe",
