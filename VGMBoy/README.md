@@ -158,7 +158,7 @@ checks before changing the manifest's `lastReviewed` date.
 
 - `VGMBoyKit` owns decoding, playback timing, and the macOS audio device.
 - The CLI and SwiftUI app are test skins over that one core.
-- ScanSong remains the only schema-24 catalog writer.
+- ScanSong remains the only schema-25 catalog writer.
 - CocoaSpice, SB2, ViewBoy, and LineBoy bundle the same VGMBoyKit behind
   host-specific adapters. None has a second playback engine or playback
   extractor.

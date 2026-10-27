@@ -55,7 +55,7 @@ scanner-specific decoding remains necessary.
   decoded transport, and audio output. Frontends own queue policy, durable
   cache preferences for browsing/artwork, persistence keys, and user
   interfaces.
-- ScanSong is the only schema-24 catalog writer. It consumes MetaMan results
+- ScanSong is the only schema-25 catalog writer. It consumes MetaMan results
   and any required VGMBoy-built inspection executables.
 - Never fork an upstream decoder per app. Keep host bridges and build staging
   owned by this package.

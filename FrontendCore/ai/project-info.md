@@ -29,7 +29,7 @@ archived outside the active tree and is no longer a maintained consumer.
 ## Local Rules
 
 - ScanSong is the only catalog writer and scanner owner.
-- CatalogReader owns read-only schema-24 access and catalog projections.
+- CatalogReader owns read-only schema-24/25 access and catalog projections.
 - VGMBoy owns format admission, decoding, timing, output gain, and the audio
   device. VGMBoyArchiveCore owns playback and export source preparation from
   archives and standalone compressed files.
