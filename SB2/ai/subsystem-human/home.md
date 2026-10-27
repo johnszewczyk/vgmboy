@@ -35,15 +35,19 @@
   active. Favorites default to insertion order and show an Added column
   (Options can choose alphabetical order); Recent stays newest-played first and
   labels that column Played.
-- Gallery is a playlist tab with an artwork-only grid. Its own sidebar toolbar
-  button opens Gallery. The sidebar automatically uses Console View and shows
+- Gallery is an artwork-only view of the current playlist tab; switching views
+  never creates a separate Gallery tab. Its sidebar toolbar button switches the
+  active tab to Gallery, and the database button returns to that tab's playlist
+  table in Disk View. The active tab keeps its title, playlist, and selection.
+  The sidebar automatically uses Console View and shows
   only consoles with indexed `Title Snap` artwork. Console rows use the normal
   sidebar spacing, font, and leaf marker; selecting one fills the Gallery grid
   with its artwork, without unfolding game rows or showing sidebar thumbnails.
-  Console/Path switching is disabled while Gallery is active. A single Gallery
-  card click selects an artwork title; Enter or double-click opens a playlist
-  tab and starts playback, leaving the Gallery tab intact. Gallery cards use a
-  bordered square artwork frame and a separate nametag below it. Artwork can
+  The database button exits Gallery to the playlist table; Path View remains
+  available from the normal playlist view. A single Gallery card click selects
+  an artwork title; Enter or double-click opens a playlist tab and starts
+  playback, leaving the Gallery view available in its original tab. Gallery
+  cards use a bordered square artwork frame and a separate nametag below it. Artwork can
   crop to fill the square or pad to show the complete image. Frame size, gap,
   corner radius, fit, and compact nametag titles live in Options > Gallery. The
   frame gap also pads the grid edges; zero gap and square corners create a

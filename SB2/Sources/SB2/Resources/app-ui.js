@@ -472,7 +472,7 @@ async function restorePlaylistTabs(value, { loadMissingGames = true, loadGallery
   browserSelectionGeneration += 1;
   invalidateSidebarInteractions();
   const identifiers = new Set();
-  const tabs = value.tabs.slice(0, 64).filter((tab) => {
+  let tabs = value.tabs.slice(0, 64).filter((tab) => {
     if (!tab || typeof tab.id !== "string" || !tab.id || identifiers.has(tab.id)) return false;
     identifiers.add(tab.id);
     return true;
@@ -493,11 +493,31 @@ async function restorePlaylistTabs(value, { loadMissingGames = true, loadGallery
     catalogPlaylistSortSessionId: null
   }));
   if (!tabs.length) return false;
+  let restoredActiveID = value.activeID;
+  const legacyGalleryIndex = tabs.findIndex((tab) =>
+    tab.kind === "gallery" && tab.title === "Gallery" && tab.playlist.length === 0);
+  if (legacyGalleryIndex >= 0) {
+    const legacyGallery = tabs[legacyGalleryIndex];
+    const adjacentPlaylist = tabs.slice(0, legacyGalleryIndex).reverse().find((tab) => tab.kind !== "gallery")
+      || tabs.slice(legacyGalleryIndex + 1).find((tab) => tab.kind !== "gallery");
+    if (adjacentPlaylist) {
+      if (restoredActiveID === legacyGallery.id) {
+        adjacentPlaylist.kind = "gallery";
+        restoredActiveID = adjacentPlaylist.id;
+      }
+      tabs = tabs.filter((tab) => tab.id !== legacyGallery.id);
+      identifiers.delete(legacyGallery.id);
+    } else {
+      // A previous version could persist Gallery as the only tab. Keep its
+      // selected view, but give the tab a normal playlist identity.
+      legacyGallery.title = "Playlist";
+    }
+  }
   state.playlistTabs = tabs;
   const restored = await transitionPlaylistTabs({
     kind: "restore",
     orderedIDs: tabs.map((tab) => tab.id),
-    activeID: identifiers.has(value.activeID) ? value.activeID : tabs[0].id
+    activeID: identifiers.has(restoredActiveID) ? restoredActiveID : tabs[0].id
   });
   state.activePlaylistTabId = restored.activeID || tabs[0].id;
   restorePlaylistTabView(findActivePlaylistTab(), { loadMissingGames, loadGalleryData });
@@ -2521,6 +2541,10 @@ async function setSidebarMode(mode) {
 
 const SIDEBAR_VIEW_CYCLE = ["consoles", "paths"];
 async function cycleSidebarMode() {
+  // Gallery and the playlist table are two views of the active workspace tab.
+  // The database button returns to that tab's playlist instead of opening a
+  // separate playlist or trying to cycle a Gallery-only sidebar mode.
+  if (isGalleryActive()) return showPlaylistFromGallery();
   const current = currentSidebarView().storedMode;
   const currentIndex = SIDEBAR_VIEW_CYCLE.indexOf(current);
   const next = SIDEBAR_VIEW_CYCLE[(currentIndex + 1 + SIDEBAR_VIEW_CYCLE.length) % SIDEBAR_VIEW_CYCLE.length];
@@ -2795,29 +2819,23 @@ function renderGalleryView() {
 }
 
 async function showGalleryPlaylist() {
-  const enteringGallery = !isGalleryActive();
-  let tab = state.playlistTabs?.find((entry) => entry.kind === "gallery");
-  if (!tab) {
-    tab = await createPlaylistTab({ duplicateActive: false, title: "Gallery" });
-    if (!tab) return false;
-  } else if (tab.id !== state.activePlaylistTabId) {
-    await activatePlaylistTab(tab.id);
+  const tab = await ensurePlaylistTab();
+  if (!tab) return false;
+  if (isGalleryActive()) {
+    void loadGalleryGames({ force: Boolean(state.galleryGamesError) });
+    return true;
   }
   const targetTabID = state.activePlaylistTabId;
   cancelPendingSidebarSearch();
   const interactionGeneration = invalidateSidebarInteractions();
+  playlistContentRequestGeneration += 1;
+  playlistSortGeneration += 1;
+  browserSelectionGeneration += 1;
 
   tab.kind = "gallery";
   state.activePlaylistTabKind = "gallery";
-  state.playlistTitle = "Gallery";
-  state.playlist = [];
-  state.selectedTrackId = null;
-  state.selectedTrackIds = [];
-  state.playlistSelectionAnchorId = null;
   state.selectedDatabaseGameKey = null;
-  if (enteringGallery) state.selectedDatabaseConsoleName = null;
-  state.catalogPlaylistColumnContentHints = null;
-  state.catalogPlaylistSortSessionId = null;
+  state.selectedDatabaseConsoleName = null;
   state.sidebarMode = "consoles";
   state.sidebarQuery = "";
   state.databaseSearchGames = null;
@@ -2826,6 +2844,8 @@ async function showGalleryPlaylist() {
   if (targetTabID !== state.activePlaylistTabId
       || interactionGeneration !== sidebarInteractionGeneration) return false;
   await syncSidebarView();
+  if (targetTabID !== state.activePlaylistTabId
+      || interactionGeneration !== sidebarInteractionGeneration) return false;
   persistSettings();
   galleryRenderSignature = null;
   renderPlaylistTabs();
@@ -2835,6 +2855,45 @@ async function showGalleryPlaylist() {
   uiApp.playback.updateTimingSummary();
   uiApp.playback.updatePlaybackReadout();
   void loadGalleryGames({ force: Boolean(state.galleryGamesError) });
+  return true;
+}
+
+async function showPlaylistFromGallery() {
+  if (!isGalleryActive()) return false;
+  const tab = findActivePlaylistTab();
+  if (!tab) return false;
+
+  const targetTabID = state.activePlaylistTabId;
+  cancelPendingSidebarSearch();
+  const interactionGeneration = invalidateSidebarInteractions();
+  playlistContentRequestGeneration += 1;
+  playlistSortGeneration += 1;
+  browserSelectionGeneration += 1;
+  await invalidatePlaylistCatalogSession();
+  if (targetTabID !== state.activePlaylistTabId
+      || interactionGeneration !== sidebarInteractionGeneration) return false;
+
+  tab.kind = "playlist";
+  state.activePlaylistTabKind = "playlist";
+  state.sidebarMode = "consoles";
+  state.sidebarQuery = "";
+  state.databaseSearchGames = null;
+  refs.sidebarSearchInput.value = "";
+  await syncSidebarView();
+  if (targetTabID !== state.activePlaylistTabId
+      || interactionGeneration !== sidebarInteractionGeneration) return false;
+  if (!databaseGamesLoaded) {
+    void loadDatabaseGames().catch((error) => console.error("[SPCBOY] sidebar load failed", error));
+  }
+
+  persistSettings();
+  renderPlaylistTabs();
+  persistPlaylistTabs();
+  renderPlaylist();
+  renderSidebar();
+  syncTreeSelection();
+  uiApp.playback.updateTimingSummary();
+  uiApp.playback.updatePlaybackReadout();
   return true;
 }
 
@@ -3140,9 +3199,10 @@ function renderSidebar() {
   const modeLabels = { consoles: "Console View", paths: "Path View" };
   const modeIcons = { consoles: "#icon-database", paths: "#icon-folder-tree" };
   if (refs.sidebarViewToggleButton) {
-    refs.sidebarViewToggleButton.title = galleryActive ? "Console View (Gallery)" : modeLabels[view.storedMode] || "Library view";
-    refs.sidebarViewToggleButton.setAttribute("aria-label", galleryActive ? "Console View (Gallery)" : modeLabels[view.storedMode] || "Library view");
-    refs.sidebarViewToggleButton.disabled = galleryActive;
+    const actionLabel = galleryActive ? "Disk View" : modeLabels[view.storedMode] || "Library view";
+    refs.sidebarViewToggleButton.title = actionLabel;
+    refs.sidebarViewToggleButton.setAttribute("aria-label", actionLabel);
+    refs.sidebarViewToggleButton.disabled = false;
     const icon = refs.sidebarViewToggleButton.querySelector("use");
     if (icon) icon.setAttribute("href", modeIcons[view.storedMode] || "#icon-sidebar-views");
   }
