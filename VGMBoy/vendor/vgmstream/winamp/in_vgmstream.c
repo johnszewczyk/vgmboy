@@ -19,7 +19,7 @@
 /* IN_STATE                                  */
 /* ***************************************** */
 
-#define VGMSTREAM_MAX_CHANNELS 64 //TODO: fix, vgmstream could change max
+#define WINAMP_MAX_CHANNELS 64 //TODO: dynamic alloc
 #define EXT_BUFFER_SIZE 200
 
 /* plugin module (declared at the bottom of this file) */
@@ -43,28 +43,32 @@ typedef struct {
     double volume;
 } winamp_state_t;
 
+/* info cache (optimization) */
+typedef struct {
+    in_char lastfn[WINAMP_PATH_LIMIT]; // name of the currently playing file
+
+    in_char info_fn[WINAMP_PATH_LIMIT];
+    in_char info_title[GETFILEINFO_TITLE_LENGTH];
+    int64_t info_time;
+    bool info_valid;
+    bool info_was_protocol;
+} winamp_cache_t;
+
 
 /* Winamp needs at least 576 16-bit samples, stereo, doubled in case DSP effects are active */
 #define SAMPLE_BUFFER_SIZE 576
-const char* tagfile_name = "!tags.m3u";
+const in_char* tagfile_name = wa_L("!tags.m3u");
 
 /* plugin state */
 HANDLE decode_thread_handle = INVALID_HANDLE_VALUE;
 
 libvgmstream_t* vgmstream = NULL;
-in_char lastfn[WINAMP_PATH_LIMIT] = {0}; /* name of the currently playing file */
 
 winamp_settings_t defaults;
 winamp_settings_t settings;
+winamp_cache_t cache;
 winamp_state_t state;
-short sample_buffer[SAMPLE_BUFFER_SIZE * 2 * VGMSTREAM_MAX_CHANNELS]; //todo maybe should be dynamic
-
-/* info cache (optimization) */
-in_char info_fn[WINAMP_PATH_LIMIT] = {0};
-in_char info_title[GETFILEINFO_TITLE_LENGTH];
-int64_t info_time;
-bool info_valid;
-bool info_was_protocol;
+short sample_buffer[SAMPLE_BUFFER_SIZE * 2 * WINAMP_MAX_CHANNELS]; //TODO: dynamic alloc
 
 
 /* ***************************************** */
@@ -82,7 +86,7 @@ bool info_was_protocol;
         int out;
         out = vsnprintf(line, sizeof(line), fmt, args);
         if (out < 0 || out > sizeof(line))
-            strcpy(line, "(ignored log)"); //to-do something better, meh
+            wa_lstrcpy(line, sizeof(line), "(ignored log)"); //to-do something better, meh
         logger_callback(LIBVGMSTREAM_LOG_LEVEL_INFO, line);
 
         va_end(args);
@@ -92,28 +96,24 @@ bool info_was_protocol;
 #endif
 #endif
 
-/* parses a modified filename ('fakename') extracting tags parameters (NULL tag for first = filename) */
-static int parse_fn_string(const in_char* fn, const in_char* tag, in_char* dst, int dst_size) {
-    const in_char* end = wa_strchr(fn,'|');
+/* copies a filename removing extra params ('C:\blah\file.fsb|1' to 'C:\blah\file.fsb') */
+static void parse_fn_base(const in_char* fn, in_char* dst, size_t dst_size) {
+    wa_istrcpy(dst, dst_size, fn);
 
-    if (tag==NULL) {
-        wa_strcpy(dst,fn);
-        if (end)
-            dst[end - fn] = '\0';
-        return 1;
-    }
-
-    dst[0] = '\0';
-    return 0;
+    in_char* end = wa_strchr(dst, '|');
+    if (!end)
+        return;
+    end[0] = 0; //'\0';
 }
 
 static int parse_fn_int(const in_char* fn, const in_char* tag, int* num) {
     const in_char* start = wa_strchr(fn,'|');
 
     if (start > 0) {
-        wa_sscanf(start+1, wa_L("$s=%i "), num);
+        wa_sscanf(start + 1, wa_L("$s=%i "), num);
         return 1;
-    } else {
+    }
+    else {
         *num = 0;
         return 0;
     }
@@ -130,7 +130,7 @@ static void load_vconfig(libvgmstream_config_t* vcfg, winamp_settings_t* setting
     vcfg->ignore_loop = settings->ignore_loop;
 
     vcfg->auto_downmix_channels = settings->downmix_channels;
-    vcfg->force_sfmt = LIBVGMSTREAM_SFMT_PCM16; //winamp can only handle PCM16/24, and the later is almost never used in vgm
+    vcfg->force_sfmt = LIBVGMSTREAM_SFMT_PCM16; // Winamp can only handle PCM16/24, and the later is almost never used in vgm
 }
 
 /* opens vgmstream for winamp */
@@ -159,7 +159,7 @@ static libvgmstream_t* init_vgmstream_winamp_fileinfo(const in_char* fn) {
     int stream_index = 0;
 
     /* check for info encoded in the filename */
-    parse_fn_string(fn, NULL, filename, WINAMP_PATH_LIMIT);
+    parse_fn_base(fn, filename, WINAMP_PATH_LIMIT);
     parse_fn_int(fn, wa_L("$s"), &stream_index);
 
     return init_vgmstream_winamp(filename, stream_index);
@@ -167,7 +167,7 @@ static libvgmstream_t* init_vgmstream_winamp_fileinfo(const in_char* fn) {
 
 
 /* try to detect XMPlay, which can't interact with the playlist = no splitting */
-static int is_xmplay() {
+static bool is_xmplay() {
     if (GetModuleHandle( TEXT("xmplay.exe") ))
         return 1;
     if (GetModuleHandle( TEXT("xmp-wadsp.dll") ))
@@ -184,7 +184,7 @@ static void get_title(in_char* dst, int dst_size, const in_char* fn, libvgmstrea
     char buffer[WINAMP_PATH_LIMIT];
     char filename_utf8[WINAMP_PATH_LIMIT];
 
-    parse_fn_string(fn, NULL, filename,WINAMP_PATH_LIMIT);
+    parse_fn_base(fn, filename, WINAMP_PATH_LIMIT);
     //parse_fn_int(fn, wa_L("$s"), &stream_index);
 
     wa_ichar_to_char(filename_utf8, WINAMP_PATH_LIMIT, filename);
@@ -202,6 +202,9 @@ static void get_title(in_char* dst, int dst_size, const in_char* fn, libvgmstrea
         libvgmstream_get_title(infostream, &tcfg, buffer, sizeof(buffer));
 
         wa_char_to_ichar(dst, dst_size, buffer);
+    }
+    else {
+        dst[0] = 0;
     }
 }
 
@@ -273,7 +276,7 @@ static void winamp_About(HWND hwndParent) {
         TCHAR buf[1024];
         size_t buf_size = 1024;
 
-        cfg_char_to_wchar(buf, buf_size, ABOUT_TEXT);
+        cfg_char_to_tchar(buf, buf_size, ABOUT_TEXT);
         MessageBox(hwndParent, buf, TEXT("about in_vgmstream"), MB_OK);
     }
 }
@@ -312,9 +315,11 @@ static int winamp_IsOurFile(const in_char *fn) {
     char filename_utf8[WINAMP_PATH_LIMIT];
     bool valid;
 
-    //;vgm_logi("\nwinamp_IsOurFile: init\n");
+    //;vgm_logi("\nwinamp_IsOurFile: start\n");
 
-    /* Winamp file opening 101:
+    /* Return 1 if we actually handle the format or 0 to let other plugins handle it, while handling certain edge cases.
+     *
+     *  Winamp file opening 101:
      * - load modules from plugin dir, in NTFS order (mostly alphabetical *.dll but not 100% like explorer.exe)
      *   > plugin list in options is ordered by description so doesn't reflect this priority
      * - make path to file
@@ -322,78 +327,139 @@ static int winamp_IsOurFile(const in_char *fn) {
      *   > generally plugins just return 0 as it's meant for protocols (a few do check the file's header there)
      * - find first module that reports that supports file extension (see build_extension_list)
      *   > for shared extensions this means plugin priority affects who hijacks the file
-     * - if still no result, retry the above 2 steps with "hi." + default extension (from config: default .mp3, path if not set?)
+     * - if still no result, retry the above 2 steps with "hi.mp3"
+     *   > the extension is configurable in "Playlist > Assume file extension ..." but can't be disabled
      *   > procotols supported by Winamp (cda:// http:// rtcp:// etc) also reach this "hi.mp3" stage (only if no extension is used?)
      *   > seems skipped when doing playlist manipulation/subsongs
-     * - if still nothing, any unplayable file will be considered "hi.mp3" by Winamp and accepted as a 0:00 file
-     *   > this is annoying so vgmstream "accepts" hi.mp3 yet won't play it, so time is blank instead of 0:00
-     *   > but must ignore "hi.mp3" if current file was a protocol to allow it
+     *   > since regular files start with a path, this is never a real file
+     * - if still nothing, this unplayable file will be considered "hi.mp3" by Winamp and accepted as a 0:00 file
+     * 
+     * Winamp uses a variation of the bizarre "hi.mp3" mechanism to query for media info in some cases.
      *
      * Notes:
-     * * if module/vgmstream is given the file (even if can't play it) Winamp will call GetInfo and stop if not valid info is returned
-     * * on init seems Winamp calls IsOurFile with "cda://" protocol, should be ignored by is_valid() as well as any other protocol
+     * - if module/vgmstream is given or accept the file (even if can't play it), Winamp will call GetInfo and stop if not valid info is returned
+     * - on init seems Winamp calls IsOurFile with "cda://" (sometimes hi.file://) protocol to probe for responses
      */
 
-    // detect repeat retries
-    if (wa_strcmp(fn, info_fn) == 0) { //TODO may need to check file size to invalidate cache
-        //;vgm_logi("winamp_IsOurFile: repeated call\n");
-        return info_valid;
+
+    // detect changes in config that don't restart the instance (only happens in Winamp 5.8+?)
+    // (could try to detect elsewhere but Winamp seems to call this first before GetInfo and such)
+    if (settings.updated) {
+        settings.updated = false;
+
+        cache.info_fn[0] = '\0';
+        cache.info_valid = false;
+        cache.info_was_protocol = false;
     }
 
-    // 'accept' hi.mp3; won't play so it'll show with blank time instead of 0:00
-    if (/*settings.exts_common_on &&*/ wa_strncmp(fn, wa_L("hi."), 3) == 0) {
-        if (info_was_protocol) { 
-            // don't 'accept' with protocols, that somehow also go through hi.mp3 before playing
-            //;vgm_logi("winamp_IsOurFile: ignored fakefile (was a protocol)\n");
+
+    // detect repeat info checks, since Winamp queries the same info multiple times in various ways
+    if (cache.info_fn[0] != '\0') {
+        //;wa_ichar_to_char(filename_utf8, WINAMP_PATH_LIMIT, fn);
+        //;vgm_logi("winamp_IsOurFile: checking path %s\n", filename_utf8);
+        //;wa_ichar_to_char(filename_utf8, WINAMP_PATH_LIMIT, cache.info_fn);
+        //;vgm_logi("winamp_IsOurFile: checking path vs old cache path %s\n", filename_utf8);
+
+        //TODO maybe could check the file size to reject
+        if (wa_strcmp(fn, cache.info_fn) == 0) {
+            //;vgm_logi("winamp_IsOurFile: repeated path call, valid=%i\n", cache.info_valid);
+            return cache.info_valid;
+        }
+
+        if (wa_strncmp(fn, wa_L("hi.file://"), 10) == 0 && wa_strcmp(fn + 10, cache.info_fn) == 0) {
+            //;vgm_logi("winamp_IsOurFile: repeated hi.file:// call, valid=%i\n", cache.info_valid);
+            return cache.info_valid;
+        }
+
+        if (wa_strncmp(fn, wa_L("hi."), 3) == 0 && wa_strcmp(fn + 3, cache.info_fn) == 0) {
+            //;vgm_logi("winamp_IsOurFile: repeated hi.(path) call, valid=%i\n", cache.info_valid);
+            return cache.info_valid;
+        }
+    }
+
+
+    // handle Winamp's arcane "hi.*" fake file handling, considering:
+    // - "hi.(ext)"" is used when no plugin can handle an unplayable file, and will be accepted by default as a 0:00 file
+    // - protocols also seem to re-send "hi.(ext)""
+    // - info box/media library uses hi.(path) to query for decoder info (only in some skins), should be caught
+    if (wa_strncmp(fn, wa_L("hi."), 3) == 0) {
+        //;wa_ichar_to_char(filename_utf8, WINAMP_PATH_LIMIT, fn);
+
+        if (cache.info_was_protocol) { 
+            // don't 'accept' protocols, that somehow also send hi.mp3 right before playing
+            //;vgm_logi("winamp_IsOurFile: ignored winamp's protocol/path fakefile %s\n", filename_utf8);
             return 0;
         }
-        //;vgm_logi("winamp_IsOurFile: accepted fakefile\n");
+
+        if (wa_strstr(fn, wa_L("://")) || wa_strchr(fn, '\\')) { 
+            // also ignore paths (hi.file://C:\... or hi.C:\...) used by the info box. Should be handled by cache.info_fn.
+            // Could peek file contents (to tell .vgm appart), but presumably Winamp expects an extension check here.
+            //;vgm_logi("winamp_IsOurFile: ignored winamp's path fakefile %s\n", filename_utf8);
+            return 0;
+        }
+
+        if (wa_strcmp(fn, wa_L("hi.")) == 0) {
+            // not sure if possible
+            //;vgm_logi("winamp_IsOurFile: ignored winamp's mini fakefile %s\n", filename_utf8);
+            return 0;
+        }
+
+
+        // 'accept' "hi.(ext)" (unplayable files), so vgmstream ignores them and they show with blank time rather than 0:00.
+        // With vgmstream installed having unplayable files as 0:00 is highly annoying (hard to detect if some odd format 
+        // doesn't actually work), so it's always 'accepted' (regardless of exts_common_on, since anythin becomes hi.mp3).
+        //;vgm_logi("winamp_IsOurFile: accepted winamp's unplayable fakefile %s\n", filename_utf8);
         return 1;
     }
 
-    info_was_protocol = wa_strstr(fn, wa_L("://"));
+    cache.info_was_protocol = wa_strstr(fn, wa_L("://"));
 
-    vcfg.skip_standard = false; /* validated by Winamp after IsOurFile, reject just in case */
-    vcfg.accept_unknown = settings.exts_unknown_on;
-    vcfg.accept_common = settings.exts_common_on;
+    cache.info_valid = false; /* may not be playable */
+    wa_istrcpy(cache.info_fn, WINAMP_PATH_LIMIT, fn); /* copy now for repeat calls */
+
+
+    // Actually check if the file is valid. The extension alone isn't enough, as we may hijack stuff like in_vgm's *.vgm or .spc,
+    // so also try to open/get info from the file (slower, so keep some stuff in cache)
 
     wa_ichar_to_char(filename_utf8, WINAMP_PATH_LIMIT, fn);
-    //;vgm_logi("winamp_IsOurFile: %s\n", filename_utf8);
+    //;vgm_logi("winamp_IsOurFile: file=%s\n", filename_utf8);
 
-    /* Return 1 if we actually handle the format or 0 to let other plugins handle it. Checking the 
-     * extension alone isn't enough, as we may hijack stuff like in_vgm's *.vgm, so also try to
-     * open/get info from the file (slower so keep some cache) */
+    vcfg.skip_standard = false; // validated by Winamp after IsOurFile, reject just in case
+    vcfg.accept_unknown = settings.exts_unknown_on;
+    vcfg.accept_common = settings.exts_common_on;
+    //;vgm_logi("winamp_IsOurFile: check is_valid exts (unk=%i, common=%i)\n", vcfg.accept_unknown, vcfg.accept_common);
 
-    info_valid = false; /* may not be playable */
-    wa_strncpy(info_fn, fn, WINAMP_PATH_LIMIT); /* copy now for repeat calls */
-
-    /* basic extension check */
+    // basic extension check
     valid = libvgmstream_is_valid(filename_utf8, &vcfg);
     if (!valid) {
-        //;vgm_logi("winamp_IsOurFile: false is-valid\n");
+        //;vgm_logi("winamp_IsOurFile: is_valid ko (rejected)\n");
         return 0;
     }
 
+    //;vgm_logi("winamp_IsOurFile: is_valid ok, check contents\n");
 
-    /* format check */
+    // format check
     infostream = init_vgmstream_winamp_fileinfo(fn);
     if (!infostream) {
-        //;vgm_logi("winamp_IsOurFile: invalid infostream\n");
+        //;vgm_logi("winamp_IsOurFile: invalid infostream (rejected)\n");
         return 0;
     }
 
-    /* first thing winamp does after accepting a file is asking for time/title, so keep those around to avoid re-parsing the file */
-    {
-        info_time = infostream->format->play_samples * 1000LL / infostream->format->sample_rate;
+    cache.info_valid = true;
+    if (infostream->format->channels > WINAMP_MAX_CHANNELS) // just in case...
+        cache.info_valid = false;
 
-        get_title(info_title,GETFILEINFO_TITLE_LENGTH, fn, infostream);
+    // first thing winamp does after accepting a file is asking for time/title, so keep those around to avoid re-parsing the file
+    if (cache.info_valid) {
+        cache.info_time = infostream->format->play_samples * 1000LL / infostream->format->sample_rate;
+
+        get_title(cache.info_title, GETFILEINFO_TITLE_LENGTH, fn, infostream);
     }
 
     //;vgm_logi("winamp_IsOurFile: accepted\n");
-    info_valid = true;
     libvgmstream_free(infostream);
 
-    return 1;
+    return cache.info_valid;
 }
 
 
@@ -410,7 +476,7 @@ static int winamp_Play(const in_char *fn) {
         return 1;
 
     /* check for info encoded in the filename */
-    parse_fn_string(fn, NULL, filename,WINAMP_PATH_LIMIT);
+    parse_fn_base(fn, filename, WINAMP_PATH_LIMIT);
     parse_fn_int(fn, wa_L("$s"), &stream_index);
 
     /* open the stream */
@@ -434,7 +500,7 @@ static int winamp_Play(const in_char *fn) {
     state.volume = get_album_gain_volume(fn);
 
     /* save original name */
-    wa_strncpy(lastfn,fn,WINAMP_PATH_LIMIT);
+    wa_istrcpy(cache.lastfn, WINAMP_PATH_LIMIT, fn);
 
     /* open the output plugin */
     max_latency = input_module.outMod->Open(vgmstream->format->sample_rate, vgmstream->format->channels, 16, 0, 0);
@@ -587,7 +653,7 @@ static int winamp_InfoBox(const in_char *fn, HWND hwnd) {
 
     wa_concatn(sizeof(description), description, "\n" PLUGIN_INFO);
 
-    cfg_char_to_wchar(tbuf, sizeof(tbuf) / sizeof(TCHAR), description);
+    cfg_char_to_tchar(tbuf, sizeof(tbuf) / sizeof(TCHAR), description);
     MessageBox(hwnd, tbuf, TEXT("Stream info"), MB_OK);
 
     return 0;
@@ -595,6 +661,7 @@ static int winamp_InfoBox(const in_char *fn, HWND hwnd) {
 
 /* retrieve title (playlist name) and time on the current or other file in the playlist */
 static void winamp_GetFileInfo(const in_char *fn, in_char *title, int *length_in_ms) {
+    int title_size = GETFILEINFO_TITLE_LENGTH;
 
     if (!fn || !*fn) {
         /* no filename = current playing file */
@@ -603,15 +670,17 @@ static void winamp_GetFileInfo(const in_char *fn, in_char *title, int *length_in
         /* Sometimes called even if no file is playing (usually when hovering "O" > preferences... submenu).
          * No idea what's that about so try to reuse last info */
         if (!vgmstream) {
-            if (info_valid) {
-                if (title) wa_strncpy(title, info_title, GETFILEINFO_TITLE_LENGTH);
-                if (length_in_ms) *length_in_ms = info_time;
+            if (cache.info_valid) {
+                if (title)
+                    wa_istrcpy(title, title_size, cache.info_title);
+                if (length_in_ms)
+                    *length_in_ms = cache.info_time;
             }
             return;
         }
 
         if (title) {
-            get_title(title,GETFILEINFO_TITLE_LENGTH, lastfn, vgmstream);
+            get_title(title, title_size, cache.lastfn, vgmstream);
         }
 
         if (length_in_ms) {
@@ -623,9 +692,11 @@ static void winamp_GetFileInfo(const in_char *fn, in_char *title, int *length_in
         //;{ char f8[WINAMP_PATH_LIMIT]; wa_ichar_to_char(f8,WINAMP_PATH_LIMIT,fn); vgm_logi("winamp_GetFileInfo: file %s\n", f8); }
 
         /* not changed from last IsOurFile (most common) */
-        if (info_valid && wa_strcmp(fn, info_fn) == 0) {
-            if (title) wa_strncpy(title, info_title, GETFILEINFO_TITLE_LENGTH);
-            if (length_in_ms) *length_in_ms = info_time;
+        if (cache.info_valid && wa_strcmp(fn, cache.info_fn) == 0) {
+            if (title)
+                wa_istrcpy(title, title_size, cache.info_title);
+            if (length_in_ms)
+                *length_in_ms = cache.info_time;
             return;
         }
 
@@ -634,14 +705,11 @@ static void winamp_GetFileInfo(const in_char *fn, in_char *title, int *length_in
         if (!infostream) return;
 
         if (title) {
-            get_title(title,GETFILEINFO_TITLE_LENGTH, fn, infostream);
+            get_title(title, title_size, fn, infostream);
         }
 
         if (length_in_ms) {
-            *length_in_ms = -1000;
-            if (infostream) {
-                *length_in_ms = infostream->format->play_samples * 1000LL / infostream->format->sample_rate;
-            }
+            *length_in_ms = infostream->format->play_samples * 1000LL / infostream->format->sample_rate;
         }
 
         libvgmstream_free(infostream);
@@ -816,20 +884,20 @@ __declspec(dllexport) In_Module * winampGetInModule2() {
 /* IN_TAGS                               */
 /* ************************************* */
 
-/* could malloc and stuff but totals aren't much bigger than WINAMP_PATH_LIMITs anyway */
+/* could malloc and stuff but totals aren't too big */
 #define WINAMP_TAGS_ENTRY_MAX      30
 #define WINAMP_TAGS_ENTRY_SIZE     2048
 
 typedef struct {
-    int loaded;
+    bool loaded;
     in_char filename[WINAMP_PATH_LIMIT]; /* tags are loaded for this file */
     int tag_count;
 
-    char keys[WINAMP_TAGS_ENTRY_MAX][WINAMP_TAGS_ENTRY_SIZE+1];
-    char vals[WINAMP_TAGS_ENTRY_MAX][WINAMP_TAGS_ENTRY_SIZE+1];
-} winamp_tags;
+    char keys[WINAMP_TAGS_ENTRY_MAX][WINAMP_TAGS_ENTRY_SIZE];
+    char vals[WINAMP_TAGS_ENTRY_MAX][WINAMP_TAGS_ENTRY_SIZE];
+} winamp_tags_t;
 
-winamp_tags last_tags;
+winamp_tags_t last_tags;
 
 
 /* Loads all tags for a filename in a temp struct to improve performance, as
@@ -838,87 +906,85 @@ static void load_tagfile_info(in_char* filename) {
     libstreamfile_t* sf_tags = NULL;
     in_char filename_clean[WINAMP_PATH_LIMIT];
     char filename_utf8[WINAMP_PATH_LIMIT];
-    char tagfile_path_utf8[WINAMP_PATH_LIMIT];
-    in_char tagfile_path_i[WINAMP_PATH_LIMIT];
-    char* path;
+    in_char tagfile_ipath[WINAMP_PATH_LIMIT];
 
 
     if (settings.tagfile_disable) { /* reset values if setting changes during play */
-        last_tags.loaded = 0;
+        last_tags.loaded = false;
         last_tags.tag_count = 0;
         return;
     }
 
     /* clean extra part for subsong tags */
-    parse_fn_string(filename, NULL, filename_clean,WINAMP_PATH_LIMIT);
+    parse_fn_base(filename, filename_clean, WINAMP_PATH_LIMIT);
 
     if (wa_strcmp(last_tags.filename, filename_clean) == 0) {
         return; /* not changed, tags still apply */
     }
 
-    last_tags.loaded = 0;
+    last_tags.loaded = false;
+    last_tags.tag_count = 0;
+    wa_istrcpy(last_tags.filename, WINAMP_PATH_LIMIT, filename_clean);
+
 
     /* tags are now for this filename, find tagfile path */
     wa_ichar_to_char(filename_utf8, WINAMP_PATH_LIMIT, filename_clean);
-    strcpy(tagfile_path_utf8,filename_utf8);
 
-    path = strrchr(tagfile_path_utf8,'\\');
-    if (path != NULL) {
-        path[1] = '\0'; /* includes "\", remove after that from tagfile_path */
-        strcat(tagfile_path_utf8, tagfile_name);
-    }
-    else { /* ??? */
-        strcpy(tagfile_path_utf8, tagfile_name);
-    }
-    wa_char_to_ichar(tagfile_path_i, WINAMP_PATH_LIMIT, tagfile_path_utf8);
+    /* create tagfile path */
+    {
+        wa_istrcpy(tagfile_ipath, WINAMP_PATH_LIMIT, filename_clean);
 
-    wa_strcpy(last_tags.filename, filename_clean);
-    last_tags.tag_count = 0;
+        in_char* path = wa_strrchr(tagfile_ipath, wa_L('\\'));
+        if (path != NULL) {
+            path[1] = 0; // remove "\""  from tagfile_path
+            wa_istrcat(tagfile_ipath, WINAMP_PATH_LIMIT, tagfile_name);
+        }
+        else { /* ??? */
+            wa_istrcpy(tagfile_ipath, WINAMP_PATH_LIMIT, tagfile_name);
+        }
+    }
 
     /* load all tags from tagfile */
-    sf_tags = open_winamp_streamfile_by_ipath(tagfile_path_i);
-    if (sf_tags != NULL) {
-        libvgmstream_tags_t* tags;
+    sf_tags = open_winamp_streamfile_by_ipath(tagfile_ipath);
+    if (!sf_tags) return;
 
-        tags = libvgmstream_tags_init(sf_tags);
-        libvgmstream_tags_find(tags, filename_utf8);
-        while (libvgmstream_tags_next_tag(tags)) {
-            int repeated_tag = 0;
-            int current_tag = last_tags.tag_count;
-            if (current_tag >= WINAMP_TAGS_ENTRY_MAX)
-                continue;
+    libvgmstream_tags_t* tags = NULL;
 
-            /* should overwrite repeated tags as global tags may appear multiple times */
-            for (int i = 0; i < current_tag; i++) {
-                if (strcmp(last_tags.keys[i], tags->key) == 0) {
-                    current_tag = i;
-                    repeated_tag = 1;
-                    break;
-                }
+    tags = libvgmstream_tags_init(sf_tags);
+    libvgmstream_tags_find(tags, filename_utf8);
+    while (libvgmstream_tags_next_tag(tags)) {
+        bool repeated_tag = false;
+        int current_tag = last_tags.tag_count;
+        if (current_tag >= WINAMP_TAGS_ENTRY_MAX)
+            continue;
+
+        /* should overwrite repeated tags as global tags may appear multiple times */
+        for (int i = 0; i < current_tag; i++) {
+            if (strcmp(last_tags.keys[i], tags->key) == 0) {
+                current_tag = i;
+                repeated_tag = true;
+                break;
             }
-
-            last_tags.keys[current_tag][0] = '\0';
-            strncat(last_tags.keys[current_tag], tags->key, WINAMP_TAGS_ENTRY_SIZE);
-            last_tags.vals[current_tag][0] = '\0';
-            strncat(last_tags.vals[current_tag], tags->val, WINAMP_TAGS_ENTRY_SIZE);
-            if (!repeated_tag)
-                last_tags.tag_count++;
         }
 
-        libvgmstream_tags_free(tags);
-        libstreamfile_close(sf_tags);
-        last_tags.loaded = 1;
+        wa_lstrcpy(last_tags.keys[current_tag], WINAMP_TAGS_ENTRY_SIZE, tags->key);
+        wa_lstrcpy(last_tags.vals[current_tag], WINAMP_TAGS_ENTRY_SIZE, tags->val);
+        if (!repeated_tag)
+            last_tags.tag_count++;
     }
+
+    libvgmstream_tags_free(tags);
+    libstreamfile_close(sf_tags);
+    last_tags.loaded = true;
 }
 
 /* Winamp repeatedly calls this for every known tag currently used in the Advanced Title Formatting (ATF)
  * config, 'metadata' being the requested tag. Returns 0 on failure/tag not found.
  * May be called again after certain actions (adding file to playlist, Play, GetFileInfo, etc), and
  * doesn't seem the plugin can tell Winamp all tags it supports at once or use custom tags. */
-//todo unicode stuff could be improved... probably
 static int winampGetExtendedFileInfo_common(in_char* filename, char *metadata, char* ret, int retlen) {
-    int i, tag_found;
-    int max_len;
+    if (!ret || retlen <= 0)
+        return 0;
 
     //;{ char f8[WINAMP_PATH_LIMIT]; wa_ichar_to_char(f8,WINAMP_PATH_LIMIT,filename); vgm_logi("winampGetExtendedFileInfo_common: file %s\n", f8); }
 
@@ -930,7 +996,7 @@ static int winampGetExtendedFileInfo_common(in_char* filename, char *metadata, c
     /* always called (value in ms), must return ok so other tags get called.
      * "0" shows length 0 in the media library but works in the playlist, null seems correct (auto-loaded) */ 
     if (strcasecmp(metadata, "length") == 0) {
-        strcpy(ret, "\0");
+        wa_lstrcpy(ret, retlen, "\0"); //TODO: rechck if correct or should do: ret[0] = 0;
         return 1;
     }
 
@@ -942,48 +1008,42 @@ static int winampGetExtendedFileInfo_common(in_char* filename, char *metadata, c
 #endif
 
 
-    /* find requested tag */
-    tag_found = 0;
-    max_len = (retlen > 0) ? retlen-1 : retlen;
-    for (i = 0; i < last_tags.tag_count; i++) {
-        if (strcasecmp(metadata,last_tags.keys[i]) == 0) {
-            ret[0] = '\0';
-            strncat(ret, last_tags.vals[i], max_len);
-            tag_found = 1;
-            break;
-        }
+    /* find requested 'metadata' tag */
+    bool tag_found = 0;
+    for (int i = 0; i < last_tags.tag_count; i++) {
+        if (strcasecmp(metadata, last_tags.keys[i]) != 0)
+            continue;
+        wa_lstrcpy(ret, retlen, last_tags.vals[i]);
+        tag_found = true;
+        break;
     }
 
-    /* if tagfile exists but TITLE doesn't Winamp won't default to GetFileInfo, so call it
+    /* if tagfile exists but TITLE doesn't, Winamp won't default to GetFileInfo, so call it
      * manually as it's useful for files with stream names */
     if (!tag_found && strcasecmp(metadata, "title") == 0) {
-        in_char ret_wchar[2048];
+        in_char title_tmp[GETFILEINFO_TITLE_LENGTH];
 
-        winamp_GetFileInfo(filename, ret_wchar, NULL);
-        wa_ichar_to_char(ret, retlen, ret_wchar);
+        winamp_GetFileInfo(filename, title_tmp, NULL);
+        wa_ichar_to_char(ret, retlen, title_tmp);
         return 1;
     }
 
     //TODO: is this always needed for Winamp to use replaygain?
     if (!tag_found && strcasecmp(metadata, "replaygain_track_gain") == 0) {
-        //strcpy(ret, "1.0"); //should set some default value?
+        //wa_lstrcpy(ret, retlen, "1.0"); //should set some default value?
         return 1;
     }
 
     if (!tag_found)
-        goto fail;
+        return 0;
 
     return 1;
-
-fail:
-    return 0;
 }
 
 
 /* for Winamp 5.24 */
 __declspec (dllexport) int winampGetExtendedFileInfo(char *filename, char *metadata, char *ret, int retlen) {
     in_char filename_wchar[WINAMP_PATH_LIMIT];
-    int ok;
 
     if (settings.tagfile_disable)
         return 0;
@@ -992,7 +1052,7 @@ __declspec (dllexport) int winampGetExtendedFileInfo(char *filename, char *metad
 
     //;{ vgm_logi("winampGetExtendedFileInfo: file %s\n", filename); }
 
-    ok = winampGetExtendedFileInfo_common(filename_wchar, metadata, ret, retlen);
+    int ok = winampGetExtendedFileInfo_common(filename_wchar, metadata, ret, retlen);
     if (ok == 0)
         return 0;
 
@@ -1003,7 +1063,6 @@ __declspec (dllexport) int winampGetExtendedFileInfo(char *filename, char *metad
 __declspec (dllexport) int winampGetExtendedFileInfoW(wchar_t *filename, char *metadata, wchar_t *ret, int retlen) {
     in_char filename_ichar[WINAMP_PATH_LIMIT];
     char ret_utf8[2048];
-    int ok;
 
     if (settings.tagfile_disable)
         return 0;
@@ -1012,11 +1071,11 @@ __declspec (dllexport) int winampGetExtendedFileInfoW(wchar_t *filename, char *m
 
     //;{ char f8[WINAMP_PATH_LIMIT]; wa_ichar_to_char(f8,WINAMP_PATH_LIMIT,filename); vgm_logi("winampGetExtendedFileInfoW: file %s\n", f8); }
 
-    ok = winampGetExtendedFileInfo_common(filename_ichar, metadata, ret_utf8,2048);
+    int ok = winampGetExtendedFileInfo_common(filename_ichar, metadata, ret_utf8, sizeof(ret_utf8));
     if (ok == 0)
         return 0;
 
-    wa_char_to_wchar(ret,retlen, ret_utf8);
+    wa_char_to_wchar(ret, retlen, ret_utf8);
 
     return 1;
 }
@@ -1042,7 +1101,7 @@ __declspec(dllexport) int winampUninstallPlugin(HINSTANCE hDllInst, HWND hwndDlg
  * documented, slightly different repeats of the above. */
 
 winamp_state_t xstate;
-short xsample_buffer[SAMPLE_BUFFER_SIZE*2 * VGMSTREAM_MAX_CHANNELS];
+short xsample_buffer[SAMPLE_BUFFER_SIZE * 2 * WINAMP_MAX_CHANNELS]; //TODO: dynamic alloc
 
 
 /* open the file and prepares to decode */
@@ -1054,6 +1113,11 @@ static void* winampGetExtendedRead_open_common(in_char *fn, int *size, int *bps,
     /* open the stream */
     xvgmstream = init_vgmstream_winamp_fileinfo(fn);
     if (!xvgmstream) {
+        return NULL;
+    }
+
+    if (xvgmstream->format->channels > WINAMP_MAX_CHANNELS) {
+        libvgmstream_free(xvgmstream);
         return NULL;
     }
 
@@ -1122,7 +1186,7 @@ __declspec(dllexport) size_t winampGetExtendedRead_getData(void *handle, char *d
         }
 
         /* decode */
-        int samples_left = (len - bytes_copied) / channels * sizeof(short);
+        int samples_left = (len - bytes_copied) / channels / sizeof(short);
         int samples_to_do = max_buffer_samples;
         if (samples_to_do > samples_left)
             samples_to_do = samples_left;
@@ -1132,8 +1196,8 @@ __declspec(dllexport) size_t winampGetExtendedRead_getData(void *handle, char *d
             continue;
 
         // ReplayGain is automatically applied in this API
-        int buf_bytes = vgmstream->decoder->buf_bytes;
-        int buf_samples = vgmstream->decoder->buf_samples;
+        int buf_bytes = xvgmstream->decoder->buf_bytes;
+        int buf_samples = xvgmstream->decoder->buf_samples;
         memcpy(&dest[bytes_copied], xsample_buffer, buf_bytes);
         bytes_copied += buf_bytes;
 
@@ -1146,17 +1210,18 @@ __declspec(dllexport) size_t winampGetExtendedRead_getData(void *handle, char *d
 /* seek in the file (possibly unused) */
 __declspec(dllexport) int winampGetExtendedRead_setTime(void *handle, int time_in_ms) {
     libvgmstream_t* xvgmstream = handle;
-    if (xvgmstream) {
-        xstate.seek_sample = (long long)time_in_ms * xvgmstream->format->sample_rate / 1000LL;
-        return 1;
-    }
-    return 0;
+    if (!xvgmstream)
+        return 0;
+    
+    xstate.seek_sample = (long long)time_in_ms * xvgmstream->format->sample_rate / 1000LL;
+    return 1;
 }
 
 /* file done */
 __declspec(dllexport) void winampGetExtendedRead_close(void *handle) {
     libvgmstream_t* xvgmstream = handle;
-    if (xvgmstream) {
-        libvgmstream_free(xvgmstream);
-    }
+    if (!xvgmstream)
+        return;
+
+    libvgmstream_free(xvgmstream);
 }

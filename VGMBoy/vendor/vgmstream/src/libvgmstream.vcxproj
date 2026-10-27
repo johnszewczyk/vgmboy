@@ -109,6 +109,9 @@
     <ClInclude Include="coding\coding.h" />
     <ClInclude Include="coding\mpeg_decoder.h" />
     <ClInclude Include="coding\vorbis_custom_decoder.h" />
+    <ClInclude Include="coding\libs\atrac9_dec.h" />
+    <ClInclude Include="coding\libs\atrac9_internal.h" />
+    <ClInclude Include="coding\libs\atrac9_internal_data.h" />
     <ClInclude Include="coding\libs\binka_data.h" />
     <ClInclude Include="coding\libs\binka_dec.h" />
     <ClInclude Include="coding\libs\binka_transform.h" />
@@ -116,7 +119,10 @@
     <ClInclude Include="coding\libs\circus_vq_lib.h" />
     <ClInclude Include="coding\libs\circus_vq_lzxpcm.h" />
     <ClInclude Include="coding\libs\clhca.h" />
+    <ClInclude Include="coding\libs\clhca_data.h" />
     <ClInclude Include="coding\libs\compresswave_lib.h" />
+    <ClInclude Include="coding\libs\g719_dec.h" />
+    <ClInclude Include="coding\libs\g719_internal.h" />
     <ClInclude Include="coding\libs\g7221_aes.h" />
     <ClInclude Include="coding\libs\g7221_data.h" />
     <ClInclude Include="coding\libs\g7221_lib.h" />
@@ -226,6 +232,7 @@
     <ClInclude Include="util\cri_keys.h" />
     <ClInclude Include="util\cri_utf.h" />
     <ClInclude Include="util\endianness.h" />
+    <ClInclude Include="util\hashes.h" />
     <ClInclude Include="util\io_callback.h" />
     <ClInclude Include="util\io_callback_sf.h" />
     <ClInclude Include="util\layout_utils.h" />
@@ -242,6 +249,7 @@
     <ClInclude Include="util\reader_text.h" />
     <ClInclude Include="util\sf_utils.h" />
     <ClInclude Include="util\spu_utils.h" />
+    <ClInclude Include="util\string_utils.h" />
     <ClInclude Include="util\text_reader.h" />
     <ClInclude Include="util\vgmstream_limits.h" />
     <ClInclude Include="util\vorbis_codebooks.h" />
@@ -318,6 +326,7 @@
     <ClCompile Include="coding\ima_decoder.c" />
     <ClCompile Include="coding\imuse_decoder.c" />
     <ClCompile Include="coding\ka1a_decoder.c" />
+    <ClCompile Include="coding\ka_decoder.c" />
     <ClCompile Include="coding\l5_555_decoder.c" />
     <ClCompile Include="coding\lsf_decoder.c" />
     <ClCompile Include="coding\mio_decoder.c" />
@@ -368,11 +377,17 @@
     <ClCompile Include="coding\xa_decoder.c" />
     <ClCompile Include="coding\xmd_decoder.c" />
     <ClCompile Include="coding\yamaha_decoder.c" />
+    <ClCompile Include="coding\libs\atrac9_dec.c" />
+    <ClCompile Include="coding\libs\atrac9_internal.c" />
     <ClCompile Include="coding\libs\binka_dec.c" />
     <ClCompile Include="coding\libs\binka_transform.c" />
     <ClCompile Include="coding\libs\circus_vq_lib.c" />
     <ClCompile Include="coding\libs\clhca.c" />
     <ClCompile Include="coding\libs\compresswave_lib.c" />
+    <ClCompile Include="coding\libs\g719_dec.c" />
+    <ClCompile Include="coding\libs\g719_tables.c" />
+    <ClCompile Include="coding\libs\g719_transform.c" />
+    <ClCompile Include="coding\libs\g719_unpack.c" />
     <ClCompile Include="coding\libs\g7221_aes.c" />
     <ClCompile Include="coding\libs\g7221_lib.c" />
     <ClCompile Include="coding\libs\g72x_vgmstream.c" />
@@ -412,7 +427,6 @@
     <ClCompile Include="layout\blocked_hvqm4.c" />
     <ClCompile Include="layout\blocked_hwas.c" />
     <ClCompile Include="layout\blocked_mul.c" />
-    <ClCompile Include="layout\blocked_mxch.c" />
     <ClCompile Include="layout\blocked_ps2_iab.c" />
     <ClCompile Include="layout\blocked_rage_aud.c" />
     <ClCompile Include="layout\blocked_rws.c" />
@@ -608,6 +622,7 @@
     <ClCompile Include="meta\jaudio.c" />
     <ClCompile Include="meta\joe.c" />
     <ClCompile Include="meta\jstm.c" />
+    <ClCompile Include="meta\ka.c" />
     <ClCompile Include="meta\ka1a.c" />
     <ClCompile Include="meta\kat.c" />
     <ClCompile Include="meta\kcey.c" />
@@ -690,7 +705,6 @@
     <ClCompile Include="meta\pasx.c" />
     <ClCompile Include="meta\pcm_kceje.c" />
     <ClCompile Include="meta\pcm_success.c" />
-    <ClCompile Include="meta\pc_mxst.c" />
     <ClCompile Include="meta\pdt.c" />
     <ClCompile Include="meta\piff_tpcm.c" />
     <ClCompile Include="meta\plug.c" />
@@ -870,6 +884,7 @@
     <ClCompile Include="meta\xa_xa30.c" />
     <ClCompile Include="meta\xma.c" />
     <ClCompile Include="meta\xma_ue3.c" />
+    <ClCompile Include="meta\xma_ue5.c" />
     <ClCompile Include="meta\xmd.c" />
     <ClCompile Include="meta\xmu.c" />
     <ClCompile Include="meta\xnb.c" />
@@ -898,6 +913,7 @@
     <ClCompile Include="util\companion_files.c" />
     <ClCompile Include="util\cri_keys.c" />
     <ClCompile Include="util\cri_utf.c" />
+    <ClCompile Include="util\hashes.c" />
     <ClCompile Include="util\io_callback_sf.c" />
     <ClCompile Include="util\layout_utils.c" />
     <ClCompile Include="util\log.c" />
@@ -909,6 +925,7 @@
     <ClCompile Include="util\reader_text.c" />
     <ClCompile Include="util\sf_utils.c" />
     <ClCompile Include="util\spu_utils.c" />
+    <ClCompile Include="util\string_utils.c" />
     <ClCompile Include="util\text_reader.c" />
     <ClCompile Include="util\vorbis_codebooks.c" />
   </ItemGroup>

@@ -11,9 +11,9 @@ stamp="$build_dir/cocoaspice-inputs.sha256"
 export PKG_CONFIG_PATH="/opt/homebrew/opt/ffmpeg/lib/pkgconfig:/opt/homebrew/opt/libvorbis/lib/pkgconfig:/opt/homebrew/opt/libogg/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 
 if [[ -e "$source_dir/.git" ]]; then
-  if git -C "$source_dir" apply --check "$patch" >/dev/null 2>&1; then
-    git -C "$source_dir" apply "$patch"
-  elif ! git -C "$source_dir" apply --reverse --check "$patch" >/dev/null 2>&1; then
+  if git -C "$source_dir" apply --unidiff-zero --check "$patch" >/dev/null 2>&1; then
+    git -C "$source_dir" apply --unidiff-zero "$patch"
+  elif ! git -C "$source_dir" apply --unidiff-zero --reverse --check "$patch" >/dev/null 2>&1; then
     echo "vgmstream source does not match the VGMBoy compatibility patch" >&2
     exit 1
   fi
@@ -75,5 +75,9 @@ cmake -S "$source_dir" -B "$build_dir" \
   -DUSE_ATRAC9=OFF \
   -DUSE_CELT=OFF \
   -DUSE_SPEEX=OFF
+# A replaced source snapshot may preserve timestamps older than existing
+# objects. A changed input signature requires a real rebuild, not just a
+# CMake timestamp check.
+cmake --build "$build_dir" --target clean
 cmake --build "$build_dir" --target libvgmstream --parallel "$build_jobs"
 printf '%s\n' "$signature" > "$stamp"

@@ -65,6 +65,8 @@ VGMSTREAM* init_vgmstream_fsb5(STREAMFILE* sf) {
      * (some FSB5 CLI versions make buggy offsets = bad output but this was fixed later) */
     if (fsb5.stream_offset > 0x7FFFFFFF) {
         sb = setup_subfile_streamfile(sf, fsb5.stream_offset, fsb5.stream_size, NULL);
+        if (!sb) goto fail;
+
         fsb5.stream_offset = 0x00;
     }
     else {
@@ -499,14 +501,14 @@ static bool parse_header(fsb5_header_t* fsb5, STREAMFILE* sf) {
     // 0x1c: zero
     if (fsb5->version == 0x01) {
         fsb5->flags          = read_u32le(0x20,sf); // found by tests and assumed to be flags, no games known
-        // 0x24: 128-bit hash
+        // 0x24: 128-bit name hash (sometimes partially filename without extension?)
         // 0x34: unknown (64-bit sub-hash?)
         fsb5->base_header_size = 0x3c;
     }
     else {
         // 0x20: zero/flags?
         // 0x24: zero/flags?
-        // 0x28: 128-bit hash
+        // 0x28: 128-bit name hash
         // 0x38: unknown (64-bit sub-hash?)
         fsb5->base_header_size = 0x40;
     }

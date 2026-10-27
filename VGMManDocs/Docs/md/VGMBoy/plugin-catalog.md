@@ -20,16 +20,16 @@ Last reviewed: **2026-09-17**
 | `psgplay` | `f2028e94e5f6c7b3b38c9f7b5e2e0e1939613c06` | `CPSGPlay` | VGMBoy playback; legacy metadata API is test-only oracle | Atari ST SNDH playback; ScanSong production metadata is read by MetaManCore |
 | `mdxmini` | `003531a471c1955f4ed4357d0e2a6cba809c34a0` plus vendored LZX code | `CMDX` | `vgmboy-mdx-inspect` (open/dependency validation only; metadata timing is MetaMan-owned) | X68000 MDX and PDX; sibling banks, legacy `\name`, inner LZX 0.32/0.42 |
 | `uade` | Homebrew UADE 3.05 | `CUADE` | `vgmboy-amiga-inspect` | Amiga EaglePlayer modules, TFMX, MED, and prefix-led replayers |
-| `vgmstream` | `807b4948cfc1de0cd90e377e9c56f74664c54a1c` plus compatibility patch | `CVGmstream` | Bundled `vgmstream-cli` | Console streamed audio, TXTP, HD/HBD/IECS-related routes |
+| `vgmstream` | `d9875b1fff307e4759dfb85e49e3d5e6fb196f7c` (`r2168`) plus compatibility patch | `CVGmstream` | Bundled `vgmstream-cli` | Console streamed audio, TXTP, HD/HBD/IECS-related routes |
 | `lazyusf2` | `421f00bcaa1988b8e1825e91780129f24fbd1aa0` | `CLazyUSF` | Native dependency-aware route | USF and miniUSF; `.usflib` companions |
 | `play-psf` | `50aedca2639521bc498ace0b2be1ea012801a86a` plus PSF-core patch | `CPlayPSF` | Native PSF route | PSF, miniPSF, PSF2, miniPSF2; `.psflib` companions |
 | `aosdk-qsf` | `e359a6e5154b2ba8499fb1f24a1f5f8a18538a61` plus lifecycle patch | `CQSF` | Playback only; ScanSong uses its own direct reader | QSF and miniQSF; `.qsflib` companions |
 | `mgba` | mGBA 0.11.0 source snapshot; tree SHA-256 `b7b71f64dab500433f3662b818e3521cf67524dcdee1a9952c1f555629ff55c0` | `CHighlyComplete` | GSF playback only; MetaManCore reads GSF metadata and validates the dependency/ROM-header structure | GSF and miniGSF playback; PSFLib assembles dependency chains. The scanner neither links nor prepares mGBA. |
 | `2sf2wav` | DeSmuME 0.9.9 svn 4608 source snapshot; tree SHA-256 `c3e329f9cf72881d25dabb03b9a89ebd4125ca9bd6d44c26f642589c622a9fb7` | `C2SF` | Native 2SF route | 2SF and mini2SF; relative library dependencies |
 | `psflib` | VGMBoy-managed source snapshot; tree SHA-256 `c3adb7ea371fbeeedc68b3747c314419b52d9cb46aa0d75f177f428bcdb7d021` | Used by PSF-family bridges | Dependency support, not a standalone route | PSF and GSF library resolution |
-| `libsidplayfp` | Homebrew libsidplayfp 3.1.0 | `CSIDPlayFP` | VGMBoy playback only; ScanSong reads PSID/RSID header metadata through MetaManCore | SID |
+| `libsidplayfp` | Homebrew libsidplayfp 3.1.2 | `CSIDPlayFP` | VGMBoy playback only; ScanSong reads PSID/RSID header metadata through MetaManCore | SID |
 | `libopenmpt` | Homebrew libopenmpt 0.8.9 | `COpenMPT` | `openmpt123`/module route | MOD, XM, IT, S3M, and registered tracker modules |
-| `ffmpeg-audio` | Homebrew FFmpeg 8.1.2_1 | `CFFmpeg` | Playback only; ScanSong reads APE directly | APE (Monkey's Audio), MP2, and TAK; one finite playback stream |
+| `ffmpeg-audio` | Homebrew FFmpeg 9.0.2_1 | `CFFmpeg` | Playback only; ScanSong reads APE directly | APE (Monkey's Audio), MP2, and TAK; one finite playback stream |
 
 Upstream revisions and SHA-256 digests for the flattened source snapshots are
 recorded in [`vendor/PROVENANCE.md`](../../../../VGMBoy/vendor/PROVENANCE.md). These are ordinary
@@ -148,7 +148,7 @@ decoder pins remain in `plugin-versions.json`.
 
 | Dependency | Current environment value | Role |
 | --- | --- | --- |
-| FFmpeg | 8.1.2_1 | `CFFmpeg` APE/MP2/TAK playback support and vgmstream build input; ScanSong reads APE header/tags directly |
+| FFmpeg | 9.0.2_1 | `CFFmpeg` APE/MP2/TAK playback support and vgmstream build input; ScanSong reads APE header/tags directly |
 | libvorbis | 1.3.7 | vgmstream Vorbis support |
 | libogg | 1.3.6 | vgmstream Ogg support |
 | CMake | 4.4.2 | libvgm, vgmstream, Play!, and mGBA builds |

@@ -161,6 +161,15 @@
     <ClInclude Include="coding\vorbis_custom_decoder.h">
       <Filter>coding\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="coding\libs\atrac9_dec.h">
+      <Filter>coding\libs\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="coding\libs\atrac9_internal.h">
+      <Filter>coding\libs\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="coding\libs\atrac9_internal_data.h">
+      <Filter>coding\libs\Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="coding\libs\binka_data.h">
       <Filter>coding\libs\Header Files</Filter>
     </ClInclude>
@@ -182,7 +191,16 @@
     <ClInclude Include="coding\libs\clhca.h">
       <Filter>coding\libs\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="coding\libs\clhca_data.h">
+      <Filter>coding\libs\Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="coding\libs\compresswave_lib.h">
+      <Filter>coding\libs\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="coding\libs\g719_dec.h">
+      <Filter>coding\libs\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="coding\libs\g719_internal.h">
       <Filter>coding\libs\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="coding\libs\g7221_aes.h">
@@ -512,6 +530,9 @@
     <ClInclude Include="util\endianness.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="util\hashes.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="util\io_callback.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
@@ -558,6 +579,9 @@
       <Filter>util\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="util\spu_utils.h">
+      <Filter>util\Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="util\string_utils.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="util\text_reader.h">
@@ -784,6 +808,9 @@
     <ClCompile Include="coding\ka1a_decoder.c">
       <Filter>coding\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="coding\ka_decoder.c">
+      <Filter>coding\Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="coding\l5_555_decoder.c">
       <Filter>coding\Source Files</Filter>
     </ClCompile>
@@ -934,6 +961,12 @@
     <ClCompile Include="coding\yamaha_decoder.c">
       <Filter>coding\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="coding\libs\atrac9_dec.c">
+      <Filter>coding\libs\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="coding\libs\atrac9_internal.c">
+      <Filter>coding\libs\Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="coding\libs\binka_dec.c">
       <Filter>coding\libs\Source Files</Filter>
     </ClCompile>
@@ -947,6 +980,18 @@
       <Filter>coding\libs\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="coding\libs\compresswave_lib.c">
+      <Filter>coding\libs\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="coding\libs\g719_dec.c">
+      <Filter>coding\libs\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="coding\libs\g719_tables.c">
+      <Filter>coding\libs\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="coding\libs\g719_transform.c">
+      <Filter>coding\libs\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="coding\libs\g719_unpack.c">
       <Filter>coding\libs\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="coding\libs\g7221_aes.c">
@@ -1064,9 +1109,6 @@
       <Filter>layout\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="layout\blocked_mul.c">
-      <Filter>layout\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="layout\blocked_mxch.c">
       <Filter>layout\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="layout\blocked_ps2_iab.c">
@@ -1654,6 +1696,9 @@
     <ClCompile Include="meta\jstm.c">
       <Filter>meta\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="meta\ka.c">
+      <Filter>meta\Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="meta\ka1a.c">
       <Filter>meta\Source Files</Filter>
     </ClCompile>
@@ -1898,9 +1943,6 @@
       <Filter>meta\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="meta\pcm_success.c">
-      <Filter>meta\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="meta\pc_mxst.c">
       <Filter>meta\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="meta\pdt.c">
@@ -2440,6 +2482,9 @@
     <ClCompile Include="meta\xma_ue3.c">
       <Filter>meta\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="meta\xma_ue5.c">
+      <Filter>meta\Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="meta\xmd.c">
       <Filter>meta\Source Files</Filter>
     </ClCompile>
@@ -2524,6 +2569,9 @@
     <ClCompile Include="util\cri_utf.c">
       <Filter>util\Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="util\hashes.c">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="util\io_callback_sf.c">
       <Filter>util\Source Files</Filter>
     </ClCompile>
@@ -2555,6 +2603,9 @@
       <Filter>util\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="util\spu_utils.c">
+      <Filter>util\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="util\string_utils.c">
       <Filter>util\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="util\text_reader.c">

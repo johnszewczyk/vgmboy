@@ -3,6 +3,7 @@
 #include "layout/layout.h"
 #include "base/plugins.h"
 #include "base/info.h"
+#include "util/string_utils.h"
 
 
 /* Defines the list of accepted extensions. vgmstream doesn't use it internally so it's here
@@ -24,6 +25,7 @@
 static const char* extension_list[] = {
     //"", /* vgmstream can play extensionless files too, but plugins must accept them manually */
 
+    "11k",
     "208",
     "2dx",
     "2dx9",
@@ -84,6 +86,7 @@ static const char* extension_list[] = {
     "ast",
     "at3",
     "at9",
+    "at9psv",
     "atsl",
     "atsl3",
     "atsl4",
@@ -206,7 +209,7 @@ static const char* extension_list[] = {
 
     "fag",
     "fda",
-    "filp",
+    "fil",
     "fish",
     //"flac", //common
     "flx",
@@ -222,6 +225,7 @@ static const char* extension_list[] = {
     "gcub",
     "gcw",
     "ged",
+    "gen",
     "genh",
     "gin",
     "gmd",  //txth/semi [High Voltage games: Charlie and the Chocolate Factory (GC), Zathura (GC)]
@@ -388,6 +392,7 @@ static const char* extension_list[] = {
     "msh",
     "msd",
     "mse",
+    "msenc",
     "msf",
     "mss",
     "msv",
@@ -405,7 +410,6 @@ static const char* extension_list[] = {
     "mvb", //txth/reserved [Porsche Challenge (PS1)]
     "mwa", //txth/reserved [Fatal Frame (Xbox)]
     "mwv",
-    "mxst",
     "myspd",
 
     "n64",
@@ -419,6 +423,7 @@ static const char* extension_list[] = {
     "npsf", //fake extension/header id for .nps (in bigfiles)
     "nsa",
     "nsopus",
+    "nst",
     "nfx",
     "nub",
     "nub2",
@@ -443,6 +448,7 @@ static const char* extension_list[] = {
     "oor",
     "opu",
     //"opus", //common
+    "opusnsw",
     "opusnx",
     "opusx",
     "oto", //txth/reserved [Vampire Savior (SAT)]
@@ -466,6 +472,7 @@ static const char* extension_list[] = {
     "pona",
     "pos",
     "ps3",
+    "ps3audio",
     "psb",
     "psf",
     "psh", //fake extension for .vsv (to be removed)
@@ -601,6 +608,7 @@ static const char* extension_list[] = {
     "ssp",
     "sspr",
     "sss",
+    "ste",
     "ster",
     "sth",
     "stm",
@@ -614,6 +622,8 @@ static const char* extension_list[] = {
     "svag",
     "svs",
     "svg",
+    "sw", //txth/reserved [Dominions II (PC)]
+    "sw2", //txth/reserved [Conquest of Elysium 4 (PC)]
     "swag",
     "swar",
     "swav",
@@ -750,6 +760,7 @@ static const char* extension_list[] = {
     "xnb",
     "xsh",
     "xsf",
+    "xsnd", //txth/reserved [3DO Interactive Sampler (3DO)]
     "xst",
     "xse",
     "xsew",
@@ -884,7 +895,7 @@ static const coding_info coding_info_list[] = {
         {coding_PSX_badflags,       "PlayStation 4-bit ADPCM (bad flags)"},
         {coding_PSX_cfg,            "PlayStation 4-bit ADPCM (configurable)"},
         {coding_PSX_pivotal,        "PlayStation 4-bit ADPCM (Pivotal)"},
-        {coding_HEVAG,              "Sony HEVAG 4-bit ADPCM"},
+        {coding_HEVAG,              "Sony HE-VAG 4-bit ADPCM"},
 
         {coding_EA_XA,              "Electronic Arts EA-XA 4-bit ADPCM v1"},
         {coding_EA_XA_int,          "Electronic Arts EA-XA 4-bit ADPCM v1 (mono/interleave)"},
@@ -940,7 +951,7 @@ static const coding_info coding_info_list[] = {
         {coding_NDS_PROCYON,        "Procyon Studio Digital Sound Elements NDS 4-bit APDCM"},
         {coding_LEVEL5,             "Level-5 4-bit ADPCM"},
         {coding_LSF,                "Gizmondo Studios Helsingborg LSF 4-bit ADPCM"},
-        {coding_MTAF,               "Konami MTAF 4-bit ADPCM"},
+        {coding_MTAF,               "Konami MTA 4-bit ADPCM"},
         {coding_MTA2,               "Konami MTA2 4-bit ADPCM"},
         {coding_MPC3,               "Paradigm MPC3 3-bit ADPCM"},
         {coding_FADPCM,             "FMOD FADPCM 4-bit ADPCM"},
@@ -951,6 +962,7 @@ static const coding_info coding_info_list[] = {
         {coding_PCFX,               "PC-FX 4-bit ADPCM"},
         {coding_OKI16,              "OKI 4-bit ADPCM (16-bit output)"},
         {coding_OKI4S,              "OKI 4-bit ADPCM (4-shift)"},
+        {coding_OKI_UM,             "OKI 4-bit ADPCM (UltraMarine)"},
         {coding_PTADPCM,            "Platinum 4-bit ADPCM"},
         {coding_IMUSE,              "LucasArts iMUSE VIMA ADPCM"},
         {coding_COMPRESSWAVE,       "CompressWave Huffman ADPCM"},
@@ -986,6 +998,7 @@ static const coding_info coding_info_list[] = {
         {coding_CF_DF_DPCM_V41,     "Cyberflix DreamFactory v4.1 DPCM"},
         {coding_CF_DF_ADPCM_v5,     "Cyberflix DreamFactory v5 ADPCM"},
         {coding_CF_DF_IMA_v5,       "Cyberflix DreamFactory v5 IMA ADPCM"},
+        {coding_KA_ADPCM,           "Knowledge Adventure ADPCM"},
 
 #ifdef VGM_USE_VORBIS
         {coding_OGG_VORBIS,         "Ogg Vorbis"},
@@ -1028,7 +1041,6 @@ static const layout_info layout_info_list[] = {
         {layout_segmented,              "segmented"},
         {layout_layered,                "layered"},
 
-        {layout_blocked_mxch,           "blocked (MxCh)"},
         {layout_blocked_ast,            "blocked (AST)"},
         {layout_blocked_halpst,         "blocked (HALPST)"},
         {layout_blocked_xa,             "blocked (XA)"},
@@ -1252,7 +1264,6 @@ static const meta_info meta_info_list[] = {
         {meta_VGV,                  "Human Head .VGV header"},
         {meta_GCUB,                 "Sega GCub header"},
         {meta_CAFF,                 "Apple Core Audio Format File header"},
-        {meta_PC_MXST,              "Lego Island MxSt Header"},
         {meta_SAB,                  "Sensaura SAB header"},
         {meta_MAXIS_XA,             "Maxis XA Header"},
         {meta_EXAKT_SC,             "assumed Activision / EXAKT SC by extension"},
@@ -1396,7 +1407,6 @@ static const meta_info meta_info_list[] = {
         {meta_TXTP,                 "TXTP generic header"},
         {meta_SMH_SMC,              "Genki SMH+SMC header"},
         {meta_PPST,                 "epics PPST header"},
-        {meta_SPS_N1,               "Nippon Ichi .SPS header"},
         {meta_UBI_BAO,              "Ubisoft BAO header"},
         {meta_DSP_SWITCH_AUDIO,     "UE4 Switch Audio header"},
         {meta_SADF,                 "Procyon Studio SADF header"},
@@ -1462,7 +1472,7 @@ static const meta_info meta_info_list[] = {
         {meta_BMP_KONAMI,           "Konami BMP header"},
         {meta_ISB,                  "Creative ISACT header"},
         {meta_XSSB,                 "Artoon XSSB header"},
-        {meta_XMA_UE3,              "Unreal Engine XMA header"},
+        {meta_XMA_UE3,              "Unreal Engine 3 XMA header"},
         {meta_FWSE,                 "MT Framework FWSE header"},
         {meta_FDA,                  "Relic FDA header"},
         {meta_TGC,                  "Tiger Game.com .4 header"},
@@ -1551,21 +1561,23 @@ static const meta_info meta_info_list[] = {
         {meta_NXMS,                 "Arika NXMS header"},
         {meta_SAUD,                 "LucasArts SAUD header"},
         {meta_CWV,                  "Nintendo .CWV header"},
+        {meta_XMA_UE5,              "Unreal Engine 5 XMA header"},
+        {meta_KA_SOUND,             "Knowledge Adventure KA Sound header"},
 };
 
-void get_vgmstream_coding_description(VGMSTREAM* vgmstream, char* out, size_t out_size) {
+void get_vgmstream_coding_description(VGMSTREAM* vgmstream, char* dst, size_t dst_size) {
 
 #ifdef VGM_USE_FFMPEG
     if (vgmstream->coding_type == coding_FFmpeg) {
         /* recurse down for FFmpeg, but metas should set prefered/main codec, or maybe print a list of codecs */
         if (vgmstream->layout_type == layout_layered) {
             layered_layout_data* layout_data = vgmstream->layout_data;
-            get_vgmstream_coding_description(layout_data->layers[0], out, out_size);
+            get_vgmstream_coding_description(layout_data->layers[0], dst, dst_size);
             return;
         }
         else if (vgmstream->layout_type == layout_segmented) {
             segmented_layout_data* layout_data = vgmstream->layout_data;
-            get_vgmstream_coding_description(layout_data->segments[0], out, out_size);
+            get_vgmstream_coding_description(layout_data->segments[0], dst, dst_size);
             return;
         }
     }
@@ -1591,7 +1603,7 @@ void get_vgmstream_coding_description(VGMSTREAM* vgmstream, char* out, size_t ou
         }
     }
 
-    strncpy(out, description, out_size);
+    strcpy_v(dst, dst_size, description);
 }
 
 static const char* get_layout_name(layout_t layout_type) {
@@ -1664,7 +1676,7 @@ static int get_layout_mixed_description(VGMSTREAM* vgmstream, char* dst, int dst
     return done;
 }
 
-void get_vgmstream_layout_description(VGMSTREAM* vgmstream, char* out, size_t out_size) {
+void get_vgmstream_layout_description(VGMSTREAM* vgmstream, char* dst, size_t dst_size) {
     const char* description;
     bool mixed = false;
 
@@ -1675,23 +1687,23 @@ void get_vgmstream_layout_description(VGMSTREAM* vgmstream, char* out, size_t ou
         layered_layout_data* data = vgmstream->layout_data;
         mixed = has_sublayouts(data->layers, data->layer_count);
         if (!mixed)
-            snprintf(out, out_size, "%s (%i layers)", description, data->layer_count);
+            snprintf(dst, dst_size, "%s (%i layers)", description, data->layer_count);
     }
     else if (vgmstream->layout_type == layout_segmented) {
         segmented_layout_data* data = vgmstream->layout_data;
         mixed = has_sublayouts(data->segments, data->segment_count);
         if (!mixed)
-            snprintf(out, out_size, "%s (%i segments)", description, data->segment_count);
+            snprintf(dst, dst_size, "%s (%i segments)", description, data->segment_count);
     }
     else {
-        snprintf(out, out_size, "%s", description);
+        snprintf(dst, dst_size, "%s", description);
     }
 
     if (mixed) {
         char tmp[256] = {0};
 
         get_layout_mixed_description(vgmstream, tmp, sizeof(tmp) - 1);
-        snprintf(out, out_size, "mixed (%s)", tmp);
+        snprintf(dst, dst_size, "mixed (%s)", tmp);
         return;
     }
 }

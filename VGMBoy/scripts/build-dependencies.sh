@@ -22,6 +22,7 @@ export MACOSX_DEPLOYMENT_TARGET=26.0
 }
 
 mkdir -p "$DEPENDENCY_ROOT" "$STAMP_ROOT"
+rebuilt_dependencies=" "
 
 dependency_signature() {
     local source_relative="$1"
@@ -76,6 +77,7 @@ ensure_dependency() {
     # product deterministically.
     signature="$(dependency_signature "$source_relative" "scripts/$build_script" "$@")"
     printf '%s\n' "$signature" > "$stamp"
+    rebuilt_dependencies="$rebuilt_dependencies$name "
 }
 
 copy_dependency() {
@@ -85,7 +87,7 @@ copy_dependency() {
     local source_stamp="$STAMP_ROOT/$name.sha256"
     local destination_stamp="$destination/.vgmboy-inputs.sha256"
     [[ -e "$source" ]] || { echo "Missing built dependency: $source" >&2; exit 1; }
-    if [[ -f "$source_stamp" && -f "$destination_stamp" ]] && cmp -s "$source_stamp" "$destination_stamp"; then
+    if [[ "$rebuilt_dependencies" != *" $name "* && -f "$source_stamp" && -f "$destination_stamp" ]] && cmp -s "$source_stamp" "$destination_stamp"; then
         echo "Reusing packaged $name dependency"
         return
     fi
