@@ -4,9 +4,9 @@ import Foundation
 import Testing
 @testable import CocoaSpice
 
-@Test func sidebarSearchIsAViewIndependentTemporaryGamesView() {
+@Test func sidebarSearchPreservesTheSelectedBrowserView() {
     #expect(PlayerViewModel.effectiveSidebarBrowserMode(storedMode: .games, searchText: "Castlevania") == .games)
-    #expect(PlayerViewModel.effectiveSidebarBrowserMode(storedMode: .files, searchText: "Castlevania") == .games)
+    #expect(PlayerViewModel.effectiveSidebarBrowserMode(storedMode: .files, searchText: "Castlevania") == .files)
     #expect(PlayerViewModel.effectiveSidebarBrowserMode(storedMode: .files, searchText: "  ") == .files)
 }
 
