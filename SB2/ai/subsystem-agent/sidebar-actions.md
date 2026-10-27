@@ -19,8 +19,11 @@ in the SB2 home view.
 
 ## Invariants
 
-- Gallery is a library view and has a dedicated square button in the sidebar
-  library toolbar. It is represented by a playlist tab, but its sidebar always
+- Gallery is an in-place view mode on the active playlist tab, switched by its
+  dedicated square button in the sidebar library toolbar. It must not create or
+  activate a separate Gallery tab. Preserve the tab's title, playlist,
+  selection, and scroll position while Gallery is visible. The database button
+  returns to that tab's playlist table in Disk View. The Gallery sidebar always
   uses Console View and displays only consoles with indexed `Title Snap`
   artwork. Gallery rows keep the normal sidebar spacing, font, and leaf marker;
   selecting a console filters the full Gallery grid. Do not unfold game rows or
@@ -53,9 +56,11 @@ in the SB2 home view.
 - Playlist-tab select and close controls resolve their current tab ID from the
   rendered tab container. A close request must resolve to a live tab before
   applying the single-tab window-close behavior.
-- A Gallery row click only selects the title because Gallery does not display a
-  playlist table. Enter or double-click opens a regular playlist tab and starts
-  playback, leaving the Gallery tab intact.
+- A Gallery card click only selects the title because Gallery does not display
+  a playlist table. Enter or double-click opens a regular playlist tab and
+  starts playback, leaving the Gallery view available in its original tab.
+  Legacy empty Gallery tabs are folded into the preceding playlist tab when
+  restoring saved tabs.
 - Gallery artwork loads share the bounded Gallery artwork cache and request
   queue. Sidebar thumbnails use an observer rooted to the sidebar scroll pane;
   do not eagerly materialize every image in the Gallery projection.
