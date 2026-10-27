@@ -34,7 +34,7 @@ crosses that ownership boundary.
 | Work | Owner and route |
 | --- | --- |
 | Archive/member source preparation, format admission, decoding, timing, transport, and audio output | [VGMBoy/AGENTS.md](VGMBoy/AGENTS.md) |
-| Source discovery, inspection orchestration, and schema-24 catalog writes | [ScanSong/AGENTS.md](ScanSong/AGENTS.md) |
+| Source discovery, inspection orchestration, and schema-25 catalog writes | [ScanSong/AGENTS.md](ScanSong/AGENTS.md) |
 | Decoder-independent native-format metadata | [MetaMan/AGENTS.md](MetaMan/AGENTS.md) |
 | UAC editing, wrapper format, and package consumers | [UACMan/AGENTS.md](UACMan/AGENTS.md) |
 | Read-only catalog access and browser projections | [CatalogReader/AGENTS.md](CatalogReader/AGENTS.md) |

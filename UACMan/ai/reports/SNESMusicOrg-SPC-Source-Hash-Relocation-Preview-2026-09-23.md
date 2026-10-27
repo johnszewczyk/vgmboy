@@ -10,8 +10,8 @@
 - `Source Encoding` is present on all `34,917` source parses as `Windows-1252`.
 - Header-byte-derived revision is SPC v.30 on `34,916` tracks and SPC v.10 on `1`. All textual SPC headers say v.30; the known disagreement is `RPG Maker 2.uac` → `19-Frozen Wasteland.spc`, which stays in the mixed-version review folder.
 - The packages already contain `1,532` `.txt`/HTML members as package asset members; all `1,519` packages have at least one. No track attachment is proposed.
-- Exact package before/after tags are in [packages.tsv](/Users/john/Downloads/Code/AudioMan/batches/snesmusicorg-spc-metadata-2026-09-23/packages.tsv). Exact per-track before/after tags and the four Stream Hashes are in [tracks.tsv](/Users/john/Downloads/Code/AudioMan/batches/snesmusicorg-spc-metadata-2026-09-23/tracks.tsv).
-- Exact source-hash record attribute enrichment is in [source-hash-record-attributes.tsv](/Users/john/Downloads/Code/AudioMan/batches/snesmusicorg-spc-metadata-2026-09-23/source-hash-record-attributes.tsv).
+- Exact package before/after tags are in [packages.tsv](../../../../AudioMan/batches/snesmusicorg-spc-metadata-2026-09-23/packages.tsv). Exact per-track before/after tags and the four Stream Hashes are in [tracks.tsv](../../../../AudioMan/batches/snesmusicorg-spc-metadata-2026-09-23/tracks.tsv).
+- Exact source-hash record attribute enrichment is in [source-hash-record-attributes.tsv](../../../../AudioMan/batches/snesmusicorg-spc-metadata-2026-09-23/source-hash-record-attributes.tsv).
 
 ## Package-level tags
 
