@@ -160,14 +160,9 @@ M3U explicitly contains a `1-indexed playlist` comment. For that M3U only,
 MetaMan subtracts one before matching rows to the GBS header tracks. The
 indexing comment is a directive rather than a `COMMENT` tag; its bytes remain
 in the unchanged M3U attachment. No Game Boy CPU emulation is used to invent
-per-track titles or timing. The final
-colon-delimited time component accepts up to three decimal digits and converts
-them exactly to milliseconds for play, loop, and fade timing. A plain loop
-value is a loop duration; a trailing hyphen marks the loop start and maps to
-intro timing without inferring a loop duration, while a bare hyphen means the
-loop duration equals the play time. Conflicting M3U rows leave ambiguous
-fields unset and add a diagnostic. GBS headers do not encode a duration, so a
-missing M3U value remains unknown rather than receiving a default duration.
+per-track titles or timing. M3U timing text remains in the retained companion
+bytes and is not projected into track timing. GBS headers do not encode a
+duration, so track timing remains unknown rather than receiving a default.
 If multiple source members share the same stem, archive packaging must hold
 the ambiguous reference for review rather than assigning it to both.
 
