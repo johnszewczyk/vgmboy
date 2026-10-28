@@ -7,7 +7,7 @@ import VGMBoyKit
 /// It is an in-process Swift boundary today; a future WebKit bridge can expose
 /// the same Codable values without importing SwiftUI or AppKit.
 enum CocoaSpiceFrontendProtocol {
-    static let version = 1
+    static let version = 2
 }
 
 enum CocoaSpiceFrontendFeature: String, Codable, CaseIterable, Sendable {
@@ -24,7 +24,7 @@ struct CocoaSpiceFrontendSurface: Codable, Equatable, Sendable {
         features.contains(feature)
     }
 
-    static let v1 = CocoaSpiceFrontendSurface(
+    static let v2 = CocoaSpiceFrontendSurface(
         version: CocoaSpiceFrontendProtocol.version,
         features: Set(CocoaSpiceFrontendFeature.allCases),
         vgmboyEndpointSurface: .v1
@@ -70,10 +70,8 @@ struct CocoaSpiceOptionsSnapshot: Codable, Equatable, Sendable {
     let isClearingCache: Bool
     let aacExportDirectory: String
     let diagnostics: PlaybackDiagnosticsSnapshot
-    let libgmeTempo: PlaybackTempo
-    let libgmeTempoEnabled: Bool
-    let libvgmTempo: PlaybackTempo
-    let libvgmTempoEnabled: Bool
+    let playbackTempo: PlaybackTempo
+    let playbackTempoEnabled: Bool
     let columnAutoSize: Bool
 }
 
@@ -112,10 +110,8 @@ enum CocoaSpiceOptionsCommand: Codable, Equatable, Sendable {
     case setSidebarLineGapPoints(Double)
     case setSidebarChildIndentPoints(Double)
     case setPlaylistLineGapPoints(Double)
-    case setLibGmeTempo(PlaybackTempo)
-    case setLibGmeTempoEnabled(Bool)
-    case setLibVgmTempo(PlaybackTempo)
-    case setLibVgmTempoEnabled(Bool)
+    case setPlaybackTempo(PlaybackTempo)
+    case setPlaybackTempoEnabled(Bool)
     case reloadCatalog
     case useDefaultCatalog
     case selectCatalog(path: String)
@@ -131,7 +127,7 @@ enum CocoaSpiceOptionsCommand: Codable, Equatable, Sendable {
 /// query/command surface instead of direct SwiftUI bindings.
 @MainActor
 final class CocoaSpiceOptionsControlSurface {
-    let surface = CocoaSpiceFrontendSurface.v1
+    let surface = CocoaSpiceFrontendSurface.v2
     private unowned let model: PlayerViewModel
 
     init(model: PlayerViewModel) {
@@ -175,10 +171,8 @@ final class CocoaSpiceOptionsControlSurface {
             isClearingCache: model.isClearingArchiveCache,
             aacExportDirectory: model.aacExportDirectoryPath,
             diagnostics: model.playbackDiagnostics,
-            libgmeTempo: model.libgmeTempo,
-            libgmeTempoEnabled: model.libgmeTempoEnabled,
-            libvgmTempo: model.libvgmTempo,
-            libvgmTempoEnabled: model.libvgmTempoEnabled,
+            playbackTempo: model.playbackTempo,
+            playbackTempoEnabled: model.playbackTempoEnabled,
             columnAutoSize: model.columnAutoSizeEnabled
         )
     }
@@ -253,14 +247,10 @@ final class CocoaSpiceOptionsControlSurface {
             model.setDatabaseSidebarChildIndentPoints(CGFloat(points))
         case .setPlaylistLineGapPoints(let points):
             model.setPlaylistLineGapPoints(CGFloat(points))
-        case .setLibGmeTempo(let tempo):
-            model.setLibGmeTempo(tempo)
-        case .setLibGmeTempoEnabled(let enabled):
-            model.setLibGmeTempoEnabled(enabled)
-        case .setLibVgmTempo(let tempo):
-            model.setLibVgmTempo(tempo)
-        case .setLibVgmTempoEnabled(let enabled):
-            model.setLibVgmTempoEnabled(enabled)
+        case .setPlaybackTempo(let tempo):
+            model.setPlaybackTempo(tempo)
+        case .setPlaybackTempoEnabled(let enabled):
+            model.setPlaybackTempoEnabled(enabled)
         case .reloadCatalog:
             model.reloadLibrary()
         case .useDefaultCatalog:
@@ -320,7 +310,7 @@ enum CocoaSpiceMainPlaybackCommand: Codable, Equatable, Sendable {
 /// separate future contract because they carry table-selection semantics.
 @MainActor
 final class CocoaSpiceMainPlaybackControlSurface {
-    let surface = CocoaSpiceFrontendSurface.v1
+    let surface = CocoaSpiceFrontendSurface.v2
     private unowned let model: PlayerViewModel
 
     init(model: PlayerViewModel) {

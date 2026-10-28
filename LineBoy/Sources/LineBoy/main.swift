@@ -82,7 +82,7 @@ private struct LineBoyCatalogPlaylistRead: Sendable {
 private struct LineBoyPlaybackSettings: Codable, Equatable {
     static let defaultsKey = "LineBoy.playbackSettings.v1"
 
-    var version = 1
+    var version = 2
     var longPlayEnabled = false
     var longPlaySeconds = PlaybackTimingPreferences.defaultLongPlaySeconds
     var unknownDurationSeconds = PlaybackTimingPreferences.defaultUnknownDurationSeconds
@@ -92,10 +92,63 @@ private struct LineBoyPlaybackSettings: Codable, Equatable {
     var monoEnabled = false
     var equalizerEnabled = false
     var equalizerBandGains = Array(repeating: Float(0), count: EqualizerConfiguration.bandCount)
-    var libGmeTempoEnabled = false
-    var libGmeTempo = PlaybackTempo.defaultValue
-    var libVgmTempoEnabled = false
-    var libVgmTempo = PlaybackTempo.defaultValue
+    var playbackTempoEnabled = false
+    var playbackTempo = PlaybackTempo.defaultValue
+
+    private enum CodingKeys: String, CodingKey {
+        case version, longPlayEnabled, longPlaySeconds, unknownDurationSeconds
+        case fadeEnabled, fadeSeconds, outputVolume, monoEnabled, equalizerEnabled, equalizerBandGains
+        case playbackTempoEnabled, playbackTempo
+        case libGmeTempoEnabled, libGmeTempo, libVgmTempoEnabled, libVgmTempo
+    }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        version = try values.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        longPlayEnabled = try values.decodeIfPresent(Bool.self, forKey: .longPlayEnabled) ?? false
+        longPlaySeconds = try values.decodeIfPresent(Int.self, forKey: .longPlaySeconds)
+            ?? PlaybackTimingPreferences.defaultLongPlaySeconds
+        unknownDurationSeconds = try values.decodeIfPresent(Int.self, forKey: .unknownDurationSeconds)
+            ?? PlaybackTimingPreferences.defaultUnknownDurationSeconds
+        fadeEnabled = try values.decodeIfPresent(Bool.self, forKey: .fadeEnabled) ?? true
+        fadeSeconds = try values.decodeIfPresent(Int.self, forKey: .fadeSeconds)
+            ?? PlaybackTimingPreferences.defaultFadeSeconds
+        outputVolume = try values.decodeIfPresent(Float.self, forKey: .outputVolume) ?? 1
+        monoEnabled = try values.decodeIfPresent(Bool.self, forKey: .monoEnabled) ?? false
+        equalizerEnabled = try values.decodeIfPresent(Bool.self, forKey: .equalizerEnabled) ?? false
+        equalizerBandGains = try values.decodeIfPresent([Float].self, forKey: .equalizerBandGains)
+            ?? Array(repeating: 0, count: EqualizerConfiguration.bandCount)
+
+        let migrated = PlaybackPreferences.migrateBackendTempo(
+            libgmeTempo: try values.decodeIfPresent(PlaybackTempo.self, forKey: .libGmeTempo),
+            libgmeEnabled: try values.decodeIfPresent(Bool.self, forKey: .libGmeTempoEnabled),
+            libvgmTempo: try values.decodeIfPresent(PlaybackTempo.self, forKey: .libVgmTempo),
+            libvgmEnabled: try values.decodeIfPresent(Bool.self, forKey: .libVgmTempoEnabled)
+        )
+        playbackTempo = PlaybackPreferences.normalizedTempo(
+            try values.decodeIfPresent(PlaybackTempo.self, forKey: .playbackTempo) ?? migrated.tempo
+        )
+        playbackTempoEnabled = try values.decodeIfPresent(Bool.self, forKey: .playbackTempoEnabled)
+            ?? migrated.enabled
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(2, forKey: .version)
+        try values.encode(longPlayEnabled, forKey: .longPlayEnabled)
+        try values.encode(longPlaySeconds, forKey: .longPlaySeconds)
+        try values.encode(unknownDurationSeconds, forKey: .unknownDurationSeconds)
+        try values.encode(fadeEnabled, forKey: .fadeEnabled)
+        try values.encode(fadeSeconds, forKey: .fadeSeconds)
+        try values.encode(outputVolume, forKey: .outputVolume)
+        try values.encode(monoEnabled, forKey: .monoEnabled)
+        try values.encode(equalizerEnabled, forKey: .equalizerEnabled)
+        try values.encode(equalizerBandGains, forKey: .equalizerBandGains)
+        try values.encode(playbackTempoEnabled, forKey: .playbackTempoEnabled)
+        try values.encode(playbackTempo, forKey: .playbackTempo)
+    }
 
     var playbackPreferences: PlaybackPreferences {
         PlaybackPreferences(
@@ -109,17 +162,15 @@ private struct LineBoyPlaybackSettings: Codable, Equatable {
             equalizerBandGains: equalizerBandGains,
             outputVolume: outputVolume,
             monoEnabled: monoEnabled,
-            libgmeTempo: libGmeTempo,
-            libgmeTempoEnabled: libGmeTempoEnabled,
-            libvgmTempo: libVgmTempo,
-            libvgmTempoEnabled: libVgmTempoEnabled
+            playbackTempo: playbackTempo,
+            playbackTempoEnabled: playbackTempoEnabled
         )
     }
 
     init() {}
 
     init(longPlayEnabled: Bool, preferences: PlaybackPreferences) {
-        self.version = 1
+        self.version = 2
         self.longPlayEnabled = longPlayEnabled
         self.longPlaySeconds = preferences.timing.longPlaySeconds
         self.unknownDurationSeconds = preferences.timing.unknownDurationSeconds
@@ -129,15 +180,11 @@ private struct LineBoyPlaybackSettings: Codable, Equatable {
         self.monoEnabled = preferences.monoEnabled
         self.equalizerEnabled = preferences.equalizer.enabled
         self.equalizerBandGains = preferences.equalizer.gainsDecibels
-        self.libGmeTempoEnabled = preferences.libgmeTempoEnabled
-        self.libGmeTempo = preferences.libgmeTempo
-        self.libVgmTempoEnabled = preferences.libvgmTempoEnabled
-        self.libVgmTempo = preferences.libvgmTempo
+        self.playbackTempoEnabled = preferences.playbackTempoEnabled
+        self.playbackTempo = preferences.playbackTempo
     }
 
     func normalized() -> Self {
-        let boundedGME = Self.normalizedTempo(libGmeTempo)
-        let boundedVGM = Self.normalizedTempo(libVgmTempo)
         let preferences = PlaybackPreferences(
             timing: PlaybackTimingPreferences(
                 longPlaySeconds: min(max(longPlaySeconds, 0), 1_800),
@@ -149,26 +196,21 @@ private struct LineBoyPlaybackSettings: Codable, Equatable {
             equalizerBandGains: equalizerBandGains,
             outputVolume: Float(FrontendPlaybackVolumeScale.normalized(Double(outputVolume))),
             monoEnabled: monoEnabled,
-            libgmeTempo: boundedGME,
-            libgmeTempoEnabled: libGmeTempoEnabled,
-            libvgmTempo: boundedVGM,
-            libvgmTempoEnabled: libVgmTempoEnabled
+            playbackTempo: playbackTempo,
+            playbackTempoEnabled: playbackTempoEnabled
         )
         return Self(longPlayEnabled: longPlayEnabled, preferences: preferences)
     }
 
     func tempo(for family: DecoderFamily?) -> PlaybackTempo {
-        switch family?.id {
-        case FormatRegistry.libgmeFamily.id where libGmeTempoEnabled: libGmeTempo
-        case FormatRegistry.libvgmFamily.id where libVgmTempoEnabled: libVgmTempo
-        default: .defaultValue
-        }
+        guard family?.supportsTempo == true, playbackTempoEnabled else { return .defaultValue }
+        return playbackTempo
     }
 
     static func restore() -> Self {
         guard let data = UserDefaults.standard.data(forKey: defaultsKey),
               let value = try? JSONDecoder().decode(Self.self, from: data),
-              value.version == 1 else { return Self() }
+              (value.version == 1 || value.version == 2) else { return Self() }
         return value.normalized()
     }
 
@@ -176,12 +218,6 @@ private struct LineBoyPlaybackSettings: Codable, Equatable {
         guard let data = try? JSONEncoder().encode(self),
               let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
         return value
-    }
-
-    private static func normalizedTempo(_ value: PlaybackTempo) -> PlaybackTempo {
-        let numerator = min(max(value.numerator, 1), PlaybackTempo.maxComponent)
-        let denominator = min(max(value.denominator, 1), PlaybackTempo.maxComponent)
-        return PlaybackTempo(numerator: numerator, denominator: denominator)
     }
 }
 
@@ -850,7 +886,7 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
         }
         let data = try JSONSerialization.data(withJSONObject: value)
         let settings = try JSONDecoder().decode(LineBoyPlaybackSettings.self, from: data)
-        guard settings.version == 1 else { throw LineBoyBridgeError.invalidArguments }
+        guard settings.version == 1 || settings.version == 2 else { throw LineBoyBridgeError.invalidArguments }
         return settings.normalized()
     }
 
@@ -884,10 +920,8 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
             || previous.unknownDurationSeconds != next.unknownDurationSeconds
             || previous.fadeEnabled != next.fadeEnabled
             || previous.fadeSeconds != next.fadeSeconds
-            || previous.libGmeTempoEnabled != next.libGmeTempoEnabled
-            || previous.libGmeTempo != next.libGmeTempo
-            || previous.libVgmTempoEnabled != next.libVgmTempoEnabled
-            || previous.libVgmTempo != next.libVgmTempo
+            || previous.playbackTempoEnabled != next.playbackTempoEnabled
+            || previous.playbackTempo != next.playbackTempo
         if timingChanged, transport.statusSync().trackLoaded, let family = activePlaybackFamily {
             let preferences = next.playbackPreferences
             let plan = PlaybackTimingPolicy.plan(

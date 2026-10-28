@@ -616,7 +616,7 @@ const state = {
   autoHideEmptyColumns: savedDisplayOptions.autoHideEmptyColumns !== false,
   autoHiddenColumnKeys: [],
   checkboxBoxes: [],
-  editingRateBackend: null,
+  editingPlaybackRate: false,
   rateDraft: "",
   animationFPSFocused: false,
   lcdContrastFocused: false,
@@ -1336,7 +1336,7 @@ export function hitTargetSnapshot() {
     playlistTabClose: widget.meta.playlistTabClose === true,
     activePlaylistTab: widget.meta.activePlaylistTab === true,
     editableDurationKey: widget.meta.editableDuration ?? null,
-    editableRateBackend: widget.meta.editableRateBackend ?? null,
+    editablePlaybackRate: widget.meta.editablePlaybackRate === true,
     playlistTabId: widget.meta.playlistTabId ?? null,
     textInset: widget.meta.inset ?? controlPaddingDots(),
     textRightInset: widget.meta.rightInset ?? widget.meta.inset ?? controlPaddingDots(),
@@ -3795,9 +3795,8 @@ function equalizerGainLabel(value) {
   return `+${value.toFixed(1)}`;
 }
 
-function playbackRateSteps(backend, preferences = state.preferences) {
-  const key = backend === "libvgm" ? "libvgmPlaybackSpeed" : "playbackSpeed";
-  const rate = preferences[key] || { numerator: 1, denominator: 1 };
+function playbackRateSteps(preferences = state.preferences) {
+  const rate = preferences.playbackSpeed || { numerator: 1, denominator: 1 };
   const numerator = Number(rate.numerator) || 1;
   const denominator = Number(rate.denominator) || 1;
   return Math.max(1, Math.min(256, Math.round(numerator / denominator * 32)));
@@ -3817,24 +3816,22 @@ function greatestCommonDivisor(left, right) {
   return a || 1;
 }
 
-function adjustPlaybackRate(backend, delta) {
-  const key = backend === "libvgm" ? "libvgmPlaybackSpeed" : "playbackSpeed";
-  const steps = Math.max(1, Math.min(256, playbackRateSteps(backend) + delta));
-  setPreference(key, { numerator: steps, denominator: 32 });
+function adjustPlaybackRate(delta) {
+  const steps = Math.max(1, Math.min(256, playbackRateSteps() + delta));
+  setPreference("playbackSpeed", { numerator: steps, denominator: 32 });
 }
 
-function beginPlaybackRateEdit(backend) {
-  state.editingRateBackend = backend;
+function beginPlaybackRateEdit() {
+  state.editingPlaybackRate = true;
   state.rateDraft = "";
   render();
 }
 
 function finishPlaybackRateEdit(commit) {
-  const backend = state.editingRateBackend;
   const draft = state.rateDraft.trim();
-  state.editingRateBackend = null;
+  state.editingPlaybackRate = false;
   state.rateDraft = "";
-  if (!commit || !backend) { render(); return; }
+  if (!commit) { render(); return; }
   let multiplier = Number.NaN;
   const fraction = draft.match(/^(\d+)\s*\/\s*(\d+)$/);
   if (fraction) {
@@ -3850,21 +3847,20 @@ function finishPlaybackRateEdit(commit) {
   }
   const steps = Math.max(1, Math.min(256, Math.round(multiplier * 32)));
   const divisor = greatestCommonDivisor(steps, 32);
-  const key = backend === "libvgm" ? "libvgmPlaybackSpeed" : "playbackSpeed";
-  setPreference(key, { numerator: steps / divisor, denominator: 32 / divisor });
+  setPreference("playbackSpeed", { numerator: steps / divisor, denominator: 32 / divisor });
 }
 
-function playbackRateInput(parent, backend) {
-  const editing = state.editingRateBackend === backend;
-  const value = editing ? `${state.rateDraft}|` : playbackRateLabel(playbackRateSteps(backend));
+function playbackRateInput(parent) {
+  const editing = state.editingPlaybackRate;
+  const value = editing ? `${state.rateDraft}|` : playbackRateLabel(playbackRateSteps());
   return label(parent, value, { width: framedTextWidth("255/32X"), height: buttonStandardHeight() }, {
     border: BUTTON_BORDER_DOTS,
     textShade: 0,
     align: "left",
     inset: controlPaddingDots(),
-    editableRateBackend: backend,
-    controlTitle: `${backend.toUpperCase()} RATE INPUT`,
-    onClick: () => beginPlaybackRateEdit(backend),
+    editablePlaybackRate: true,
+    controlTitle: "PLAYBACK RATE INPUT",
+    onClick: beginPlaybackRateEdit,
   });
 }
 
@@ -3874,11 +3870,8 @@ function playbackTempoForTrack(track, preferences = state.preferences) {
   if (!extension) return 1;
   const descriptor = bridge?.playbackBackends?.find((backend) => backend.supportsTempo
     && backend.extensions?.some((candidate) => String(candidate).toLowerCase() === extension));
-  const family = descriptor?.id === "libvgm" ? "libvgm"
-    : descriptor?.id === "libgme" ? "libgme" : null;
-  if (!family) return 1;
-  const enabledKey = family === "libvgm" ? "libvgmPlaybackSpeedEnabled" : "playbackSpeedEnabled";
-  return preferences[enabledKey] === true ? playbackRateSteps(family, preferences) / 32 : 1;
+  if (!descriptor) return 1;
+  return preferences.playbackSpeedEnabled === true ? playbackRateSteps(preferences) / 32 : 1;
 }
 
 function addPlaybackOptions(parent, pref) {
@@ -3960,27 +3953,24 @@ function addDiagnosticsOptions(parent) {
   optionDiagnosticRow(decoder, "DECODE ERROR", snapshot.decode_error === true ? "YES" : hasStatus ? "NO" : "—");
 }
 
-function optionPlaybackRateRow(parent, backend) {
-  const title = backend.toUpperCase();
+function optionPlaybackRateRow(parent) {
+  const title = "PLAYBACK";
   const row = optionFieldRow(parent, "RATE",
     buttonStandardHeight() * 2 + uiGap() * 2 + framedTextWidth("255/32X"), { optionPlaybackRate: title });
-  pixelButton(row, "-", () => adjustPlaybackRate(backend, -1), {
+  pixelButton(row, "-", () => adjustPlaybackRate(-1), {
     controlTitle: `${title} RATE -`,
   });
-  pixelButton(row, "+", () => adjustPlaybackRate(backend, 1), {
+  pixelButton(row, "+", () => adjustPlaybackRate(1), {
     controlTitle: `${title} RATE +`,
   });
-  playbackRateInput(row, backend);
+  playbackRateInput(row);
 }
 
 function addMethodOptions(parent, pref) {
   const speed = optionGroup(parent, "DECODER SPEED");
-  optionToggle(speed, "LIBGME SPEED", pref.playbackSpeedEnabled === true,
+  optionToggle(speed, "PLAYBACK SPEED", pref.playbackSpeedEnabled === true,
     () => setPreference("playbackSpeedEnabled", pref.playbackSpeedEnabled !== true));
-  optionPlaybackRateRow(speed, "libgme");
-  optionToggle(speed, "LIBVGM SPEED", pref.libvgmPlaybackSpeedEnabled === true,
-    () => setPreference("libvgmPlaybackSpeedEnabled", pref.libvgmPlaybackSpeedEnabled !== true));
-  optionPlaybackRateRow(speed, "libvgm");
+  optionPlaybackRateRow(speed);
 }
 
 function paintEqualizerBar(box, gain, index = null) {
@@ -6730,8 +6720,6 @@ async function setPreference(key, value, updateAudio = false) {
       "spcFadeSeconds",
       "playbackSpeed",
       "playbackSpeedEnabled",
-      "libvgmPlaybackSpeed",
-      "libvgmPlaybackSpeedEnabled",
     ].includes(key)) {
       const pref = state.preferences;
       const currentTrack = state.activeQueue.find((track) => trackID(track) === state.currentTrackId)
@@ -7346,7 +7334,7 @@ canvas.addEventListener("keydown", (event) => {
     event.preventDefault();
     return;
   }
-  if (state.editingRateBackend) {
+  if (state.editingPlaybackRate) {
     if (event.key === "Escape") finishPlaybackRateEdit(false);
     else if (event.key === "Enter" || event.key === "Tab") finishPlaybackRateEdit(true);
     else if (event.key === "Backspace") {

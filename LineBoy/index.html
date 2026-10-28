@@ -1220,11 +1220,10 @@
             </section>
             <section class="option-card">
             <div class="option-section-title">DECODER SPEED</div>
-            <div class="option-row"><span>LIBGME</span><button class="option-value" id="libgme-speed-enabled" type="button" data-native-setting aria-pressed="false">OFF</button></div>
-            <div class="option-row"><span>LIBGME RATE</span><div class="range-control"><input class="brightness-range" id="libgme-speed" type="range" min="16" max="64" step="1" data-native-setting aria-label="libgme playback speed"><output class="range-readout" id="libgme-speed-readout" for="libgme-speed">1.00X</output></div></div>
-            <div class="option-row"><span>LIBVGM</span><button class="option-value" id="libvgm-speed-enabled" type="button" data-native-setting aria-pressed="false">OFF</button></div>
-            <div class="option-row"><span>LIBVGM RATE</span><div class="range-control"><input class="brightness-range" id="libvgm-speed" type="range" min="16" max="64" step="1" data-native-setting aria-label="libvgm playback speed"><output class="range-readout" id="libvgm-speed-readout" for="libvgm-speed">1.00X</output></div></div>
-            <div class="option-note">SPEED USES 1/32 STEPS FROM 0.50X TO 2.00X.</div>
+            <div class="option-row"><span>PLAYBACK SPEED</span><button class="option-value" id="playback-speed-enabled" type="button" data-native-setting aria-pressed="false">OFF</button></div>
+            <div class="option-row"><span>RATE</span><div class="range-control"><input class="brightness-range" id="playback-speed" type="range" min="1" max="256" step="1" data-native-setting aria-label="Playback speed"><output class="range-readout" id="playback-speed-readout" for="playback-speed">1X</output></div></div>
+            <div class="option-note">ONE RATE APPLIES TO EVERY DECODER THAT SUPPORTS NATIVE TEMPO.</div>
+            <div class="option-note">SPEED USES 1/32 STEPS FROM 1/32X TO 8X.</div>
             <div class="option-note">TIMING CHANGES RESTART THE CURRENT TRACK AT ITS POSITION.</div>
             </section>
           </div>
@@ -1417,12 +1416,9 @@
       fadeEnabled: document.querySelector("#fade-enabled"),
       fadeSeconds: document.querySelector("#fade-seconds"),
       fadeReadout: document.querySelector("#fade-readout"),
-      libGmeTempoEnabled: document.querySelector("#libgme-speed-enabled"),
-      libGmeTempo: document.querySelector("#libgme-speed"),
-      libGmeTempoReadout: document.querySelector("#libgme-speed-readout"),
-      libVgmTempoEnabled: document.querySelector("#libvgm-speed-enabled"),
-      libVgmTempo: document.querySelector("#libvgm-speed"),
-      libVgmTempoReadout: document.querySelector("#libvgm-speed-readout"),
+      playbackTempoEnabled: document.querySelector("#playback-speed-enabled"),
+      playbackTempo: document.querySelector("#playback-speed"),
+      playbackTempoReadout: document.querySelector("#playback-speed-readout"),
       outputVolume: document.querySelector("#audio-volume"),
       outputVolumeReadout: document.querySelector("#audio-volume-readout"),
       monoEnabled: document.querySelector("#mono-enabled"),
@@ -1559,7 +1555,19 @@
       const denominator = Number(value?.denominator);
       const multiplier = denominator > 0 && Number.isFinite(numerator / denominator)
         ? numerator / denominator : 1;
-      return Math.max(16, Math.min(64, Math.round(multiplier * 32)));
+      return Math.max(1, Math.min(256, Math.round(multiplier * 32)));
+    }
+
+    function playbackTempoLabel(step) {
+      let numerator = step;
+      let denominator = 32;
+      let left = numerator;
+      let right = denominator;
+      while (right !== 0) [left, right] = [right, left % right];
+      const divisor = left || 1;
+      numerator /= divisor;
+      denominator /= divisor;
+      return denominator === 1 ? `${numerator}X` : `${numerator}/${denominator}X`;
     }
 
     function normalizePlaybackSettings(value = {}) {
@@ -1568,8 +1576,16 @@
         return min + Math.round((bounded - min) / step) * step;
       };
       const gains = Array.isArray(value.equalizerBandGains) ? value.equalizerBandGains : [];
+      const legacyGmeTempo = value.libGmeTempo || { numerator: 1, denominator: 1 };
+      const legacyVgmTempo = value.libVgmTempo || { numerator: 1, denominator: 1 };
+      const legacyGmeEnabled = Boolean(value.libGmeTempoEnabled);
+      const legacyVgmEnabled = Boolean(value.libVgmTempoEnabled);
+      const useLegacyVgm = legacyGmeEnabled !== legacyVgmEnabled
+        ? legacyVgmEnabled
+        : !legacyGmeEnabled && playbackTempoStep(legacyGmeTempo) === 32 && playbackTempoStep(legacyVgmTempo) !== 32;
+      const migratedTempo = useLegacyVgm ? legacyVgmTempo : legacyGmeTempo;
       return {
-        version: 1,
+        version: 2,
         longPlayEnabled: Boolean(value.longPlayEnabled),
         longPlaySeconds: snap(value.longPlaySeconds ?? 180, 0, 1800, 15),
         unknownDurationSeconds: snap(value.unknownDurationSeconds ?? 150, 30, 900, 15),
@@ -1582,10 +1598,12 @@
           const gain = Number(gains[index] ?? 0);
           return snap(Number.isFinite(gain) ? gain : 0, -12, 12, 0.5);
         }),
-        libGmeTempoEnabled: Boolean(value.libGmeTempoEnabled),
-        libGmeTempo: { numerator: playbackTempoStep(value.libGmeTempo), denominator: 32 },
-        libVgmTempoEnabled: Boolean(value.libVgmTempoEnabled),
-        libVgmTempo: { numerator: playbackTempoStep(value.libVgmTempo), denominator: 32 },
+        playbackTempoEnabled: value.playbackTempoEnabled === undefined
+          ? legacyGmeEnabled || legacyVgmEnabled : Boolean(value.playbackTempoEnabled),
+        playbackTempo: {
+          numerator: playbackTempoStep(value.playbackTempo || migratedTempo),
+          denominator: 32,
+        },
       };
     }
 
@@ -1617,16 +1635,11 @@
       controls.fadeSeconds.value = String(playbackSettings.fadeSeconds);
       controls.fadeReadout.value = formatOptionTime(playbackSettings.fadeSeconds);
       controls.fadeReadout.textContent = controls.fadeReadout.value;
-      setOptionToggle(controls.libGmeTempoEnabled, playbackSettings.libGmeTempoEnabled, "libgme speed");
-      const libGmeStep = playbackTempoStep(playbackSettings.libGmeTempo);
-      controls.libGmeTempo.value = String(libGmeStep);
-      controls.libGmeTempoReadout.value = `${(libGmeStep / 32).toFixed(2)}X`;
-      controls.libGmeTempoReadout.textContent = controls.libGmeTempoReadout.value;
-      setOptionToggle(controls.libVgmTempoEnabled, playbackSettings.libVgmTempoEnabled, "libvgm speed");
-      const libVgmStep = playbackTempoStep(playbackSettings.libVgmTempo);
-      controls.libVgmTempo.value = String(libVgmStep);
-      controls.libVgmTempoReadout.value = `${(libVgmStep / 32).toFixed(2)}X`;
-      controls.libVgmTempoReadout.textContent = controls.libVgmTempoReadout.value;
+      setOptionToggle(controls.playbackTempoEnabled, playbackSettings.playbackTempoEnabled, "Playback speed");
+      const tempoStep = playbackTempoStep(playbackSettings.playbackTempo);
+      controls.playbackTempo.value = String(tempoStep);
+      controls.playbackTempoReadout.value = playbackTempoLabel(tempoStep);
+      controls.playbackTempoReadout.textContent = controls.playbackTempoReadout.value;
       controls.outputVolume.value = String(Math.round(playbackSettings.outputVolume * 20));
       controls.outputVolumeReadout.value = `${Math.round(playbackSettings.outputVolume * 100)}%`;
       controls.outputVolumeReadout.textContent = controls.outputVolumeReadout.value;
@@ -1645,7 +1658,7 @@
           : "PLAYBACK SETTINGS ARE AVAILABLE IN THE NATIVE PLAYER.";
       }
       [controls.longPlaySeconds, controls.unknownDurationSeconds, controls.fadeSeconds,
-        controls.libGmeTempo, controls.libVgmTempo, controls.outputVolume].forEach(updateRangeProgress);
+        controls.playbackTempo, controls.outputVolume].forEach(updateRangeProgress);
       nativePlaybackControls.forEach((control) => { control.disabled = !nativeHost; });
     }
 
@@ -1658,10 +1671,8 @@
         unknownDurationSeconds: controls.unknownDurationSeconds.value,
         fadeEnabled: controls.fadeEnabled.getAttribute("aria-pressed") === "true",
         fadeSeconds: controls.fadeSeconds.value,
-        libGmeTempoEnabled: controls.libGmeTempoEnabled.getAttribute("aria-pressed") === "true",
-        libGmeTempo: { numerator: Number(controls.libGmeTempo.value), denominator: 32 },
-        libVgmTempoEnabled: controls.libVgmTempoEnabled.getAttribute("aria-pressed") === "true",
-        libVgmTempo: { numerator: Number(controls.libVgmTempo.value), denominator: 32 },
+        playbackTempoEnabled: controls.playbackTempoEnabled.getAttribute("aria-pressed") === "true",
+        playbackTempo: { numerator: Number(controls.playbackTempo.value), denominator: 32 },
         outputVolume: Number(controls.outputVolume.value) / 20,
         monoEnabled: controls.monoEnabled.getAttribute("aria-pressed") === "true",
         equalizerEnabled: controls.equalizerEnabled.getAttribute("aria-pressed") === "true",
@@ -2080,8 +2091,7 @@
     const playbackToggles = [
       [playbackSettingsControls.longPlayEnabled, "Long Play", false],
       [playbackSettingsControls.fadeEnabled, "Fade out", false],
-      [playbackSettingsControls.libGmeTempoEnabled, "libgme speed", false],
-      [playbackSettingsControls.libVgmTempoEnabled, "libvgm speed", false],
+      [playbackSettingsControls.playbackTempoEnabled, "Playback speed", false],
       [playbackSettingsControls.monoEnabled, "Mono output", true],
       [playbackSettingsControls.equalizerEnabled, "Equalizer", true],
     ];
@@ -2095,8 +2105,7 @@
       playbackSettingsControls.longPlaySeconds,
       playbackSettingsControls.unknownDurationSeconds,
       playbackSettingsControls.fadeSeconds,
-      playbackSettingsControls.libGmeTempo,
-      playbackSettingsControls.libVgmTempo,
+      playbackSettingsControls.playbackTempo,
     ];
     playbackTimingRanges.forEach((input) => {
       input.addEventListener("input", () => updatePlaybackSettings());

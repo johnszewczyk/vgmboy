@@ -2,7 +2,8 @@
   const DEFAULT = Object.freeze({ numerator: 1, denominator: 1 });
   const MAX_COMPONENT = 1_000_000;
   const MAX_DECIMAL_PLACES = 6;
-  const PLAYBACK_SPEED_STEPS_PER_UNIT = 64;
+  const PLAYBACK_SPEED_STEPS_PER_UNIT = 32;
+  const MAX_PLAYBACK_SPEED_STEPS = 256;
   const MAX_DISPLAY_FRACTION_DENOMINATOR = PLAYBACK_SPEED_STEPS_PER_UNIT;
 
   function greatestCommonDivisor(left, right) {
@@ -24,17 +25,15 @@
     if (!isValidComponents(numerator, denominator)) {
       return { ...DEFAULT };
     }
-    const divisor = greatestCommonDivisor(numerator, denominator);
-    return { numerator: numerator / divisor, denominator: denominator / divisor };
-  }
-
-  function snapToSixtyFourths(value) {
-    const multiplier = value.numerator / value.denominator;
-    const numerator = Math.min(
-      MAX_COMPONENT,
-      Math.max(1, Math.round(multiplier * PLAYBACK_SPEED_STEPS_PER_UNIT))
+    const steps = Math.min(
+      MAX_PLAYBACK_SPEED_STEPS,
+      Math.max(1, Math.round(numerator / denominator * PLAYBACK_SPEED_STEPS_PER_UNIT))
     );
-    return normalize({ numerator, denominator: PLAYBACK_SPEED_STEPS_PER_UNIT });
+    const divisor = greatestCommonDivisor(steps, PLAYBACK_SPEED_STEPS_PER_UNIT);
+    return {
+      numerator: steps / divisor,
+      denominator: PLAYBACK_SPEED_STEPS_PER_UNIT / divisor
+    };
   }
 
   function parse(value) {

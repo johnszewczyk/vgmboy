@@ -113,7 +113,8 @@ WIDTH MODE (FILL or FRAME), SCANLINES, BRIGHTNESS, SELECTOR FLOW, the active
 beam pitch, and a native fullscreen toggle. CRT contains a THIN/NORMAL/WIDE beam-width control
 and reports the active pitch. PLAYLIST contains AUTO SIZE and MAX WIDTH.
 PLAYBACK contains Long Play duration, the unknown-duration default, fade
-settings, and independent libgme/libvgm speed controls. AUDIO contains output
+settings, and one shared speed switch and rate for all tempo-capable decoders.
+AUDIO contains output
 volume, mono, and a ten-band equalizer with per-band gain and reset-flat
 control. These native playback settings persist across restarts. Volume uses
 the shared 20-detent scale; audio controls apply through VGMBoy, and timing or

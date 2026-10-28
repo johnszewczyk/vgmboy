@@ -24,8 +24,8 @@
   CocoaSpice's `PlaybackFormatRegistry` is only an archive-admission adapter and must not rebuild
   extension unions, backend IDs, Long Play, tempo, or natural-ending flags.
 - SAP's descriptor routes to the ASAP decoder family, which supports Long Play and
-  does not support tempo. CocoaSpice's libgme Play Speed description lists only
-  the formats that use libgme.
+  does not support tempo. Play Speed is one frontend preference; the capability
+  manifest decides which tracks receive it.
 - `VGMBoyKit.PlaybackPreferences` owns timing, fade, EQ, volume, mono, and native-tempo
   normalization. `AppSessionPersistence` retains CocoaSpice's UserDefaults keys and legacy-shape
   compatibility while passing values through that shared semantic model.
@@ -102,7 +102,7 @@
   must express pause, replacement, seek, and completion only through the typed core controls; it
   must not stop/recreate a separate device path around those transitions.
 - The CocoaSpice equalizer UI maps directly to VGMBoy's ten 31 Hz–16 kHz bands, constrained to -12...+12 dB.
-- The libgme and libvgm Play Speed controls persist frontend preferences and reconfigure a loaded track with both its tempo-scaled timing plan and shared `PlaybackTempo`. A tempo-only `set_tempo` command does not update the active frame cap. Non-tempo decoder families always receive the default multiplier.
+- Play Speed persists one frontend preference and reconfigures a loaded tempo-capable track with both its tempo-scaled timing plan and shared `PlaybackTempo`. A tempo-only `set_tempo` command does not update the active frame cap. Decoder families without native tempo support always receive the default multiplier.
 - `FormatRegistry.family(for:)` resolves a source path, not a bare extension. CocoaSpice adapts a playable extension as `source.<extension>` through one `playbackFamily(forPathExtension:)` helper for both initial tempo selection and the live `set_tempo` eligibility check.
 - CocoaSpice persists its chosen App Volume and Mono preferences, then reapplies them to a newly created bundled core. VGMBoy owns the actual attenuation and real-time channel downmix.
 - `build.sh` packages VGMBoy's dynamic decoder requirements under `Contents/Frameworks`; SID uses the bundled `libsidplayfp.7.dylib` via `@executable_path`, never a runtime Homebrew path or a user-chosen core executable.

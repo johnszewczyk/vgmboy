@@ -10,8 +10,7 @@ struct OptionsView: View {
     @State private var longPlayTimeText = ""
     @State private var unknownDurationTimeText = ""
     @State private var fadeTimeText = ""
-    @State private var libGmeTempoText = PlaybackTempo.defaultValue.displayString
-    @State private var libVgmTempoText = PlaybackTempo.defaultValue.displayString
+    @State private var playbackTempoText = PlaybackTempo.defaultValue.displayString
     @State private var selection: OptionsSection = .data
     @State private var hasInitializedPresentation = false
 
@@ -103,8 +102,7 @@ struct OptionsView: View {
             longPlayTimeText = Self.formatTime(model.manualPreFadeSeconds)
             unknownDurationTimeText = Self.formatTime(model.unknownDurationSeconds)
             fadeTimeText = Self.formatTime(model.configuredFadeSeconds)
-            libGmeTempoText = model.libgmeTempo.displayString
-            libVgmTempoText = model.libvgmTempo.displayString
+            playbackTempoText = model.playbackTempo.displayString
             DispatchQueue.main.async {
                 NSApp.windows.first(where: { $0.cocoaSpiceRole == .settings })?.makeFirstResponder(nil)
             }
@@ -313,78 +311,40 @@ struct OptionsView: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
 
-            tempoRow(
-                title: "libgme",
-                detail: "SPC, NSF/NSFE, GBS, HES, KSS, and AY",
-                enabled: Binding(
-                    get: { model.libgmeTempoEnabled },
-                    set: { model.setLibGmeTempoEnabled($0) }
-                ),
-                text: $libGmeTempoText,
-                commit: { commitTempo(libGmeTempoText, backend: .libgme) }
-            )
-            tempoRow(
-                title: "libvgm",
-                detail: "GYM, S98, VGM, VGZ, and DRO",
-                enabled: Binding(
-                    get: { model.libvgmTempoEnabled },
-                    set: { model.setLibVgmTempoEnabled($0) }
-                ),
-                text: $libVgmTempoText,
-                commit: { commitTempo(libVgmTempoText, backend: .libvgm) }
-            )
-        }
-    }
-
-    private enum TempoBackend {
-        case libgme
-        case libvgm
-    }
-
-    private func tempoRow(
-        title: String,
-        detail: String,
-        enabled: Binding<Bool>,
-        text: Binding<String>,
-        commit: @escaping () -> Void
-    ) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Toggle(isOn: enabled) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .foregroundStyle(.white)
-                    Text(detail)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+            HStack(alignment: .top, spacing: 12) {
+                Toggle(isOn: Binding(
+                    get: { model.playbackTempoEnabled },
+                    set: { model.setPlaybackTempoEnabled($0) }
+                )) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Playback Speed")
+                            .foregroundStyle(.white)
+                        Text("Applied to every format whose decoder supports native tempo.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .toggleStyle(.checkbox)
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            TextField("1", text: text)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 72, alignment: .trailing)
-                .multilineTextAlignment(.trailing)
-                .onSubmit(commit)
+                TextField("1", text: $playbackTempoText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 72, alignment: .trailing)
+                    .multilineTextAlignment(.trailing)
+                    .onSubmit { commitTempo(playbackTempoText) }
+            }
         }
     }
 
-    private func commitTempo(_ rawValue: String, backend: TempoBackend) {
-        guard let tempo = PlaybackTempo.parse(rawValue) else {
-            switch backend {
-            case .libgme: libGmeTempoText = model.libgmeTempo.displayString
-            case .libvgm: libVgmTempoText = model.libvgmTempo.displayString
-            }
+    private func commitTempo(_ rawValue: String) {
+        guard let parsed = PlaybackTempo.parse(rawValue), parsed.multiplier <= 8 else {
+            playbackTempoText = model.playbackTempo.displayString
             return
         }
-        switch backend {
-        case .libgme:
-            libGmeTempoText = tempo.displayString
-            model.setLibGmeTempo(tempo)
-        case .libvgm:
-            libVgmTempoText = tempo.displayString
-            model.setLibVgmTempo(tempo)
-        }
+        let tempo = PlaybackPreferences.normalizedTempo(parsed)
+        playbackTempoText = tempo.displayString
+        model.setPlaybackTempo(tempo)
     }
 
     private var audioPage: some View {
