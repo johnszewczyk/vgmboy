@@ -11,6 +11,11 @@ scripts. JavaScript uses textContent for file names/errors and sends commands
 through the named player message handler. Native commands validate finite numeric
 values and bounds; file access is through NSOpenPanel or native open URLs, never
 arbitrary JavaScript paths. State crosses through callAsyncJavaScript arguments.
+Local file drops are received by the WKWebView host as an AppKit drag destination
+so WebKit cannot swallow them before SwiftUI handles the drop. It accepts Finder
+file URLs and the legacy filenames pasteboard type, then routes local URLs through
+the same native session loader. The app registers the UAC document type for Finder
+and Dock open events.
 Remove the script handler when the web view dismantles; retain no view cycle.
 
 PlayerViewModel owns the in-memory file session and translates controls into the

@@ -1,25 +1,6 @@
+import AppKit
 import SwiftUI
-import UniformTypeIdentifiers
 import WebKit
-
-private final class DropURLCollector: @unchecked Sendable {
-    private let lock = NSLock()
-    private var storage: [URL?]
-
-    init(count: Int) { storage = Array(repeating: nil, count: count) }
-
-    func set(_ url: URL?, at index: Int) {
-        lock.lock()
-        storage[index] = url
-        lock.unlock()
-    }
-
-    var urls: [URL] {
-        lock.lock()
-        defer { lock.unlock() }
-        return storage.compactMap { $0 }
-    }
-}
 
 struct ContentView: View {
     @Bindable var model: PlayerViewModel
@@ -27,7 +8,7 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            PlayerWebView(model: model)
+            PlayerWebView(model: model, isDropTargeted: $isDropTargeted)
             if isDropTargeted {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color.black.opacity(0.72))
@@ -54,35 +35,30 @@ struct ContentView: View {
         }
         .frame(minWidth: 760, minHeight: 560)
         .onOpenURL { model.load(fileURL: $0) }
-        .onDrop(of: [UTType.fileURL], isTargeted: $isDropTargeted, perform: acceptDrop)
+    }
+}
+
+private func localFileURLs(from pasteboard: NSPasteboard) -> [URL] {
+    let fileURLObjects = pasteboard.readObjects(
+        forClasses: [NSURL.self],
+        options: [.urlReadingFileURLsOnly: true]
+    ) ?? []
+    let urls = fileURLObjects.compactMap { object -> URL? in
+        guard let url = object as? URL, url.isFileURL else { return nil }
+        return url.standardizedFileURL
     }
 
-    private func acceptDrop(_ providers: [NSItemProvider]) -> Bool {
-        let fileProviders = providers.filter {
-            $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier)
-        }
-        guard !fileProviders.isEmpty else { return false }
+    let filenamesType = NSPasteboard.PasteboardType(rawValue: "NSFilenamesPboardType")
+    let filenameURLs = (pasteboard.propertyList(forType: filenamesType) as? [String] ?? [])
+        .map { URL(fileURLWithPath: $0).standardizedFileURL }
 
-        let collector = DropURLCollector(count: fileProviders.count)
-        let group = DispatchGroup()
-        for (index, provider) in fileProviders.enumerated() {
-            group.enter()
-            _ = provider.loadObject(ofClass: URL.self) { object, _ in
-                collector.set(object, at: index)
-                group.leave()
-            }
-        }
-        group.notify(queue: .main) {
-            let urls = collector.urls
-            guard !urls.isEmpty else { return }
-            Task { @MainActor in model.addFiles(urls) }
-        }
-        return true
-    }
+    var seen = Set<URL>()
+    return (urls + filenameURLs).filter { seen.insert($0).inserted }
 }
 
 private struct PlayerWebView: NSViewRepresentable {
     let model: PlayerViewModel
+    @Binding var isDropTargeted: Bool
 
     func makeCoordinator() -> Coordinator { Coordinator(model: model) }
 
@@ -90,9 +66,15 @@ private struct PlayerWebView: NSViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         configuration.userContentController.add(context.coordinator, name: "player")
-        let view = WKWebView(frame: .zero, configuration: configuration)
+        let view = DropHandlingWebView(frame: .zero, configuration: configuration)
         view.navigationDelegate = context.coordinator
         view.setValue(false, forKey: "drawsBackground")
+        view.onDropTargetChanged = { [weak coordinator = context.coordinator] targeted in
+            coordinator?.dropTargetChanged?(targeted)
+        }
+        view.onFileURLsDropped = { [weak coordinator = context.coordinator] urls in
+            coordinator?.model.addFiles(urls)
+        }
         context.coordinator.webView = view
         if let page = Bundle.module.url(forResource: "index", withExtension: "html", subdirectory: "Resources") {
             context.coordinator.pageURL = page
@@ -101,16 +83,24 @@ private struct PlayerWebView: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ view: WKWebView, context: Context) { context.coordinator.publish() }
+    func updateNSView(_ view: WKWebView, context: Context) {
+        context.coordinator.dropTargetChanged = { [dropTargetBinding = _isDropTargeted] targeted in
+            dropTargetBinding.wrappedValue = targeted
+        }
+        context.coordinator.publish()
+    }
 
     static func dismantleNSView(_ view: WKWebView, coordinator: Coordinator) {
         view.configuration.userContentController.removeScriptMessageHandler(forName: "player")
         view.navigationDelegate = nil
+        (view as? DropHandlingWebView)?.onDropTargetChanged = nil
+        (view as? DropHandlingWebView)?.onFileURLsDropped = nil
     }
 
     @MainActor final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
         let model: PlayerViewModel
         weak var webView: WKWebView?
+        var dropTargetChanged: ((Bool) -> Void)?
         var pageURL: URL?
         var ready = false
         var lastSnapshot: Data?
@@ -138,5 +128,50 @@ private struct PlayerWebView: NSViewRepresentable {
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void) {
             decisionHandler(navigationAction.targetFrame?.isMainFrame == true && navigationAction.request.url?.standardizedFileURL == pageURL?.standardizedFileURL ? .allow : .cancel)
         }
+    }
+}
+
+@MainActor
+private final class DropHandlingWebView: WKWebView {
+    var onDropTargetChanged: ((Bool) -> Void)?
+    var onFileURLsDropped: (([URL]) -> Void)?
+
+    override init(frame: CGRect, configuration: WKWebViewConfiguration) {
+        super.init(frame: frame, configuration: configuration)
+        registerForDraggedTypes([
+            .fileURL,
+            NSPasteboard.PasteboardType(rawValue: "NSFilenamesPboardType")
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is not supported")
+    }
+
+    override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        guard !localFileURLs(from: sender.draggingPasteboard).isEmpty else { return [] }
+        onDropTargetChanged?(true)
+        return .copy
+    }
+
+    override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
+        guard !localFileURLs(from: sender.draggingPasteboard).isEmpty else { return [] }
+        return .copy
+    }
+
+    override func draggingExited(_ sender: (any NSDraggingInfo)?) {
+        onDropTargetChanged?(false)
+    }
+
+    override func prepareForDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        !localFileURLs(from: sender.draggingPasteboard).isEmpty
+    }
+
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        let urls = localFileURLs(from: sender.draggingPasteboard)
+        onDropTargetChanged?(false)
+        guard !urls.isEmpty else { return false }
+        onFileURLsDropped?(urls)
+        return true
     }
 }
