@@ -25,6 +25,14 @@ a 205 ms ease transition. **Save** writes the source file. If another process
 changes that file after it was opened, VGMManDocs reports a conflict and
 requires reloading before another save can replace the current version.
 
+## macOS Keyboard Shortcuts
+
+The native app menu provides standard text editing commands, including
+Command-X/C/V and Command-A. Command-W closes the window, Command-M minimizes
+it, and Command-Return toggles the window's standard zoom. Command-Q quits the
+app through its normal quit path. The app has one window, so closing that last
+window exits the app.
+
 ## Live Updates
 
 Changes made to Markdown files under `Docs/md/` update the document tree and
