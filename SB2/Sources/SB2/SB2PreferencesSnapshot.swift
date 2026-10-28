@@ -99,6 +99,7 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
     var columnVisibility: [String: Bool]?
     var playlistColumnSizing: FrontendPlaylistColumnSizing?
     var columnAutoSize: Bool?
+    var playlistLinkMode: Bool?
     var playlistSortEnabled: Bool?
     var sortColumn: String?
     var sortDirection: String?
@@ -140,6 +141,7 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
         titlebarTextColor = "#e0e1eb"
         titlebarBold = false
         playlistColumnSizing = FrontendPlaylistColumnSizing()
+        playlistLinkMode = false
         playlistSortEnabled = false
         mainWindowAlwaysOnTop = false
         settingsWindowAlwaysOnTop = false
@@ -213,6 +215,7 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
         selectionAnimationEnabled = selectionAnimationEnabled ?? true
         titlebarTextColor = titlebarTextColor ?? "#e0e1eb"
         titlebarBold = titlebarBold ?? false
+        playlistLinkMode = playlistLinkMode ?? false
         playlistColumnSizing = FrontendPlaylistColumnSizing(
             horizontalPaddingPerSide: playlistColumnSizing?.horizontalPaddingPerSide
                 ?? FrontendPlaylistColumnSizing.defaultHorizontalPaddingPerSide

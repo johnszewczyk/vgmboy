@@ -131,6 +131,7 @@ const state = {
   automaticallyHiddenColumns: new Set(),
   playlistColumnSizing: { horizontalPaddingPerSide: 8 },
   columnAutoSize: true,
+  playlistLinkMode: false,
   // Catalog order is authoritative until a user explicitly asks to sort a
   // column. Do not let a display/width feature reorder shared rows.
   playlistSortEnabled: false,
@@ -264,6 +265,7 @@ const refs = {
   titlebarTextColorInput: document.getElementById("titlebar-text-color-input"),
   titlebarBoldCheckbox: document.getElementById("titlebar-bold-checkbox"),
   columnAutoSizeCheckbox: document.getElementById("column-auto-size-checkbox"),
+  playlistLinkModeCheckbox: document.getElementById("playlist-link-mode-checkbox"),
   autoResizeAnimationEnabledCheckbox: document.getElementById("auto-resize-animation-enabled-checkbox"),
   autoResizeAnimationInput: document.getElementById("auto-resize-animation-input"),
   selectionAnimationEnabledCheckbox: document.getElementById("selection-animation-enabled-checkbox"),
@@ -416,6 +418,7 @@ async function loadSettings() {
       : { ...DEFAULT_COLUMN_VISIBILITY };
     state.playlistColumnSizing = normalizePlaylistColumnSizing(parsed.playlistColumnSizing);
     state.columnAutoSize = parsed.columnAutoSize !== false;
+    state.playlistLinkMode = parsed.playlistLinkMode === true;
     const savedSortColumn = typeof parsed.sortColumn === "string" ? parsed.sortColumn : null;
     const savedSortIsValid = savedSortColumn !== null
       && COLUMN_DEFS.some((column) => column.id === savedSortColumn && column.sortable !== false);
@@ -500,6 +503,7 @@ function settingsSnapshot() {
     columnVisibility: state.columnVisibility,
     playlistColumnSizing: state.playlistColumnSizing,
     columnAutoSize: state.columnAutoSize,
+    playlistLinkMode: state.playlistLinkMode,
     playlistSortEnabled: state.playlistSortEnabled,
     sortColumn: state.sortColumn,
     sortDirection: state.sortDirection,

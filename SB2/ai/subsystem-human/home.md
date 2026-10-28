@@ -66,6 +66,10 @@
 - Playlist tab selection retains its close control and prevents text
   selection. Playlist row selection also retains its separate one-pixel
   underline.
+- Playlist rows select on a single click by default and play on Enter or
+  double-click. UI Chrome > Playlist Options > Link Mode changes a plain single
+  click to select and play immediately; modifier-clicks still extend selection,
+  and the pointer cursor indicates Link Mode is active.
 - Playlist row selection uses one animated, one-pixel underline at the row
   bottom. The previous solid-versus-outline selection option is retired.
 - Sidebar selection remains available to navigation and activation. Hover,
