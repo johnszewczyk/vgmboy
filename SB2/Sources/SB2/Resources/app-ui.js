@@ -4112,16 +4112,23 @@ function createPlaylistRow(track, rowIndex) {
 
   row.addEventListener("click", (event) => {
     if (!row.isConnected || row.dataset.trackId !== track.id) return;
+    if (event.target?.closest?.("button, input, select, a, [contenteditable=true]")) return;
     const selectedTrack = selectPlaylistTrack(track.id, {
       extend: event.metaKey || event.ctrlKey,
       range: event.shiftKey
     });
     if (!selectedTrack) return;
     uiApp.playback.updateTimingSummary();
+    if (state.playlistLinkMode && !event.metaKey && !event.ctrlKey && !event.shiftKey && event.detail <= 1) {
+      playVisibleTrack(track.id, 0).catch((error) => {
+        console.error(error);
+      });
+    }
   });
 
   row.addEventListener("dblclick", () => {
     if (!row.isConnected || row.dataset.trackId !== track.id) return;
+    if (state.playlistLinkMode) return;
     playVisibleTrack(track.id, 0).catch((error) => {
       console.error(error);
     });
@@ -4324,6 +4331,7 @@ function applyUISettings() {
   rootStyle.setProperty("--line", state.uiChromeDividerColor ?? "rgb(40 40 40)");
   rootStyle.setProperty("--item-spacing-px", `${state.uiItemSpacingPx}px`);
   document.body.dataset.sbMotion = state.selectionAnimationEnabled ? "on" : "off";
+  document.body.dataset.playlistLinkMode = state.playlistLinkMode ? "on" : "off";
   rootStyle.setProperty("--column-resize-duration", `${state.autoResizeAnimationEnabled ? state.autoResizeAnimationMilliseconds : 0}ms`);
   rootStyle.setProperty("--selection-animation-duration", `${state.selectionAnimationEnabled ? state.selectionAnimationMilliseconds : 0}ms`);
   rootStyle.setProperty("--titlebar-text-color", state.titlebarTextColor);
@@ -4431,6 +4439,7 @@ function renderAll() {
   refs.playlistHeaderBoldCheckbox.checked = state.playlistHeaderBold;
   if (document.activeElement !== refs.spcUnknownDurationInput) refs.spcUnknownDurationInput.value = uiApp.formatTime(state.unknownDurationSeconds);
   refs.columnAutoSizeCheckbox.checked = state.columnAutoSize;
+  refs.playlistLinkModeCheckbox.checked = state.playlistLinkMode;
   refs.autoResizeAnimationEnabledCheckbox.checked = state.autoResizeAnimationEnabled;
   refs.autoResizeAnimationInput.value = String(state.autoResizeAnimationMilliseconds);
   refs.autoResizeAnimationInput.disabled = !state.autoResizeAnimationEnabled;
@@ -4918,6 +4927,12 @@ function setColumnAutoSize(enabled) {
   if (state.columnAutoSize) autoSizedPlaylistSignature = null;
   persistSettings();
   renderPlaylist();
+}
+
+function setPlaylistLinkMode(enabled) {
+  state.playlistLinkMode = Boolean(enabled);
+  persistSettings();
+  renderAll();
 }
 
 function setAnimationTiming(key, value) {

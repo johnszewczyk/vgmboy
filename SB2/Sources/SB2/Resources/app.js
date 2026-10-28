@@ -252,6 +252,9 @@ refs.titlebarBoldCheckbox.addEventListener("change", (event) => {
 refs.columnAutoSizeCheckbox.addEventListener("change", (event) => {
   app.ui.setColumnAutoSize(event.target.checked);
 });
+refs.playlistLinkModeCheckbox.addEventListener("change", (event) => {
+  app.ui.setPlaylistLinkMode(event.target.checked);
+});
 
 refs.autoResizeAnimationInput.addEventListener("change", (event) => {
   app.ui.setAnimationTiming("autoResizeAnimationMilliseconds", event.target.value);

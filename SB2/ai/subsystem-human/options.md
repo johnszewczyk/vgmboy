@@ -75,6 +75,10 @@ older full snapshot back over newer values.
   pixels; the previous zero/unset default stays 0 px. Font sizes do not scale
   the saved gap. Both lists fade over their bottom 1 rem (0%, 50%, 75% background coverage) and retain scroll room
   to reveal the final row.
+- UI Chrome > Playlist Options includes Link Mode. It is off by default; when
+  enabled, a plain single click on a playlist row selects and starts that track.
+  Modifier-clicks remain selection gestures, and favorite buttons still only
+  toggle Favorites. The preference persists across launches.
 - Drag playlist headings to reorder them. Neighboring headings slide aside
   using the interface motion preference; Escape cancels the reorder. The open
   star heading matches the hosted player. Play shows animated bars while

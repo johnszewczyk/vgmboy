@@ -809,6 +809,12 @@ body.playlist-columns-resizing .playlist-table td {
   -webkit-user-select: none;
 }
 
+body[data-playlist-link-mode="on"] .playlist-row,
+body[data-playlist-link-mode="on"] .playlist-row > td,
+body[data-playlist-link-mode="on"] .playlist-row > td * {
+  cursor: pointer;
+}
+
 /* Selection is drawn by the shared rounded selection indicator. Native table
    focus rings are both redundant and visually inconsistent with that control. */
 .playlist-row:focus,
