@@ -73,11 +73,11 @@
                 <input class="field" id="fade" type="number" min="0" max="60" value="6" data-control="fade">
               </div>
               <div class="setting-row">
-                <label for="tempo">Playback speed</label>
-                <select class="field" id="tempo" data-control="tempo">
-                  <option value="0.25">¼×</option><option value="0.5">½×</option><option value="0.75">¾×</option><option value="1" selected>1×</option>
-                  <option value="1.25">1¼×</option><option value="1.5">1½×</option><option value="1.75">1¾×</option><option value="2">2×</option>
-                </select>
+                <label for="tempo">Playback speed<small>1/32 steps · 1/32× to 8×</small></label>
+                <div class="tempo-control">
+                  <input class="range" id="tempo" type="range" min="1" max="256" step="1" value="32" data-control="tempo" aria-label="Playback speed">
+                  <output id="tempo-label" for="tempo">1×</output>
+                </div>
               </div>
             </section>
           </div>

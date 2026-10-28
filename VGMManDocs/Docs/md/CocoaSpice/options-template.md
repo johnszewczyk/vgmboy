@@ -86,12 +86,11 @@
 
 ### Play Speed
 
-> Fractions and decimals are accepted and snap to 1/32 increments.
+> One speed setting applies to every format whose decoder supports native tempo. Fractions and decimals are accepted, snap to 1/32 steps, and range from 1/32× to 8×.
 
 | Control | Detail | Value field | Default |
 | --- | --- | --- | --- |
-| [ ] `libgme` | `SPC, NSF/NSFE, GBS, HES, KSS, and AY` | `[text field: 1]` | `1×` |
-| [ ] `libvgm` | `GYM, S98, VGM, VGZ, and DRO` | `[text field: 1]` | `1×` |
+| [ ] `Enable playback speed` | Applies to formats with native tempo support | `[text field: 1]` | `1×` |
 
 **Tempo field format:** placeholder `1`, rounded-border style, width `72`.
 **Accepted input:** fractions and decimals.  

@@ -26,9 +26,9 @@
 - Playback volume uses twenty 5% steps in Options and in the compact Volume
   popup on the home toolbar. The home popup stays behind the Options layer.
 - One playback speed setting applies to every format whose decoder supports
-  native tempo. Its value commits only when Enter is pressed, snaps to 1/64
-  increments, displays fractions through denominator 64, and uses a compact
-  eight-character field.
+  native tempo. Its value commits only when Enter is pressed, snaps to 1/32
+  increments from 1/32× through 8×, displays reduced fractions, and uses a
+  compact eight-character field.
 - Option pages use a readable system font and a 65-character content width.
   Section headings are underlined; setting rows use whitespace without
   divider lines. UI Chrome and UI Fonts are separate SPCBOY pages. UI Fonts

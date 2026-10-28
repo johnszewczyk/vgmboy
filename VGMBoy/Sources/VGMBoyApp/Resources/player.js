@@ -10,6 +10,17 @@
       ? String(Math.floor(minutes / 60)) + ':' + String(minutes % 60).padStart(2, '0') + ':' + remainder
       : String(minutes) + ':' + remainder;
   };
+  const tempoLabel = step => {
+    let numerator = Math.max(1, Math.min(256, Math.round(Number(step) || 32)));
+    let denominator = 32;
+    let left = numerator;
+    let right = denominator;
+    while (right !== 0) [left, right] = [right, left % right];
+    const divisor = left || 1;
+    numerator /= divisor;
+    denominator /= divisor;
+    return denominator === 1 ? `${numerator}×` : `${numerator}/${denominator}×`;
+  };
   const setText = (id, value) => {
     const node = $(id);
     const next = String(value ?? '');
@@ -60,6 +71,7 @@
     if (input.dataset.control === 'seek') {
       setText('clock', formatTime(input.value) + ' / ' + formatTime(input.max));
     }
+    if (input.dataset.control === 'tempo') setText('tempo-label', tempoLabel(input.value));
     if (input.dataset.band !== undefined) {
       const gain = Number(input.value);
       input.nextElementSibling.textContent = (gain > 0 ? '+' : '') + gain.toFixed(1) + ' dB';
@@ -73,6 +85,11 @@
     if (control === 'volume') return;
     if (control === 'seek') {
       send('seek', Number(input.value));
+      return;
+    }
+    if (control === 'tempo') {
+      send('tempo', Number(input.value) / 32);
+      input.blur();
       return;
     }
     if (control) {
@@ -217,7 +234,9 @@
       setControl('longPlay', state.longPlay);
       setControl('length', state.length);
       setControl('fade', state.fade);
-      setControl('tempo', state.tempo);
+      const tempoStep = Math.max(1, Math.min(256, Math.round((Number(state.tempo) || 1) * 32)));
+      setControl('tempo', tempoStep);
+      if (document.activeElement !== $('tempo')) setText('tempo-label', tempoLabel(tempoStep));
       setControl('mono', state.mono);
       setControl('volume', state.volume);
       setControl('eqEnabled', state.eqEnabled);

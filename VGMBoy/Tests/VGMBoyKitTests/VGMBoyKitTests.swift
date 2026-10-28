@@ -42,8 +42,8 @@ struct FormatRegistryTests {
             equalizerBandGains: [-99, 3.5, 99],
             outputVolume: 2,
             monoEnabled: true,
-            libgmeTempo: PlaybackTempo(numerator: 2, denominator: 1),
-            libgmeTempoEnabled: true
+            playbackTempo: PlaybackTempo(numerator: 2, denominator: 1),
+            playbackTempoEnabled: true
         )
 
         #expect(preferences.fadeSeconds == 0)
@@ -54,9 +54,8 @@ struct FormatRegistryTests {
         #expect(preferences.equalizer.gainsDecibels.count == EqualizerConfiguration.bandCount)
         #expect(preferences.outputVolume == 1)
         #expect(preferences.monoEnabled)
-        #expect(preferences.libgmeTempo.multiplier == 2)
-        #expect(preferences.libgmeTempoEnabled)
-        #expect(!preferences.libvgmTempoEnabled)
+        #expect(preferences.playbackTempo.multiplier == 2)
+        #expect(preferences.playbackTempoEnabled)
     }
 
     @Test("routes libgme extensions to the libgme family")

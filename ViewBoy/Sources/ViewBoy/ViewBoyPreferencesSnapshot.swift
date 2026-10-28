@@ -109,15 +109,12 @@ struct ViewBoyPreferencesSnapshot: Codable, Sendable {
         appVolume = Double(shared.outputVolume)
         monoEnabled = shared.monoEnabled
         playbackSpeed = .init(
-            numerator: shared.libgmeTempo.numerator,
-            denominator: shared.libgmeTempo.denominator
+            numerator: shared.playbackTempo.numerator,
+            denominator: shared.playbackTempo.denominator
         )
-        playbackSpeedEnabled = shared.libgmeTempoEnabled
-        libvgmPlaybackSpeed = .init(
-            numerator: shared.libvgmTempo.numerator,
-            denominator: shared.libvgmTempo.denominator
-        )
-        libvgmPlaybackSpeedEnabled = shared.libvgmTempoEnabled
+        playbackSpeedEnabled = shared.playbackTempoEnabled
+        libvgmPlaybackSpeed = nil
+        libvgmPlaybackSpeedEnabled = nil
         autoResizeAnimationMilliseconds = FrontendAnimationTimings.defaultDurationMilliseconds
         selectionAnimationMilliseconds = FrontendAnimationTimings.defaultDurationMilliseconds
         autoResizeAnimationEnabled = true
@@ -168,6 +165,13 @@ struct ViewBoyPreferencesSnapshot: Codable, Sendable {
             )
         }
 
+        let migratedTempo = PlaybackPreferences.migrateBackendTempo(
+            libgmeTempo: tempo(playbackSpeed),
+            libgmeEnabled: playbackSpeedEnabled,
+            libvgmTempo: tempo(libvgmPlaybackSpeed),
+            libvgmEnabled: libvgmPlaybackSpeedEnabled
+        )
+
         let shared = PlaybackPreferences(
             timing: PlaybackTimingPreferences(
                 longPlaySeconds: manualPlayTimeSeconds ?? PlaybackTimingPreferences.defaultLongPlaySeconds,
@@ -179,10 +183,8 @@ struct ViewBoyPreferencesSnapshot: Codable, Sendable {
             equalizerBandGains: equalizerBandGains?.map(Float.init) ?? [],
             outputVolume: Float(appVolume ?? 1),
             monoEnabled: monoEnabled ?? false,
-            libgmeTempo: tempo(playbackSpeed),
-            libgmeTempoEnabled: playbackSpeedEnabled ?? false,
-            libvgmTempo: tempo(libvgmPlaybackSpeed),
-            libvgmTempoEnabled: libvgmPlaybackSpeedEnabled ?? false
+            playbackTempo: migratedTempo.tempo,
+            playbackTempoEnabled: migratedTempo.enabled
         )
         manualPlayTimeSeconds = shared.timing.longPlaySeconds
         unknownDurationSeconds = shared.timing.unknownDurationSeconds
@@ -193,14 +195,11 @@ struct ViewBoyPreferencesSnapshot: Codable, Sendable {
         appVolume = Double(shared.outputVolume)
         monoEnabled = shared.monoEnabled
         playbackSpeed = PlaybackRate(
-            numerator: shared.libgmeTempo.numerator,
-            denominator: shared.libgmeTempo.denominator
+            numerator: shared.playbackTempo.numerator,
+            denominator: shared.playbackTempo.denominator
         )
-        playbackSpeedEnabled = shared.libgmeTempoEnabled
-        libvgmPlaybackSpeed = PlaybackRate(
-            numerator: shared.libvgmTempo.numerator,
-            denominator: shared.libvgmTempo.denominator
-        )
-        libvgmPlaybackSpeedEnabled = shared.libvgmTempoEnabled
+        playbackSpeedEnabled = shared.playbackTempoEnabled
+        libvgmPlaybackSpeed = nil
+        libvgmPlaybackSpeedEnabled = nil
     }
 }

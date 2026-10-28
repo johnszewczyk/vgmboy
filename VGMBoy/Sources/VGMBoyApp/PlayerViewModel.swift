@@ -325,7 +325,12 @@ final class PlayerViewModel {
         case "longPlay": if let enabled = value as? Bool { longPlayEnabled = enabled; applyTimingChange() }
         case "length": if let number = finite { manualSeconds = Int(min(86400, max(5, number))); applyTimingChange() }
         case "fade": if let number = finite { fadeSeconds = Int(min(60, max(0, number))); applyTimingChange() }
-        case "tempo": if let number = finite { tempo = min(2, max(0.25, number)); applyTimingChange() }
+        case "tempo":
+            if let number = finite {
+                let steps = min(256, max(1, Int((number * 32).rounded())))
+                tempo = Double(steps) / 32
+                applyTimingChange()
+            }
         case "volume":
             if let number = finite { volume = min(1, max(0, number)); perform(.setOutputVolume, .init(outputVolume: Float(volume))) }
         case "mono": if let enabled = value as? Bool { monoEnabled = enabled; perform(.setMonoEnabled, .init(monoEnabled: enabled)) }

@@ -127,15 +127,12 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
         appVolume = Double(shared.outputVolume)
         monoEnabled = shared.monoEnabled
         playbackSpeed = .init(
-            numerator: shared.libgmeTempo.numerator,
-            denominator: shared.libgmeTempo.denominator
+            numerator: shared.playbackTempo.numerator,
+            denominator: shared.playbackTempo.denominator
         )
-        playbackSpeedEnabled = shared.libgmeTempoEnabled
-        libvgmPlaybackSpeed = .init(
-            numerator: shared.libvgmTempo.numerator,
-            denominator: shared.libvgmTempo.denominator
-        )
-        libvgmPlaybackSpeedEnabled = shared.libvgmTempoEnabled
+        playbackSpeedEnabled = shared.playbackTempoEnabled
+        libvgmPlaybackSpeed = nil
+        libvgmPlaybackSpeedEnabled = nil
         autoResizeAnimationMilliseconds = FrontendAnimationTimings.defaultDurationMilliseconds
         selectionAnimationMilliseconds = FrontendAnimationTimings.defaultDurationMilliseconds
         autoResizeAnimationEnabled = true
@@ -230,22 +227,12 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
             )
         }
 
-        let libgmeTempo = tempo(playbackSpeed)
-        let libvgmTempo = tempo(libvgmPlaybackSpeed)
-        let libgmeEnabled = playbackSpeedEnabled ?? false
-        let libvgmEnabled = libvgmPlaybackSpeedEnabled ?? false
-        let globalTempo: PlaybackTempo
-        if libgmeEnabled != libvgmEnabled {
-            globalTempo = libgmeEnabled ? libgmeTempo : libvgmTempo
-        } else if !libgmeEnabled, libgmeTempo == .defaultValue, libvgmTempo != .defaultValue {
-            // Keep a customized legacy value when neither backend was enabled.
-            globalTempo = libvgmTempo
-        } else {
-            // If both legacy controls were enabled with different rates, use
-            // the former primary (libgme) value as the deterministic migration.
-            globalTempo = libgmeTempo
-        }
-        let globalTempoEnabled = libgmeEnabled || libvgmEnabled
+        let migratedTempo = PlaybackPreferences.migrateBackendTempo(
+            libgmeTempo: tempo(playbackSpeed),
+            libgmeEnabled: playbackSpeedEnabled,
+            libvgmTempo: tempo(libvgmPlaybackSpeed),
+            libvgmEnabled: libvgmPlaybackSpeedEnabled
+        )
 
         let shared = PlaybackPreferences(
             timing: PlaybackTimingPreferences(
@@ -258,10 +245,8 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
             equalizerBandGains: equalizerBandGains?.map(Float.init) ?? [],
             outputVolume: Float(appVolume ?? 1),
             monoEnabled: monoEnabled ?? false,
-            libgmeTempo: globalTempo,
-            libgmeTempoEnabled: globalTempoEnabled,
-            libvgmTempo: globalTempo,
-            libvgmTempoEnabled: globalTempoEnabled
+            playbackTempo: migratedTempo.tempo,
+            playbackTempoEnabled: migratedTempo.enabled
         )
         manualPlayTimeSeconds = shared.timing.longPlaySeconds
         unknownDurationSeconds = shared.timing.unknownDurationSeconds
@@ -271,8 +256,8 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
         equalizerBandGains = shared.equalizer.gainsDecibels.map(Double.init)
         appVolume = Double(shared.outputVolume)
         monoEnabled = shared.monoEnabled
-        playbackSpeed = PlaybackRate(numerator: globalTempo.numerator, denominator: globalTempo.denominator)
-        playbackSpeedEnabled = globalTempoEnabled
+        playbackSpeed = PlaybackRate(numerator: shared.playbackTempo.numerator, denominator: shared.playbackTempo.denominator)
+        playbackSpeedEnabled = shared.playbackTempoEnabled
         libvgmPlaybackSpeed = nil
         libvgmPlaybackSpeedEnabled = nil
     }

@@ -783,10 +783,8 @@ final class PlayerViewModel {
     var endFadeEnabled = true
     var configuredFadeSeconds: Int = PlaybackTimingPreferences.defaultFadeSeconds
     var fadedSkipEnabled = false
-    var libgmeTempo = PlaybackTempo.defaultValue
-    var libgmeTempoEnabled = false
-    var libvgmTempo = PlaybackTempo.defaultValue
-    var libvgmTempoEnabled = false
+    var playbackTempo = PlaybackTempo.defaultValue
+    var playbackTempoEnabled = false
     var fadeSeconds: Int { endFadeEnabled ? configuredFadeSeconds : 0 }
     private var fadedSkipTask: Task<Void, Never>?
     private var fadedSkipToken: UUID?
@@ -1830,10 +1828,8 @@ final class PlayerViewModel {
             sidebarSystemMode: sidebarSystemMode,
             preferEmbeddedConsoleTags: preferEmbeddedConsoleTags,
             sidebarBrowserModeRawValue: sidebarBrowserMode.rawValue,
-            libgmeTempo: libgmeTempo,
-            libgmeTempoEnabled: libgmeTempoEnabled,
-            libvgmTempo: libvgmTempo,
-            libvgmTempoEnabled: libvgmTempoEnabled
+            playbackTempo: playbackTempo,
+            playbackTempoEnabled: playbackTempoEnabled
         )
     }
 
@@ -1894,32 +1890,18 @@ final class PlayerViewModel {
         }
     }
 
-    func setLibGmeTempo(_ tempo: PlaybackTempo) {
-        libgmeTempo = tempo
+    func setPlaybackTempo(_ tempo: PlaybackTempo) {
+        playbackTempo = PlaybackPreferences.normalizedTempo(tempo)
         refreshPlaylistTotalDurationReadout()
         savePreferencesNow()
-        applyPlaybackTempoIfNeeded(for: "libgme")
+        applyPlaybackTempoIfNeeded()
     }
 
-    func setLibGmeTempoEnabled(_ enabled: Bool) {
-        libgmeTempoEnabled = enabled
+    func setPlaybackTempoEnabled(_ enabled: Bool) {
+        playbackTempoEnabled = enabled
         refreshPlaylistTotalDurationReadout()
         savePreferencesNow()
-        applyPlaybackTempoIfNeeded(for: "libgme")
-    }
-
-    func setLibVgmTempo(_ tempo: PlaybackTempo) {
-        libvgmTempo = tempo
-        refreshPlaylistTotalDurationReadout()
-        savePreferencesNow()
-        applyPlaybackTempoIfNeeded(for: "libvgm")
-    }
-
-    func setLibVgmTempoEnabled(_ enabled: Bool) {
-        libvgmTempoEnabled = enabled
-        refreshPlaylistTotalDurationReadout()
-        savePreferencesNow()
-        applyPlaybackTempoIfNeeded(for: "libvgm")
+        applyPlaybackTempoIfNeeded()
     }
 
     func setFadedSkipEnabled(_ enabled: Bool) {
@@ -2732,9 +2714,9 @@ final class PlayerViewModel {
         }
     }
 
-    private func applyPlaybackTempoIfNeeded(for backendID: String) {
+    private func applyPlaybackTempoIfNeeded() {
         guard let track = currentTrack,
-              playbackFamily(forPathExtension: track.playablePathExtension)?.id == backendID,
+              playbackFamily(forPathExtension: track.playablePathExtension)?.supportsTempo == true,
               !isLoading else { return }
         let trackID = track.id
         let playback = self.playback
@@ -2979,11 +2961,7 @@ final class PlayerViewModel {
               family.supportsTempo else {
             return .defaultValue
         }
-        switch family.id {
-        case "libgme": return libgmeTempoEnabled ? libgmeTempo : .defaultValue
-        case "libvgm": return libvgmTempoEnabled ? libvgmTempo : .defaultValue
-        default: return .defaultValue
-        }
+        return playbackTempoEnabled ? playbackTempo : .defaultValue
     }
 
     private func playbackFamily(forPathExtension pathExtension: String) -> DecoderFamily? {
@@ -3128,7 +3106,9 @@ final class PlayerViewModel {
         )
         let tempo = playbackTempo(forPathExtension: trackPathExtension ?? currentTrack?.playablePathExtension)
         guard tempo != .defaultValue else { return plan }
-        let scaledPreFade = max(1, Int((Double(plan.preFadeSeconds) / tempo.multiplier).rounded(.down)))
+        let scaledPreFade = plan.preFadeSeconds == 0
+            ? 0
+            : max(1, Int((Double(plan.preFadeSeconds) / tempo.multiplier).rounded(.down)))
         return PlaybackPlan(
             preFadeSeconds: scaledPreFade,
             fadeSeconds: plan.fadeSeconds,
@@ -3566,10 +3546,8 @@ final class PlayerViewModel {
         }
         appVolume = AudioOutputVolume.clamped(Float(preferences.appVolume))
         monoEnabled = preferences.monoEnabled
-        libgmeTempo = preferences.libgmeTempo
-        libgmeTempoEnabled = preferences.libgmeTempoEnabled
-        libvgmTempo = preferences.libvgmTempo
-        libvgmTempoEnabled = preferences.libvgmTempoEnabled
+        playbackTempo = preferences.playbackTempo
+        playbackTempoEnabled = preferences.playbackTempoEnabled
         randomPlaybackScope = RandomPlaybackScope(rawValue: preferences.randomPlaybackScopeRawValue ?? "off") ?? .off
         repeatMode = RepeatMode(rawValue: preferences.repeatModeRawValue ?? "off") ?? .off
         if randomPlaybackScope == .library { loadRandomLibraryTracks() }
