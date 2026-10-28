@@ -3,9 +3,11 @@
 - The top title strip shows SPCBOY, the current console and album, and CPU use.
 - Window controls are rendered in the title strip; AppKit's native stoplights
   are hidden, and the strip remains draggable.
-- Nine playback, audio, and Options controls share the first sidebar toolbar at
-  equal widths. The Volume control opens a 220px popup slider with twenty 5%
-  detents and visible tick marks.
+- Ten playback, audio, and Options controls share the first sidebar toolbar at
+  equal widths. The Speed toggle sits beside Long Play and Volume; it enables
+  or disables the configured playback rate without changing that saved rate.
+  The Volume control opens a 220px popup slider with twenty 5% detents and
+  visible tick marks.
   Search shares the next toolbar with five square buttons for Console/Path
   view, Gallery, Recent, Favorites, and expand/collapse; the search field
   shrinks to make room.

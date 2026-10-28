@@ -28,7 +28,8 @@
 - One playback speed setting applies to every format whose decoder supports
   native tempo. Its value commits only when Enter is pressed, snaps to 1/32
   increments from 1/32× through 8×, displays reduced fractions, and uses a
-  compact eight-character field.
+  compact eight-character field. The Speed toolbar toggle enables or disables
+  that configured rate while preserving its saved value.
 - Option pages use a readable system font and a 65-character content width.
   Section headings are underlined; setting rows use whitespace without
   divider lines. UI Chrome and UI Fonts are separate SPCBOY pages. UI Fonts

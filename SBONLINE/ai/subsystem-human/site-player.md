@@ -20,14 +20,18 @@ first and labels the date column Played. The collection shortcut clears the
 album scope; pagination remains bounded.
 
 The toolbar uses the existing hosted player for previous/next, Play/Pause, Stop,
-EQ, Long Play, volume, queue, and Options. Stop resets the selected track to the
-beginning and retains its queue. The entire site uses the same charcoal/cyan theme;
+EQ, Long Play, Speed, volume, queue, and Options. Speed enables or disables the
+configured client playback rate without changing its saved value. Stop resets
+the selected track to the beginning and retains its queue. The entire site uses
+the same charcoal/cyan theme;
 Profile, Listening, Favorites, Spotlight, and owner tools remain in the account
 menu.
 
 Selected tracks stream as 128 kbps AAC. Source packages stay compressed on the
 server; only the requested member is materialized for playback. Browser EQ and
-fractional playback speed use the existing audio engine. Long Play supports seconds or M:SS/H:MM:SS durations; zero means unlimited,
+fractional playback speed use the existing audio engine. A saved non-1× rate
+remains enabled when upgrading; new default 1× settings start disabled. Long
+Play supports seconds or M:SS/H:MM:SS durations; zero means unlimited,
 within the hosted 60-minute session limit. Existing saved durations migrate. Favorites, album favorites, Recent,
 Gallery, and the shared player retain their hosted API and account contracts.
 The retired Chat and generic Feed do not appear in the player.

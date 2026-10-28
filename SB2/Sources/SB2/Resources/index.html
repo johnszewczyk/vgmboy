@@ -30,6 +30,7 @@
       <symbol id="icon-pause" viewBox="0 0 24 24"><rect x="14" y="3" width="5" height="18" rx="1" /><rect x="5" y="3" width="5" height="18" rx="1" /></symbol>
       <symbol id="icon-skip-forward" viewBox="0 0 24 24"><path d="M21 4v16" /><path d="M6.029 4.285A2 2 0 0 0 3 6v12a2 2 0 0 0 3.029 1.715l9.997-5.998a2 2 0 0 0 .003-3.432z" /></symbol>
       <symbol id="icon-infinity" viewBox="0 0 24 24"><path d="M6 16c5 0 7-8 12-8a4 4 0 0 1 0 8c-5 0-7-8-12-8a4 4 0 1 0 0 8" /></symbol>
+      <symbol id="icon-speed" viewBox="0 0 24 24"><path d="M4.8 18a9 9 0 1 1 14.4 0" /><path d="m12 13 4-4" /><circle cx="12" cy="13" r="1.5" /></symbol>
       <symbol id="icon-repeat-2" viewBox="0 0 24 24"><path d="m2 9 3-3 3 3" /><path d="M13 18H7a2 2 0 0 1-2-2V6" /><path d="m22 15-3 3-3-3" /><path d="M11 6h6a2 2 0 0 1 2 2v10" /></symbol>
       <symbol id="icon-list-collapse" viewBox="0 0 24 24"><path d="M4 6h16M4 12h11M4 18h16" /><path d="m18 10 3 3 3-3" /></symbol>
       <symbol id="icon-list-expand" viewBox="0 0 24 24"><path d="M4 6h16M4 12h11M4 18h16" /><path d="m18 14 3-3 3 3" /></symbol>
@@ -61,8 +62,7 @@
               <button id="next-button" class="tool-button glyph-button ui-control" title="Next" aria-label="Next"><svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-forward"></use></svg></button>
               <button id="equalizer-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Enable Equalizer" aria-label="Enable Equalizer" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sliders-horizontal"></use></svg></button>
               <button id="long-play-button" class="tool-button glyph-button ui-control" type="button" title="Toggle Long Play" aria-label="Toggle Long Play"><svg class="ui-icon" aria-hidden="true"><use href="#icon-infinity"></use></svg></button>
-              <button id="repeat-button" class="tool-button glyph-button ui-control" type="button" title="Repeat off" aria-label="Repeat off"><svg class="ui-icon" aria-hidden="true"><use href="#icon-repeat-2"></use></svg></button>
-              <button id="options-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Options" aria-label="Options" aria-haspopup="dialog" aria-expanded="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-settings"></use></svg></button>
+              <button id="playback-speed-button" class="tool-button glyph-button ui-control" type="button" title="Playback speed disabled" aria-label="Playback speed disabled" aria-pressed="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-speed"></use></svg></button>
               <div id="toolbar-volume-control" class="toolbar-volume-control">
                 <button id="toolbar-volume-button" class="tool-button glyph-button ui-control" type="button" title="Volume 100%" aria-label="Volume 100%" aria-haspopup="dialog" aria-expanded="false" aria-controls="toolbar-volume-popover"><svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg></button>
                 <div id="toolbar-volume-popover" class="toolbar-volume-popover" role="dialog" aria-label="Playback volume" hidden>
@@ -71,6 +71,8 @@
                   <output id="toolbar-volume-value">100%</output>
                 </div>
               </div>
+              <button id="repeat-button" class="tool-button glyph-button ui-control" type="button" title="Repeat off" aria-label="Repeat off"><svg class="ui-icon" aria-hidden="true"><use href="#icon-repeat-2"></use></svg></button>
+              <button id="options-toolbar-button" class="tool-button glyph-button ui-control" type="button" title="Options" aria-label="Options" aria-haspopup="dialog" aria-expanded="false"><svg class="ui-icon" aria-hidden="true"><use href="#icon-settings"></use></svg></button>
             </div>
           </div>
           <div class="sidebar-search-wrap toolbar">
