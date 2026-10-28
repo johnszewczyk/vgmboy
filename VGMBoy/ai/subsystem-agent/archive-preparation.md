@@ -40,6 +40,24 @@ finite AAC export; it has no catalog, queue, or UI policy.
   revision. Selected ZIP bytes, traversal rejection and real hosted UAC byte
   parity are verified on Linux. MathBook stages the runtime outside app releases.
 
+## Supported Containers and Tools
+
+- `.zip`, `.7z`, and `.lha` use `7zz` for listing and extraction.
+- `.rsn` uses `lsar` for listing and `unar` for extraction.
+- `.tar` uses the configured `bsdtar` executable (invoked as `tar`).
+- `.uac` listing comes from the validated manifest. Legacy sequential payloads
+  and complete-set preparation use the shared UAC/Zstandard and TAR path;
+  indexed selected-member reads use `UACWrapperCore`.
+- Standalone `.zst` and `.zstd` media files have one implicit member and use
+  `zstd` for decompression. `.tar.zst`, `.tar.zstd`, and `.tzst` are not
+  accepted archive containers.
+
+Archive membership alone does not make every entry playable. Frontends filter
+members through `FormatRegistry`, which also determines whether preparation
+needs one member or a dependency-complete set. These external tools are host
+dependencies discovered through `ArchiveMaterializerConfiguration`; they are
+not bundled by this archive core.
+
 ## Invariants
 
 - A transport `load` with `archiveEntry` treats `path` as the archive source;
