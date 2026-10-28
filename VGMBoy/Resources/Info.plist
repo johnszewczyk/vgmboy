@@ -13,7 +13,7 @@
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleIconFile</key>
-    <string>app-icon.png</string>
+    <string>app-icon.icns</string>
     <key>CFBundleName</key>
     <string>VGMBoy</string>
     <key>CFBundlePackageType</key>
@@ -26,6 +26,8 @@
     <string>26.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.music</string>
     <key>UTImportedTypeDeclarations</key>
     <array>
         <dict>

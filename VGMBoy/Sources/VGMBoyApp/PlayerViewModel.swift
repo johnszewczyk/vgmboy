@@ -23,6 +23,8 @@ final class PlayerViewModel {
     var statistics = PlaybackStatistics()
     var filePath: String?
     var selectedTrack = 0
+    var trackCount = 0
+    private var hasPlaybackLoaded = false
 
     var isPlaying = false
     var reachedEnd = false
@@ -138,20 +140,24 @@ final class PlayerViewModel {
         archiveEntry = source.archiveEntry
         filePath = source.sourceURL.path
         selectedTrack = 0
+        trackCount = 0
+        hasPlaybackLoaded = false
         errorMessage = nil
         loadSelectedTrack()
     }
 
     func selectTrack(_ index: Int) {
-        guard index >= 0, index != selectedTrack else { return }
+        guard (0 ..< trackCount).contains(index), index != selectedTrack else { return }
         selectedTrack = index
-        loadSelectedTrack()
+        loadSelectedTrack(autoplay: isPlaying)
     }
 
     func togglePlay() {
         do {
             if isPlaying {
                 apply(controller.perform(.init(command: .pause)).status)
+            } else if !hasPlaybackLoaded {
+                loadSelectedTrack()
             } else {
                 let event = controller.perform(.init(command: .play))
                 if event.kind == .error { throw PlayerControlError.rejected(event.message) }
@@ -164,9 +170,14 @@ final class PlayerViewModel {
 
     func stop() {
         apply(controller.perform(.init(command: .stop)).status)
+        hasPlaybackLoaded = false
     }
 
     func seek(to seconds: Double) {
+        if !hasPlaybackLoaded {
+            loadSelectedTrack(resumeAt: seconds, autoplay: false)
+            return
+        }
         do {
             let event = controller.perform(.init(command: .seek, payload: .init(positionMilliseconds: Int(max(0, seconds) * 1_000))))
             if event.kind == .error { throw PlayerControlError.rejected(event.message) }
@@ -210,6 +221,7 @@ final class PlayerViewModel {
                 playMilliseconds: manualSeconds * 1_000, fadeMilliseconds: fadeSeconds * 1_000
             )))
             if loaded.kind == .error { throw PlayerControlError.rejected(loaded.message) }
+            hasPlaybackLoaded = true
             if seconds > 0 {
                 let seeked = controller.perform(.init(command: .seek, payload: .init(positionMilliseconds: Int(seconds * 1_000))))
                 if seeked.kind == .error { throw PlayerControlError.rejected(seeked.message) }
@@ -221,6 +233,7 @@ final class PlayerViewModel {
             } else { apply(controller.status()) }
             errorMessage = nil
         } catch {
+            hasPlaybackLoaded = controller.status().statistics.trackIndex != nil
             errorMessage = error.localizedDescription
         }
     }
@@ -232,6 +245,15 @@ final class PlayerViewModel {
         reachedEnd = status.reachedEnd
         diagnostics = status.diagnostics
         statistics = status.statistics
+        if let trackCount = status.statistics.trackCount {
+            self.trackCount = trackCount
+        }
+        hasPlaybackLoaded = status.statistics.trackIndex != nil
+        if let trackIndex = status.statistics.trackIndex {
+            selectedTrack = trackIndex
+        } else if trackCount == 0 {
+            selectedTrack = 0
+        }
         if let message = status.errorMessage { errorMessage = message }
     }
 
@@ -242,7 +264,7 @@ final class PlayerViewModel {
             "path": currentSource?.location ?? "Local playback · original formats · native audio output",
             "loaded": filePath != nil, "playing": isPlaying, "ended": reachedEnd,
             "elapsed": elapsedSeconds, "window": max(displayDuration, elapsedSeconds + 1),
-            "family": currentFamily?.id ?? "No source", "track": selectedTrack + 1,
+            "family": currentFamily?.id ?? "No source", "track": selectedTrack + 1, "trackCount": trackCount,
             "supportsTempo": currentFamily?.supportsTempo ?? false,
             "supportsLongPlay": currentFamily?.supportsLongPlay ?? false,
             "longPlay": longPlayEnabled, "length": manualSeconds, "fade": fadeSeconds,
@@ -282,7 +304,10 @@ final class PlayerViewModel {
                 let next = index + (command == "next" ? 1 : -1)
                 if sessionFiles.indices.contains(next) { load(source: sessionFiles[next]) }
             }
-        case "track": if let number = finite, (1...1000).contains(number) { selectTrack(Int(number) - 1) }
+        case "track":
+            if let number = finite, number.rounded() == number, number >= 1, number <= Double(trackCount) {
+                selectTrack(Int(number) - 1)
+            }
         case "seek": if let number = finite { seek(to: min(max(0, number), max(displayDuration, elapsedSeconds))) }
         case "longPlay": if let enabled = value as? Bool { longPlayEnabled = enabled; applyTimingChange() }
         case "length": if let number = finite { manualSeconds = Int(min(86400, max(5, number))); applyTimingChange() }
