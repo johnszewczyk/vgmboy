@@ -4,12 +4,18 @@ VGMBoy's command line (`vgmboy-cli`) and standalone WebKit application (`VGMBoy`
 play original game-music files through one native audio core. The app uses a
 charcoal/cyan two-pane interface: session files and compact transport controls on
 the left, with Player, Audio, Diagnostics and Formats pages on the right. Its
-bottom status bar keeps playback time, seek and volume visible across pages. Open
-multiple local audio files or archives with Command-O, or drag them into the
-window. VGMBoy lists supported archive members and prepares the selected source
-through its shared archive core; the app does not need a catalog. The first
-item in each added batch starts playing, and Previous/Next move through the
-local session.
+bottom status bar keeps playback time, seek and volume visible across pages.
+Command-O adds local audio files or archives to the current session; dropping
+files onto the window replaces that session. Both routes accept the formats
+listed below, including NSF, GBS, PSF, SPC, and GSF, and expand archives only
+into playable entries recognized by the shared format registry. The archive
+core prepares those entries without a catalog. The first accepted item in the
+resulting batch starts playing, and Previous/Next move through the local
+session. Supported archive containers are UAC, ZIP, 7z, LHA, RSN, and TAR.
+Standalone `.zst` and `.zstd` files are also supported; TAR+Zstandard archives
+are not. Archive tools must be available on the host: `7zz` for ZIP/7z/LHA,
+`lsar` and `unar` for RSN, `bsdtar` for TAR, and `zstd` for standalone
+Zstandard files and applicable UAC payloads.
 The subsong field uses a one-based source index. Show in Finder locates the
 selected source.
 
