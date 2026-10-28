@@ -1,8 +1,8 @@
 # Decoder Update Verification
 
-## Current working-tree evidence
+## Working-tree evidence from 2026-10-27
 
-- libsidplayfp 3.1.2 is the linked Homebrew formula. The Bionic Commando USA
+- libsidplayfp 3.1.2 was the linked Homebrew formula. The Bionic Commando USA
   SID from the High Voltage SID collection was extracted to a temporary file;
   VGMBoy's SID fixture test enumerated both subtunes and rendered nonzero PCM.
 - vgmstream r2168 (`d9875b1fff307e4759dfb85e49e3d5e6fb196f7c`) uses the

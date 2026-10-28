@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 MANIFEST="${VGMBoy_PLUGIN_MANIFEST:-$ROOT_DIR/Docs/plugin-versions.json}"
-CATALOG="${VGMBoy_PLUGIN_CATALOG:-$ROOT_DIR/Docs/plugin-catalog.md}"
+CATALOG="${VGMBoy_PLUGIN_CATALOG:-$ROOT_DIR/../VGMManDocs/Docs/md/VGMBoy/plugin-catalog.md}"
 
 [[ -f "$MANIFEST" ]] || { echo "Missing plugin manifest: $MANIFEST" >&2; exit 1; }
 [[ -f "$CATALOG" ]] || { echo "Missing plugin catalog: $CATALOG" >&2; exit 1; }
