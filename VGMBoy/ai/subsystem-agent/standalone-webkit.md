@@ -32,9 +32,7 @@ focused controls; playback/status events stay on the main actor at the UI edge.
 The packaged app is a regular Dock app with a native menu bar. Keep standard
 window actions in native command groups so keyboard shortcuts reach AppKit and
 focused text controls retain normal editing behavior. The Dock icon is packaged
-as an `.icns` resource generated from the source PNG. Finder file drops are
-handled by the outer SwiftUI view through file-URL item providers so WebKit's
-internal content view does not own the drop destination.
+as an `.icns` resource generated from the source PNG.
 
 Verification must include the packaged app's bundled-resource load, native open
 panel, file playback, pause/seek and an Audio/Diagnostics page check. Browser-only
