@@ -79,6 +79,9 @@ older full snapshot back over newer values.
   enabled, a plain single click on a playlist row selects and starts that track.
   Modifier-clicks remain selection gestures, and favorite buttons still only
   toggle Favorites. The preference persists across launches.
+- Options checkboxes use aligned square controls: an outlined square when off
+  and an accent-filled square with a check when on. The playback-speed input is
+  independent of its enable checkbox; editing it never toggles Speed.
 - Drag playlist headings to reorder them. Neighboring headings slide aside
   using the interface motion preference; Escape cancels the reorder. The open
   star heading matches the hosted player. Play shows animated bars while
