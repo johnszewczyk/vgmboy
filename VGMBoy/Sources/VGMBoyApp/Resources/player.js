@@ -32,6 +32,7 @@
   const tabs = Array.from(document.querySelectorAll('[data-page]'));
   const pages = Array.from(document.querySelectorAll('[data-page-panel]'));
   let filesKey = '';
+  let trackCountKey = '';
   let frequenciesKey = '';
   let formatsKey = '';
 
@@ -151,6 +152,25 @@
     }));
   };
 
+  const renderTracks = count => {
+    const normalizedCount = Math.max(0, Math.floor(Number(count) || 0));
+    if (String(normalizedCount) === trackCountKey) return;
+    trackCountKey = String(normalizedCount);
+    const options = Array.from({length: normalizedCount}, (_, index) => {
+      const option = document.createElement('option');
+      option.value = String(index + 1);
+      option.textContent = 'Track ' + String(index + 1).padStart(2, '0');
+      return option;
+    });
+    if (!options.length) {
+      const option = document.createElement('option');
+      option.value = '1';
+      option.textContent = 'No track loaded';
+      options.push(option);
+    }
+    $('track').replaceChildren(...options);
+  };
+
   const renderFormats = formats => {
     $('format-list').replaceChildren(...formats.map(format => {
       const row = document.createElement('div');
@@ -188,7 +208,12 @@
       setText('clock', formatTime(state.elapsed) + ' / ' + formatTime(duration));
 
       document.querySelectorAll('[data-loaded]').forEach(control => { control.disabled = !state.loaded; });
+      renderTracks(state.trackCount);
       setControl('track', state.track);
+      $('track').disabled = !state.loaded || state.trackCount <= 1;
+      setText('track-count', state.loaded
+        ? state.trackCount + (state.trackCount === 1 ? ' subsong' : ' subsongs')
+        : 'No file loaded');
       setControl('longPlay', state.longPlay);
       setControl('length', state.length);
       setControl('fade', state.fade);

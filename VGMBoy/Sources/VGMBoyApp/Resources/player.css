@@ -353,6 +353,32 @@ progress::-webkit-progress-value { border-radius: 4px; background: var(--cyan); 
   .two-groups { grid-template-columns: minmax(0, 1fr) !important; gap: 0 !important; }
   .statusbar { grid-template-columns: minmax(135px, .8fr) auto minmax(100px, 1fr) minmax(120px, .9fr); gap: 8px; }
 }
+@media (max-width: 600px) {
+  body { grid-template-rows: 32px minmax(0, 1fr) 52px; }
+  .workspace { grid-template-columns: minmax(104px, 34%) minmax(0, 1fr); }
+  .sidebar { grid-template-rows: 30px 30px minmax(0, 1fr) 24px; }
+  .transport-toolbar, .page-tabs { gap: 1px; padding: 2px; }
+  .tool-button { height: 24px; font-size: 10px; }
+  .page-tab { padding: 0 4px; font-size: 9px; }
+  .file-heading { padding: 0 4px; font-size: 8px; }
+  .file-list { padding: 2px; }
+  .file-row { grid-template-columns: 18px minmax(0, 1fr); gap: 3px; padding: 0 2px; font-size: 9px; }
+  .sidebar-status { gap: 3px; padding: 0 4px; font-size: 7px; }
+  .page-scroll { padding: 8px; }
+  .page-title { gap: 4px; padding-bottom: 8px; }
+  .page-title h1 { font-size: 13px; }
+  .page-title > span { font-size: 7px; }
+  .source-note { gap: 4px; font-size: 8px; }
+  .setting-row { grid-template-columns: minmax(0, 1fr) minmax(0, 42%); gap: 6px; padding: 5px 4px; }
+  .setting-row label, .setting-row .setting-label { font-size: 10px; }
+  .setting-row small { font-size: 8px; }
+  .field { padding: 0 4px; font-size: 10px; }
+  .statusbar { grid-template-columns: minmax(0, 1fr) auto; gap: 3px 6px; padding: 3px 4px; font-size: 8px; }
+  .position-range { grid-column: 1 / -1; grid-row: 2; }
+  .playback-state { gap: 3px; font-size: 7px; }
+  .clock { font-size: 8px; }
+  .volume-control { grid-template-columns: 20px minmax(0, 1fr) 30px; gap: 3px; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

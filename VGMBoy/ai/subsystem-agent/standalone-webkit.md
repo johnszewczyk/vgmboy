@@ -21,11 +21,20 @@ Remove the script handler when the web view dismantles; retain no view cycle.
 PlayerViewModel owns the in-memory file session and translates controls into the
 existing typed PlaybackController API. It never writes the catalog. Decoder
 capabilities come from FormatRegistry.playbackDescriptors. Subsong indices are
-one-based in the UI and zero-based in the core; unsupported indices fail through
-the core. Timing edits preserve position and paused state. The seek window is a
+one-based in the UI and zero-based in the core; shared playback status reports
+the decoder's track count so the player can expose a bounded subsong picker for
+GBS, NSF, and other multi-track formats. Timing edits preserve position and
+paused state. The seek window is a
 frontend bound, not authoritative metadata duration. Native output diagnostics
 remain read-only. Observation publishes changed snapshots without replacing
 focused controls; playback/status events stay on the main actor at the UI edge.
+
+The packaged app is a regular Dock app with a native menu bar. Keep standard
+window actions in native command groups so keyboard shortcuts reach AppKit and
+focused text controls retain normal editing behavior. The Dock icon is packaged
+as an `.icns` resource generated from the source PNG. Finder file drops are
+handled by the outer SwiftUI view through file-URL item providers so WebKit's
+internal content view does not own the drop destination.
 
 Verification must include the packaged app's bundled-resource load, native open
 panel, file playback, pause/seek and an Audio/Diagnostics page check. Browser-only

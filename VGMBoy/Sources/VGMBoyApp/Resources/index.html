@@ -54,8 +54,8 @@
             <section class="group" aria-labelledby="track-heading">
               <h2 id="track-heading">TRACK</h2>
               <div class="setting-row">
-                <label for="track">Subsong<small>Source track index</small></label>
-                <input class="field" id="track" type="number" min="1" max="1000" value="1" data-control="track" data-loaded>
+                <label for="track">Subsong<small id="track-count">No file loaded</small></label>
+                <select class="field" id="track" data-control="track" data-loaded disabled><option value="1">Track 1</option></select>
               </div>
             </section>
             <section class="group" aria-labelledby="timing-heading">

@@ -42,6 +42,7 @@ public struct PlaybackDiagnostics: Sendable, Codable, Equatable {
 public struct PlaybackStatistics: Sendable, Codable, Equatable {
     public var decoderFamily: String?
     public var trackIndex: Int?
+    public var trackCount: Int?
     public var decoderSampleRate: Int
     public var outputSampleRate: Int
     public var decodedFrames: Int64
@@ -51,6 +52,7 @@ public struct PlaybackStatistics: Sendable, Codable, Equatable {
     public init(
         decoderFamily: String? = nil,
         trackIndex: Int? = nil,
+        trackCount: Int? = nil,
         decoderSampleRate: Int = 0,
         outputSampleRate: Int = 0,
         decodedFrames: Int64 = 0,
@@ -59,6 +61,7 @@ public struct PlaybackStatistics: Sendable, Codable, Equatable {
     ) {
         self.decoderFamily = decoderFamily
         self.trackIndex = trackIndex
+        self.trackCount = trackCount
         self.decoderSampleRate = decoderSampleRate
         self.outputSampleRate = outputSampleRate
         self.decodedFrames = decodedFrames
@@ -373,6 +376,7 @@ final class PlaybackSession: @unchecked Sendable {
         let statistics = PlaybackStatistics(
             decoderFamily: decoderFamily,
             trackIndex: isLoaded ? currentTrackIndex : nil,
+            trackCount: decoder?.trackCount,
             decoderSampleRate: decoder?.sampleRate ?? 0,
             outputSampleRate: diagnostics.sampleRate,
             decodedFrames: decodedFrames,

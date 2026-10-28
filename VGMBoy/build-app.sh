@@ -33,6 +33,14 @@ for candidate in "$SCRIPT_DIR/app-icon.png" "$SCRIPT_DIR/app-icon.jpg"; do
 done
 if [[ -n "$ICON_SOURCE" ]]; then
     sips -s format png "$ICON_SOURCE" --out "$APP_DIR/Contents/Resources/app-icon.png" >/dev/null
+    ICONSET_DIR="$BUILD_DIR/app-icon.iconset"
+    mkdir -p "$ICONSET_DIR"
+    for size in 16 32 128 256 512; do
+        sips -z "$size" "$size" "$ICON_SOURCE" --out "$ICONSET_DIR/icon_${size}x${size}.png" >/dev/null
+        doubled=$((size * 2))
+        sips -z "$doubled" "$doubled" "$ICON_SOURCE" --out "$ICONSET_DIR/icon_${size}x${size}@2x.png" >/dev/null
+    done
+    iconutil -c icns "$ICONSET_DIR" -o "$APP_DIR/Contents/Resources/app-icon.icns"
 fi
 codesign --force --sign - "$APP_DIR"
 
