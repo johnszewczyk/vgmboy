@@ -80,6 +80,14 @@ final class PlayerViewModel {
     }
 
     func addFiles(_ urls: [URL]) {
+        loadFiles(urls, replacingSession: false)
+    }
+
+    func replaceFiles(_ urls: [URL]) {
+        loadFiles(urls, replacingSession: true)
+    }
+
+    private func loadFiles(_ urls: [URL], replacingSession: Bool) {
         let materializer = ArchiveMaterializer()
         var incoming: [SessionFile] = []
         var listingError: String?
@@ -120,12 +128,17 @@ final class PlayerViewModel {
             return
         }
 
-        var seen = Set(sessionFiles)
+        var seen = replacingSession ? Set<SessionFile>() : Set(sessionFiles)
         let uniqueIncoming = incoming.filter { seen.insert($0).inserted }
-        let capacity = max(0, 2_000 - sessionFiles.count)
+        let capacity = max(0, 2_000 - (replacingSession ? 0 : sessionFiles.count))
         let additions = Array(uniqueIncoming.prefix(capacity))
-        sessionFiles.append(contentsOf: additions)
-        guard let first = additions.first ?? incoming.first(where: { sessionFiles.contains($0) }) else {
+        if replacingSession {
+            sessionFiles = additions
+        } else {
+            sessionFiles.append(contentsOf: additions)
+        }
+        let existingSelection = replacingSession ? nil : incoming.first(where: { sessionFiles.contains($0) })
+        guard let first = additions.first ?? existingSelection else {
             errorMessage = "This local session is full. Restart VGMBoy to clear it."
             return
         }

@@ -14,8 +14,8 @@ arbitrary JavaScript paths. State crosses through callAsyncJavaScript arguments.
 Local file drops are received by the WKWebView host as an AppKit drag destination
 so WebKit cannot swallow them before SwiftUI handles the drop. It accepts Finder
 file URLs and the legacy filenames pasteboard type, then routes local URLs through
-the same native session loader. The app registers the UAC document type for Finder
-and Dock open events.
+the native session loader, replacing the current local session. The app registers
+the UAC document type for Finder and Dock open events.
 Remove the script handler when the web view dismantles; retain no view cycle.
 
 PlayerViewModel owns the in-memory file session and translates controls into the

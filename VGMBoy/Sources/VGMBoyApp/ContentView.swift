@@ -73,7 +73,7 @@ private struct PlayerWebView: NSViewRepresentable {
             coordinator?.dropTargetChanged?(targeted)
         }
         view.onFileURLsDropped = { [weak coordinator = context.coordinator] urls in
-            coordinator?.model.addFiles(urls)
+            coordinator?.model.replaceFiles(urls)
         }
         context.coordinator.webView = view
         if let page = Bundle.module.url(forResource: "index", withExtension: "html", subdirectory: "Resources") {
