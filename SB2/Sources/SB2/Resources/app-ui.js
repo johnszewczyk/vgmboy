@@ -4202,7 +4202,13 @@ function renderPlaylist({ sort = true, persistTab = true } = {}) {
   // its tbody is empty, so reading it after replacement loses the user's row.
   const preservedScrollTop = Math.max(0, Number(refs.playlistBodyWrap?.scrollTop) || 0);
   if (persistTab && findActivePlaylistTab()) persistPlaylistTabs();
+  const previousVisibleColumnIDs = orderedColumns().map((column) => column.id);
   updateAutomaticColumnVisibility();
+  const visibleColumnIDs = orderedColumns().map((column) => column.id);
+  if (previousVisibleColumnIDs.length !== visibleColumnIDs.length
+      || previousVisibleColumnIDs.some((columnId, index) => columnId !== visibleColumnIDs[index])) {
+    renderPlaylistHeader();
+  }
   applyColumnMinimumWidths();
   playlistRenderGeneration += 1;
   const generation = playlistRenderGeneration;
