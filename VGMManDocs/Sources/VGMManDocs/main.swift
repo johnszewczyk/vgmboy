@@ -9,6 +9,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     private var directory: MarkdownDirectory?
     private var watcher: MarkdownDirectoryWatcher?
     private var pendingRefresh: DispatchWorkItem?
+    private var closeWindowMenuItem: NSMenuItem?
+    private var minimizeWindowMenuItem: NSMenuItem?
+    private var zoomWindowMenuItem: NSMenuItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -51,11 +54,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
 
         let fileMenuItem = NSMenuItem(title: "File", action: nil, keyEquivalent: "")
         let fileMenu = NSMenu(title: "File")
-        fileMenu.addItem(NSMenuItem(
+        let closeItem = NSMenuItem(
             title: "Close Window",
             action: #selector(NSWindow.performClose(_:)),
             keyEquivalent: "w"
-        ))
+        )
+        closeWindowMenuItem = closeItem
+        fileMenu.addItem(closeItem)
         fileMenuItem.submenu = fileMenu
         mainMenu.addItem(fileMenuItem)
 
@@ -75,17 +80,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
 
         let windowMenuItem = NSMenuItem(title: "Window", action: nil, keyEquivalent: "")
         let windowMenu = NSMenu(title: "Window")
-        windowMenu.addItem(NSMenuItem(
+        let minimizeItem = NSMenuItem(
             title: "Minimize",
             action: #selector(NSWindow.miniaturize(_:)),
             keyEquivalent: "m"
-        ))
+        )
+        minimizeWindowMenuItem = minimizeItem
+        windowMenu.addItem(minimizeItem)
         let zoomItem = NSMenuItem(
             title: "Zoom",
             action: #selector(NSWindow.zoom(_:)),
             keyEquivalent: "\r"
         )
         zoomItem.keyEquivalentModifierMask = [.command]
+        zoomWindowMenuItem = zoomItem
         windowMenu.addItem(zoomItem)
         windowMenuItem.submenu = windowMenu
         mainMenu.addItem(windowMenuItem)
@@ -148,6 +156,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
             backing: .buffered,
             defer: false
         )
+        closeWindowMenuItem?.target = window
+        minimizeWindowMenuItem?.target = window
+        zoomWindowMenuItem?.target = window
         window.title = "VGMManDocs"
         window.minSize = NSSize(width: 820, height: 560)
         window.appearance = NSAppearance(named: .darkAqua)
