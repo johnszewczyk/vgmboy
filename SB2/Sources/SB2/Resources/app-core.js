@@ -113,8 +113,6 @@ const state = {
   archiveCacheLimitBytes: DEFAULT_ARCHIVE_CACHE_LIMIT_BYTES,
   playbackSpeed: { ...playbackSpeed.DEFAULT },
   playbackSpeedEnabled: false,
-  libvgmPlaybackSpeed: { ...playbackSpeed.DEFAULT },
-  libvgmPlaybackSpeedEnabled: false,
   longPlayEnabled: false,
   repeatMode: "off",
   queuedSkipsEnabled: false,
@@ -285,10 +283,8 @@ const refs = {
   spcLengthInput: document.getElementById("spc-length-input"),
   spcUnknownDurationInput: document.getElementById("spc-unknown-duration-input"),
   spcFadeInput: document.getElementById("spc-fade-input"),
-  playbackSpeedInput: document.getElementById("libgme-playback-speed-input"),
-  playbackSpeedEnabledCheckbox: document.getElementById("libgme-playback-speed-enabled-checkbox"),
-  libvgmPlaybackSpeedInput: document.getElementById("libvgm-playback-speed-input"),
-  libvgmPlaybackSpeedEnabledCheckbox: document.getElementById("libvgm-playback-speed-enabled-checkbox"),
+  playbackSpeedInput: document.getElementById("playback-speed-input"),
+  playbackSpeedEnabledCheckbox: document.getElementById("playback-speed-enabled-checkbox"),
   equalizerEnabledCheckbox: document.getElementById("equalizer-enabled-checkbox"),
   equalizerResetButton: document.getElementById("equalizer-reset-button"),
   equalizerBandInputs: [...document.querySelectorAll("[data-equalizer-band]")],
@@ -352,8 +348,6 @@ async function loadSettings() {
     state.spcFadeSeconds = normalizeFadeTime(parsed.spcFadeSeconds);
     state.playbackSpeed = playbackSpeed.normalize(parsed.playbackSpeed);
     state.playbackSpeedEnabled = Boolean(parsed.playbackSpeedEnabled);
-    state.libvgmPlaybackSpeed = playbackSpeed.normalize(parsed.libvgmPlaybackSpeed);
-    state.libvgmPlaybackSpeedEnabled = Boolean(parsed.libvgmPlaybackSpeedEnabled);
     state.equalizerEnabled = Boolean(parsed.equalizerEnabled);
     state.equalizerBandGains = EQUALIZER_BAND_FREQUENCIES.map((_, index) => normalizeEqualizerGain(parsed.equalizerBandGains?.[index]));
     state.appVolume = normalizeAppVolume(parsed.appVolume);
@@ -459,8 +453,6 @@ function settingsSnapshot() {
     spcFadeSeconds: state.spcFadeSeconds,
     playbackSpeed: state.playbackSpeed,
     playbackSpeedEnabled: state.playbackSpeedEnabled,
-    libvgmPlaybackSpeed: state.libvgmPlaybackSpeed,
-    libvgmPlaybackSpeedEnabled: state.libvgmPlaybackSpeedEnabled,
     uiItemSpacingPx: state.uiItemSpacingPx,
     rootPath: null,
     localBrowserEnabled: false,

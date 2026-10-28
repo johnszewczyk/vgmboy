@@ -4447,8 +4447,6 @@ function renderAll() {
   refs.favoriteHistoricalSortCheckbox.checked = state.favoriteSortOrder === "historical";
   refs.playbackSpeedEnabledCheckbox.checked = state.playbackSpeedEnabled;
   if (document.activeElement !== refs.playbackSpeedInput) refs.playbackSpeedInput.value = uiApp.formatPlaybackSpeed(state.playbackSpeed);
-  refs.libvgmPlaybackSpeedEnabledCheckbox.checked = state.libvgmPlaybackSpeedEnabled;
-  if (document.activeElement !== refs.libvgmPlaybackSpeedInput) refs.libvgmPlaybackSpeedInput.value = uiApp.formatPlaybackSpeed(state.libvgmPlaybackSpeed);
   refs.longPlayButton.classList.toggle("is-selected", state.longPlayEnabled);
   refs.longPlayButton.setAttribute("aria-pressed", state.longPlayEnabled ? "true" : "false");
   refs.longPlayButton.title = state.longPlayEnabled ? "Long Play enabled" : "Long Play disabled";
@@ -4763,30 +4761,27 @@ function commitSpcFadeInput(rawValue) {
   });
 }
 
-function commitPlaybackSpeedInput(backendId, rawValue) {
-  const speedKey = backendId === "libvgm" ? "libvgmPlaybackSpeed" : "playbackSpeed";
-  const enabledKey = backendId === "libvgm" ? "libvgmPlaybackSpeedEnabled" : "playbackSpeedEnabled";
-  const input = backendId === "libvgm" ? refs.libvgmPlaybackSpeedInput : refs.playbackSpeedInput;
+function commitPlaybackSpeedInput(rawValue) {
+  const input = refs.playbackSpeedInput;
   const parsedSpeed = uiApp.parsePlaybackSpeed(rawValue);
   if (!parsedSpeed) {
-    input.value = uiApp.formatPlaybackSpeed(state[speedKey]);
+    input.value = uiApp.formatPlaybackSpeed(state.playbackSpeed);
     return;
   }
   input.value = uiApp.formatPlaybackSpeed(parsedSpeed);
-  if (parsedSpeed.numerator === state[speedKey].numerator && parsedSpeed.denominator === state[speedKey].denominator) {
+  if (parsedSpeed.numerator === state.playbackSpeed.numerator && parsedSpeed.denominator === state.playbackSpeed.denominator) {
     return;
   }
-  state[speedKey] = parsedSpeed;
+  state.playbackSpeed = parsedSpeed;
   persistSettings();
-  if (state[enabledKey]) uiApp.playback.refreshPlaybackForSpeedChange(backendId).catch((error) => console.error(error));
+  if (state.playbackSpeedEnabled) uiApp.playback.refreshPlaybackForSpeedChange().catch((error) => console.error(error));
   renderAll();
 }
 
-function setPlaybackSpeedEnabled(backendId, enabled) {
-  const enabledKey = backendId === "libvgm" ? "libvgmPlaybackSpeedEnabled" : "playbackSpeedEnabled";
-  state[enabledKey] = Boolean(enabled);
+function setPlaybackSpeedEnabled(enabled) {
+  state.playbackSpeedEnabled = Boolean(enabled);
   persistSettings();
-  uiApp.playback.refreshPlaybackForSpeedChange(backendId).catch((error) => console.error(error));
+  uiApp.playback.refreshPlaybackForSpeedChange().catch((error) => console.error(error));
   renderAll();
 }
 
