@@ -48,6 +48,8 @@ scanner-specific decoding remains necessary.
 - Decoder/dependency matrix and exact pins:
   [plugin-catalog.md](../../VGMManDocs/Docs/md/VGMBoy/plugin-catalog.md) and
   `../Docs/plugin-versions.json`.
+- Decoder update checks and fixture evidence:
+  [plugin-updates.md](verification/plugin-updates.md).
 
 ## Local Rules
 

@@ -24,9 +24,10 @@ inputs under `VGMBoy/patches/`.
 
 All listed source is stored as regular files in this repository. The recorded upstream commit
 identifies the source base where available; the SHA-256 covers the exact checked-in directory.
-Compatibility patches are separately versioned under `VGMBoy/patches/` and applied to disposable
-build copies where required. Missing upstream revisions remain explicitly marked rather than
-being inferred from a local snapshot hash.
+Compatibility patches are separately versioned under `VGMBoy/patches/`.
+The vgmstream patch is present in its checked-in source; the AOSDK QSF patch
+is applied to a disposable staging copy. Missing upstream revisions remain
+explicitly marked rather than being inferred from a local snapshot hash.
 
 For the `vgmstream` digest, sort tracked paths relative to `vendor/vgmstream/`,
 write each as `<file SHA-256><two spaces><relative path><newline>`, and SHA-256

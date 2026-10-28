@@ -7,7 +7,11 @@ this page records what each input does at the VGMBoy and ScanSong boundaries.
 It describes the current implementation, not a claim that every file in a
 format family is playable.
 
-Last reviewed: **2026-09-17**
+Last full milestone review recorded in the manifest: **2026-09-17**. Individual
+decoder updates and their verification may be newer; see the
+[decoder update evidence](../../../../VGMBoy/ai/verification/plugin-updates.md).
+Homebrew versions describe the reviewed development environment and are not
+repository-enforced package locks.
 
 ## Decoder matrix
 
@@ -34,8 +38,9 @@ Last reviewed: **2026-09-17**
 Upstream revisions and SHA-256 digests for the flattened source snapshots are
 recorded in [`vendor/PROVENANCE.md`](../../../../VGMBoy/vendor/PROVENANCE.md). These are ordinary
 files in the family repository, not active Git submodules. Compatibility
-patches are tracked in `patches/` and applied only at the disposable build
-boundary where required.
+patches are tracked in `patches/`. Application depends on the builder: the
+vgmstream source includes its FFmpeg patch, while the AOSDK QSF patch is
+applied to a disposable staging copy.
 
 ## Plugin boundaries
 

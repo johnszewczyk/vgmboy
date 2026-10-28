@@ -153,6 +153,10 @@ returns a failure when an update or missing source needs review. A reported
 milestone is not adopted automatically: update the pin, rebuild the affected
 core and scanner plugin, then run the format-specific regression and playback
 checks before changing the manifest's `lastReviewed` date.
+The Homebrew entries record the reviewed development environment, not a
+repository-enforced package lock. The latest decoder update's test fixtures
+and remaining evidence gaps are in
+[`ai/verification/plugin-updates.md`](ai/verification/plugin-updates.md).
 
 ## Project boundaries
 
