@@ -4453,6 +4453,11 @@ function renderAll() {
   refs.longPlayButton.setAttribute("aria-label", refs.longPlayButton.title);
   const repeatTitles = { off: "Repeat off", all: "Repeat all", one: "Repeat one" };
   refs.repeatButton.dataset.repeatMode = state.repeatMode;
+  const playbackSpeedTitle = `Playback speed ${uiApp.formatPlaybackSpeed(state.playbackSpeed)}× ${state.playbackSpeedEnabled ? "enabled" : "disabled"}`;
+  refs.playbackSpeedButton.classList.toggle("is-selected", state.playbackSpeedEnabled);
+  refs.playbackSpeedButton.setAttribute("aria-pressed", state.playbackSpeedEnabled ? "true" : "false");
+  refs.playbackSpeedButton.title = playbackSpeedTitle;
+  refs.playbackSpeedButton.setAttribute("aria-label", playbackSpeedTitle);
   refs.repeatButton.classList.toggle("is-selected", state.repeatMode !== "off");
   refs.repeatButton.setAttribute("aria-pressed", state.repeatMode === "off" ? "false" : "true");
   refs.repeatButton.title = repeatTitles[state.repeatMode];

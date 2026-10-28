@@ -69,6 +69,10 @@ refs.longPlayButton.addEventListener("click", () => {
   app.ui.setSpcForceManualTime(!state.longPlayEnabled);
 });
 
+refs.playbackSpeedButton.addEventListener("click", () => {
+  app.ui.setPlaybackSpeedEnabled(!state.playbackSpeedEnabled);
+});
+
 refs.repeatButton.addEventListener("click", () => {
   app.ui.cycleRepeatMode();
 });

@@ -327,6 +327,7 @@ const refs = {
   optionsToolbarButton: document.getElementById("options-toolbar-button"),
   sb2ConsoleLabel: document.getElementById("sb2-console-label"),
   sb2AlbumLabel: document.getElementById("sb2-album-label"),
+  playbackSpeedButton: document.getElementById("playback-speed-button"),
   sb2CPUValue: document.getElementById("sb2-cpu-value"),
   sb2CPUFill: document.getElementById("sb2-cpu-fill"),
   playbackErrorToast: document.getElementById("playback-error-toast")
