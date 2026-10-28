@@ -152,19 +152,12 @@ refs.spcFadeInput.addEventListener("blur", (event) => {
 refs.playbackSpeedInput.addEventListener("keydown", (event) => {
   if (event.key !== "Enter") return;
   event.preventDefault();
-  app.ui.commitPlaybackSpeedInput("libgme", event.currentTarget.value);
+  app.ui.commitPlaybackSpeedInput(event.currentTarget.value);
 });
 
 refs.playbackSpeedEnabledCheckbox.addEventListener("change", (event) => {
-  app.ui.setPlaybackSpeedEnabled("libgme", event.target.checked);
+  app.ui.setPlaybackSpeedEnabled(event.target.checked);
 });
-
-refs.libvgmPlaybackSpeedInput.addEventListener("keydown", (event) => {
-  if (event.key !== "Enter") return;
-  event.preventDefault();
-  app.ui.commitPlaybackSpeedInput("libvgm", event.currentTarget.value);
-});
-refs.libvgmPlaybackSpeedEnabledCheckbox.addEventListener("change", (event) => app.ui.setPlaybackSpeedEnabled("libvgm", event.target.checked));
 
 refs.equalizerEnabledCheckbox.addEventListener("change", (event) => {
   app.ui.setEqualizerEnabled(event.target.checked);

@@ -48,6 +48,7 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
     var spcFadeSeconds: Int?
     var playbackSpeed: PlaybackRate?
     var playbackSpeedEnabled: Bool?
+    // Decoded once for migration from the old backend-specific SB2 controls.
     var libvgmPlaybackSpeed: PlaybackRate?
     var libvgmPlaybackSpeedEnabled: Bool?
     var uiItemSpacingRem: Double? // Legacy decode only.
@@ -229,6 +230,23 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
             )
         }
 
+        let libgmeTempo = tempo(playbackSpeed)
+        let libvgmTempo = tempo(libvgmPlaybackSpeed)
+        let libgmeEnabled = playbackSpeedEnabled ?? false
+        let libvgmEnabled = libvgmPlaybackSpeedEnabled ?? false
+        let globalTempo: PlaybackTempo
+        if libgmeEnabled != libvgmEnabled {
+            globalTempo = libgmeEnabled ? libgmeTempo : libvgmTempo
+        } else if !libgmeEnabled, libgmeTempo == .defaultValue, libvgmTempo != .defaultValue {
+            // Keep a customized legacy value when neither backend was enabled.
+            globalTempo = libvgmTempo
+        } else {
+            // If both legacy controls were enabled with different rates, use
+            // the former primary (libgme) value as the deterministic migration.
+            globalTempo = libgmeTempo
+        }
+        let globalTempoEnabled = libgmeEnabled || libvgmEnabled
+
         let shared = PlaybackPreferences(
             timing: PlaybackTimingPreferences(
                 longPlaySeconds: manualPlayTimeSeconds ?? PlaybackTimingPreferences.defaultLongPlaySeconds,
@@ -240,10 +258,10 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
             equalizerBandGains: equalizerBandGains?.map(Float.init) ?? [],
             outputVolume: Float(appVolume ?? 1),
             monoEnabled: monoEnabled ?? false,
-            libgmeTempo: tempo(playbackSpeed),
-            libgmeTempoEnabled: playbackSpeedEnabled ?? false,
-            libvgmTempo: tempo(libvgmPlaybackSpeed),
-            libvgmTempoEnabled: libvgmPlaybackSpeedEnabled ?? false
+            libgmeTempo: globalTempo,
+            libgmeTempoEnabled: globalTempoEnabled,
+            libvgmTempo: globalTempo,
+            libvgmTempoEnabled: globalTempoEnabled
         )
         manualPlayTimeSeconds = shared.timing.longPlaySeconds
         unknownDurationSeconds = shared.timing.unknownDurationSeconds
@@ -253,16 +271,10 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
         equalizerBandGains = shared.equalizer.gainsDecibels.map(Double.init)
         appVolume = Double(shared.outputVolume)
         monoEnabled = shared.monoEnabled
-        playbackSpeed = PlaybackRate(
-            numerator: shared.libgmeTempo.numerator,
-            denominator: shared.libgmeTempo.denominator
-        )
-        playbackSpeedEnabled = shared.libgmeTempoEnabled
-        libvgmPlaybackSpeed = PlaybackRate(
-            numerator: shared.libvgmTempo.numerator,
-            denominator: shared.libvgmTempo.denominator
-        )
-        libvgmPlaybackSpeedEnabled = shared.libvgmTempoEnabled
+        playbackSpeed = PlaybackRate(numerator: globalTempo.numerator, denominator: globalTempo.denominator)
+        playbackSpeedEnabled = globalTempoEnabled
+        libvgmPlaybackSpeed = nil
+        libvgmPlaybackSpeedEnabled = nil
     }
 
     private mutating func normalizePlaylistColumnPreferences() {

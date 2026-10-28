@@ -194,9 +194,8 @@ function playbackSpeedForTrack(track) {
   const supportsNativeTempo = backend?.playbackSpeedExtensions?.some(
     (candidate) => playbackBackends.normalizeExtension(candidate) === extension
   );
-  if (backend?.playbackSpeedMode === "native-tempo" && supportsNativeTempo) {
-    if (backend.id === "libgme" && state.playbackSpeedEnabled) return state.playbackSpeed;
-    if (backend.id === "libvgm" && state.libvgmPlaybackSpeedEnabled) return state.libvgmPlaybackSpeed;
+  if (backend?.playbackSpeedMode === "native-tempo" && supportsNativeTempo && state.playbackSpeedEnabled) {
+    return state.playbackSpeed;
   }
   return { numerator: 1, denominator: 1 };
 }
@@ -1252,10 +1251,9 @@ async function refreshPlaybackForTimingChange() {
   updatePlaybackReadout();
 }
 
-async function refreshPlaybackForSpeedChange(backendId) {
+async function refreshPlaybackForSpeedChange() {
   const track = currentTrack();
-  const activeBackend = playbackBackends.forPath(track?.archiveEntry || track?.path)?.id;
-  if (activeBackend !== backendId || !track || state.currentTrackId !== track.id) return;
+  if (!track || state.currentTrackId !== track.id) return;
   await refreshPlaybackForTimingChange();
 }
 

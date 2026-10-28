@@ -25,8 +25,9 @@
   and inset as the home toolbars, playlist tabs, and column headers.
 - Playback volume uses twenty 5% steps in Options and in the compact Volume
   popup on the home toolbar. The home popup stays behind the Options layer.
-- Playback speed fields commit only when Enter is pressed, snap rates to 1/64
-  increments, display fractions through denominator 64, and use a compact
+- One playback speed setting applies to every format whose decoder supports
+  native tempo. Its value commits only when Enter is pressed, snaps to 1/64
+  increments, displays fractions through denominator 64, and uses a compact
   eight-character field.
 - Option pages use a readable system font and a 65-character content width.
   Section headings are underlined; setting rows use whitespace without
