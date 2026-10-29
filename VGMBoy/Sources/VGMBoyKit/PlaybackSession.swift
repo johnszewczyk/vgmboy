@@ -202,6 +202,9 @@ final class PlaybackSession: @unchecked Sendable {
 
             let metadata = try decoder.metadata(for: trackIndex)
             let validLoop = loop.flatMap { $0.isValid ? $0 : nil }
+            if let validLoop, loopOutputBounds(validLoop, tempo: effectiveTempo) == nil {
+                throw PlaybackControlError.invalidPayload("Playback loop boundaries are outside the supported frame range.")
+            }
             longPlayRepeatsVGMAtEnd = plan.isLongPlay && family.id == FormatRegistry.libvgmFamily.id && validLoop == nil
             longPlayVGMTrackFrames = longPlayRepeatsVGMAtEnd && metadata.naturalPlayMs > 0
                 ? Int64((Double(metadata.naturalPlayMs) * Double(sampleRate) / 1_000 / effectiveTempo).rounded())
@@ -307,6 +310,9 @@ final class PlaybackSession: @unchecked Sendable {
 
     public func seek(to seconds: Double) throws {
         try queue.sync {
+            guard seconds.isFinite, seconds >= 0, seconds <= Double(Int32.max) / 1_000 else {
+                throw PlaybackControlError.invalidPayload("Seek is outside the supported millisecond range.")
+            }
             guard let decoder else { return }
             let wasPlaying = output.isRunning
             if wasPlaying { output.pause() }
@@ -626,10 +632,17 @@ final class PlaybackSession: @unchecked Sendable {
         return try decoder.readFrames(min(requested, Int(min(Int64(requested), available))))
     }
 
-    private func loopOutputBounds(_ loop: PlaybackLoopMetadata) -> (start: Int64, end: Int64)? {
-        let scale = Double(sampleRate) / Double(loop.sampleRateHz) / currentTempo
-        let start = Int64((Double(loop.startSample) * scale).rounded())
-        let end = Int64((Double(loop.endSample) * scale).rounded())
+    private func loopOutputBounds(_ loop: PlaybackLoopMetadata, tempo: Double? = nil) -> (start: Int64, end: Int64)? {
+        let scale = Double(sampleRate) / Double(loop.sampleRateHz) / (tempo ?? currentTempo)
+        let scaledStart = (Double(loop.startSample) * scale).rounded()
+        let scaledEnd = (Double(loop.endSample) * scale).rounded()
+        // Native decoders use signed 32-bit millisecond seeks; reject loop
+        // endpoints beyond that range before any floating-point integer cast.
+        let maximumFrames = Double(Int32.max) * Double(sampleRate) / 1_000
+        guard scaledStart.isFinite, scaledEnd.isFinite, scaledStart >= 0,
+              scaledEnd <= maximumFrames, scaledEnd > scaledStart else { return nil }
+        let start = Int64(scaledStart)
+        let end = Int64(scaledEnd)
         return end > start ? (start, end) : nil
     }
 
