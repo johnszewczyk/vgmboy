@@ -79,9 +79,23 @@ members, use structural **format** `"USF Library"` with `role = "asset"`.
   AudioMan final-sort procedure. Do not put those production labels in UAC
   `Status`; that field is reserved for `Mixed Versions`, `Incomplete`, and
   `Corrupt` issues defined by the base profile.
-- **Region and library names** — Do not infer ROM region or `Source ROM` from
-  the `USA`/`JPN` substrings in a `.usflib` filename. Resolve territory and ROM
-  identity through the source and No-Intro review evidence.
+- **Region and library names** — A `.usflib` serial such as
+  `NUS-NTEA-USA.usflib` is a territory and serial clue, not a ROM revision
+  claim. Use it with the full No-Intro candidate set; if all contained library
+  serials agree and the matching DAT object corroborates the serial, it can
+  support territory. Otherwise keep `Region=--`.
+- **Shared multi-market ROMs** — A combined value such as `JP, US` is valid
+  only when one exact DAT entry names both markets and contains one ROM object.
+  If libraries are present, their serials must agree on one territory within
+  the combined set and match the DAT serial. Separate DAT rows or ROM objects
+  for Japan and USA must not be combined into one Region value, and a
+  shared-market DAT entry must not be narrowed to the territory suffix on its
+  library filename. In the current N64 BigEndian snapshot, 1080 Snowboarding
+  DAT `0007` is one Japan/USA ROM object with serial `NTEA`; DAT `0006`
+  (Europe) and `1136` (USA LodgeNet) are distinct ROM objects. The matching
+  `NUS-NTEA-USA.usflib` supports retaining `Region=JP, US` for the DAT `0007`
+  source, without claiming that it matches a particular ROM revision beyond
+  that DAT entry.
 - **Format boundaries** — A USF UAC contains USF/miniusf playable members and
   their `.usflib` assets. Other playable formats such as `.mid` or `.wav` need
   their own reviewed format disposition; they must not be silently mixed into
