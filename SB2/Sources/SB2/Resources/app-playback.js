@@ -181,6 +181,14 @@ function requestedPlaybackSpeed() {
   return state.playbackSpeedEnabled ? state.playbackSpeed : { numerator: 1, denominator: 1 };
 }
 
+function currentNativeGeneration() {
+  const generation = Number(state.nativePlayback?.generation);
+  if (!Number.isSafeInteger(generation) || generation <= 0) {
+    throw new Error("Playback session identity is unavailable; retry the control.");
+  }
+  return generation;
+}
+
 function fallbackPlaybackSpeedForTrack(track) {
   const sourceName = track?.archiveEntry || track?.sourceFilename || track?.path || "";
   const backend = playbackBackends.forPath(sourceName);
@@ -1139,10 +1147,11 @@ async function togglePlayback() {
       clearQueuedSkipTimer();
     }
     const generation = ++playbackGeneration;
+    const expectedGeneration = currentNativeGeneration();
     try {
       await fadeActiveOutput(TRANSPORT_DECLICK_MS);
       if (generation !== playbackGeneration) return;
-      const snapshot = await window.spcBoySB2.nativePlaybackPause();
+      const snapshot = await window.spcBoySB2.nativePlaybackPause({ expectedGeneration });
       if (generation !== playbackGeneration) return;
       await setPlaybackPowerSaveBlocker(false);
       if (generation !== playbackGeneration) return;
@@ -1163,10 +1172,11 @@ async function togglePlayback() {
 
   if (nativePlaybackInitialized && state.nativePlayback.trackLoaded) {
     const generation = ++playbackGeneration;
+    const expectedGeneration = currentNativeGeneration();
     try {
       await setPlaybackPowerSaveBlocker(true);
       if (generation !== playbackGeneration) return;
-      const snapshot = await window.spcBoySB2.nativePlaybackResume();
+      const snapshot = await window.spcBoySB2.nativePlaybackResume({ expectedGeneration });
       if (generation !== playbackGeneration) {
         return;
       }
@@ -1198,11 +1208,12 @@ async function restartAt(seconds) {
   if (state.currentTrackId === track.id) {
     if (nativePlaybackInitialized && state.nativePlayback.trackLoaded) {
       const generation = ++playbackGeneration;
+      const expectedGeneration = currentNativeGeneration();
       const requestedMilliseconds = Math.round(state.elapsedSeconds * 1000);
       await cancelQueuedSkip({ restoreOutput: true });
       if (generation !== playbackGeneration) return;
       try {
-        const snapshot = await window.spcBoySB2.nativePlaybackSeek({ positionMilliseconds: requestedMilliseconds });
+        const snapshot = await window.spcBoySB2.nativePlaybackSeek({ positionMilliseconds: requestedMilliseconds, expectedGeneration });
         if (generation !== playbackGeneration) {
           return;
         }

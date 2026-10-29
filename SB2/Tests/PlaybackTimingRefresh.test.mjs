@@ -105,6 +105,38 @@ test('fade and restore commands retain the originating native generation', async
   assert.deepEqual(requests.map(request => request.expectedGeneration), [42, 42]);
 });
 
+test('pause, resume and seek carry their observed native session', async () => {
+  const identityStart = source.indexOf('function currentNativeGeneration()');
+  const identityEnd = source.indexOf('\nfunction fallbackPlaybackSpeedForTrack(', identityStart);
+  const start = source.indexOf('async function togglePlayback()');
+  const end = source.indexOf('\nasync function refreshPlaybackForTimingChange()', start);
+  assert.ok(identityStart >= 0 && identityEnd > identityStart && start >= 0 && end > start);
+  const requests = [];
+  const window = { spcBoySB2: {
+    nativePlaybackPause: async value => { requests.push(['pause', value]); return {}; },
+    nativePlaybackResume: async value => { requests.push(['resume', value]); return {}; },
+    nativePlaybackSeek: async value => { requests.push(['seek', value]); return {}; }
+  } };
+  const state = { currentTrackId: 'one', isPlaying: true, elapsedSeconds: 0, totalSeconds: 10,
+    nativePlayback: { generation: 42, trackLoaded: true, transportState: 'playing' } };
+  const run = new Function('state', 'window', `
+    let playbackGeneration = 0, queuedSkipRequest = null, nativePlaybackInitialized = true;
+    const TRANSPORT_DECLICK_MS = 10, activeTrackInfo = () => ({ id: 'one' });
+    const fadeActiveOutput = async () => {}, clearQueuedSkipTimer = () => {};
+    const setPlaybackPowerSaveBlocker = async () => {}, cancelQueuedSkip = async () => {};
+    const applyNativePlaybackSnapshot = () => {}, updatePlaybackReadout = () => {}, updateNativeDiagnostics = () => {};
+    ${source.slice(identityStart, identityEnd)}
+    ${source.slice(start, end)}
+    return { togglePlayback, restartAt };
+  `)(state, window);
+  await run.togglePlayback();
+  state.isPlaying = false; state.nativePlayback.transportState = 'paused';
+  await run.togglePlayback();
+  await run.restartAt(2);
+  assert.deepEqual(requests.map(([name, value]) => [name, value.expectedGeneration]),
+    [['pause', 42], ['resume', 42], ['seek', 42]]);
+});
+
 const resolveStart = source.indexOf('async function resolveTimingPlan(');
 const resolveEnd = source.indexOf('\nfunction matchesCurrentPlaybackSettings(', resolveStart);
 assert.ok(resolveStart >= 0 && resolveEnd > resolveStart);

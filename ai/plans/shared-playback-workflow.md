@@ -9,6 +9,16 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Session-scoped controls, 2026-10-29: SB2 now forwards its observed native
+  generation for pause, resume and seek, and shared transport rejects delayed
+  controls for a replaced session on its serialized queue. Existing callers may
+  omit the guard. Native coverage checks stale requests and valid controls;
+  renderer coverage checks identity forwarding. All 49 transport and 21 SB2
+  playback renderer checks passed and SB2 built. The rebuilt isolated bundle
+  paused and resumed a 30-second WAV and its displayed clock advanced from
+  0:04 to 0:12. This does not force the race through a live WebKit worker,
+  exercise packaged seek, or prove audible continuity.
+
 - SB2 lifecycle request ordering, 2026-10-29: SB2's detached workers previously
   reserved start ownership after dispatch, allowing worker scheduling to invert
   message order. Start, stop, unload and cache-clear now reserve at message

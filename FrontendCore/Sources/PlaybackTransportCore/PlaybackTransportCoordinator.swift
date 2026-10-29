@@ -510,6 +510,24 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         }
     }
 
+    public func performSessionControlSync(
+        _ command: PlaybackControlCommand,
+        payload: PlaybackControlPayload = .init(),
+        expectedGeneration: Int? = nil
+    ) throws -> PlaybackTransportStatus {
+        guard command == .play || command == .pause || command == .seek else {
+            throw PlaybackControlError.invalidPayload("Unsupported session control command.")
+        }
+        return try queue.sync {
+            if let expectedGeneration, expectedGeneration != currentPlaybackGeneration {
+                throw CancellationError()
+            }
+            let event = performLocked(.init(command: command, payload: payload))
+            try requireSuccess(event)
+            return status(event.status)
+        }
+    }
+
     public func stop() async {
         await run {
             self.retirePlaybackLocked()
