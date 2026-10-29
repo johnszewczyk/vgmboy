@@ -76,7 +76,8 @@ startup contracts shared by the VGMMan player frontends.
   and reloads with timing and tempo together, retaining track and source identity.
 - Timing previews use the decoder family's effective rate rather than the
   stored requested preference. Native status and preview calculations must
-  agree when a backend clamps or rounds a requested rate.
+  agree when a backend clamps or rounds a requested rate. Preview durations
+  are already output-time values; consumers must not apply tempo scaling again.
 - `PlaybackTransportAudioConfigurationRequest` is the complete output snapshot
   for volume, EQ, and mono. `PlaybackTransportCoordinator.configureAudio(_:)`
   normalizes and serializes all three control commands; presentation adapters
