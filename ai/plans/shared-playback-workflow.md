@@ -6,6 +6,18 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- ViewBoy stale end-status pass, 2026-10-29: a delayed end for the same
+  generation could fail the renderer's status-sequence check but still retire
+  the current track and advance the queue. A focused renderer test reproduced
+  the unwanted retirement with sequence 11 after sequence 12. The completion
+  handler now requires an accepted, ended status before retirement; all six
+  focused completion-race checks pass. Family verification's ViewBoy test glob
+  now selects `.test.mjs` files. The full renderer run passed 15 of 16 tests;
+  the existing framebuffer-default assertion and missing tab-reducer mock still
+  fail. A rebuilt isolated package played two short WAVs, advanced to the second
+  and stopped, recording both in temporary history. The stale-event race itself
+  was tested in the renderer harness; audible behavior remains unverified.
+
 - CocoaSpice replacement ownership pass, 2026-10-29: a stale start could call
   the adapter's unconditional stop before the coordinator rejected its request,
   retiring a newer track. The shared coordinator now checks request ownership
