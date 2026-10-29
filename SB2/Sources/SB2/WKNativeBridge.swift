@@ -448,6 +448,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             // reorder work. The native counter outlives a recreated WebView.
             settings["settingsRevision"] = WKPlaybackBridge.shared.reserveSettingsRevision()
             detachedArguments[0] = settings
+        } else if method == "nativePlaybackSeek",
+                  var seek = args.first as? [String: Any],
+                  seek["expectedGeneration"] is Int {
+            seek["seekRevision"] = WKPlaybackBridge.shared.reserveSeekRevision()
+            detachedArguments[0] = seek
         }
         let requestArgumentsJSON = Self.json(detachedArguments)
         let requestCatalogURL = catalogURL

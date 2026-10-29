@@ -9,6 +9,14 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Ordered seeks, 2026-10-29: session identity alone did not order two seeks
+  for the same loaded track. SB2 now reserves a transport-owned seek revision
+  at message receipt; shared transport rejects an older numbered seek even if
+  its worker arrives later. A native integration check exercises reversed order,
+  subsequent newer seeks and legacy wire decoding. All 50 transport and 21 SB2
+  playback renderer checks passed and SB2 built. This does not force the worker
+  race in a packaged WebView.
+
 - Failure and retry boundary, 2026-10-29: the existing shared integration
   check verifies that archive preparation failure preserves the prior session,
   while a failed replacement after decoder retirement clears the session and a

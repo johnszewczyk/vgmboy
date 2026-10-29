@@ -144,10 +144,12 @@ public struct PlaybackTransportAACExportCancellationResponse: Codable, Equatable
 public struct PlaybackTransportSeekRequest: Codable, Equatable, Sendable {
     public let positionMilliseconds: Int
     public let expectedGeneration: Int?
+    public let seekRevision: Int?
 
-    public init(positionMilliseconds: Int, expectedGeneration: Int? = nil) {
+    public init(positionMilliseconds: Int, expectedGeneration: Int? = nil, seekRevision: Int? = nil) {
         self.positionMilliseconds = max(0, positionMilliseconds)
         self.expectedGeneration = expectedGeneration
+        self.seekRevision = seekRevision
     }
 
     public var payload: PlaybackControlPayload {
