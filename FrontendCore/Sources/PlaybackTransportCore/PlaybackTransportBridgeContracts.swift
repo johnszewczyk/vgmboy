@@ -212,6 +212,15 @@ public struct PlaybackTimingPreviewRequest: Codable, Equatable, Sendable {
     /// Resolves the shared timing policy and scales the visible pre-fade
     /// duration for native tempo without changing the decoder's policy.
     public func preview() throws -> PlaybackTimingPreview {
+        // Native timing is bounded to signed 32-bit milliseconds. Validate
+        // decoded bridge values too: synthesized Decodable bypasses init.
+        let maximum = Int(Int32.max)
+        guard (0...maximum).contains(playMilliseconds),
+              (0...maximum).contains(manualPlayMilliseconds),
+              (0...maximum).contains(fadeMilliseconds),
+              (1...maximum).contains(unknownDurationMilliseconds) else {
+            throw PlaybackControlError.invalidPayload("Playback timing is outside the supported range.")
+        }
         guard let family = FormatRegistry.family(for: sourcePath) else {
             throw PlaybackControlError.invalidPayload("Playback timing requires a supported file path.")
         }

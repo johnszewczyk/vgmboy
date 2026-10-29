@@ -9,6 +9,12 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Shared preview bounds, 2026-10-29: timing preview now rejects negative or
+  larger-than-native input durations before scaling. This prevents an oversized
+  bridge request from trapping during integer conversion; tests cover an
+  oversized Swift request, a negative decoded request and a supported boundary
+  at slow tempo.
+
 - Precise shared timing preview, 2026-10-29: the shared bridge previously
   rounded timing to whole seconds before SB2 used it, despite millisecond
   playback support. It now supplies output-time millisecond fields alongside

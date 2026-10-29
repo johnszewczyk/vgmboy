@@ -40,6 +40,25 @@ func statusPayloadKeepsReplyAndEventFieldsIdentical() throws {
 }
 
 @Test
+func timingPreviewRejectsOutOfRangeValuesBeforeScaling() throws {
+    let oversized = PlaybackTimingPreviewRequest(
+        sourcePath: "/music/track.spc", playMilliseconds: Int.max,
+        tempo: .init(numerator: 1, denominator: 32)
+    )
+    #expect(throws: (any Error).self) { try oversized.preview() }
+
+    let json = #"{"path":"/music/track.spc","playMilliseconds":-1,"manualPlayMilliseconds":1000,"fadeMilliseconds":0,"unknownDurationMilliseconds":1000,"tempo":{"numerator":1,"denominator":1},"longPlayEnabled":false}"#
+    let decoded = try JSONDecoder().decode(PlaybackTimingPreviewRequest.self, from: Data(json.utf8))
+    #expect(throws: (any Error).self) { try decoded.preview() }
+
+    let boundary = try PlaybackTimingPreviewRequest(
+        sourcePath: "/music/track.spc", playMilliseconds: Int(Int32.max), fadeMilliseconds: 0,
+        tempo: .init(numerator: 1, denominator: 32)
+    ).preview()
+    #expect(boundary.preFadeMilliseconds > Int(Int32.max))
+}
+
+@Test
 func statusPayloadCanRepresentDrainedNaturalEnd() {
     let status = PlaybackTransportStatus(
         currentTrackID: "track-a",
