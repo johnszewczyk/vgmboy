@@ -9,6 +9,18 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Packaged SB2 queue progression, 2026-10-29: the isolated bundle based on
+  `0c8d54fa` plus the stopped-timing fix used two generated three-second WAVs
+  and the isolated schema-24 catalog. With repeat off, playback history recorded
+  `one.wav` then `two.wav` once each and the UI returned to stopped. Repeat All
+  wrapped from the second track to the first, Repeat One restarted the first,
+  and manual Next/Previous produced the expected adjacent history entries.
+  WAV SHA-256 values: one
+  `125a2fc533ad0d91e0b443897a61b93d0d087f39bbb3ea0662d085cdac1aeece`, two
+  `fc2e69c7ade6def80e3015ed033b58628fca0c44f59b88ff7ca7c67fb7202fe7`.
+  This verifies the exercised UI and history path, not audible quality,
+  shuffle, failed-source recovery, or other formats.
+
 - Packaged SB2 timing and stop, 2026-10-29: an isolated bundle based on
   `0c8d54fa` with isolated user data and a small schema-24 test catalog played
   the SPC fixture (SHA-256
