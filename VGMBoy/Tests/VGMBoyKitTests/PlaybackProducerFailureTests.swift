@@ -99,3 +99,34 @@ private let fixturePlan = PlaybackPlan(preFadeMilliseconds: 5_000, fadeMilliseco
         #expect(session.status().statistics.decoderFamily == nil)
     }
 }
+
+@Test func unrepresentableLoopBoundsFailWithoutTrappingOrLeaking() throws {
+    for loop in [
+        PlaybackLoopMetadata(startSample: 1, endSample: Int64.max, sampleRateHz: 1),
+        PlaybackLoopMetadata(startSample: 1, endSample: Int64.max, sampleRateHz: 44_100),
+        PlaybackLoopMetadata(startSample: 1, endSample: Int64.max / 2, sampleRateHz: 44_100)
+    ] {
+        let decoder = ScriptedProducerDecoder()
+        let session = makeSession(decoder)
+        #expect(throws: (any Error).self) {
+            try session.load(path: "/fixture.spc", trackIndex: 0, plan: fixturePlan, tempo: 1, loop: loop)
+        }
+        #expect(decoder.closed)
+        #expect(session.status().statistics.decoderFamily == nil)
+    }
+}
+
+@Test func invalidSeekDoesNotAlterTheLoadedSession() throws {
+    let decoder = ScriptedProducerDecoder()
+    let session = makeSession(decoder)
+    defer { session.stop() }
+    _ = try session.load(path: "/fixture.spc", trackIndex: 0, plan: fixturePlan, tempo: 1)
+    let before = session.status()
+    for seconds in [Double.infinity, Double.nan, -1, Double(Int32.max) / 1_000 + 1] {
+        #expect(throws: (any Error).self) { try session.seek(to: seconds) }
+    }
+    let after = session.status()
+    #expect(after.diagnostics.generation == before.diagnostics.generation)
+    #expect(after.diagnostics.bufferedFrames == before.diagnostics.bufferedFrames)
+    #expect(!decoder.closed)
+}

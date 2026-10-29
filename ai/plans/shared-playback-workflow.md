@@ -9,6 +9,14 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Loop and seek bounds, 2026-10-29: extreme valid-looking loop metadata could
+  trap while converting to output frames, and extreme direct seeks could
+  overflow decoder conversions. Session load now rejects loop boundaries that
+  exceed native seek range or collapse below an output frame, and seek rejects
+  nonfinite, negative and out-of-range positions before changing playback.
+  Injected checks verify cleanup and unchanged buffered state; existing authored
+  loop/tempo and transport tests exercise ordinary behavior.
+
 - Loop-tag file access, 2026-10-29: the shared reader opened every source
   before checking whether it supported that format. It now opens only FLAC and
   APE for tag inspection, leaving other decoders to perform their own reads.

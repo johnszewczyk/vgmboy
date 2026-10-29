@@ -43,6 +43,9 @@ same typed endpoint operations.
   member before calling `load`.
 - Embedded loop-tag inspection reads files only for FLAC and APE, the formats it
   parses. Invalid or overflowing derived loop boundaries are ignored.
+- Seek positions and scaled loop boundaries must fit the native signed 32-bit
+  millisecond range. Reject unrepresentable requests before pausing or seeking;
+  a loop that collapses below one output frame is also rejected at load.
 - `PlaybackStatus.statistics` is the shared diagnostic payload for decoder family, decoder/output
   rates, decoded frames, audible position frames, and tempo. It deliberately excludes title,
   filename, and other frontend “now playing” presentation fields. Device counters remain in
