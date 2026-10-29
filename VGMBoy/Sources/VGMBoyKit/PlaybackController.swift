@@ -134,6 +134,25 @@ public final class PlaybackController: @unchecked Sendable {
         }
     }
 
+    /// Prepares a source, then asks the host whether the request still owns
+    /// playback before retiring the current native session.
+    public func loadIfCurrent(
+        payload: PlaybackControlPayload,
+        sourceData: Data? = nil,
+        isCurrent: @escaping @Sendable () -> Bool
+    ) -> PlaybackControlEvent {
+        do {
+            try load(payload, sourceData: sourceData, isCurrent: isCurrent)
+            let event = PlaybackControlEvent(kind: .response, status: session.status())
+            emit(event)
+            return event
+        } catch {
+            let event = PlaybackControlEvent(kind: .error, status: session.status(), message: error.localizedDescription)
+            emit(event)
+            return event
+        }
+    }
+
     private func execute(_ request: PlaybackControlRequest) throws -> PlaybackControlEvent {
         guard request.version == PlaybackControlProtocol.version else {
             throw PlaybackControlError.invalidPayload("Unsupported control API version \(request.version).")
@@ -235,7 +254,7 @@ public final class PlaybackController: @unchecked Sendable {
     }
 
     @discardableResult
-    private func load(_ payload: PlaybackControlPayload, sourceData: Data?) throws -> PlaybackStatus {
+    private func load(_ payload: PlaybackControlPayload, sourceData: Data?, isCurrent: (() -> Bool)? = nil) throws -> PlaybackStatus {
         guard let path = payload.path, !path.isEmpty else {
             throw PlaybackControlError.invalidPayload("Load requires a path.")
         }
@@ -266,11 +285,12 @@ public final class PlaybackController: @unchecked Sendable {
         guard trackIndex >= 0, let family = FormatRegistry.family(for: playablePath) else {
             throw PlaybackControlError.invalidPayload("Track index must be non-negative and the file format must be supported.")
         }
+        let loop = payload.loop ?? (sourceData == nil ? PlaybackLoopTagReader.read(path: playablePath) : PlaybackLoopTagReader.read(data: sourceData ?? Data(), extensionName: URL(fileURLWithPath: playablePath).pathExtension))
+        guard isCurrent?() ?? true else { throw CancellationError() }
         if payload.playbackMode != nil || payload.playMilliseconds != nil || payload.fadeMilliseconds != nil || payload.unknownDurationMilliseconds != nil {
             try configurePlaybackMode(payload, reloadCurrent: false)
         }
         let plan = makePlan(family: family)
-        let loop = payload.loop ?? (sourceData == nil ? PlaybackLoopTagReader.read(path: playablePath) : PlaybackLoopTagReader.read(data: sourceData ?? Data(), extensionName: URL(fileURLWithPath: playablePath).pathExtension))
         let replacedStatus: PlaybackStatus
         do {
             replacedStatus = try session.load(path: playablePath, sourceData: sourceData, trackIndex: trackIndex, plan: plan, tempo: tempo, loop: loop)

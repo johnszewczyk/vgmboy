@@ -34,10 +34,11 @@ startup contracts shared by the VGMMan player frontends.
   stale natural-end events are discarded before status or end delivery.
 - A replacement-request stop is serialized with its newest-request check, so
   an older request cannot retire playback owned by a newer request.
-- Start requests recheck ownership after source preparation, after any seek,
-  and after playback starts. A superseded start retires its own replacement
-  before a newer queued request can begin; preparation failure before native
-  replacement continues to preserve the previous session.
+- Start requests recheck ownership inside the shared load boundary after source
+  preparation and before replacing the native session, then after load, seek,
+  and playback start. A superseded preparation preserves the previous session;
+  after native replacement begins, cancellation retires its own replacement
+  before a newer queued request can begin.
 - Queued status for a retired generation is not published as the current track.
   Snapshot reads are non-emitting so a callback may safely refresh the current
   state without recursively producing another status event.

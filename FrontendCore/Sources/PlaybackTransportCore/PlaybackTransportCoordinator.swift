@@ -564,17 +564,14 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
 
     private func startContinuationLocked(_ start: PlaybackContinuationStart) throws {
         guard isLatest(start.requestID) else { throw CancellationError() }
-        naturalEndGate.reset()
-        continuationCoordinator.reset()
-        let event: PlaybackControlEvent
-        if let sourceData = start.track.sourceData {
-            event = controller.loadInMemory(sourceData: sourceData, payload: start.payload)
-        } else {
-            event = controller.perform(.init(command: .load, payload: start.payload))
+        let event = controller.loadIfCurrent(payload: start.payload, sourceData: start.track.sourceData) {
+            self.isLatest(start.requestID)
         }
         do {
-            try requireSuccess(event)
             guard isLatest(start.requestID) else { throw CancellationError() }
+            try requireSuccess(event)
+            naturalEndGate.reset()
+            continuationCoordinator.reset()
             if start.startMilliseconds > 0 {
                 try requireSuccess(controller.perform(.init(
                     command: .seek,
@@ -820,8 +817,6 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             fadeMilliseconds: plan.fadeSeconds * 1_000,
             unknownDurationMilliseconds: plan.unknownDurationSeconds * 1_000
         )
-        naturalEndGate.reset()
-        continuationCoordinator.reset()
         let payload = PlaybackControlPayload(
             path: track.archivePath ?? track.path,
             archiveEntry: track.archiveEntry,
@@ -833,16 +828,15 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             unknownDurationMilliseconds: timing.unknownDurationMilliseconds,
             loop: track.loop
         )
-        let event: PlaybackControlEvent
-        if let sourceData = track.sourceData {
-            event = controller.loadInMemory(sourceData: sourceData, payload: payload)
-        } else {
-            event = controller.perform(.init(command: .load, payload: payload))
+        let event = controller.loadIfCurrent(payload: payload, sourceData: track.sourceData) {
+            self.isLatest(requestID)
         }
         let previousGeneration = currentPlaybackGeneration
         do {
-            try requireSuccess(event)
             guard isLatest(requestID) else { throw CancellationError() }
+            try requireSuccess(event)
+            naturalEndGate.reset()
+            continuationCoordinator.reset()
             currentPlaybackGeneration = event.status?.diagnostics.generation
             if resumeAt > 0 {
                 try requireSuccess(controller.perform(.init(
