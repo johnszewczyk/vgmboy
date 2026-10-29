@@ -444,50 +444,16 @@ final class PlaybackSession: @unchecked Sendable {
     }
 
     private func refill() {
-        guard let decoder else { return }
+        guard decoder != nil else { return }
         let highWater = Int(Double(output.capacityFrames) * 0.75)
-        while output.bufferedFrames < highWater {
-            if capFrames > 0 && sessionFrames >= capFrames {
-                reachedEnd = true
-                break
-            }
-            if decoder.trackEnded {
-                guard rewindVGMForLongPlayIfNeeded(decoder) else {
-                    reachedEnd = true
-                    break
-                }
-                continue
-            }
-            let chunkStart = sessionFrames
-            let frames: (left: [Float], right: [Float])
-            do {
-                frames = try readPlaybackFrames(decoder: decoder, requested: nextReadFrameCount())
-            } catch {
-                stopRefillTimer()
-                output.pause()
-                errorMessage = error.localizedDescription
-                publishStatus()
-                return
-            }
-            guard !frames.left.isEmpty, !frames.right.isEmpty else {
-                if decoder.trackEnded, longPlayRepeatsVGMAtEnd {
-                    if decoder.absolutePlayedFrames == 0 {
-                        longPlayRepeatsVGMAtEnd = false
-                        reachedEnd = true
-                        break
-                    }
-                    continue
-                }
-                if decoder.trackEnded {
-                    reachedEnd = true
-                }
-                break
-            }
-            let faded = applyFadeIfNeeded(decoder, chunkStart: chunkStart, left: frames.left, right: frames.right)
-            sessionFrames += Int64(min(faded.left.count, faded.right.count))
-            if output.write(left: faded.left, right: faded.right) == 0 {
-                break
-            }
+        do {
+            try fillBuffer(to: highWater)
+        } catch {
+            stopRefillTimer()
+            output.pause()
+            errorMessage = error.localizedDescription
+            publishStatus()
+            return
         }
         if reachedEnd {
             if output.bufferedFrames == 0 {
@@ -525,6 +491,12 @@ final class PlaybackSession: @unchecked Sendable {
     }
 
     private func prime(to targetBufferedFrames: Int) throws {
+        try fillBuffer(to: targetBufferedFrames)
+    }
+
+    /// Priming and periodic refill must apply identical end, loop and fade
+    /// rules; the callers retain their distinct error and publication behavior.
+    private func fillBuffer(to targetBufferedFrames: Int) throws {
         guard let decoder else { return }
         while output.bufferedFrames < targetBufferedFrames {
             if capFrames > 0 && sessionFrames >= capFrames {

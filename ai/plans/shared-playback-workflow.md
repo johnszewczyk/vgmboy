@@ -6,6 +6,29 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Fourth pass, 2026-10-29: priming and periodic refill now use the same buffer
+  producer, preserving their existing distinct error/publication paths. Ten
+  focused FrontendCore integration checks passed, including bounded Long Play
+  with a fade on real SPC and VGM fixtures and natural-end delivery after the
+  output ring drained. SB2, ViewBoy and CocoaSpice Swift builds and both
+  documentation checks passed. This verifies those paths, not audible
+  continuity, loop transitions, partial writes or complete packaged-app behavior.
+- An exploratory PCM comparison rendered two seconds at 1×, switched to 2×,
+  and compared the next 4,096 left-channel samples against newly started
+  decoders at 2× after seeks of 0.5, 1, 2 and 4 seconds. The SPC fixture's mean
+  absolute differences were 0.0794, 0.0409, 0.0728 and 0.0749; the VGM
+  fixture's were 0.2207, 0.1616, 0.1797 and 0.1576. Decoder startup/seek state
+  and waveform phase were not controlled, so these scores do not establish the
+  correct seek conversion. The libvgm source confirms its sample-to-tick mapping
+  changes with playback speed; verify GME and multi-segment tempo behavior with
+  a controlled timeline before changing position semantics. Fixtures: vendored
+  `f-zero - big blue.spc` SHA-256
+  `c2e3fbc4ecee60a2f9102acd374387438ac3a9ba5bfaca2f02a12fc6315bee85`;
+  `TwinCobra.vgm` SHA-256
+  `4d2c6b387499cac407bd969d92c88b6a32285bc965e0452ef6a0294ea2107ebc`.
+  The exploratory harness was temporary; its transcript is
+  `/private/tmp/vgmman-tempo-seek-research.log` while that file exists.
+
 - Third pass, 2026-10-29: SB2 and ViewBoy send the shared typed
   reconfiguration request, and CocoaSpice's timing-plan route invokes the same
   coordinator operation. Mode and tempo are applied in one controller reload;
