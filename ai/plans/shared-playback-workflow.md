@@ -6,6 +6,21 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Archive verification, 2026-10-29: a generated ZIP containing the vendored
+  SPC fixture was loaded, played and reconfigured, then its source archive was
+  removed. A further reconfiguration failed during preparation while the
+  original generation remained loaded and playing. A second generated ZIP
+  contained the `ending3.txtp`/`ending3.rsf` dependency pair from the prior
+  plugin fixture set. After the same preparation failure, its active session
+  stayed loaded and playing and could seek and refill its ring. Both focused
+  FrontendCore tests passed. These checks establish the exercised native
+  transport and dependency preparation paths, not audible or packaged-UI
+  behavior, PSF-family dependencies, or UAC loop handling. The optional TXTP
+  test requires `VGM_TXTP_ARCHIVE_FIXTURE_DIR` and skips if it is not set.
+  Fixture SHA-256 values: TXTP
+  `4980c5ed7d4bc65c1cc984387208eeb7cf8818bae08424288f8f5b5ddf243c66`, RSF
+  `b07ca78bb9998177a219d3cf8f5b20822113a342abac28283e29c73848317`.
+
 - Fourth pass, 2026-10-29: priming and periodic refill now use the same buffer
   producer, preserving their existing distinct error/publication paths. Ten
   focused FrontendCore integration checks passed, including bounded Long Play
