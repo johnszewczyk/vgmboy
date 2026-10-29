@@ -98,10 +98,12 @@
   executables are built and handed off by VGMBoy; CocoaSpice only provides the shared upstream
   source/build inputs used by the app family.
 - Core status updates CocoaSpice display state, while the coordinator's
-  one-shot natural-end event returns the shared completion target. CocoaSpice
-  maps that stable ID into its native queue model and retains only frontend-local
-  random choice and presentation handoff; the shared core prevents duplicate or
-  stale completion delivery.
+  one-shot natural-end event returns the shared completion target. After the
+  main-actor handoff the adapter asynchronously refreshes transport status and
+  orders UI delivery by status sequence. It accepts a natural end only while
+  the same generation and track remain loaded and ended; if an ordinary status
+  arrives first, it refreshes rather than discarding the one-shot end. CocoaSpice
+  maps the stable ID into its queue model and keeps frontend-local random choice.
 - VGMBoy retains one silent initialized macOS output endpoint for the host lifetime. CocoaSpice
   must express pause, replacement, seek, and completion only through the typed core controls; it
   must not stop/recreate a separate device path around those transitions.

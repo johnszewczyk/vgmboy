@@ -1041,27 +1041,23 @@ final class PlayerViewModel {
         playback.setAppVolume(appVolume)
         playback.setMonoEnabled(monoEnabled)
         playback.setPlaybackStateHandler { [weak self] snapshot in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                if !self.isSeeking {
-                    self.playbackElapsedSeconds = snapshot.elapsedSeconds
-                }
-                self.isPlaying = snapshot.isPlaying
-                self.playbackReachedEnd = snapshot.reachedEnd
-                self.updateRemoteTransportState()
+            guard let self else { return }
+            if !self.isSeeking {
+                self.playbackElapsedSeconds = snapshot.elapsedSeconds
             }
+            self.isPlaying = snapshot.isPlaying
+            self.playbackReachedEnd = snapshot.reachedEnd
+            self.updateRemoteTransportState()
         }
         playback.setPlaybackNaturalEndHandler { [weak self] snapshot in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.playbackReachedEnd = true
-                if !self.isSeeking {
-                    self.playbackElapsedSeconds = snapshot.elapsedSeconds
-                }
-                self.isPlaying = false
-                self.handlePlaybackCompletionIfNeeded()
-                self.updateRemoteTransportState()
+            guard let self else { return }
+            self.playbackReachedEnd = true
+            if !self.isSeeking {
+                self.playbackElapsedSeconds = snapshot.elapsedSeconds
             }
+            self.isPlaying = false
+            self.handlePlaybackCompletionIfNeeded()
+            self.updateRemoteTransportState()
         }
         playbackStorage = playback
         return playback

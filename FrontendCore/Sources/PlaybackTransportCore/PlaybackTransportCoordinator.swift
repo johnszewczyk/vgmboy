@@ -639,12 +639,14 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         }
     }
 
+    /// Snapshot reads must not emit a control response: frontends may refresh
+    /// status from a status callback and would otherwise create a feedback loop.
     public func status() async -> PlaybackTransportStatus {
-        await run { self.status(self.controller.perform(.init(command: .status)).status) }
+        await run { self.status(self.controller.status()) }
     }
 
     public func statusSync() -> PlaybackTransportStatus {
-        queue.sync { status(controller.perform(.init(command: .status)).status) }
+        queue.sync { status(controller.status()) }
     }
 
     public func spectrum() -> (left: [Float], right: [Float]) {

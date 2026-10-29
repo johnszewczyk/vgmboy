@@ -350,7 +350,7 @@ func uacMemberLoopMetadataIsProjected() throws {
 }
 
 @Test func optionsControlSurfaceIsVersionedAndCodable() throws {
-    let surface = CocoaSpiceFrontendSurface.v1
+    let surface = CocoaSpiceFrontendSurface.v2
     #expect(surface.version == CocoaSpiceFrontendProtocol.version)
     #expect(surface.supports(.options))
     #expect(surface.supports(.mainPlayback))

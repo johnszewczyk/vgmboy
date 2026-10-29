@@ -6,6 +6,29 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- CocoaSpice callback pass, 2026-10-29: transport events previously crossed
+  a main-queue hop and an additional MainActor task after their source generation
+  had been discarded. Its adapter now refreshes current transport status without
+  blocking the UI, orders status delivery by sequence, and verifies the ended
+  generation and track still own a loaded, ended session before invoking the
+  main-actor completion handler. If an ordinary status overtakes the one-shot
+  end, it refreshes again rather than dropping that end. A focused guard check
+  rejects replaced, resumed and unloaded sessions; a 3-second generated WAV
+  produced one natural-end callback in the package integration check. The
+  CocoaSpice test target's stale v1 surface reference was updated to v2.
+  An isolated packaged check exposed a feedback loop: the new refresh used a
+  status command that itself emitted a callback, and the test process reached
+  approximately 140% CPU before it was quit. Shared asynchronous and synchronous
+  snapshot reads now use the non-emitting controller getter; focused tests verify
+  repeated reads do not emit and real playback stays below 100 status callbacks
+  while delivering one natural end. All 37 shared transport tests passed. A
+  rebuilt isolated package launched without the runaway loop, but its archive
+  metadata read stalled in filesystem extended-attribute lookup; the process
+  sampled at 0.4% CPU while stalled and was stopped. Sustained post-fix packaged
+  playback and CPU behavior are still unverified. The test process used temporary
+  data paths. These checks do not simulate every actor scheduling race or
+  establish audible output.
+
 - Completion race pass, 2026-10-29: ViewBoy previously continued a completed
   queue after a delayed retirement reply even if the same track had restarted
   or reconfigured; random modes also proceeded when native retirement returned
@@ -18,10 +41,8 @@ Recheck paths, working-tree changes, and findings before continuing.
   frontend packages build. In a ViewBoy packaged run, two generated 3-second
   WAVs played to natural completion, advanced from one to two and stopped;
   both appeared in isolated history. This does not prove audible continuity.
-  CocoaSpice passes transport callbacks through a main-queue handoff and a
-  separate MainActor task without retaining the originating generation in its
-  playback snapshot; investigate whether delayed callbacks can update a newer
-  session before treating its event-order gate as complete.
+  See the later CocoaSpice callback pass for its event-handoff changes and
+  remaining verification limits.
 
 - ViewBoy history fix, 2026-10-29: the packaged UI played the SPC but did
   not add it to shared history. The renderer passes one track dictionary to

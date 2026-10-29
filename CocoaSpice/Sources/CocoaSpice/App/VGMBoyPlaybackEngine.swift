@@ -9,8 +9,9 @@ final class PlaybackEngine: @unchecked Sendable {
     private let transport = PlaybackTransportCoordinator(label: "CocoaSpice.vgmboy-playback")
     private let exportQueue = DispatchQueue(label: "CocoaSpice.vgmboy-export", qos: .utility)
     private let adapterState = PlaybackAdapterState()
-    private var playbackStateHandler: (@Sendable (PlaybackStatusSnapshot) -> Void)?
-    private var playbackNaturalEndHandler: (@Sendable (PlaybackStatusSnapshot) -> Void)?
+    @MainActor private var playbackStateHandler: (@MainActor @Sendable (PlaybackStatusSnapshot) -> Void)?
+    @MainActor private var playbackNaturalEndHandler: (@MainActor @Sendable (PlaybackStatusSnapshot) -> Void)?
+    @MainActor private var latestDeliveredStatusSequence: UInt64 = 0
 
     /// This is a lock-backed snapshot because the adapter's async playback
     /// methods resume on a cooperative executor while transport callbacks are
@@ -26,19 +27,29 @@ final class PlaybackEngine: @unchecked Sendable {
         // state and is replaced on the main queue; reading it here raced
         // replacement and produced a bad Swift URL/String access on Atari ST
         // activation. Keep this adapter's presentation handoff on main.
-        transport.setStatusHandler { [weak self] status in
-            DispatchQueue.main.async { [weak self] in
-                self?.publish(status: status)
+        transport.setStatusHandler { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                // Re-read after the queue handoff: an older queued status must
+                // not overwrite a replacement session's presentation.
+                let current = await self.transport.status()
+                guard current.statusSequence >= self.latestDeliveredStatusSequence else { return }
+                self.latestDeliveredStatusSequence = current.statusSequence
+                self.publish(status: current)
             }
         }
         transport.setNaturalEndHandler { [weak self] status in
-            DispatchQueue.main.async { [weak self] in
-                self?.playbackNaturalEndHandler?(PlaybackStatusSnapshot(
-                    currentTrackID: status.currentTrackID,
-                    isPlaying: status.isPlaying,
-                    elapsedSeconds: status.elapsedSeconds,
-                    reachedEnd: true
-                ))
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                var current = await self.transport.status()
+                // A newer ordinary status may reach the UI first. Refresh
+                // rather than dropping the one-shot completion event.
+                while current.statusSequence < self.latestDeliveredStatusSequence {
+                    current = await self.transport.status()
+                }
+                guard Self.acceptsNaturalEnd(status, current: current) else { return }
+                self.latestDeliveredStatusSequence = current.statusSequence
+                self.playbackNaturalEndHandler?(PlaybackStatusSnapshot(status: current))
             }
         }
     }
@@ -51,11 +62,11 @@ final class PlaybackEngine: @unchecked Sendable {
         transport.setEqualizer(enabled: enabled, bandGains: bandGains)
     }
 
-    func setPlaybackStateHandler(_ handler: (@Sendable (PlaybackStatusSnapshot) -> Void)?) {
+    @MainActor func setPlaybackStateHandler(_ handler: (@MainActor @Sendable (PlaybackStatusSnapshot) -> Void)?) {
         playbackStateHandler = handler
     }
 
-    func setPlaybackNaturalEndHandler(_ handler: (@Sendable (PlaybackStatusSnapshot) -> Void)?) {
+    @MainActor func setPlaybackNaturalEndHandler(_ handler: (@MainActor @Sendable (PlaybackStatusSnapshot) -> Void)?) {
         playbackNaturalEndHandler = handler
     }
 
@@ -245,13 +256,14 @@ final class PlaybackEngine: @unchecked Sendable {
         }
     }
 
-    private func publish(status: PlaybackTransportStatus) {
-        playbackStateHandler?(PlaybackStatusSnapshot(
-            currentTrackID: status.currentTrackID,
-            isPlaying: status.isPlaying,
-            elapsedSeconds: status.elapsedSeconds,
-            reachedEnd: status.reachedEnd
-        ))
+    @MainActor private func publish(status: PlaybackTransportStatus) {
+        playbackStateHandler?(PlaybackStatusSnapshot(status: status))
+    }
+
+    static func acceptsNaturalEnd(_ event: PlaybackTransportStatus, current: PlaybackTransportStatus) -> Bool {
+        event.generation != 0 && event.generation == current.generation
+            && event.currentTrackID != nil && event.currentTrackID == current.currentTrackID
+            && current.trackLoaded && current.reachedEnd
     }
 }
 
@@ -282,6 +294,18 @@ struct PlaybackStatusSnapshot: Sendable {
     let isPlaying: Bool
     let elapsedSeconds: TimeInterval
     let reachedEnd: Bool
+
+    init(currentTrackID: TrackItem.ID?, isPlaying: Bool, elapsedSeconds: TimeInterval, reachedEnd: Bool) {
+        self.currentTrackID = currentTrackID
+        self.isPlaying = isPlaying
+        self.elapsedSeconds = elapsedSeconds
+        self.reachedEnd = reachedEnd
+    }
+
+    init(status: PlaybackTransportStatus) {
+        self.init(currentTrackID: status.currentTrackID, isPlaying: status.isPlaying,
+                  elapsedSeconds: status.elapsedSeconds, reachedEnd: status.reachedEnd)
+    }
 }
 
 /// Presentation constants for the unchanged CocoaSpice controls. Equalizer

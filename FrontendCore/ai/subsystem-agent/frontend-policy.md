@@ -33,6 +33,8 @@ startup contracts shared by the VGMMan player frontends.
   coordinator adopts its returned generation and resets completion claims;
   stale natural-end events are discarded before status or end delivery.
 - Queued status for a retired generation is not published as the current track.
+  Snapshot reads are non-emitting so a callback may safely refresh the current
+  state without recursively producing another status event.
   Failed starts and reconfigurations retain the previous track only if the
   native generation did not change; once replacement starts, failure clears
   coordinator track identity and retires the native session.
