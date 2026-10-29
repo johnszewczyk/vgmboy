@@ -166,7 +166,7 @@ function resetNativePlaybackSnapshot() {
 
 function currentTotalSeconds(track) {
   const plan = track ? timingPlans.get(track.id) : null;
-  if (plan?.is_long_play && plan.pre_fade_seconds <= 0) return 0;
+  if (plan) return plan.total_seconds;
   return currentOutputBasePlaybackSeconds(track) + currentFadeSeconds(track);
 }
 
@@ -174,16 +174,6 @@ function effectiveTotalSeconds(track) {
   return playbackWindow && playbackWindow.trackId === track?.id
     ? playbackWindow.totalSeconds
     : currentTotalSeconds(track);
-}
-
-function currentBasePlaybackSeconds(track) {
-  const plan = track ? timingPlans.get(track.id) : null;
-  if (plan && Number.isFinite(plan.pre_fade_seconds)) {
-    return plan.pre_fade_seconds;
-  }
-  return track?.basePlaybackSeconds > 0
-    ? track.basePlaybackSeconds
-    : state.unknownDurationSeconds;
 }
 
 function playbackSpeedForTrack(track) {
@@ -207,8 +197,12 @@ function playbackSpeedForTrack(track) {
 }
 
 function currentOutputBasePlaybackSeconds(track) {
+  const plan = track ? timingPlans.get(track.id) : null;
+  // The shared preview is already scaled to output time at the effective tempo.
+  if (plan) return plan.pre_fade_seconds;
   const speed = playbackSpeedForTrack(track);
-  const milliseconds = Math.max(0, Math.round(currentBasePlaybackSeconds(track) * 1000));
+  const baseSeconds = track?.basePlaybackSeconds > 0 ? track.basePlaybackSeconds : state.unknownDurationSeconds;
+  const milliseconds = Math.max(0, Math.round(baseSeconds * 1000));
   return Math.round(milliseconds * speed.denominator / speed.numerator) / 1000;
 }
 

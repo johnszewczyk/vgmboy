@@ -9,6 +9,15 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Shared timing adoption, 2026-10-29: SB2 applied tempo scaling to an already
+  scaled shared timing preview, producing 22.5 seconds from a 45-second preview
+  at 2x. It now uses the shared output duration and total directly, including
+  for its Long Play start window. A renderer test reproduces the old result;
+  fallback catalog estimates and unbounded Long Play have separate checks.
+  All 14 SB2 renderer checks, 38 shared transport checks, the updated shared
+  timing contract test and the SB2 Swift build passed. Packaged and audible
+  behavior at changed speed remain to be verified.
+
 - SB2 start/settings race, 2026-10-29: a timing change can overlap timing
   planning, native initialization or native start. A start now replans if its
   settings changed before native start, and reconfigures the accepted session

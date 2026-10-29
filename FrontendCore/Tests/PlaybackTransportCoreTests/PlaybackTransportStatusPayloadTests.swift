@@ -132,6 +132,14 @@ func timingBridgeContractsKeepPolicyAndControlPayloadOutOfTheFrontend() throws {
     #expect(previewObject["pre_fade_seconds"] as? Int == 72)
     #expect(previewObject["total_seconds"] as? Int == 76)
 
+    let longPlayPreview = try PlaybackTimingPreviewRequest(
+        sourcePath: "/music/track.spc", manualPlayMilliseconds: 90_000,
+        fadeMilliseconds: 6_000, tempo: .init(numerator: 2, denominator: 1),
+        longPlayEnabled: true
+    ).preview()
+    #expect(longPlayPreview.preFadeSeconds == 45)
+    #expect(longPlayPreview.totalSeconds == 51)
+
     let reconfiguration = PlaybackTransportReconfigurationRequest(
         longPlayEnabled: true,
         manualPlayMilliseconds: 240_000,
