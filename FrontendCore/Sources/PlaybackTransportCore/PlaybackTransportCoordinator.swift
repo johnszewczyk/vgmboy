@@ -327,6 +327,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     private let requestLock = NSLock()
     private var latestPlaybackRequest = 0
     private var settingsRevisionCounter = 0
+    private var seekRevisionCounter = 0
     private var currentTrack: PlaybackTransportTrack?
     private var currentPlaybackPlan = PlaybackTimingPlan(
         preFadeSeconds: PlaybackTimingPreferences.defaultUnknownDurationSeconds,
@@ -339,6 +340,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     private var currentPlaybackGeneration: Int?
     private var currentTrackStartGeneration: Int?
     private var latestSettingsRevision: Int?
+    private var latestSeekRevision: Int?
     private var nextStatusSequence: UInt64 = 0
     private var naturalEndGate = PlaybackNaturalEndGate()
     private let continuationCoordinator = PlaybackContinuationCoordinator()
@@ -383,6 +385,14 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         defer { requestLock.unlock() }
         settingsRevisionCounter += 1
         return settingsRevisionCounter
+    }
+
+    /// Reserve before dispatch so concurrent seeks retain host receipt order.
+    public func reserveSeekRevision() -> Int {
+        requestLock.lock()
+        defer { requestLock.unlock() }
+        seekRevisionCounter += 1
+        return seekRevisionCounter
     }
 
     public func invalidatePlaybackRequests() {
@@ -513,7 +523,8 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     public func performSessionControlSync(
         _ command: PlaybackControlCommand,
         payload: PlaybackControlPayload = .init(),
-        expectedGeneration: Int? = nil
+        expectedGeneration: Int? = nil,
+        seekRevision: Int? = nil
     ) throws -> PlaybackTransportStatus {
         guard command == .play || command == .pause || command == .seek else {
             throw PlaybackControlError.invalidPayload("Unsupported session control command.")
@@ -521,6 +532,12 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         return try queue.sync {
             if let expectedGeneration, expectedGeneration != currentPlaybackGeneration {
                 throw CancellationError()
+            }
+            if command == .seek, let seekRevision {
+                guard seekRevision > 0, latestSeekRevision.map({ seekRevision > $0 }) ?? true else {
+                    throw CancellationError()
+                }
+                latestSeekRevision = seekRevision
             }
             let event = performLocked(.init(command: command, payload: payload))
             try requireSuccess(event)

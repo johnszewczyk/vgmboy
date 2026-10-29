@@ -52,6 +52,10 @@ final class WKPlaybackBridge: @unchecked Sendable {
         transport.reserveSettingsRevision()
     }
 
+    func reserveSeekRevision() -> Int {
+        transport.reserveSeekRevision()
+    }
+
     func setStatusHandler(_ handler: (@Sendable (PlaybackTransportStatus) -> Void)?) {
         handlerLock.lock()
         defer { handlerLock.unlock() }
@@ -164,7 +168,7 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 errorMessage: "Playback seek requires a position."
             )
             return statusResponse(try transport.performSessionControlSync(.seek, payload: request.payload,
-                                                                            expectedGeneration: request.expectedGeneration))
+                expectedGeneration: request.expectedGeneration, seekRevision: request.seekRevision))
         case "nativePlaybackRampGain":
             let request: PlaybackTransportRampGainRequest = try bridgeRequest(
                 args,

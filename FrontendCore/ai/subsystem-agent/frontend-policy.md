@@ -94,6 +94,8 @@ startup contracts shared by the VGMMan player frontends.
   the latest reserved playback request on the transport queue before retirement.
 - Session-scoped pause, resume and seek commands optionally carry the expected
   native generation, checked before the shared controller executes them.
+  Ordered seeks can also carry a transport-reserved monotonic revision, so a
+  late worker cannot overwrite a newer seek. Legacy unnumbered seeks remain valid.
 - Timing previews use the decoder family's effective rate rather than the
   stored requested preference. Native status and preview calculations must
   agree when a backend clamps or rounds a requested rate. Preview durations

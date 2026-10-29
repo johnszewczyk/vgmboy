@@ -149,6 +149,29 @@ private final class StatusRecorder: @unchecked Sendable {
     #expect(try transport.performSessionControlSync(.play).isPlaying)
 }
 
+@Test func newerSeekWinsWhenWorkersArriveOutOfOrder() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 4).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.reordered.seeks")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    let loaded = transport.perform(.init(command: .load, payload: .init(path: url.path)))
+    let generation = try #require(loaded.status?.diagnostics.generation)
+    let first = transport.reserveSeekRevision(), second = transport.reserveSeekRevision()
+    let newer = try transport.performSessionControlSync(.seek, payload: .init(positionMilliseconds: 2000),
+                                                         expectedGeneration: generation, seekRevision: second)
+    #expect(abs(newer.elapsedSeconds - 2) < 0.05)
+    #expect(throws: CancellationError.self) {
+        try transport.performSessionControlSync(.seek, payload: .init(positionMilliseconds: 1000),
+                                                expectedGeneration: generation, seekRevision: first)
+    }
+    #expect(abs(transport.statusSync().elapsedSeconds - 2) < 0.05)
+    let third = transport.reserveSeekRevision()
+    let next = try transport.performSessionControlSync(.seek, payload: .init(positionMilliseconds: 3000),
+                                                       expectedGeneration: generation, seekRevision: third)
+    #expect(abs(next.elapsedSeconds - 3) < 0.05)
+}
+
 @Test func sharedReconfigurationRetainsPausedPositionAndGatesUnsupportedTempo() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
