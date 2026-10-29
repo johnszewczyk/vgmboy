@@ -481,6 +481,17 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         }
     }
 
+    /// Retire the old session only if this replacement still owns the newest
+    /// start request. The check and stop run on the same transport queue.
+    @discardableResult
+    public func stopForPlaybackRequest(_ requestID: Int) async -> Bool {
+        await run {
+            guard self.isLatest(requestID) else { return false }
+            self.retirePlaybackLocked()
+            return true
+        }
+    }
+
     /// Claims, retires, and computes the one continuation decision for a completed
     /// native session. The generation check and one-shot claim live beside the
     /// VGMBoy controller so a frontend cannot accidentally make a decision for

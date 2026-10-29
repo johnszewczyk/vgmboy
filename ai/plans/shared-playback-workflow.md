@@ -6,6 +6,15 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- CocoaSpice replacement ownership pass, 2026-10-29: a stale start could call
+  the adapter's unconditional stop before the coordinator rejected its request,
+  retiring a newer track. The shared coordinator now checks request ownership
+  on its serialized queue before that replacement stop, and CocoaSpice uses it.
+  A real-WAV CocoaSpice integration check verifies that an older request is
+  cancelled while the newer track remains loaded and playing. All 38 shared
+  transport tests and three focused CocoaSpice checks passed. This is package
+  evidence; the post-change packaged UI and audible behavior remain unverified.
+
 - Post-fix packaged CocoaSpice check, 2026-10-29: using the corrected isolated
   package and an M3U containing two generated three-second WAVs, the player
   started the first track, advanced to the second, and stopped. The isolated
