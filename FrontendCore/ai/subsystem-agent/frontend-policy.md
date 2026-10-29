@@ -81,6 +81,8 @@ startup contracts shared by the VGMMan player frontends.
   The preview also carries millisecond-precision pre-fade, fade and total
   values. Its original whole-second fields and decoding of older replies are
   retained for compatibility; new consumers should use the precise fields.
+  Timing preview validates decoded durations against the native timing range
+  before tempo scaling, including requests that bypass the Swift initializer.
 - `PlaybackTransportAudioConfigurationRequest` is the complete output snapshot
   for volume, EQ, and mono. `PlaybackTransportCoordinator.configureAudio(_:)`
   normalizes and serializes all three control commands; presentation adapters
