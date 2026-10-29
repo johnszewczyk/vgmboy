@@ -9,6 +9,13 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Typed tempo integration, 2026-10-29: a shared transport test starts and
+  reconfigures an SPC and generated WAV with requested 8x tempo and shared
+  Long Play previews. Native status reports 4x for the SPC and 1x for WAV,
+  while retaining the requested track identity. This exercises the typed SB2
+  request shape against real decoder sessions, not a packaged UI or audible
+  transition. The SPC is the vendored F-Zero fixture identified below.
+
 - SB2 tempo policy extraction, 2026-10-29: timing previews, native start and
   reconfiguration now forward the selected tempo to shared format policy,
   rather than applying SB2's backend limits before those requests. SB2 retains
