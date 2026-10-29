@@ -172,6 +172,49 @@ private final class StatusRecorder: @unchecked Sendable {
     #expect(abs(next.elapsedSeconds - 3) < 0.05)
 }
 
+@Test func oversizedTimingPlansAreRejectedBeforeReplacingPlayback() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.oversized.plan")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let original = transport.statusSync()
+    let plans = [
+        PlaybackTimingPlan(preFadeSeconds: .max, fadeSeconds: .max, usesNativeEnding: false, isLongPlay: true),
+        PlaybackTimingPlan(preFadeSeconds: 1, fadeSeconds: .max, usesNativeEnding: false, isLongPlay: true),
+        PlaybackTimingPlan(preFadeSeconds: 1, fadeSeconds: 0, usesNativeEnding: false, isLongPlay: true,
+                           unknownDurationSeconds: .max)
+    ]
+    #expect(plans[0].totalSeconds == Int.max)
+    for plan in plans {
+        await #expect(throws: PlaybackControlError.self) {
+            try await transport.reconfigureCurrentTrack(plan: plan, tempo: .defaultValue)
+        }
+        let request = transport.reservePlaybackRequest()
+        await #expect(throws: PlaybackControlError.self) {
+            try await transport.play(track: .init(id: "replacement", path: url.path), plan: plan,
+                                     tempo: .defaultValue, requestID: request)
+        }
+        let status = transport.statusSync()
+        #expect(status.currentTrackID == original.currentTrackID && status.generation == original.generation)
+    }
+    #expect(throws: PlaybackControlError.self) {
+        try transport.exportAAC(sourcePath: url.path, trackIndex: 0, plan: plans[0],
+                                outputDirectory: url.deletingLastPathComponent(), filenameStem: "invalid")
+    }
+    #expect(throws: AACExportError.self) {
+        try transport.exportAAC(.init(sourcePath: url.path, trackIndex: 0,
+            outputDirectory: url.deletingLastPathComponent(), filenameStem: "invalid",
+            playMilliseconds: .max, fadeMilliseconds: .max))
+    }
+    #expect(throws: AACExportError.self) {
+        try transport.exportAAC(.init(sourcePath: url.path, trackIndex: 0,
+            outputDirectory: url.deletingLastPathComponent(), filenameStem: "invalid",
+            playMilliseconds: Int(Int32.max), fadeMilliseconds: 1))
+    }
+}
+
 @Test func sharedReconfigurationRetainsPausedPositionAndGatesUnsupportedTempo() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }

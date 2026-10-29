@@ -57,7 +57,11 @@ public struct PlaybackTimingPlan: Equatable, Sendable {
     public let isLongPlay: Bool
     public let unknownDurationSeconds: Int
 
-    public var totalSeconds: Int { preFadeSeconds > 0 ? preFadeSeconds + fadeSeconds : 0 }
+    public var totalSeconds: Int {
+        guard preFadeSeconds > 0 else { return 0 }
+        let (total, overflow) = preFadeSeconds.addingReportingOverflow(fadeSeconds)
+        return overflow ? Int.max : total
+    }
 
     public init(
         preFadeSeconds: Int,

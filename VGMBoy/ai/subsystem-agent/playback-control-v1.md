@@ -73,6 +73,10 @@ same typed endpoint operations.
   accepted by the current wrapper. Libgme is limited to 0.02–4×, libvgm to 0.05–4× with
   0.001 precision, and non-tempo families use 1×. Session status reports the applied rate.
   An unsupported or already-effective direct tempo command leaves buffered PCM intact.
+- `PlaybackTimingPlan.totalSeconds` saturates on integer addition overflow;
+  transport conversion independently rejects durations outside its native range.
+- AAC export rejects play and fade durations whose sum exceeds the native
+  millisecond range before opening a decoder or creating an output file.
 - A `set_playback_mode` request can include a tempo multiplier. VGMBoy applies
   both to the same reload and resumes from the prior session position and play
   state; it does not issue a separate in-place tempo change first. An identical

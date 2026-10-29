@@ -96,6 +96,9 @@ startup contracts shared by the VGMMan player frontends.
   native generation, checked before the shared controller executes them.
   Ordered seeks can also carry a transport-reserved monotonic revision, so a
   late worker cannot overwrite a newer seek. Legacy unnumbered seeks remain valid.
+- Whole-second timing plans are range-checked before conversion to native
+  milliseconds for start, reconfiguration and AAC export; invalid plans fail
+  before replacing the current session.
 - Timing previews use the decoder family's effective rate rather than the
   stored requested preference. Native status and preview calculations must
   agree when a backend clamps or rounds a requested rate. Preview durations
