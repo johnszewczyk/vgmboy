@@ -496,6 +496,20 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         }
     }
 
+    /// Apply a renderer envelope only while the requested session still owns
+    /// playback. Legacy callers may omit the generation.
+    public func rampOutputGainSync(_ request: PlaybackTransportRampGainRequest) throws -> PlaybackTransportStatus {
+        try queue.sync {
+            if let expected = request.expectedGeneration,
+               expected != currentPlaybackGeneration {
+                throw CancellationError()
+            }
+            let event = controller.perform(.init(command: .rampOutputGain, payload: request.payload))
+            try requireSuccess(event)
+            return status(event.status)
+        }
+    }
+
     public func stop() async {
         await run {
             self.retirePlaybackLocked()

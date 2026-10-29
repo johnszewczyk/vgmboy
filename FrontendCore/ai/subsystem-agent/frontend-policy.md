@@ -86,6 +86,10 @@ startup contracts shared by the VGMMan player frontends.
   Omitting both values retains the existing bridge contract. A newly loaded
   track resets the lineage and accepted revision; the transport's separate
   revision reservation counter remains monotonic for its lifetime.
+- Renderer output-gain ramps may carry an expected native generation. The
+  shared coordinator checks it on the transport queue before touching output,
+  rejecting a ramp for a retired or replaced session; requests without the
+  field retain their legacy behavior.
 - Timing previews use the decoder family's effective rate rather than the
   stored requested preference. Native status and preview calculations must
   agree when a backend clamps or rounds a requested rate. Preview durations

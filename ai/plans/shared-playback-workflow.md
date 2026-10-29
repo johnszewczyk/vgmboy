@@ -9,6 +9,17 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Session-scoped output ramps, 2026-10-29: delayed SB2 fade or restore requests
+  could otherwise act on a replacement session. A typed optional generation
+  travels with the ramp, and shared transport checks it on its serialized
+  queue before modifying output. Requests without a generation remain compatible.
+  Native checks cover stale, current and legacy requests; a renderer check
+  verifies fade and restore retain the originating identity. All 47 shared
+  transport tests and 20 SB2 playback renderer tests passed, and SB2 built.
+  A rebuilt isolated SB2 bundle with the small catalog and two generated
+  30-second WAVs advanced on faded Next and continued playing; this does not
+  establish the audible envelope or reproduce delayed delivery in the app.
+
 - Packaged SB2 queue progression, 2026-10-29: the isolated bundle based on
   `0c8d54fa` plus the stopped-timing fix used two generated three-second WAVs
   and the isolated schema-24 catalog. With repeat off, playback history recorded

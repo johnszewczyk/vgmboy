@@ -55,9 +55,10 @@ function waitForAudioEnvelope(durationMs) {
 
 async function fadeActiveOutput(durationMs = TRANSPORT_DECLICK_MS) {
   const activeTrack = activeTrackInfo();
-  if (nativePlaybackInitialized && activeTrack) {
+  const expectedGeneration = Number(state.nativePlayback?.generation);
+  if (nativePlaybackInitialized && activeTrack && Number.isSafeInteger(expectedGeneration) && expectedGeneration > 0) {
     try {
-      await window.spcBoySB2.nativePlaybackRampGain?.({ outputGain: 0, rampMilliseconds: durationMs });
+      await window.spcBoySB2.nativePlaybackRampGain?.({ outputGain: 0, rampMilliseconds: durationMs, expectedGeneration });
     } catch {
       // The normal stop path still has to complete if a helper exited between
       // the transition request and its short output envelope.
@@ -817,11 +818,13 @@ async function stopPlaybackState({ declick = true, keepNativeOutput = false, nat
 }
 
 async function cancelQueuedSkip({ restoreOutput = false } = {}) {
-  const hadQueuedSkip = Boolean(queuedSkipRequest);
+  const request = queuedSkipRequest;
   queuedSkipRequest = null;
   clearQueuedSkipTimer();
-  if (restoreOutput && hadQueuedSkip && nativePlaybackInitialized && state.nativePlayback.trackLoaded) {
-    await window.spcBoySB2.nativePlaybackRampGain({ outputGain: 1, rampMilliseconds: TRANSPORT_DECLICK_MS });
+  if (restoreOutput && request && nativePlaybackInitialized && state.nativePlayback.trackLoaded
+      && Number.isSafeInteger(request.nativeGeneration) && request.nativeGeneration > 0) {
+    await window.spcBoySB2.nativePlaybackRampGain({ outputGain: 1, rampMilliseconds: TRANSPORT_DECLICK_MS,
+      expectedGeneration: request.nativeGeneration });
   }
 }
 
