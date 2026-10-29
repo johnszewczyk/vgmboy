@@ -156,7 +156,7 @@ struct OptionsView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Extended playback")
                                 .foregroundStyle(.white)
-                            Text("Set the target duration used when Long Play is enabled.")
+                            Text("Set the target duration. Enter 0:00 for unlimited playback.")
                                 .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
                         }
@@ -324,9 +324,8 @@ struct OptionsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-            }
-            .toggleStyle(.checkbox)
-            .frame(maxWidth: .infinity, alignment: .leading)
+                .toggleStyle(.checkbox)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 TextField("1", text: $playbackTempoText)
                     .textFieldStyle(.roundedBorder)
@@ -872,7 +871,7 @@ struct OptionsView: View {
     private func applyLongPlayTimeText() {
         let trimmed = longPlayTimeText.trimmingCharacters(in: .whitespacesAndNewlines)
         let parsedSeconds = Self.parseTime(trimmed) ?? model.manualPreFadeSeconds
-        model.manualPreFadeSeconds = max(30, parsedSeconds)
+        model.manualPreFadeSeconds = max(0, parsedSeconds)
         model.handleManualPlaySecondsChanged()
         longPlayTimeText = Self.formatTime(model.manualPreFadeSeconds)
     }

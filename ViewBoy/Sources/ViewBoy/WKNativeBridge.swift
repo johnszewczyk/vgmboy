@@ -989,6 +989,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "game": track.game,
             "artist": track.author,
             "system": track.system,
+            "year": CatalogPlaylistYear.displayText(from: track.year),
+            "dumper": CatalogPlaylistDumper.displayText(from: track.dumper),
             "playLengthMs": track.lengthMilliseconds
         ]
     }
@@ -1027,6 +1029,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "game": track.game,
             "artist": track.author,
             "system": track.system,
+            "year": CatalogPlaylistYear.displayText(from: track.year),
+            "dumper": CatalogPlaylistDumper.displayText(from: track.dumper),
             "playLengthMs": track.lengthMilliseconds
         ]
     }

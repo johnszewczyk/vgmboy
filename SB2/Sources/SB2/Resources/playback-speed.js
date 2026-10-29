@@ -42,7 +42,7 @@
     if (fraction) {
       const candidate = { numerator: Number(fraction[1]), denominator: Number(fraction[2]) };
       return isValidComponents(candidate.numerator, candidate.denominator)
-        ? snapToSixtyFourths(normalize(candidate))
+        ? normalize(candidate)
         : null;
     }
     const decimal = new RegExp(`^(?:(\\d+)(?:\\.(\\d{0,${MAX_DECIMAL_PLACES}}))?|\\.(\\d{1,${MAX_DECIMAL_PLACES}}))$`).exec(text);
@@ -51,7 +51,7 @@
     const denominator = 10 ** decimals.length;
     const numerator = Number(decimal[1] || 0) * denominator + Number(decimals || 0);
     if (!isValidComponents(numerator, denominator)) return null;
-    return snapToSixtyFourths(normalize({ numerator, denominator }));
+    return normalize({ numerator, denominator });
   }
 
   function format(value) {

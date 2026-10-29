@@ -18,6 +18,14 @@ enum PlaylistPresentation {
         metadata?.system.nonEmpty ?? "—"
     }
 
+    static func yearText(for metadata: TrackMetadata?) -> String {
+        metadata?.year.nonEmpty ?? "—"
+    }
+
+    static func dumperText(for metadata: TrackMetadata?) -> String {
+        metadata?.dumper.nonEmpty ?? "—"
+    }
+
     static func lengthText(for metadata: TrackMetadata?) -> String {
         guard let metadata else { return "—" }
         let seconds = max(0, metadata.playLengthMs > 0 ? metadata.playLengthMs / 1000 : 0)
@@ -59,6 +67,8 @@ enum PlaylistPresentation {
         var widestGameText = ""
         var widestAuthorText = ""
         var widestSystemText = ""
+        var widestYearText = "—"
+        var widestDumperText = "—"
         var widestLengthText = "—"
 
         for track in tracks {
@@ -68,6 +78,8 @@ enum PlaylistPresentation {
             widestGameText = longerText(widestGameText, gameText(for: track, metadata: trackMetadata))
             widestAuthorText = longerText(widestAuthorText, authorText(for: trackMetadata))
             widestSystemText = longerText(widestSystemText, systemText(for: trackMetadata))
+            widestYearText = longerText(widestYearText, yearText(for: trackMetadata))
+            widestDumperText = longerText(widestDumperText, dumperText(for: trackMetadata))
             widestLengthText = longerText(widestLengthText, lengthText(for: trackMetadata))
         }
 
@@ -78,6 +90,8 @@ enum PlaylistPresentation {
             gameText: widestGameText,
             authorText: widestAuthorText,
             systemText: widestSystemText,
+            yearText: widestYearText,
+            dumperText: widestDumperText,
             lengthText: widestLengthText
         )
     }
@@ -115,6 +129,8 @@ enum PlaylistPresentation {
             gameText: gameText(for: track, metadata: metadata),
             authorText: authorText(for: metadata),
             systemText: systemText(for: metadata),
+            yearText: yearText(for: metadata),
+            dumperText: dumperText(for: metadata),
             pathText: track.fullPathText,
             lengthMilliseconds: metadata?.playLengthMs ?? 0,
             trackNumber: track.trackNumber,

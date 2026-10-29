@@ -28,6 +28,13 @@ combining a native-ending mode with an explicit fade value.
   lose the timeline.
 - Long play caps the stream at (manual + fade) in the shell for every family. Native ending relies
   on the decoder's own `trackEnded` (capped only as a backstop).
+- A Long Play duration of zero is the explicit unbounded mode: the session applies no time cap or
+  end fade. Frontends must preserve zero through input parsing, tempo adjustment, and preference
+  restoration. Play! PSF playback executes loops encoded in the emulated sequence/driver; it does
+  not turn those events into PCM sample-loop metadata.
+- A finite libvgm stream with no explicit loop metadata restarts from its beginning in Long Play,
+  and the session timeline keeps advancing to the configured cap. This lets complete VGM captures
+  play repeatedly without inventing a VGM loop point.
 - `file_default` uses a native ending only when the requested fade is zero. A nonzero fade is an
   explicit bounded request and is applied exactly once by the decoder or shared session DSP.
 - The 150-second value is only the core safety window for a timed request that lacks a natural

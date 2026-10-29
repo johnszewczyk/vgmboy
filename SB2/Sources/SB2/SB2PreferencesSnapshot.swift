@@ -31,6 +31,8 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
         .init(id: "game"),
         .init(id: "artist"),
         .init(id: "system"),
+        .year,
+        .dumper,
         .init(id: "path"),
         .init(id: "lengthLabel")
     ])

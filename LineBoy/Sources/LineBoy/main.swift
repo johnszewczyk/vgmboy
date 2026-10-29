@@ -167,8 +167,6 @@ private struct LineBoyPlaybackSettings: Codable, Equatable {
         )
     }
 
-    init() {}
-
     init(longPlayEnabled: Bool, preferences: PlaybackPreferences) {
         self.version = 2
         self.longPlayEnabled = longPlayEnabled
@@ -747,6 +745,8 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
                     gameText: track.display.gameText,
                     authorText: track.display.authorText,
                     systemText: track.display.systemText,
+                    yearText: track.display.yearText,
+                    dumperText: track.display.dumperText,
                     pathText: track.archiveEntry.map { "\(track.archivePath ?? track.sourcePath)#\($0)" }
                         ?? track.sourcePath,
                     lengthMilliseconds: track.lengthMilliseconds,
@@ -780,6 +780,8 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
                 "game": track.display.gameText,
                 "author": track.display.authorText,
                 "system": track.display.systemText,
+                "year": track.display.yearText,
+                "dumper": track.display.dumperText,
                 "path": path,
                 "lengthMilliseconds": track.lengthMilliseconds,
                 "length": track.display.lengthText,
@@ -798,6 +800,8 @@ final class LineBoyNativeBridge: NSObject, WKScriptMessageHandler {
                 "game": hints.gameText,
                 "artist": hints.authorText,
                 "system": hints.systemText,
+                "year": hints.yearText,
+                "dumper": hints.dumperText,
                 "path": hints.pathText,
                 "lengthLabel": hints.lengthText
             ]

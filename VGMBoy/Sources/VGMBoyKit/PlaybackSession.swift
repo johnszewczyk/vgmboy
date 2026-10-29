@@ -120,6 +120,9 @@ final class PlaybackSession: @unchecked Sendable {
     private var currentTempo = 1.0
     private var playbackLoop: PlaybackLoopMetadata?
     private var remainingLoopRepeats: Int?
+    private var longPlayRepeatsVGMAtEnd = false
+    private var longPlayVGMTrackFrames: Int64 = 0
+    private var sessionFrames: Int64 = 0
     private var reachedEnd = false
     private var errorMessage: String?
     private var isLoaded = false
@@ -165,6 +168,10 @@ final class PlaybackSession: @unchecked Sendable {
 
             let metadata = try decoder.metadata(for: trackIndex)
             let validLoop = loop.flatMap { $0.isValid ? $0 : nil }
+            longPlayRepeatsVGMAtEnd = plan.isLongPlay && family.id == FormatRegistry.libvgmFamily.id && validLoop == nil
+            longPlayVGMTrackFrames = longPlayRepeatsVGMAtEnd && metadata.naturalPlayMs > 0
+                ? Int64(metadata.naturalPlayMs) * Int64(sampleRate) / 1_000
+                : 0
             if validLoop != nil, !plan.isLongPlay, plan.usesDecoderNaturalDuration {
                 // An authored loop is an explicit native ending. Leave the
                 // decoder open-ended and let the session perform the sample
@@ -229,6 +236,7 @@ final class PlaybackSession: @unchecked Sendable {
             self.decoder = decoder
             playbackLoop = validLoop
             remainingLoopRepeats = validLoop?.repeatCount
+            sessionFrames = 0
             currentTrackIndex = trackIndex
             decoderFamily = family.id
             currentTempo = tempo
@@ -268,7 +276,15 @@ final class PlaybackSession: @unchecked Sendable {
             if wasPlaying { output.pause() }
             stopRefillTimer()
             reachedEnd = false
-            decoder.seek(milliseconds: Int(seconds * 1000))
+            let requestedFrames = Int64(max(0, seconds) * Double(sampleRate))
+            if longPlayRepeatsVGMAtEnd, longPlayVGMTrackFrames > 0 {
+                let sourceFrames = requestedFrames % longPlayVGMTrackFrames
+                decoder.seek(milliseconds: Int(sourceFrames * 1_000 / Int64(sampleRate)))
+                sessionFrames = requestedFrames
+            } else {
+                decoder.seek(milliseconds: Int(seconds * 1_000))
+                sessionFrames = decoder.absolutePlayedFrames
+            }
             output.clearBuffer()
             try prime(to: output.primeFrameCount)
             if wasPlaying {
@@ -369,10 +385,8 @@ final class PlaybackSession: @unchecked Sendable {
         // producer primes/refills the ring. Report consumed PCM, not decoded
         // PCM, so a freshly loaded track still reads 0:00 and seek remains
         // anchored at the requested audible offset.
-        let elapsed = decoder.map {
-            Double(max(0, $0.absolutePlayedFrames - Int64(diagnostics.bufferedFrames))) / Double(sampleRate)
-        } ?? 0
-        let decodedFrames = decoder?.absolutePlayedFrames ?? 0
+        let elapsed = Double(max(0, sessionFrames - Int64(diagnostics.bufferedFrames))) / Double(sampleRate)
+        let decodedFrames = sessionFrames
         let statistics = PlaybackStatistics(
             decoderFamily: decoderFamily,
             trackIndex: isLoaded ? currentTrackIndex : nil,
@@ -420,14 +434,21 @@ final class PlaybackSession: @unchecked Sendable {
         guard let decoder else { return }
         let highWater = Int(Double(output.capacityFrames) * 0.75)
         while output.bufferedFrames < highWater {
-            if decoder.trackEnded || (capFrames > 0 && decoder.absolutePlayedFrames >= capFrames) {
+            if capFrames > 0 && sessionFrames >= capFrames {
                 reachedEnd = true
                 break
             }
-            let chunkStart = decoder.absolutePlayedFrames
+            if decoder.trackEnded {
+                guard rewindVGMForLongPlayIfNeeded(decoder) else {
+                    reachedEnd = true
+                    break
+                }
+                continue
+            }
+            let chunkStart = sessionFrames
             let frames: (left: [Float], right: [Float])
             do {
-                frames = try readPlaybackFrames(decoder: decoder, requested: chunkFrameCount)
+                frames = try readPlaybackFrames(decoder: decoder, requested: nextReadFrameCount())
             } catch {
                 stopRefillTimer()
                 output.pause()
@@ -435,7 +456,22 @@ final class PlaybackSession: @unchecked Sendable {
                 publishStatus()
                 return
             }
+            guard !frames.left.isEmpty, !frames.right.isEmpty else {
+                if decoder.trackEnded, longPlayRepeatsVGMAtEnd {
+                    if decoder.absolutePlayedFrames == 0 {
+                        longPlayRepeatsVGMAtEnd = false
+                        reachedEnd = true
+                        break
+                    }
+                    continue
+                }
+                if decoder.trackEnded {
+                    reachedEnd = true
+                }
+                break
+            }
             let faded = applyFadeIfNeeded(decoder, chunkStart: chunkStart, left: frames.left, right: frames.right)
+            sessionFrames += Int64(min(faded.left.count, faded.right.count))
             if output.write(left: faded.left, right: faded.right) == 0 {
                 break
             }
@@ -475,17 +511,50 @@ final class PlaybackSession: @unchecked Sendable {
     private func prime(to targetBufferedFrames: Int) throws {
         guard let decoder else { return }
         while output.bufferedFrames < targetBufferedFrames {
-            if decoder.trackEnded || (capFrames > 0 && decoder.absolutePlayedFrames >= capFrames) {
+            if capFrames > 0 && sessionFrames >= capFrames {
                 reachedEnd = true
                 break
             }
-            let chunkStart = decoder.absolutePlayedFrames
-            let frames = try readPlaybackFrames(decoder: decoder, requested: chunkFrameCount)
+            if decoder.trackEnded {
+                guard rewindVGMForLongPlayIfNeeded(decoder) else {
+                    reachedEnd = true
+                    break
+                }
+                continue
+            }
+            let chunkStart = sessionFrames
+            let frames = try readPlaybackFrames(decoder: decoder, requested: nextReadFrameCount())
+            guard !frames.left.isEmpty, !frames.right.isEmpty else {
+                if decoder.trackEnded, longPlayRepeatsVGMAtEnd {
+                    if decoder.absolutePlayedFrames == 0 {
+                        longPlayRepeatsVGMAtEnd = false
+                        reachedEnd = true
+                        break
+                    }
+                    continue
+                }
+                if decoder.trackEnded {
+                    reachedEnd = true
+                }
+                break
+            }
             let faded = applyFadeIfNeeded(decoder, chunkStart: chunkStart, left: frames.left, right: frames.right)
+            sessionFrames += Int64(min(faded.left.count, faded.right.count))
             if output.write(left: faded.left, right: faded.right) == 0 {
                 break
             }
         }
+    }
+
+    private func nextReadFrameCount() -> Int {
+        guard capFrames > 0 else { return chunkFrameCount }
+        return Int(max(1, min(Int64(chunkFrameCount), capFrames - sessionFrames)))
+    }
+
+    private func rewindVGMForLongPlayIfNeeded(_ decoder: any AudioDecoder) -> Bool {
+        guard longPlayRepeatsVGMAtEnd, decoder.trackEnded else { return false }
+        decoder.seek(milliseconds: 0)
+        return !decoder.trackEnded && decoder.absolutePlayedFrames == 0
     }
 
     /// Applies a linear fade-out across the final `fadeFrames` before the cap.
@@ -558,6 +627,9 @@ final class PlaybackSession: @unchecked Sendable {
         currentTempo = 1
         playbackLoop = nil
         remainingLoopRepeats = nil
+        longPlayRepeatsVGMAtEnd = false
+        longPlayVGMTrackFrames = 0
+        sessionFrames = 0
         capFrames = 0
         fadeFrames = 0
         reachedEnd = false
