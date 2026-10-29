@@ -220,6 +220,7 @@ async function resolveTimingPlan(track, { force = false, cache = true } = {}) {
     return timingPlans.get(track.id);
   }
 
+  const settingsGeneration = playbackSettingsGeneration;
   const plan = await window.spcBoySB2.nativePlaybackTiming({
     path: track.archiveEntry || track.sourceFilename || track.path || "",
     playMilliseconds: Math.max(0, Math.round((Number(track.basePlaybackSeconds) || 0) * 1000)),
@@ -243,7 +244,7 @@ async function resolveTimingPlan(track, { force = false, cache = true } = {}) {
     is_long_play: isLongPlay,
     uses_native_ending: Boolean(plan.uses_native_ending)
   };
-  if (cache) timingPlans.set(track.id, normalized);
+  if (cache && settingsGeneration === playbackSettingsGeneration) timingPlans.set(track.id, normalized);
   return normalized;
 }
 
@@ -1213,17 +1214,27 @@ async function refreshPlaybackForTimingChange() {
   // Timing changes apply to the loaded session, including a paused session.
   // Do not use activeTrackInfo() here: after a native stop it may return the
   // last presentation track even though no current session exists.
+  const requestGeneration = ++playbackSettingsGeneration;
+  const generation = playbackGeneration;
+  // Timing preferences affect every track, including a stopped selection.
+  timingPlans.clear();
   const track = currentTrack();
   if (!track || state.currentTrackId !== track.id) {
+    const previewTrack = activeTrackInfo();
     updateTimingSummary();
     updatePlaybackReadout();
+    if (!state.currentTrackId && previewTrack) {
+      const preview = await resolveTimingPlan(previewTrack, { force: true, cache: false });
+      if (requestGeneration !== playbackSettingsGeneration || generation !== playbackGeneration
+          || state.currentTrackId || activeTrackInfo()?.id !== previewTrack.id) return;
+      timingPlans.set(previewTrack.id, preview);
+      updateTimingSummary();
+      updatePlaybackReadout();
+    }
     return;
   }
 
-  const requestGeneration = ++playbackSettingsGeneration;
-  const generation = playbackGeneration;
   const trackID = track.id;
-  timingPlans.delete(track.id);
   const plan = await resolveTimingPlan(track, { force: true, cache: false });
   if (!matchesCurrentPlaybackSettings(requestGeneration, generation, trackID)) return;
   timingPlans.set(trackID, plan);
@@ -1260,8 +1271,6 @@ async function refreshPlaybackForTimingChange() {
 }
 
 async function refreshPlaybackForSpeedChange() {
-  const track = currentTrack();
-  if (!track || state.currentTrackId !== track.id) return;
   await refreshPlaybackForTimingChange();
 }
 

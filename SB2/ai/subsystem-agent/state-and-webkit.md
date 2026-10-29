@@ -4,6 +4,13 @@ SB2 owns this host adaptation and presentation persistence. Shared catalog,
 playlist validation, preference normalization and playback policy retain their
 existing owners.
 
+## Playback timing preview
+
+Timing and speed preference changes invalidate per-track timing plans. SB2
+refreshes the stopped track preview through the shared timing bridge, accepting
+its reply only while settings, playback and selected-track identity still match.
+Late timing replies from older settings cannot repopulate the plan cache.
+
 ## Playback completion
 
 After native completion retirement returns, advance only while the same track,

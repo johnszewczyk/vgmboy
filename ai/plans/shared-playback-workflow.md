@@ -1,10 +1,33 @@
 # Shared playback workflow consolidation plan
 
-Status: research and staged implementation plan, 2026-10-28. See the checkpoint
-below for the first pass and its verification limits; remaining phases are open.
-Recheck paths, working-tree changes, and findings before continuing.
+Status: implementation and verification remain in progress. SB2 is the primary
+interface and the only frontend in the current regression-testing scope, per
+user direction. Finish the shared VGMBoy and FrontendCore work using SB2 before
+returning to ViewBoy and CocoaSpice; LineBoy is deprecated and excluded. Earlier
+cross-frontend checkpoints are historical evidence, not current scope. Recheck
+paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
+
+- SB2 timing-preview pass, 2026-10-29: the isolated player showed a stopped
+  track's old Long Play duration after the setting was disabled. Timing plans
+  were cached by track ID and a settings change returned before invalidating
+  them when no track was active. SB2 now invalidates all plans for timing and
+  speed changes, refreshes the stopped preview through shared timing, and
+  prevents replies for old settings or selections from updating the cache.
+  Three focused renderer checks cover the cache and reply-order cases; all seven
+  SB2 focused checks, 38 shared transport checks, and four VGMBoy timing/tempo
+  checks passed. A rebuilt isolated SB2 package showed 3:06 with Long Play on
+  and 0:09 after it was disabled for a three-second WAV with six-second fade.
+  This does not establish audible continuity or all playback mode transitions.
+
+- SB2-primary scope, 2026-10-29: the user directed shared-module regression
+  testing through SB2 and deferred ViewBoy and CocoaSpice until the shared work
+  is finished. SB2's focused completion tests exercise its actual renderer
+  handler for a current retirement, declined claim, changed track or generation,
+  and a stale same-generation end. This covers deterministic event ordering;
+  it does not replace live playback, audible checks or the remaining shared-core
+  gates.
 
 - ViewBoy stale end-status pass, 2026-10-29: a delayed end for the same
   generation could fail the renderer's status-sequence check but still retire
@@ -619,9 +642,9 @@ force unnecessary reloads. Define the effective tempo and precision policy from
 phase 0, preserve existing persisted values or migrate them explicitly, and
 make the reported effective values match playback and preview.
 
-Gate: equivalent requests from the three apps produce equivalent effective
-core settings and position without an intermediate end or queue advance;
-frontend-specific queue and display policy remains intact.
+Gate for the current phase: SB2 requests produce the intended effective core
+settings and position without an intermediate end or queue advance. Equivalence
+with the other frontends is a deferred follow-up after shared work is finished.
 
 ### 3. Simplify the session producer
 
@@ -646,9 +669,10 @@ for API compatibility. LineBoy is deprecated and excluded from this plan. Preser
 archives, queue, navigation and persistence; update implemented current-state
 subsystem documentation with the final behavior.
 
-Gate: all three apps exercise the same core sequence for equivalent actions,
-while each retains its own queue and UI behavior. Any unsupported format or
-frontend difference is documented with evidence, not silently normalized.
+Gate for the current phase: SB2 exercises the shared core sequence while
+retaining its queue and UI behavior. Equivalent ViewBoy and CocoaSpice checks
+are deferred until shared work is finished. Document unsupported formats and
+frontend differences with evidence.
 
 ### 5. Verification and release evidence
 
