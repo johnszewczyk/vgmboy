@@ -1,5 +1,12 @@
 # Timing, Long Play, and Fade
 
+An authored loop's source samples are converted to output-frame bounds using
+the active effective tempo. Seeking the logical output timeline maps through
+completed loop repetitions and restores the remaining repeat count, including
+when seeking backward or into an unbounded loop. The original loop metadata
+remains available after finite repeats are exhausted so later seeks can restore
+it. This does not by itself map a position across a tempo change.
+
 ## Scope
 
 Decode-window planning, long play, and fade for every decoder family.
