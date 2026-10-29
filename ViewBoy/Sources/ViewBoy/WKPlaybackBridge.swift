@@ -131,7 +131,7 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 longPlayEnabled: request["longPlayEnabled"] as? Bool ?? false,
                 preferences: preferences
             )
-            let tempo = tempoMultiplier(request["tempo"])
+            let tempo = FormatRegistry.effectiveTempo(tempoMultiplier(request["tempo"]), family: family)
             let scaledPreFadeSeconds = plan.preFadeSeconds <= 0
                 ? 0
                 : max(1, Int((Double(plan.preFadeSeconds) / tempo).rounded(.down)))

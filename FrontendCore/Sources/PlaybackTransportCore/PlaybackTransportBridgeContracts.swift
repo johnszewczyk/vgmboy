@@ -225,9 +225,10 @@ public struct PlaybackTimingPreviewRequest: Codable, Equatable, Sendable {
                 fadeSeconds: fadeMilliseconds / 1_000
             )
         )
+        let effectiveTempo = FormatRegistry.effectiveTempo(tempo.multiplier, family: family)
         let scaledPreFadeSeconds = plan.preFadeSeconds <= 0
             ? 0
-            : max(1, Int((Double(plan.preFadeSeconds) / tempo.multiplier).rounded(.down)))
+            : max(1, Int((Double(plan.preFadeSeconds) / effectiveTempo).rounded(.down)))
         return .init(
             preFadeSeconds: scaledPreFadeSeconds,
             fadeSeconds: plan.fadeSeconds,

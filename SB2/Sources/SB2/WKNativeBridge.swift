@@ -139,13 +139,17 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
     private static var playbackBackendManifest: [[String: Any]] {
         FormatRegistry.playbackDescriptors.map { descriptor in
-            backend(
+            var result = backend(
                 descriptor.id,
                 extensions: descriptor.extensions,
                 supportsLongPlay: descriptor.supportsLongPlay,
                 supportsTempo: descriptor.supportsTempo,
                 hasNaturalEnding: descriptor.hasNaturalEnding
             )
+            result["tempoMinimum"] = FormatRegistry.effectiveTempo(0.0001, familyID: descriptor.familyID)
+            result["tempoMaximum"] = FormatRegistry.effectiveTempo(8, familyID: descriptor.familyID)
+            result["tempoPrecision"] = descriptor.familyID == "libvgm" ? 0.001 : 0
+            return result
         }
     }
 

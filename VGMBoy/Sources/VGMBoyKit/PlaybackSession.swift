@@ -176,7 +176,8 @@ final class PlaybackSession: @unchecked Sendable {
             }
             let decoder = try DecoderFactory.make(path: path, sourceData: sourceData, sampleRate: sampleRate)
             try decoder.startTrack(trackIndex)
-            decoder.setTempo(tempo)
+            let effectiveTempo = FormatRegistry.effectiveTempo(tempo, family: family)
+            decoder.setTempo(effectiveTempo)
 
             let metadata = try decoder.metadata(for: trackIndex)
             let validLoop = loop.flatMap { $0.isValid ? $0 : nil }
@@ -251,7 +252,7 @@ final class PlaybackSession: @unchecked Sendable {
             sessionFrames = 0
             currentTrackIndex = trackIndex
             decoderFamily = family.id
-            currentTempo = tempo
+            currentTempo = effectiveTempo
             reachedEnd = false
             errorMessage = nil
             isLoaded = true
@@ -314,10 +315,13 @@ final class PlaybackSession: @unchecked Sendable {
             guard tempo.isFinite, tempo > 0 else {
                 throw PlaybackControlError.invalidPayload("Tempo must be a positive finite value.")
             }
+            let effectiveTempo = FormatRegistry.effectiveTempo(tempo, familyID: decoderFamily)
+            guard effectiveTempo != currentTempo else { return }
             let wasPlaying = output.isRunning
             if wasPlaying { output.pause() }
             stopRefillTimer()
-            decoder.setTempo(tempo)
+            decoder.setTempo(effectiveTempo)
+            currentTempo = effectiveTempo
             output.clearBuffer()
             try prime(to: output.primeFrameCount)
             if wasPlaying {

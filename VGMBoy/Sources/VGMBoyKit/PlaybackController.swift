@@ -163,8 +163,9 @@ public final class PlaybackController: @unchecked Sendable {
                 throw PlaybackControlError.invalidPayload("Tempo must be a positive finite value.")
             }
             try session.setTempo(tempo)
+            let effectiveTempo = session.status().statistics.tempo
             lock.lock()
-            if loaded != nil { loaded?.tempo = tempo }
+            if loaded != nil { loaded?.tempo = effectiveTempo }
             lock.unlock()
         case .setPlaybackMode:
             try configurePlaybackMode(request.payload)

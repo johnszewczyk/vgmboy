@@ -42,6 +42,25 @@ public struct PlaybackFormatDescriptor: Sendable, Codable, Equatable, Hashable {
 }
 
 public enum FormatRegistry {
+    /// Actual multiplier accepted by the current native decoder wrappers.
+    /// Preferences retain the requested value independently of this rate.
+    public static func effectiveTempo(_ requested: Double, family: DecoderFamily?) -> Double {
+        guard requested.isFinite, requested > 0, let family, family.supportsTempo else { return 1 }
+        return effectiveTempo(requested, familyID: family.id)
+    }
+
+    public static func effectiveTempo(_ requested: Double, familyID: String?) -> Double {
+        guard requested.isFinite, requested > 0 else { return 1 }
+        switch familyID {
+        case "libgme":
+            return min(4, max(0.02, requested))
+        case "libvgm":
+            return (min(4, max(0.05, requested)) * 1_000).rounded() / 1_000
+        default:
+            return 1
+        }
+    }
+
     public static let libgmeFamily = DecoderFamily(
         id: "libgme",
         supportsLongPlay: true,
