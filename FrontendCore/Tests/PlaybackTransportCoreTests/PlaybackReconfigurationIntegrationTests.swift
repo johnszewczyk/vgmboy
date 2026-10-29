@@ -243,16 +243,21 @@ func supersededArchiveStartNeverBeginsPlayback() async throws {
     zip.waitUntilExit()
     #expect(zip.terminationStatus == 0)
 
-    for route in ["typed", "async", "replacement", "preserve", "async-preserve"] {
+    for route in ["typed", "async", "replacement", "preserve", "async-preserve", "end-during-preparation"] {
         try? FileManager.default.removeItem(at: marker)
         let transport = PlaybackTransportCoordinator(label: "test.superseded.archive.\(route)")
         defer { _ = transport.perform(.init(command: .stop)) }
+        let ends = EndRecorder()
+        transport.setNaturalEndHandler { ends.record($0.generation) }
         var previousGeneration: Int?
-        if route.contains("preserve") {
+        if route.contains("preserve") || route == "end-during-preparation" {
             let path = "/no-such-directory/previous.spc"
+            let payload = route == "end-during-preparation"
+                ? PlaybackControlPayload(path: path, playbackMode: .timed, playMilliseconds: 300, fadeMilliseconds: 0)
+                : PlaybackControlPayload(path: path)
             let initial = PlaybackContinuationStart(
                 track: .init(id: "previous", path: path, sourceData: try Data(contentsOf: fixture)),
-                payload: .init(path: path), requestID: transport.reservePlaybackRequest()
+                payload: payload, requestID: transport.reservePlaybackRequest()
             )
             try transport.start(initial)
             previousGeneration = transport.statusSync().generation
@@ -288,6 +293,11 @@ func supersededArchiveStartNeverBeginsPlayback() async throws {
         }
         await #expect(throws: CancellationError.self) { try await pending.value }
         if let replacement { try await replacement.value }
+        if route == "end-during-preparation" {
+            for _ in 0..<80 where ends.snapshot().isEmpty {
+                try await Task.sleep(for: .milliseconds(25))
+            }
+        }
         let status = transport.statusSync()
         if route == "replacement" {
             #expect(status.isPlaying && status.trackLoaded)
@@ -296,6 +306,11 @@ func supersededArchiveStartNeverBeginsPlayback() async throws {
             #expect(status.isPlaying && status.trackLoaded)
             #expect(status.currentTrackID == "previous")
             #expect(status.generation == previousGeneration)
+        } else if route == "end-during-preparation" {
+            #expect(!status.isPlaying && status.trackLoaded)
+            #expect(status.currentTrackID == "previous")
+            #expect(status.generation == previousGeneration)
+            #expect(ends.snapshot() == [previousGeneration].compactMap { $0 })
         } else {
             #expect(!status.isPlaying, Comment(rawValue: route))
             #expect(!status.trackLoaded, Comment(rawValue: route))

@@ -15,7 +15,9 @@ paths, working-tree changes, and findings before continuing.
   Request-aware shared loading now checks ownership after preparation and
   before timing changes or native replacement, preserving the previous playing
   track and generation. Typed and async starts are both covered; invalidation
-  after replacement begins still follows the existing retirement boundary.
+  after replacement begins still follows the existing retirement boundary. An
+  additional timed SPC case ends during the slow preparation and delivers one
+  completion for its original generation after cancellation.
 
 - Superseded archive start, 2026-10-29: a signaling slow-7zz test reproduced
   an invalidated start loading and playing after source preparation. Shared
