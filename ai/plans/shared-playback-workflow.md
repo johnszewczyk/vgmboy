@@ -6,6 +6,18 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Reload-boundary pass, 2026-10-29: replacement preparation remains outside
+  the active session, and the prior audible position is now captured after the
+  old transport pauses and completes its short ramp. A focused integration
+  test used a temporary wrapper that delayed 7zz by 0.5 seconds: playback
+  advanced during archive preparation, and the replacement resumed at or
+  beyond the position observed during preparation. The optional test runs with
+  `VGM_TEST_SLOW_ARCHIVE=1` and a deliberately slow `VGMBOY_7Z_BINARY`. All
+  33 shared-transport tests (including this optional test skipped in the normal
+  run), five focused timeline tests, and the three frontend builds passed; the
+  slow-archive test passed separately with the wrapper enabled. These checks
+  do not establish sample-identical or audible continuity.
+
 - Tempo position pass, 2026-10-29: mode/tempo reloads now translate the
   previous logical output time by the old effective tempo divided by the new
   effective tempo before seeking. Direct tempo changes use the same reload,
@@ -19,9 +31,8 @@ Recheck paths, working-tree changes, and findings before continuing.
   authored repeats. All 32 shared-transport tests, five focused VGMBoy
   timeline tests, the SB2 clock projection check and all three frontend Swift
   builds passed. These checks do not establish sample-identical or audible
-  continuity, every decoder format, or packaged-app behavior. A mode reload
-  captures status before its output pause ramp, so up to the short ramp window
-  may still need sample-level investigation.
+  continuity, every decoder format, or packaged-app behavior. See the later
+  reload-boundary pass above for the status-capture change.
 
 - Loop seek mapping, 2026-10-29: a regression test showed that seeking to
   1.75 seconds in a two-repeat 0.25–0.75-second loop incorrectly ended a

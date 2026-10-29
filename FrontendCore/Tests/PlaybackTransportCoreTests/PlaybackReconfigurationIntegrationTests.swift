@@ -107,6 +107,48 @@ func archiveReconfigurationKeepsActiveSessionWhenPreparationFails() throws {
     #expect(afterFailure.isPlaying)
 }
 
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VGM_TEST_SLOW_ARCHIVE"] == "1",
+    "Run with a deliberately slow VGMBOY_7Z_BINARY to verify the preparation boundary."))
+func reconfigurationCapturesPositionAfterArchivePreparation() async throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let fixture = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let archive = directory.appendingPathComponent("music.zip")
+    let zip = Process()
+    zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+    zip.arguments = ["-q", "-j", archive.path, fixture.path]
+    try zip.run()
+    zip.waitUntilExit()
+    #expect(zip.terminationStatus == 0)
+
+    let controller = PlaybackController()
+    defer { _ = controller.perform(.init(command: .stop)) }
+    #expect(controller.perform(.init(command: .load, payload: .init(
+        path: archive.path, archiveEntry: fixture.lastPathComponent,
+        playbackMode: .fileDefault, fadeMilliseconds: 0
+    ))).kind != .error)
+    #expect(controller.perform(.init(command: .play)).kind != .error)
+    let before = controller.status()
+    let operation = Task.detached {
+        controller.perform(.init(command: .setPlaybackMode, payload: .init(
+            playbackMode: .fileDefault, fadeMilliseconds: 0
+        )))
+    }
+    try await Task.sleep(for: .milliseconds(200))
+    let during = controller.status()
+    #expect(during.isPlaying)
+    #expect(during.elapsedSeconds > before.elapsedSeconds + 0.08)
+    let result = await operation.value
+    let after = try #require(result.status)
+    #expect(result.kind != .error)
+    #expect(after.isPlaying)
+    #expect(after.elapsedSeconds >= during.elapsedSeconds - 0.03)
+}
+
 @Test(.enabled(if: ProcessInfo.processInfo.environment["VGM_TXTP_ARCHIVE_FIXTURE_DIR"] != nil,
     "Set VGM_TXTP_ARCHIVE_FIXTURE_DIR to a directory containing ending3.txtp and ending3.rsf."))
 func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
