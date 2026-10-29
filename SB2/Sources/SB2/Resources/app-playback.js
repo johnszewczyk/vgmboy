@@ -228,13 +228,16 @@ async function resolveTimingPlan(track, { force = false, cache = true } = {}) {
     throw new Error("VGMBoy returned no playback timing plan.");
   }
   const isLongPlay = Boolean(plan.is_long_play);
-  const preFadeSeconds = Number(plan.pre_fade_seconds);
+  const precise = plan.pre_fade_milliseconds != null && plan.fade_milliseconds != null
+    && plan.total_milliseconds != null && Number.isFinite(Number(plan.pre_fade_milliseconds))
+    && Number.isFinite(Number(plan.fade_milliseconds)) && Number.isFinite(Number(plan.total_milliseconds));
+  const preFadeSeconds = precise ? Number(plan.pre_fade_milliseconds) / 1000 : Number(plan.pre_fade_seconds);
   const normalized = {
-    pre_fade_seconds: isLongPlay ? Math.max(0, preFadeSeconds) : Math.max(1, preFadeSeconds),
-    fade_seconds: Math.max(0, Number(plan.fade_seconds) || 0),
+    pre_fade_seconds: Math.max(0, preFadeSeconds),
+    fade_seconds: Math.max(0, Number(precise ? plan.fade_milliseconds / 1000 : plan.fade_seconds) || 0),
     total_seconds: isLongPlay && preFadeSeconds <= 0
       ? 0
-      : Math.max(1, Number(plan.total_seconds) || 0),
+      : Math.max(0, Number(precise ? plan.total_milliseconds / 1000 : plan.total_seconds) || 0),
     is_long_play: isLongPlay,
     uses_native_ending: Boolean(plan.uses_native_ending)
   };

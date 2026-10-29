@@ -58,3 +58,15 @@ test('a timing response from old settings cannot repopulate the cache', async ()
   await request;
   assert.equal(run.timingPlans.has('one'), false);
 });
+
+test('shared millisecond timing survives the renderer bridge', async () => {
+  const state = { manualPlayTimeSeconds: 180, unknownDurationSeconds: 150, longPlayEnabled: false };
+  const plan = { pre_fade_seconds: 1, fade_seconds: 0, total_seconds: 1,
+    pre_fade_milliseconds: 375, fade_milliseconds: 250, total_milliseconds: 625,
+    is_long_play: false };
+  const run = makeResolver(state, { spcBoySB2: { nativePlaybackTiming: async () => plan } }, () => 0.25, () => ({ numerator: 2, denominator: 1 }));
+  const preview = await run.resolveTimingPlan({ id: 'one', path: '/tmp/one.spc', basePlaybackSeconds: 0.75 });
+  assert.equal(preview.pre_fade_seconds, 0.375);
+  assert.equal(preview.fade_seconds, 0.25);
+  assert.equal(preview.total_seconds, 0.625);
+});

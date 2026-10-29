@@ -78,6 +78,9 @@ startup contracts shared by the VGMMan player frontends.
   stored requested preference. Native status and preview calculations must
   agree when a backend clamps or rounds a requested rate. Preview durations
   are already output-time values; consumers must not apply tempo scaling again.
+  The preview also carries millisecond-precision pre-fade, fade and total
+  values. Its original whole-second fields and decoding of older replies are
+  retained for compatibility; new consumers should use the precise fields.
 - `PlaybackTransportAudioConfigurationRequest` is the complete output snapshot
   for volume, EQ, and mono. `PlaybackTransportCoordinator.configureAudio(_:)`
   normalizes and serializes all three control commands; presentation adapters
