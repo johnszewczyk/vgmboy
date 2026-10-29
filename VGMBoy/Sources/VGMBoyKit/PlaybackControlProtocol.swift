@@ -29,6 +29,16 @@ public struct PlaybackTempo: Codable, Equatable, Sendable {
         self.denominator = denominator / divisor
     }
 
+    private enum CodingKeys: String, CodingKey { case numerator, denominator }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            numerator: try values.decode(Int.self, forKey: .numerator),
+            denominator: try values.decode(Int.self, forKey: .denominator)
+        )
+    }
+
     public var multiplier: Double { Double(numerator) / Double(denominator) }
 
     public static func parse(_ value: String) -> Self? {

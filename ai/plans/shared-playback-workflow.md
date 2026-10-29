@@ -9,6 +9,13 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Decoded tempo invariants, 2026-10-29: JSON decoding had bypassed the shared
+  tempo initializer, allowing zero denominators, out-of-range components and
+  unreduced fractions into preference calculations. Decoding now uses the same
+  normalization and 1x invalid-value fallback as construction. A focused test
+  failed for all four cases before the fix and now checks preference
+  normalization, display and Codable round trips.
+
 - Shared numeric input bounds, 2026-10-29: asynchronous transport seek now
   rejects nonfinite and out-of-range values before converting to milliseconds,
   retaining finite negative-value clamping. Shared decimal tempo parsing rejects

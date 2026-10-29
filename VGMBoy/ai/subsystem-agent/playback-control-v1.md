@@ -64,6 +64,8 @@ same typed endpoint operations.
   typed `set_tempo` multiplier; decoder-family capability remains owned by `FormatRegistry` and
   gates application to formats that support native tempo (currently libgme and libvgm). Decimal
   parsing rejects oversized or overflowing input before arithmetic or normalization.
+  Decoded tempo fractions use the same reduction and invalid-value fallback as
+  directly constructed values, before preferences or bridges consume them.
 - The preference stores the requested rate; `FormatRegistry.effectiveTempo` resolves the rate
   accepted by the current wrapper. Libgme is limited to 0.02–4×, libvgm to 0.05–4× with
   0.001 precision, and non-tempo families use 1×. Session status reports the applied rate.
