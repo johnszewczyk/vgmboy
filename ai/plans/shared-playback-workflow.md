@@ -6,6 +6,13 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Post-fix packaged CocoaSpice check, 2026-10-29: using the corrected isolated
+  package and an M3U containing two generated three-second WAVs, the player
+  started the first track, advanced to the second, and stopped. The isolated
+  history recorded `one`, then `two`; the process sampled at 0.1% CPU after
+  playback, and the earlier persistent status feedback loop did not recur.
+  This short run does not establish sustained playback CPU or audible quality.
+
 - CocoaSpice callback pass, 2026-10-29: transport events previously crossed
   a main-queue hop and an additional MainActor task after their source generation
   had been discarded. Its adapter now refreshes current transport status without
