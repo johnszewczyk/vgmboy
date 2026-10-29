@@ -184,7 +184,7 @@ final class PlaybackSession: @unchecked Sendable {
             let validLoop = loop.flatMap { $0.isValid ? $0 : nil }
             longPlayRepeatsVGMAtEnd = plan.isLongPlay && family.id == FormatRegistry.libvgmFamily.id && validLoop == nil
             longPlayVGMTrackFrames = longPlayRepeatsVGMAtEnd && metadata.naturalPlayMs > 0
-                ? Int64(metadata.naturalPlayMs) * Int64(sampleRate) / 1_000
+                ? Int64((Double(metadata.naturalPlayMs) * Double(sampleRate) / 1_000 / effectiveTempo).rounded())
                 : 0
             if validLoop != nil, !plan.isLongPlay, plan.usesDecoderNaturalDuration {
                 // An authored loop is an explicit native ending. Leave the
@@ -311,29 +311,6 @@ final class PlaybackSession: @unchecked Sendable {
                 decoder.seek(milliseconds: Int(seconds * 1_000))
                 sessionFrames = decoder.absolutePlayedFrames
             }
-            output.clearBuffer()
-            try prime(to: output.primeFrameCount)
-            if wasPlaying {
-                try output.start()
-                startRefillTimer()
-            }
-            publishStatus()
-        }
-    }
-
-    public func setTempo(_ tempo: Double) throws {
-        try queue.sync {
-            guard let decoder else { throw PlaybackSessionError.notLoaded }
-            guard tempo.isFinite, tempo > 0 else {
-                throw PlaybackControlError.invalidPayload("Tempo must be a positive finite value.")
-            }
-            let effectiveTempo = FormatRegistry.effectiveTempo(tempo, familyID: decoderFamily)
-            guard effectiveTempo != currentTempo else { return }
-            let wasPlaying = output.isRunning
-            if wasPlaying { output.pause() }
-            stopRefillTimer()
-            decoder.setTempo(effectiveTempo)
-            currentTempo = effectiveTempo
             output.clearBuffer()
             try prime(to: output.primeFrameCount)
             if wasPlaying {

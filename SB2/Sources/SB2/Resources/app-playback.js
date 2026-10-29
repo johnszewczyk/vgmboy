@@ -95,9 +95,8 @@ function renderPlaybackClock(timestamp) {
   }
 
   const elapsedSinceAnchor = Math.max(0, (Number(timestamp) - nativeClockAnchor.timestamp) / 1000);
-  const tempo = Math.max(0.01, Number(state.nativePlayback?.tempo) || 1);
   const projectedSeconds = clampPosition(
-    nativeClockAnchor.positionSeconds + elapsedSinceAnchor * tempo,
+    nativeClockAnchor.positionSeconds + elapsedSinceAnchor,
     state.totalSeconds
   );
   if (projectedSeconds > state.elapsedSeconds) {
@@ -1248,7 +1247,9 @@ async function refreshPlaybackForTimingChange() {
     throw error;
   }
   if (!matchesCurrentPlaybackSettings(requestGeneration, generation, trackID)) return;
-  applyNativePlaybackSnapshot(track, snapshot, generation, { allowNativeGenerationChange: true });
+  applyNativePlaybackSnapshot(track, snapshot, generation, {
+    allowNativeGenerationChange: true, allowPositionRewind: true
+  });
   state.totalSeconds = effectiveTotalSeconds(track);
   state.elapsedSeconds = state.totalSeconds > 0
     ? Math.max(0, Math.min(state.elapsedSeconds, state.totalSeconds))

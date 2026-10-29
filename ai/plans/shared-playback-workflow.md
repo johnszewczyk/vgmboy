@@ -6,6 +6,23 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Tempo position pass, 2026-10-29: mode/tempo reloads now translate the
+  previous logical output time by the old effective tempo divided by the new
+  effective tempo before seeking. Direct tempo changes use the same reload,
+  preserve existing timing settings, and update the native generation; an
+  unchanged effective rate remains a no-op. Authored-loop seek mapping handles
+  the translated logical time, and libvgm Long Play repetition length scales
+  with effective tempo. SB2's displayed output-time clock advances at one
+  second per second and accepts the translated position after reconfiguration.
+  Controlled decoder tests distinguish source tones across one and multiple
+  rate changes; controller tests verify translated positions with and without
+  authored repeats. All 32 shared-transport tests, five focused VGMBoy
+  timeline tests, the SB2 clock projection check and all three frontend Swift
+  builds passed. These checks do not establish sample-identical or audible
+  continuity, every decoder format, or packaged-app behavior. A mode reload
+  captures status before its output pause ramp, so up to the short ramp window
+  may still need sample-level investigation.
+
 - Loop seek mapping, 2026-10-29: a regression test showed that seeking to
   1.75 seconds in a two-repeat 0.25–0.75-second loop incorrectly ended a
   two-second source at 3.5 seconds instead of 3.0. Session seeking now maps

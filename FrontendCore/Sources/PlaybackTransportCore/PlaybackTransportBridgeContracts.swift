@@ -304,8 +304,8 @@ public struct PlaybackTransportReconfigurationRequest: Codable, Equatable, Senda
     }
 }
 
-/// A narrow typed tempo update. Keeping it distinct from reconfiguration lets
-/// a renderer update native-tempo backends without reloading timing state.
+/// A narrow typed tempo update. A changed effective rate reloads the current
+/// session while retaining its timing settings; an unchanged rate is a no-op.
 public struct PlaybackTransportTempoRequest: Codable, Equatable, Sendable {
     public let tempo: PlaybackTempo
 
