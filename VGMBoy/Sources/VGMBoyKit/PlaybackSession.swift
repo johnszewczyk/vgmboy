@@ -138,6 +138,10 @@ final class PlaybackSession: @unchecked Sendable {
         output = AudioOutput()
     }
 
+    init(output: AudioOutput) {
+        self.output = output
+    }
+
     func spectrum() -> (left: [Float], right: [Float]) { output.spectrum() }
 
     public func setStatusHandler(_ handler: (@Sendable (PlaybackStatus) -> Void)?) {
@@ -513,7 +517,16 @@ final class PlaybackSession: @unchecked Sendable {
                 continue
             }
             let chunkStart = sessionFrames
-            let frames = try readPlaybackFrames(decoder: decoder, requested: nextReadFrameCount())
+            // This session is the ring's only producer. The callback can only
+            // free space, so a read bounded by the current free capacity must
+            // fit without discarding a decoded suffix.
+            let freeFrames = max(0, output.capacityFrames - output.bufferedFrames)
+            guard freeFrames > 0 else { break }
+            let requested = min(nextReadFrameCount(), freeFrames)
+            let frames = try readPlaybackFrames(decoder: decoder, requested: requested)
+            guard frames.left.count == frames.right.count, frames.left.count <= requested else {
+                throw PlaybackControlError.invalidPayload("Decoder returned an invalid PCM frame count.")
+            }
             guard !frames.left.isEmpty, !frames.right.isEmpty else {
                 if decoder.trackEnded, longPlayRepeatsVGMAtEnd {
                     if decoder.absolutePlayedFrames == 0 {
@@ -529,9 +542,10 @@ final class PlaybackSession: @unchecked Sendable {
                 break
             }
             let faded = applyFadeIfNeeded(decoder, chunkStart: chunkStart, left: frames.left, right: frames.right)
-            sessionFrames += Int64(min(faded.left.count, faded.right.count))
-            if output.write(left: faded.left, right: faded.right) == 0 {
-                break
+            let written = output.write(left: faded.left, right: faded.right)
+            sessionFrames += Int64(written)
+            guard written == faded.left.count else {
+                throw PlaybackControlError.invalidPayload("Playback output could not accept decoded PCM.")
             }
         }
     }

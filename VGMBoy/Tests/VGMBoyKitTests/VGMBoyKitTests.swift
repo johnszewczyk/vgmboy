@@ -867,6 +867,38 @@ struct SessionFadeTests {
 
 @Suite("Realtime Transport")
 struct RealtimeTransportTests {
+    @Test("partial and rejected writes do not advance EQ for unqueued samples")
+    func partialWriteKeepsEQStateAligned() throws {
+        func makeOutput(_ capacity: UInt32) throws -> OpaquePointer {
+            var config = VGMBoyAudioUnitConfig(sample_rate: 44_100, channel_count: 2, callback_frames: 8, ring_buffer_frames: capacity)
+            var result: OpaquePointer?
+            #expect(vgmboy_audio_unit_create(&result, &config) == 0)
+            let output = try #require(result)
+            var gains: [Float] = [0, 0, 0, 0, 0, 9, 0, 0, 0, 0]
+            gains.withUnsafeBufferPointer { vgmboy_audio_unit_set_equalizer(output, 1, $0.baseAddress, $0.count) }
+            vgmboy_audio_unit_set_transport_active(output, 1)
+            vgmboy_audio_unit_set_transport_gain(output, 1)
+            return output
+        }
+        let partial = try makeOutput(4), reference = try makeOutput(8)
+        defer { vgmboy_audio_unit_destroy(partial); vgmboy_audio_unit_destroy(reference) }
+        let input: [Int16] = [8000, -8000, 14000, -14000, -5000, 5000, 12000, -12000,
+                              2000, -2000, -16000, 16000, 7000, -7000, 1000, -1000]
+        var chunk = input, expectedInput = input
+        #expect(vgmboy_audio_unit_enqueue_pcm(partial, &chunk, 8) == 4)
+        #expect(Array(chunk[8...]) == Array(input[8...]))
+        var rejected = [Int16](repeating: 19000, count: 8)
+        #expect(vgmboy_audio_unit_enqueue_pcm(partial, &rejected, 4) == 0)
+        #expect(vgmboy_audio_unit_enqueue_pcm(reference, &expectedInput, 8) == 8)
+        var first = [Int16](repeating: 0, count: 8), second = first, expected = [Int16](repeating: 0, count: 16)
+        #expect(vgmboy_audio_unit_render_offline(partial, &first, 4) == 4)
+        var remaining = Array(input[8...])
+        #expect(vgmboy_audio_unit_enqueue_pcm(partial, &remaining, 4) == 4)
+        #expect(vgmboy_audio_unit_render_offline(partial, &second, 4) == 4)
+        #expect(vgmboy_audio_unit_render_offline(reference, &expected, 8) == 8)
+        #expect(first + second == expected)
+    }
+
     @Test("direct AudioUnit transport owns the session PCM ring")
     func directTransportBuffersAndClearsPCM() {
         let output = AudioOutput(sampleRate: 10, capacitySeconds: 0.4)

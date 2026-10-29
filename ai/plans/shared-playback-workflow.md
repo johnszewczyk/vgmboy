@@ -9,6 +9,18 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Shared producer short-write pass, 2026-10-29: an offline small-ring test
+  reproduced DSP state advancing for PCM that the ring rejected, and a real
+  generated VGM primed into an 88-frame ring exposed 4,008 falsely audible
+  frames after a 4,096-frame decode. Output DSP now processes only writable
+  frames; the producer bounds reads by ring capacity, counts accepted frames,
+  and fails explicitly on an invalid decoder result or unexpected short write.
+  Tests compare retried EQ output sample-for-sample with an uninterrupted
+  reference and exercise small-ring priming and seeking. Eight focused VGMBoy
+  tests, 40 shared transport tests and 17 SB2 renderer tests passed; SB2
+  built successfully. Packaged UI and
+  audible device behavior after this core change still require verification.
+
 - Isolated SB2 tempo UI, 2026-10-29: an app copy built from the current shared
   bridge and SB2 renderer used a separate bundle ID and temporary playlist,
   history, favorites and cache. With the vendored F-Zero SPC fixture and an

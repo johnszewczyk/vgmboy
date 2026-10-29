@@ -29,6 +29,9 @@ opens or manipulates an audio device.
 - Initial priming and periodic refill share one PCM producer for decoder reads, loop/long-play
   handling, cap accounting and fades. Priming propagates decode errors to its caller; periodic
   refill stops and publishes its error. Completion is published only after the ring drains.
+- Decoder reads are bounded by free ring capacity. Frame accounting advances only for accepted
+  stereo PCM; an invalid decoder result or unexpected short enqueue fails explicitly. Output DSP
+  and the spectrum tap process only accepted frames, so rejected writes do not advance EQ state.
 - The final callback multiplies post-EQ, post-volume PCM by the 10 ms envelope immediately before
   the default output device. `AudioOutput` gives that callback a 12 ms window before marking the
   transport inactive, while retaining a silent initialized unit for seamless next-track playback.

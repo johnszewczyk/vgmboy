@@ -125,6 +125,14 @@ void vgmboy_audio_unit_set_equalizer(VGMBoyAudioUnit* output, int enabled, const
 size_t vgmboy_audio_unit_enqueue_pcm(VGMBoyAudioUnit* output, int16_t* samples, size_t frames) {
   if (!output || !samples) return 0;
   pthread_mutex_lock(&output->producer_lock);
+  // Only process frames that fit. Advancing EQ and the spectrum tap for a
+  // rejected suffix would make a later retry start with the wrong DSP state.
+  const uint64_t write = atomic_load_explicit(&output->write_index, memory_order_relaxed);
+  const uint64_t read = atomic_load_explicit(&output->read_index, memory_order_acquire);
+  const uint64_t used = write - read;
+  const size_t available = used <= output->capacity_bytes
+      ? (output->capacity_bytes - (size_t)used) / VGMBOY_BYTES_PER_FRAME : 0;
+  if (frames > available) frames = available;
   for (size_t frame = 0; frame < frames; frame += 1) {
     float left = samples[frame * 2] / 32768.0f;
     float right = samples[frame * 2 + 1] / 32768.0f;
@@ -146,8 +154,8 @@ size_t vgmboy_audio_unit_enqueue_pcm(VGMBoyAudioUnit* output, int16_t* samples, 
     output->spectrum_write = (output->spectrum_write + 1) % VGMBOY_SPECTRUM_FRAMES;
     if (output->spectrum_count < VGMBOY_SPECTRUM_FRAMES) output->spectrum_count += 1;
   }
-  pthread_mutex_unlock(&output->producer_lock);
   const size_t written = ring_write(output, samples, frames * VGMBOY_BYTES_PER_FRAME) / VGMBOY_BYTES_PER_FRAME;
+  pthread_mutex_unlock(&output->producer_lock);
   atomic_fetch_add_explicit(&output->frames_written, written, memory_order_relaxed);
   return written;
 }
