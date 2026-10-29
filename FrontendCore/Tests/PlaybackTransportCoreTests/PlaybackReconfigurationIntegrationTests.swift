@@ -105,6 +105,37 @@ private final class StatusRecorder: @unchecked Sendable {
     #expect(accepted.generation != before.generation)
 }
 
+@Test func settingsRevisionsOrderReloadsWithinOneTrack() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.settings.order")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    let loaded = transport.perform(.init(command: .load, payload: .init(path: url.path)))
+    let initial = try #require(loaded.status?.diagnostics.generation)
+    let first = try transport.reconfigureSync(.init(
+        longPlayEnabled: true, manualPlayMilliseconds: 1_000, expectedGeneration: initial, settingsRevision: 1
+    ))
+    let second = try transport.reconfigureSync(.init(
+        longPlayEnabled: true, manualPlayMilliseconds: 2_000, expectedGeneration: initial, settingsRevision: 2
+    ))
+    #expect(second.generation != first.generation)
+    #expect(throws: CancellationError.self) {
+        try transport.reconfigureSync(.init(
+            longPlayEnabled: true, manualPlayMilliseconds: 3_000, expectedGeneration: initial, settingsRevision: 1
+        ))
+    }
+    #expect(transport.statusSync().generation == second.generation)
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let replacement = transport.statusSync()
+    #expect(throws: CancellationError.self) {
+        try transport.reconfigureSync(.init(
+            longPlayEnabled: true, manualPlayMilliseconds: 4_000, expectedGeneration: initial, settingsRevision: 3
+        ))
+    }
+    #expect(transport.statusSync().generation == replacement.generation)
+}
+
 @Test func asyncSeekRejectsUnrepresentablePositionsWithoutChangingPlayback() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }

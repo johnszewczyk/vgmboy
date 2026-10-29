@@ -9,15 +9,30 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Ordered settings reconfiguration, 2026-10-29: shared transport accepts an
+  earlier generation only within the current loaded track's reload lineage and
+  rejects older settings revisions or a replacement track's old generation.
+  Focused native tests cover successive reloads, out-of-order requests,
+  replacement and wire compatibility. SB2 adoption remains deferred: WebView
+  recreation can reset its local revision counter while the native session
+  survives. Resolve and test counter synchronization before enabling the guard;
+  packaged races and audible transitions remain unverified. Three focused
+  transport checks and 17 SB2 renderer checks passed, and SB2 built. The full
+  transport run failed device-driven drain cases with zero consumed frames; a
+  focused retry and the same case in the earlier isolated checkout failed the
+  same way. macOS listed the built-in speakers, but this does not establish why
+  the output callback did not drain. Recheck the output environment and rerun
+  those tests before claiming full validation.
+
 - Stale reconfiguration boundary, 2026-10-29: a focused native test reproduced
   an old request reloading a replacement track. Shared reconfiguration now
   accepts an optional expected native generation and rejects mismatches before
   changing playback; requests that omit it remain compatible. The matching
-  generation still reconfigures. SB2 does not yet send the guard: two rapid
+  generation still reconfigures. At this checkpoint SB2 did not send the guard: two rapid
   settings changes can both observe the same generation, so an earlier accepted
   reload could cause the latest setting to be rejected. Resolve and test that
-  settings ordering before adopting the guard in SB2; the interference risk
-  remains open at that bridge.
+  settings ordering before adopting the guard in SB2; see the later shared
+  ordering checkpoint above for the remaining WebView lifecycle issue.
 
 - Superseded preparation preservation, 2026-10-29: the first cancellation
   fix still replaced and retired an already-playing track after an archive
