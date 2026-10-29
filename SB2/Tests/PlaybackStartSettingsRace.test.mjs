@@ -14,7 +14,7 @@ const makePlayer = new Function('env', `
   let nativePlaybackInitialized = true;
   const playbackApp = { ui: { refreshPlaylistPlaybackState() {} } };
   const currentTotalSeconds = () => 10, currentOutputBasePlaybackSeconds = () => 10;
-  const currentFadeSeconds = () => 0, playbackSpeedForTrack = () => ({ numerator: 1, denominator: 1 });
+  const currentFadeSeconds = () => 0, requestedPlaybackSpeed = () => ({ numerator: 1, denominator: 1 });
   const resetNativePlaybackSnapshot = () => {}, updatePlaybackReadout = () => {}, updateNativeDiagnostics = () => {};
   ${source.slice(start, end)}
   return { playTrackNow, changeSettings: () => { playbackSettingsGeneration++; },

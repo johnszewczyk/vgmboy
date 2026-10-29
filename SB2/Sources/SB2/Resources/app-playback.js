@@ -176,7 +176,11 @@ function effectiveTotalSeconds(track) {
     : currentTotalSeconds(track);
 }
 
-function playbackSpeedForTrack(track) {
+function requestedPlaybackSpeed() {
+  return state.playbackSpeedEnabled ? state.playbackSpeed : { numerator: 1, denominator: 1 };
+}
+
+function fallbackPlaybackSpeedForTrack(track) {
   const sourceName = track?.archiveEntry || track?.sourceFilename || track?.path || "";
   const backend = playbackBackends.forPath(sourceName);
   const extension = playbackBackends.extensionForPath(sourceName);
@@ -200,7 +204,7 @@ function currentOutputBasePlaybackSeconds(track) {
   const plan = track ? timingPlans.get(track.id) : null;
   // The shared preview is already scaled to output time at the effective tempo.
   if (plan) return plan.pre_fade_seconds;
-  const speed = playbackSpeedForTrack(track);
+  const speed = fallbackPlaybackSpeedForTrack(track);
   const baseSeconds = track?.basePlaybackSeconds > 0 ? track.basePlaybackSeconds : state.unknownDurationSeconds;
   const milliseconds = Math.max(0, Math.round(baseSeconds * 1000));
   return Math.round(milliseconds * speed.denominator / speed.numerator) / 1000;
@@ -221,7 +225,7 @@ async function resolveTimingPlan(track, { force = false, cache = true } = {}) {
     manualPlayMilliseconds: Math.max(0, Math.round(state.manualPlayTimeSeconds * 1000)),
     fadeMilliseconds: Math.max(0, Math.round(currentFadeSeconds(track) * 1000)),
     unknownDurationMilliseconds: Math.max(1, Math.round(state.unknownDurationSeconds * 1000)),
-    tempo: playbackSpeedForTrack(track),
+    tempo: requestedPlaybackSpeed(),
     longPlayEnabled: state.longPlayEnabled
   });
   if (!plan || !Number.isFinite(Number(plan.pre_fade_seconds))) {
@@ -250,11 +254,6 @@ function matchesCurrentPlaybackSettings(requestGeneration, generation, trackID) 
     && generation === playbackGeneration
     && state.currentTrackId === trackID
     && currentTrack()?.id === trackID;
-}
-
-function samePlaybackSpeed(left, right) {
-  return Number(left?.numerator) === Number(right?.numerator)
-    && Number(left?.denominator) === Number(right?.denominator);
 }
 
 function clampPosition(positionSeconds, durationSeconds) {
@@ -906,7 +905,7 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
         ? playbackBaseSeconds
         : (timingPlan.is_long_play ? playbackBaseSeconds : 0)) * 1000),
       fadeMilliseconds: Math.round((fadeNowSeconds > 0 ? fadeNowSeconds : currentFadeSeconds(track)) * 1000),
-      tempo: playbackSpeedForTrack(track),
+      tempo: requestedPlaybackSpeed(),
       longPlayEnabled: timingPlan.is_long_play,
       timedOverride: fadeNowSeconds > 0,
       unknownDurationMilliseconds: Math.round(state.unknownDurationSeconds * 1000)
@@ -1260,7 +1259,7 @@ async function refreshPlaybackForTimingChange() {
       manualPlayMilliseconds: Math.max(0, Math.round(plan.pre_fade_seconds * 1000)),
       fadeMilliseconds: Math.max(0, Math.round(plan.fade_seconds * 1000)),
       unknownDurationMilliseconds: Math.max(1, Math.round(state.unknownDurationSeconds * 1000)),
-      tempo: playbackSpeedForTrack(track)
+      tempo: requestedPlaybackSpeed()
     });
   } catch (error) {
     if (!matchesCurrentPlaybackSettings(requestGeneration, generation, trackID)) return;

@@ -9,6 +9,14 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- SB2 tempo policy extraction, 2026-10-29: timing previews, native start and
+  reconfiguration now forward the selected tempo to shared format policy,
+  rather than applying SB2's backend limits before those requests. SB2 retains
+  a local estimate only while a shared timing preview is unavailable. Renderer
+  tests cover enabled and disabled intent and forwarding; shared transport
+  coverage verifies effective decoder limits. Packaged speed changes and audible
+  continuity remain open.
+
 - Shared preview bounds, 2026-10-29: timing preview now rejects negative or
   larger-than-native input durations before scaling. This prevents an oversized
   bridge request from trapping during integer conversion; tests cover an
