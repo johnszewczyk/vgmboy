@@ -9,6 +9,14 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- In-memory source verification, 2026-10-29: the shared coordinator started,
+  paused and reconfigured vendored SPC and SAP bytes using nonexistent file
+  paths. Both retained track identity and paused state through a new generation;
+  the requested 2x applied to SPC and resolved to 1x for SAP. Fixture SHA-256:
+  SPC `c2e3fbc4ecee60a2f9102acd374387438ac3a9ba5bfaca2f02a12fc6315bee85`,
+  SAP `a2b8e006e28f40ff638b657645f8002c70c9a8f0979b462b4a68613bc8442454`.
+  This is native integration evidence, not SB2 packaged or audible evidence.
+
 - Loop and seek bounds, 2026-10-29: extreme valid-looking loop metadata could
   trap while converting to output frames, and extreme direct seeks could
   overflow decoder conversions. Session load now rejects loop boundaries that

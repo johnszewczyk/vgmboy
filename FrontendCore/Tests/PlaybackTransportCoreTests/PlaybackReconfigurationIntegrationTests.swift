@@ -330,6 +330,41 @@ func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
     }
 }
 
+@Test func inMemorySourcesSurviveSharedReconfigurationWithoutAFilePath() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    for (relative, ext, effective) in [
+        ("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc", "spc", 2.0),
+        ("VGMBoy/vendor/zxtune/samples/chiptunes/CO12294/sap/intro.sap", "sap", 1.0)
+    ] {
+        let data = try Data(contentsOf: root.appendingPathComponent(relative))
+        let path = "/no-such-directory/shared-memory-fixture.\(ext)"
+        #expect(!FileManager.default.fileExists(atPath: path))
+        let transport = PlaybackTransportCoordinator(label: "test.in-memory.reconfiguration")
+        defer { _ = transport.perform(.init(command: .stop)) }
+        let start = PlaybackContinuationStart(
+            track: .init(id: "memory-\(ext)", path: path, sourceData: data),
+            payload: .init(path: path, tempo: 1, playbackMode: .longPlay, playMilliseconds: 20_000, fadeMilliseconds: 0),
+            requestID: transport.reservePlaybackRequest()
+        )
+        try transport.start(start)
+        #expect(transport.perform(.init(command: .pause)).kind != .error)
+        let before = transport.statusSync()
+        #expect(before.currentTrackID == "memory-\(ext)")
+        #expect(before.trackLoaded)
+        let after = try transport.reconfigureSync(.init(
+            longPlayEnabled: true, manualPlayMilliseconds: 10_000,
+            fadeMilliseconds: 0, tempo: .init(numerator: 2, denominator: 1)
+        ))
+        #expect(after.currentTrackID == "memory-\(ext)")
+        #expect(after.trackLoaded)
+        #expect(!after.isPlaying)
+        #expect(after.tempo == effective)
+        #expect(after.generation != before.generation)
+    }
+}
+
 @Test func unsupportedDirectTempoDoesNotDiscardPausedPCM() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
