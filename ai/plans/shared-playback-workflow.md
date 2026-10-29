@@ -9,6 +9,21 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Packaged SB2 timing and stop, 2026-10-29: an isolated bundle based on
+  `0c8d54fa` with isolated user data and a small schema-24 test catalog played
+  the SPC fixture (SHA-256
+  `c2e3fbc4ecee60a2f9102acd374387438ac3a9ba5bfaca2f02a12fc6315bee85`).
+  The interface showed pause/resume state changes, rapid Long Play and speed
+  changes, and matching 3:06, 1:26 and 0:26 timing projections. Stopping after
+  the changes exposed a 3:06 stale total while the selected track projected
+  0:26. SB2 now uses the selected track's timing plan on stop; a test failed
+  before the change and passed afterward, and a rebuilt isolated bundle showed
+  0:00 / 0:26 / 0:20 after stopping. All 19 SB2 playback renderer checks passed.
+  This does not prove audible continuity or WebView recreation. With the real
+  large catalog expanded, UI automation stalled and a WebKit sample showed
+  style recalculation; the cause and product impact remain unconfirmed. The
+  sample is `/private/tmp/sb2-webcontent-busy-pass.txt` while present.
+
 - Fade duration bounds, 2026-10-29: shared faded skip rejects nonfinite and
   unrepresentable durations before integer conversion; finite negative values
   retain their minimum-duration behavior. The VGMBoy session rejects ramps

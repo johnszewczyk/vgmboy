@@ -61,6 +61,27 @@ test('live timing changes target the observed native session', async () => {
   assert.equal(requests.length, 1);
 });
 
+test('stopping shows the selected track timing rather than the manual default', async () => {
+  const start = source.indexOf('async function stopPlaybackState(');
+  const end = source.indexOf('\nasync function cancelQueuedSkip(', start);
+  assert.ok(start >= 0 && end > start);
+  const state = { currentTrackId: 'one', currentTrackInfo: {}, isPlaying: true, elapsedSeconds: 12 };
+  const run = new Function('state', `
+    let queuedSkipRequest = {}, playbackGeneration = 0, playbackWindow = {};
+    const clearQueuedSkipTimer = () => {}, stopAllOutput = async () => {};
+    const setPlaybackPowerSaveBlocker = async () => {};
+    const targetPlaybackSeconds = () => 186, activeTrackInfo = () => ({ id: 'one' });
+    const currentTotalSeconds = () => 26;
+    const resetNativePlaybackSnapshot = () => {}, updatePlaybackReadout = () => {}, updateNativeDiagnostics = () => {};
+    const playbackApp = { ui: { refreshPlaylistPlaybackState: () => {} } };
+    ${source.slice(start, end)}
+    return stopPlaybackState;
+  `)(state);
+  await run();
+  assert.equal(state.totalSeconds, 26);
+  assert.equal(state.elapsedSeconds, 0);
+});
+
 const resolveStart = source.indexOf('async function resolveTimingPlan(');
 const resolveEnd = source.indexOf('\nfunction matchesCurrentPlaybackSettings(', resolveStart);
 assert.ok(resolveStart >= 0 && resolveEnd > resolveStart);
