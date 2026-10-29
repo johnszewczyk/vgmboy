@@ -55,6 +55,8 @@ component task:
 
 - Cross-component ownership or priorities:
   [ai/plans/family-priorities.md](ai/plans/family-priorities.md).
+- Shared playback workflow research and implementation plan:
+  [ai/plans/shared-playback-workflow.md](ai/plans/shared-playback-workflow.md).
 - Player frontend comparison or parity:
   [ai/reports/frontend-parity.md](ai/reports/frontend-parity.md).
 - Family-wide clean checkout or build evidence:
