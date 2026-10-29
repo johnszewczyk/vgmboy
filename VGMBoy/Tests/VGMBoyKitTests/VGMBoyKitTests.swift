@@ -697,6 +697,21 @@ struct PlaybackControlProtocolTests {
         #expect(PlaybackTempo.parse("999999999999999999999999.5") == nil)
     }
 
+    @Test("decoded tempo values retain the constructor's invariants")
+    func decodedTempoValuesAreNormalized() throws {
+        for json in [#"{"numerator":1,"denominator":0}"#,
+                     #"{"numerator":-1,"denominator":2}"#,
+                     #"{"numerator":1000001,"denominator":1}"#] {
+            let value = try JSONDecoder().decode(PlaybackTempo.self, from: Data(json.utf8))
+            #expect(value == .defaultValue)
+            #expect(PlaybackPreferences.normalizedTempo(value) == .defaultValue)
+            #expect(value.displayString == "1")
+        }
+        let fraction = try JSONDecoder().decode(PlaybackTempo.self, from: Data(#"{"numerator":10,"denominator":8}"#.utf8))
+        #expect(fraction == PlaybackTempo(numerator: 5, denominator: 4))
+        #expect(try JSONDecoder().decode(PlaybackTempo.self, from: JSONEncoder().encode(fraction)) == fraction)
+    }
+
     @Test("v1 load control round-trips through Codable")
     func loadRequestRoundTrip() throws {
         let request = PlaybackControlRequest(
