@@ -6,6 +6,23 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Completion race pass, 2026-10-29: ViewBoy previously continued a completed
+  queue after a delayed retirement reply even if the same track had restarted
+  or reconfigured; random modes also proceeded when native retirement returned
+  no decision. It now checks track, native generation and request token after
+  each asynchronous boundary and requires a successful native claim. Four
+  focused tests execute the renderer handler and pass; the old handler fails
+  three of them. SB2 now checks the native generation after retirement as well
+  as its frontend generation and track ID; a temporary focused smoke check
+  reproduces the old unwanted advance and passes against the fix. Both isolated
+  frontend packages build. In a ViewBoy packaged run, two generated 3-second
+  WAVs played to natural completion, advanced from one to two and stopped;
+  both appeared in isolated history. This does not prove audible continuity.
+  CocoaSpice passes transport callbacks through a main-queue handoff and a
+  separate MainActor task without retaining the originating generation in its
+  playback snapshot; investigate whether delayed callbacks can update a newer
+  session before treating its event-order gate as complete.
+
 - ViewBoy history fix, 2026-10-29: the packaged UI played the SPC but did
   not add it to shared history. The renderer passes one track dictionary to
   `playbackHistoryRecord`, while ViewBoy's bridge tried to parse it directly
@@ -273,8 +290,8 @@ frontend adapters translate user intent and display authoritative results.
 | App-specific controls, navigation, queue policy and presentation | SB2, ViewBoy, CocoaSpice |
 | Archive and UAC interpretation | Existing owning components; preserve their contracts |
 
-Review direct PlaybackController clients, including VGMBoy itself, and affected
-shared clients such as LineBoy. Investigate hosted SBONLINE integration before
+Review direct PlaybackController clients, including VGMBoy itself. LineBoy is
+deprecated and excluded from this plan at the user’s direction. Investigate hosted SBONLINE integration before
 changing a shared contract it consumes; do not alter its separately owned
 production deployment as part of this plan without an explicit cross-project
 scope. Avoid introducing a second playback engine or frontend-specific transport
@@ -568,8 +585,8 @@ monotonic where appropriate, and playback ends exactly once after draining.
 Migrate SB2, ViewBoy and CocoaSpice in small reviewable steps to the shared
 transaction and authoritative status, removing duplicated transport decisions
 only when their behavior is covered. Verify ViewBoy's renderer generation
-handling explicitly. Check direct VGMBoy callers and affected LineBoy/hosted
-integration for API compatibility. Preserve app-specific options, selection,
+handling explicitly. Check direct VGMBoy callers and affected hosted integration
+for API compatibility. LineBoy is deprecated and excluded from this plan. Preserve app-specific options, selection,
 archives, queue, navigation and persistence; update implemented current-state
 subsystem documentation with the final behavior.
 
@@ -587,8 +604,8 @@ identity, formats, app build and observed results:
   progress ordering. Include tempo endpoints, persisted out-of-range values,
   subsecond and zero duration, loops/fades and in-memory/archive sources.
 - Package and renderer checks for touched owners; `scripts/verify-family.sh`
-  covers several family packages but does **not** cover SB2 or LineBoy. Select
-  their own applicable checks explicitly. SB2's `ai/AGENTS.md` says not to add
+  covers several family packages but does **not** cover SB2. Select SB2 checks
+  explicitly; deprecated LineBoy is outside this plan. SB2's `ai/AGENTS.md` says not to add
   tests or run test suites unless requested: obtain authorization through the
   implementation request before doing either. CocoaSpice's instructions prefer
   human testing unless a quick sanity check suffices.

@@ -6399,6 +6399,9 @@ async function handleNativeEnded(snapshot) {
   applyNativeStatus(snapshot);
   state.retiredGeneration = generation;
   const completedId = state.currentTrackId;
+  const playbackToken = state.playbackToken;
+  const stillCurrent = () => state.currentTrackId === completedId
+    && state.playbackGeneration === generation && state.playbackToken === playbackToken;
   const queue = [...(state.playbackQueue.length ? state.playbackQueue : state.activeQueue)];
   try {
     const decision = await bridge.playbackCompletionRetire({
@@ -6411,7 +6414,7 @@ async function handleNativeEnded(snapshot) {
       playlistIds: queue.map(trackID),
       intent: { repeatMode: state.preferences.repeatMode === "one" ? "one" : "off" },
     });
-    if (state.currentTrackId !== completedId) return;
+    if (!decision || !stillCurrent()) return;
     const repeatMode = state.preferences.repeatMode || "off";
     const randomMode = state.preferences.randomMode || "off";
     let next = null;
@@ -6422,7 +6425,7 @@ async function handleNativeEnded(snapshot) {
       next = pickPlaylistRandom(queue, repeatMode === "all");
     } else if (randomMode === "library") {
       const selection = await pickLibraryRandom();
-      if (state.currentTrackId !== completedId) return;
+      if (!stillCurrent()) return;
       next = selection?.track || null;
       nextQueue = selection?.queue || queue;
     } else {
@@ -6442,6 +6445,7 @@ async function handleNativeEnded(snapshot) {
       render();
     }
   } catch (error) {
+    if (!stillCurrent()) return;
     state.status = `QUEUE ERROR: ${error.message}`;
     render();
   }
