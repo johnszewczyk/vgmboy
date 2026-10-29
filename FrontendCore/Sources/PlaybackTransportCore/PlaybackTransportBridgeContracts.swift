@@ -143,13 +143,23 @@ public struct PlaybackTransportAACExportCancellationResponse: Codable, Equatable
 /// for session validity; this boundary only prevents positional bridge values.
 public struct PlaybackTransportSeekRequest: Codable, Equatable, Sendable {
     public let positionMilliseconds: Int
+    public let expectedGeneration: Int?
 
-    public init(positionMilliseconds: Int) {
+    public init(positionMilliseconds: Int, expectedGeneration: Int? = nil) {
         self.positionMilliseconds = max(0, positionMilliseconds)
+        self.expectedGeneration = expectedGeneration
     }
 
     public var payload: PlaybackControlPayload {
         .init(positionMilliseconds: positionMilliseconds)
+    }
+}
+
+public struct PlaybackTransportSessionRequest: Codable, Equatable, Sendable {
+    public let expectedGeneration: Int?
+
+    public init(expectedGeneration: Int? = nil) {
+        self.expectedGeneration = expectedGeneration
     }
 }
 

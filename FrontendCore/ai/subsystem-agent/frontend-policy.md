@@ -92,6 +92,8 @@ startup contracts shared by the VGMMan player frontends.
   field retain their legacy behavior.
 - Conditional stop has asynchronous and synchronous entry points; both check
   the latest reserved playback request on the transport queue before retirement.
+- Session-scoped pause, resume and seek commands optionally carry the expected
+  native generation, checked before the shared controller executes them.
 - Timing previews use the decoder family's effective rate rather than the
   stored requested preference. Native status and preview calculations must
   agree when a backend clamps or rounds a requested rate. Preview durations

@@ -29,6 +29,8 @@ generation, so a delayed output ramp cannot modify a replacement session.
 Start, stop, unload and cache-clear operations reserve playback request
 ownership at WebKit message receipt, before detached workers can reorder them;
 the shared transport rejects a superseded start or stop.
+Pause, resume and seek carry the native session generation captured at the
+start of the renderer operation; stale controls are rejected by shared transport.
 
 ## Playback completion
 

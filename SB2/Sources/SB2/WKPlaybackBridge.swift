@@ -148,12 +148,11 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 requestID: requestID ?? transport.reservePlaybackRequest()
             ))
             return statusResponse()
-        case "nativePlaybackResume":
-            try perform(.play)
-            return statusResponse()
-        case "nativePlaybackPause":
-            try perform(.pause)
-            return statusResponse()
+        case "nativePlaybackResume", "nativePlaybackPause":
+            let request: PlaybackTransportSessionRequest = args.isEmpty
+                ? .init() : try bridgeRequest(args, errorMessage: "Playback control requires a valid session identity.")
+            let command: PlaybackControlCommand = method == "nativePlaybackResume" ? .play : .pause
+            return statusResponse(try transport.performSessionControlSync(command, expectedGeneration: request.expectedGeneration))
         case "nativePlaybackStop", "nativePlaybackClose", "nativePlaybackUnload":
             guard let requestID, transport.stopForPlaybackRequestSync(requestID) else {
                 throw PlaybackBridgeError.superseded
@@ -164,8 +163,8 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 args,
                 errorMessage: "Playback seek requires a position."
             )
-            try perform(.seek, payload: request.payload)
-            return statusResponse()
+            return statusResponse(try transport.performSessionControlSync(.seek, payload: request.payload,
+                                                                            expectedGeneration: request.expectedGeneration))
         case "nativePlaybackRampGain":
             let request: PlaybackTransportRampGainRequest = try bridgeRequest(
                 args,
