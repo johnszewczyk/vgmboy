@@ -47,6 +47,29 @@ private final class StatusRecorder: @unchecked Sendable {
     #expect(updated.tempo == 1)
 }
 
+@Test func unchangedReconfigurationKeepsSessionAndBufferedPCM() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.unchanged.reconfiguration")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    let loaded = transport.perform(.init(command: .load, payload: .init(
+        path: url.path, tempo: 1, playbackMode: .fileDefault,
+        fadeMilliseconds: 0, unknownDurationMilliseconds: 150_000
+    )))
+    let before = try #require(loaded.status)
+    let unchanged = try transport.reconfigureSync(.init(
+        longPlayEnabled: false, fadeMilliseconds: 0, unknownDurationMilliseconds: 150_000
+    ))
+    #expect(unchanged.generation == before.diagnostics.generation)
+    #expect(unchanged.bufferedFrames == before.diagnostics.bufferedFrames)
+    #expect(unchanged.elapsedSeconds == before.elapsedSeconds)
+    let changed = try transport.reconfigureSync(.init(
+        longPlayEnabled: false, fadeMilliseconds: 1_000, unknownDurationMilliseconds: 150_000
+    ))
+    #expect(changed.generation != unchanged.generation)
+}
+
 @Test func sharedReconfigurationRetiresFailedReload() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
@@ -135,7 +158,7 @@ func reconfigurationCapturesPositionAfterArchivePreparation() async throws {
     let before = controller.status()
     let operation = Task.detached {
         controller.perform(.init(command: .setPlaybackMode, payload: .init(
-            playbackMode: .fileDefault, fadeMilliseconds: 0
+            playbackMode: .fileDefault, fadeMilliseconds: 1_000
         )))
     }
     try await Task.sleep(for: .milliseconds(200))
@@ -368,7 +391,7 @@ func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
         trackID: "loop-track", sourcePath: url.path, fadeMilliseconds: 0, loop: loop
     )
     try transport.start(request.continuationStart(requestID: transport.reservePlaybackRequest()))
-    let configured = try transport.reconfigureSync(.init(longPlayEnabled: false, fadeMilliseconds: 0))
+    let configured = try transport.reconfigureSync(.init(longPlayEnabled: false, fadeMilliseconds: 1_000))
     for _ in 0..<100 where ends.snapshot().isEmpty {
         try await Task.sleep(for: .milliseconds(50))
     }
@@ -540,7 +563,7 @@ func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
     let originalGeneration = try #require(loaded.status?.diagnostics.generation)
     #expect(transport.perform(.init(command: .play)).kind != .error)
     let changed = transport.perform(.init(command: .setPlaybackMode, payload: .init(
-        playbackMode: .timed, playMilliseconds: 1_000, fadeMilliseconds: 0
+        playbackMode: .timed, playMilliseconds: 1_000, fadeMilliseconds: 1_000
     )))
     #expect(changed.kind != .error)
     let newGeneration = try #require(changed.status?.diagnostics.generation)

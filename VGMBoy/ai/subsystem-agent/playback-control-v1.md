@@ -63,7 +63,9 @@ same typed endpoint operations.
   An unsupported or already-effective direct tempo command leaves buffered PCM intact.
 - A `set_playback_mode` request can include a tempo multiplier. VGMBoy applies
   both to the same reload and resumes from the prior session position and play
-  state; it does not issue a separate in-place tempo change first.
+  state; it does not issue a separate in-place tempo change first. An identical
+  timing configuration and effective tempo is a no-op and keeps the session,
+  generation, and buffered PCM.
 - A changed `set_tempo` uses the same reload and retains the existing timing
   settings; an unchanged effective rate is a no-op. A reload gets a new native
   generation. The logical output-time seek is rebased by old effective tempo
