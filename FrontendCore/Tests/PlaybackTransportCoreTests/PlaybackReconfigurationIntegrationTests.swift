@@ -297,6 +297,39 @@ func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
     }
 }
 
+@Test func typedStartAndReconfigurationResolveRequestedTempoInSharedCore() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let spc = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let wav = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: wav) }
+    try silentWAV(seconds: 3).write(to: wav)
+    for (url, effective) in [(spc, 4.0), (wav, 1.0)] {
+        let transport = PlaybackTransportCoordinator(label: "test.typed.requested.tempo")
+        defer { _ = transport.perform(.init(command: .stop)) }
+        let requested = PlaybackTempo(numerator: 8, denominator: 1)
+        let preview = try PlaybackTimingPreviewRequest(
+            sourcePath: url.path, manualPlayMilliseconds: 80_000, fadeMilliseconds: 0,
+            tempo: requested, longPlayEnabled: true
+        ).preview()
+        let start = PlaybackTransportStartRequest(
+            trackID: "tempo", sourcePath: url.path,
+            playMilliseconds: preview.preFadeMilliseconds, fadeMilliseconds: 0,
+            tempo: requested, longPlayEnabled: true
+        )
+        try transport.start(start.continuationStart(requestID: transport.reservePlaybackRequest()))
+        #expect(transport.statusSync().tempo == effective, Comment(rawValue: url.path))
+        #expect(preview.preFadeMilliseconds == Int(80_000 / effective), Comment(rawValue: url.path))
+        let updated = try transport.reconfigureSync(.init(
+            longPlayEnabled: true, manualPlayMilliseconds: preview.preFadeMilliseconds,
+            fadeMilliseconds: 0, tempo: requested
+        ))
+        #expect(updated.tempo == effective, Comment(rawValue: url.path))
+        #expect(updated.currentTrackID == "tempo")
+    }
+}
+
 @Test func unsupportedDirectTempoDoesNotDiscardPausedPCM() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
