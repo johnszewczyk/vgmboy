@@ -32,6 +32,10 @@ startup contracts shared by the VGMMan player frontends.
 - A successful low-level mode change can reload the native session. The
   coordinator adopts its returned generation and resets completion claims;
   stale natural-end events are discarded before status or end delivery.
+- Queued status for a retired generation is not published as the current track.
+  Failed starts and reconfigurations retain the previous track only if the
+  native generation did not change; once replacement starts, failure clears
+  coordinator track identity and retires the native session.
 - `FrontendStartupCore` owns the shared four-stage startup sequence, progress
   state transitions, and reveal/ready timing policy. Frontends own startup
   rendering and app-specific loading operations.

@@ -524,14 +524,21 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         } else {
             event = controller.perform(.init(command: .load, payload: start.payload))
         }
-        try requireSuccess(event)
-        if start.startMilliseconds > 0 {
-            try requireSuccess(controller.perform(.init(
-                command: .seek,
-                payload: .init(positionMilliseconds: start.startMilliseconds)
-            )))
+        do {
+            try requireSuccess(event)
+            if start.startMilliseconds > 0 {
+                try requireSuccess(controller.perform(.init(
+                    command: .seek,
+                    payload: .init(positionMilliseconds: start.startMilliseconds)
+                )))
+            }
+            try requireSuccess(controller.perform(.init(command: .play)))
+        } catch {
+            if event.kind != .error || event.status?.diagnostics.generation != currentPlaybackGeneration {
+                retirePlaybackLocked()
+            }
+            throw error
         }
-        try requireSuccess(controller.perform(.init(command: .play)))
         currentTrack = start.track
         currentPlaybackGeneration = event.status?.diagnostics.generation
     }
@@ -701,7 +708,13 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     public func perform(_ request: PlaybackControlRequest) -> PlaybackControlEvent {
         queue.sync {
             let event = controller.perform(request)
-            guard event.kind != .error else { return event }
+            guard event.kind != .error else {
+                if (request.command == .load || request.command == .setPlaybackMode),
+                   event.status?.diagnostics.generation != currentPlaybackGeneration {
+                    retirePlaybackLocked()
+                }
+                return event
+            }
             switch request.command {
             case .load:
                 if let path = request.payload.path, !path.isEmpty {
@@ -766,15 +779,23 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         } else {
             event = controller.perform(.init(command: .load, payload: payload))
         }
-        try requireSuccess(event)
-        currentPlaybackGeneration = event.status?.diagnostics.generation
-        if resumeAt > 0 {
-            try requireSuccess(controller.perform(.init(
-                command: .seek,
-                payload: .init(positionMilliseconds: Int(resumeAt * 1_000))
-            )))
+        let previousGeneration = currentPlaybackGeneration
+        do {
+            try requireSuccess(event)
+            currentPlaybackGeneration = event.status?.diagnostics.generation
+            if resumeAt > 0 {
+                try requireSuccess(controller.perform(.init(
+                    command: .seek,
+                    payload: .init(positionMilliseconds: Int(resumeAt * 1_000))
+                )))
+            }
+            if autoplay { try requireSuccess(controller.perform(.init(command: .play))) }
+        } catch {
+            if event.kind != .error || event.status?.diagnostics.generation != previousGeneration {
+                retirePlaybackLocked()
+            }
+            throw error
         }
-        if autoplay { try requireSuccess(controller.perform(.init(command: .play))) }
         currentTrack = track
         currentPlaybackPlan = plan
     }
@@ -823,6 +844,11 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
 
     private func publish(status: VGMBoyKit.PlaybackStatus, naturalEnd: Bool) {
         queue.async {
+            if let generation = self.currentPlaybackGeneration {
+                guard status.diagnostics.generation == generation else { return }
+            } else if status.statistics.trackIndex != nil {
+                return
+            }
             if naturalEnd,
                !self.naturalEndGate.shouldPublish(
                    generation: status.diagnostics.generation,

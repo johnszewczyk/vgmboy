@@ -6,6 +6,22 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Second pass: ordinary status callbacks are generation-filtered before
+  publication; failed replacement clears partial session and controller state
+  once native replacement begins, while failure during source preparation keeps
+  the old session. Failed mode preparation restores prior mode settings. Both
+  typed start and reconfiguration paths now clear track identity when a
+  replacement or its follow-up seek/play fails. These boundaries do not yet
+  constitute the shared atomic reconfiguration transaction in phase 2.
+- Focused integration coverage exercises delayed old status, failed archive
+  preparation, missing-decoder replacement, typed-start failure, retry, reload
+  end and delayed completion. It uses generated silent WAV files; dependency
+  archive leases, injected prime/seek/play failures, packaged UI, and audible
+  behavior remain unverified. Six focused FrontendCore tests and SB2, ViewBoy
+  and CocoaSpice Swift builds passed; these do not prove packaged playback.
+  Homebrew FFmpeg and libsidplayfp still produced macOS 27 versus target
+  macOS 26 linker warnings.
+
 - Family work in progress was captured and pushed as `e8de10f2`; this is a
   checkpoint, not a verified release. The generated Python bytecode cache was
   left untracked. The checkpoint contains Markdown hard-break trailing spaces that

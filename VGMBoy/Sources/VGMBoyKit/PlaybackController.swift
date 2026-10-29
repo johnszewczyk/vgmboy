@@ -248,15 +248,27 @@ public final class PlaybackController: @unchecked Sendable {
         guard tempo.isFinite, tempo > 0 else {
             throw PlaybackControlError.invalidPayload("Tempo must be a positive finite value.")
         }
-        if payload.playbackMode != nil || payload.playMilliseconds != nil || payload.fadeMilliseconds != nil || payload.unknownDurationMilliseconds != nil {
-            try configurePlaybackMode(payload, reloadCurrent: false)
-        }
         guard trackIndex >= 0, let family = FormatRegistry.family(for: playablePath) else {
             throw PlaybackControlError.invalidPayload("Track index must be non-negative and the file format must be supported.")
         }
+        if payload.playbackMode != nil || payload.playMilliseconds != nil || payload.fadeMilliseconds != nil || payload.unknownDurationMilliseconds != nil {
+            try configurePlaybackMode(payload, reloadCurrent: false)
+        }
         let plan = makePlan(family: family)
         let loop = payload.loop ?? (sourceData == nil ? PlaybackLoopTagReader.read(path: playablePath) : PlaybackLoopTagReader.read(data: sourceData ?? Data(), extensionName: URL(fileURLWithPath: playablePath).pathExtension))
-        _ = try session.load(path: playablePath, sourceData: sourceData, trackIndex: trackIndex, plan: plan, tempo: tempo, loop: loop)
+        do {
+            try session.load(path: playablePath, sourceData: sourceData, trackIndex: trackIndex, plan: plan, tempo: tempo, loop: loop)
+        } catch {
+            // Session load has already retired the previous decoder. Its
+            // metadata and materializer must not outlive that failed session.
+            lock.lock()
+            let previousMaterializer = activeArchiveMaterializer
+            activeArchiveMaterializer = nil
+            loaded = nil
+            lock.unlock()
+            previousMaterializer?.release()
+            throw error
+        }
         lock.lock()
         let previousMaterializer = activeArchiveMaterializer
         activeArchiveMaterializer = nextArchiveMaterializer
@@ -279,6 +291,10 @@ public final class PlaybackController: @unchecked Sendable {
             throw PlaybackControlError.invalidPayload("Unknown-duration fallback must be positive.")
         }
         lock.lock()
+        let previousMode = mode
+        let previousPlay = explicitPlayMilliseconds
+        let previousFade = explicitFadeMilliseconds
+        let previousUnknown = explicitUnknownDurationMilliseconds
         mode = requestedMode
         explicitPlayMilliseconds = payload.playMilliseconds
         explicitFadeMilliseconds = payload.fadeMilliseconds
@@ -287,12 +303,34 @@ public final class PlaybackController: @unchecked Sendable {
         lock.unlock()
         guard reloadCurrent, let current else { return }
         let previousStatus = session.status()
-        try load(
-            PlaybackControlPayload(path: current.path, archiveEntry: current.archiveEntry, trackIndex: current.trackIndex, tempo: current.tempo, loop: current.loop),
-            sourceData: current.sourceData
-        )
-        if previousStatus.elapsedSeconds > 0 { try session.seek(to: previousStatus.elapsedSeconds) }
-        if previousStatus.isPlaying { try session.play() }
+        do {
+            try load(
+                PlaybackControlPayload(path: current.path, archiveEntry: current.archiveEntry, trackIndex: current.trackIndex, tempo: current.tempo, loop: current.loop),
+                sourceData: current.sourceData
+            )
+            if previousStatus.elapsedSeconds > 0 { try session.seek(to: previousStatus.elapsedSeconds) }
+            if previousStatus.isPlaying { try session.play() }
+        } catch {
+            if session.status().diagnostics.generation == previousStatus.diagnostics.generation {
+                // Preparation failed before replacing the active decoder.
+                lock.lock()
+                mode = previousMode
+                explicitPlayMilliseconds = previousPlay
+                explicitFadeMilliseconds = previousFade
+                explicitUnknownDurationMilliseconds = previousUnknown
+                lock.unlock()
+            } else {
+                // Replacement began; no partially loaded session remains active.
+                session.stop()
+                lock.lock()
+                let materializer = activeArchiveMaterializer
+                activeArchiveMaterializer = nil
+                loaded = nil
+                lock.unlock()
+                materializer?.release()
+            }
+            throw error
+        }
     }
 
     private func makePlan(family: DecoderFamily) -> PlaybackPlan {

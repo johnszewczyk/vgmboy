@@ -49,6 +49,10 @@ same typed endpoint operations.
   a fade, status application, or completion handoff must discard the work when that generation
   changes; pause, seek, and output-gain ramps preserve it. Natural-end events carry the status
   captured when that session drained, even if a replacement loads before callback delivery.
+- A replacement preparation failure leaves the active decoder in place. Once a new session load
+  starts, a failure retires the prior decoder, releases its materializer, and clears loaded-track
+  state; a partially initialized replacement is stopped and released. A failed mode change restores
+  prior mode settings if source preparation failed before session replacement.
 - `PlaybackTempo` is the shared fraction representation for one global frontend speed setting. UI parsing accepts
   decimal or fractional input and snaps it to musical 1/32 increments before the host sends the
   typed `set_tempo` multiplier; decoder-family capability remains owned by `FormatRegistry` and

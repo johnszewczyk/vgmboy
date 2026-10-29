@@ -20,6 +20,87 @@ private final class EndRecorder: @unchecked Sendable {
     }
 }
 
+private final class StatusRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [PlaybackTransportStatus] = []
+    func record(_ status: PlaybackTransportStatus) { lock.lock(); values.append(status); lock.unlock() }
+    func clear() { lock.lock(); values.removeAll(); lock.unlock() }
+    func snapshot() -> [PlaybackTransportStatus] { lock.lock(); defer { lock.unlock() }; return values }
+}
+
+@Test func failedReplacementRetiresOnlyAfterSessionReplacementBegins() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 2).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.failed.replacement")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    let first = transport.perform(.init(command: .load, payload: .init(path: url.path)))
+    #expect(first.kind != .error)
+    let firstGeneration = try #require(first.status?.diagnostics.generation)
+
+    // Preparation fails before the current decoder is released.
+    let missingArchive = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".zip")
+    let preparationError = transport.perform(.init(command: .load, payload: .init(
+        path: missingArchive.path, archiveEntry: "track.spc"
+    )))
+    #expect(preparationError.kind == .error)
+    #expect(transport.statusSync().currentTrackID == url.path)
+    #expect(transport.statusSync().generation == firstGeneration)
+
+    // This admitted extension reaches session.load, which retires the old
+    // decoder before failing to open the missing replacement.
+    let missingWAV = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".wav")
+    let openError = transport.perform(.init(command: .load, payload: .init(path: missingWAV.path)))
+    #expect(openError.kind == .error)
+    let stopped = transport.statusSync()
+    #expect(stopped.currentTrackID == nil)
+    #expect(!stopped.trackLoaded)
+    #expect(!stopped.isPlaying)
+    #expect(stopped.generation != firstGeneration)
+
+    let retry = transport.perform(.init(command: .load, payload: .init(path: url.path)))
+    #expect(retry.kind != .error)
+    #expect(transport.statusSync().currentTrackID == url.path)
+
+    // The typed start route must apply the same failure boundary.
+    let start = PlaybackContinuationStart(
+        track: PlaybackTransportTrack(id: "missing", path: missingWAV.path),
+        payload: .init(path: missingWAV.path),
+        requestID: transport.reservePlaybackRequest()
+    )
+    #expect(throws: (any Error).self) { try transport.start(start) }
+    #expect(!transport.statusSync().trackLoaded)
+    #expect(transport.statusSync().currentTrackID == nil)
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+}
+
+@MainActor
+@Test func delayedOldStatusCannotDescribeReplacementTrack() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let first = directory.appendingPathComponent("first.wav")
+    let second = directory.appendingPathComponent("second.wav")
+    try silentWAV(seconds: 2).write(to: first)
+    try silentWAV(seconds: 2).write(to: second)
+    let transport = PlaybackTransportCoordinator(label: "test.delayed.status")
+    let statuses = StatusRecorder()
+    transport.setStatusHandler { statuses.record($0) }
+    let original = transport.perform(.init(command: .load, payload: .init(path: first.path)))
+    let oldGeneration = try #require(original.status?.diagnostics.generation)
+    let replacement = transport.perform(.init(command: .load, payload: .init(path: second.path)))
+    let newGeneration = try #require(replacement.status?.diagnostics.generation)
+    statuses.clear()
+    // The main queue could not deliver session status callbacks while the
+    // two synchronous loads ran, so the old callbacks arrive after replacement.
+    try await Task.sleep(for: .milliseconds(300))
+    let observed = statuses.snapshot()
+    #expect(!observed.isEmpty)
+    #expect(!observed.contains { $0.generation == oldGeneration })
+    #expect(observed.allSatisfy { $0.generation == newGeneration && $0.currentTrackID == second.path })
+    _ = transport.perform(.init(command: .stop))
+}
+
 @Test func reconfigurationPublishesEndForReloadedGeneration() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
