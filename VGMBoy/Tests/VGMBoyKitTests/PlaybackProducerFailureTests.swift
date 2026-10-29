@@ -33,11 +33,29 @@ private final class ScriptedProducerDecoder: AudioDecoder {
         case .mismatched: return ([0.5], [])
         case .pcm:
             absolutePlayedFrames += Int64(count)
-            let pcm = [Float](repeating: 0.5, count: count)
+            let pcm = [Float](repeating: 0, count: count)
             return (pcm, pcm)
         }
     }
     func close() { closed = true }
+}
+
+@Test func periodicDecodeFailureStopsOutputAndReportsError() async throws {
+    let decoder = ScriptedProducerDecoder([.pcm, .failure])
+    let session = makeSession(decoder)
+    defer { session.stop() }
+    _ = try session.load(path: "/fixture.spc", trackIndex: 0, plan: fixturePlan, tempo: 1)
+    try session.play()
+    for _ in 0..<80 where session.status().errorMessage == nil {
+        try await Task.sleep(for: .milliseconds(25))
+    }
+    let status = session.status()
+    #expect(status.errorMessage != nil)
+    #expect(!status.isPlaying)
+    #expect(!status.reachedEnd)
+    #expect(!decoder.closed)
+    session.stop()
+    #expect(decoder.closed)
 }
 private func makeSession(_ decoder: ScriptedProducerDecoder) -> PlaybackSession {
     PlaybackSession(output: AudioOutput(sampleRate: 44_100, capacitySeconds: 0.01), makeDecoder: { _, _, _ in decoder })
