@@ -9,6 +9,22 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Decoder setup cleanup, 2026-10-29: injected start and metadata failures showed
+  that a newly created decoder was not explicitly closed before session
+  ownership began. The session now owns the decoder immediately after creation,
+  so setup and priming failures use the same cleanup path. Additional injected
+  tests cover transient empty reads, invalid stereo PCM, thrown decode errors,
+  and recovery after an empty read; focused checks passed. Periodic-refill
+  failure and packaged playback with this follow-up still need verification.
+
+- Packaged producer smoke, 2026-10-29: rebuilt isolated SB2 from `178e8bc1`
+  producer sources and played the vendored SPC copied into the temporary test
+  directory (SHA-256 `c2e3fbc4ecee60a2f9102acd374387438ac3a9ba5bfaca2f02a12fc6315bee85`).
+  With an 8x request, the preview showed 0:26 and the clock advanced from 0:00
+  to 0:05. The first attempt using its path under Downloads stalled in a file
+  open before decoding; the process sample is `/private/tmp/sb2-producer-sample.txt`
+  while available. No conclusion about its cause or audible continuity is made.
+
 - Shared producer short-write pass, 2026-10-29: an offline small-ring test
   reproduced DSP state advancing for PCM that the ring rejected, and a real
   generated VGM primed into an 88-frame ring exposed 4,008 falsely audible

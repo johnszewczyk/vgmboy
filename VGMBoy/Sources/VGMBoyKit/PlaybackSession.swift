@@ -112,6 +112,7 @@ final class PlaybackSession: @unchecked Sendable {
     private let sampleRate = 44_100
     private let chunkFrameCount = 4096
     private let output: AudioOutput
+    private let makeDecoder: (String, Data?, Int) throws -> any AudioDecoder
     private var decoder: (any AudioDecoder)?
     private var capFrames: Int64 = 0
     private var fadeFrames: Int64 = 0
@@ -136,10 +137,14 @@ final class PlaybackSession: @unchecked Sendable {
 
     public init() {
         output = AudioOutput()
+        makeDecoder = { try DecoderFactory.make(path: $0, sourceData: $1, sampleRate: $2) }
     }
 
-    init(output: AudioOutput) {
+    init(output: AudioOutput, makeDecoder: @escaping (String, Data?, Int) throws -> any AudioDecoder = {
+        try DecoderFactory.make(path: $0, sourceData: $1, sampleRate: $2)
+    }) {
         self.output = output
+        self.makeDecoder = makeDecoder
     }
 
     func spectrum() -> (left: [Float], right: [Float]) { output.spectrum() }
@@ -187,7 +192,10 @@ final class PlaybackSession: @unchecked Sendable {
                     (path as NSString).pathExtension
                 )
             }
-            let decoder = try DecoderFactory.make(path: path, sourceData: sourceData, sampleRate: sampleRate)
+            let decoder = try makeDecoder(path, sourceData, sampleRate)
+            // Adopt the native resource immediately so failed track setup or
+            // metadata reads run the same explicit cleanup as failed priming.
+            self.decoder = decoder
             try decoder.startTrack(trackIndex)
             let effectiveTempo = FormatRegistry.effectiveTempo(tempo, family: family)
             decoder.setTempo(effectiveTempo)
@@ -259,7 +267,6 @@ final class PlaybackSession: @unchecked Sendable {
                 }
             }
 
-            self.decoder = decoder
             initialLoop = validLoop
             playbackLoop = validLoop
             remainingLoopRepeats = validLoop?.repeatCount
