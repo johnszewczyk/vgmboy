@@ -162,6 +162,13 @@ final class PlaybackSession: @unchecked Sendable {
         try queue.sync {
             releaseCurrent()
             generation += 1
+            var loadedSuccessfully = false
+            defer {
+                if !loadedSuccessfully {
+                    releaseCurrent()
+                    publishStatus()
+                }
+            }
             guard let family = FormatRegistry.family(for: path) else {
                 throw DecoderFactoryError.unsupportedFamily(
                     (path as NSString).pathExtension
@@ -251,6 +258,7 @@ final class PlaybackSession: @unchecked Sendable {
             output.clearBuffer()
             output.resetDiagnostics()
             try prime(to: output.primeFrameCount)
+            loadedSuccessfully = true
             publishStatus()
         }
     }
