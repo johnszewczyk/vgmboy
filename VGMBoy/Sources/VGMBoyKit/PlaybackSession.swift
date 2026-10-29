@@ -131,6 +131,7 @@ final class PlaybackSession: @unchecked Sendable {
     private var lastProgressStatusUptime: TimeInterval = 0
     private var statusHandler: (@Sendable (PlaybackStatus) -> Void)?
     private var completionHandler: (@Sendable () -> Void)?
+    private var completionStatusHandler: (@Sendable (PlaybackStatus) -> Void)?
 
     public init() {
         output = AudioOutput()
@@ -144,6 +145,10 @@ final class PlaybackSession: @unchecked Sendable {
 
     public func setCompletionHandler(_ handler: (@Sendable () -> Void)?) {
         queue.async { self.completionHandler = handler }
+    }
+
+    func setCompletionStatusHandler(_ handler: (@Sendable (PlaybackStatus) -> Void)?) {
+        queue.async { self.completionStatusHandler = handler }
     }
 
     public func load(
@@ -503,8 +508,11 @@ final class PlaybackSession: @unchecked Sendable {
         output.pause()
         publishStatus()
         let handler = completionHandler
+        let statusHandler = completionStatusHandler
+        let completedStatus = makeStatus()
         DispatchQueue.main.async {
             handler?()
+            statusHandler?(completedStatus)
         }
     }
 

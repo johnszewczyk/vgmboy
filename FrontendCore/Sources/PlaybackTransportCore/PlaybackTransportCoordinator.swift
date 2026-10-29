@@ -721,8 +721,13 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             default:
                 break
             }
-            if request.command == .load {
-                currentPlaybackGeneration = event.status?.diagnostics.generation
+            if request.command == .load || request.command == .setPlaybackMode {
+                let generation = event.status?.diagnostics.generation
+                if generation != currentPlaybackGeneration {
+                    naturalEndGate.reset()
+                    continuationCoordinator.reset()
+                }
+                currentPlaybackGeneration = generation
             }
             return event
         }
@@ -818,14 +823,14 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
 
     private func publish(status: VGMBoyKit.PlaybackStatus, naturalEnd: Bool) {
         queue.async {
+            if naturalEnd,
+               !self.naturalEndGate.shouldPublish(
+                   generation: status.diagnostics.generation,
+                   currentGeneration: self.currentPlaybackGeneration
+               ) { return }
             let snapshot = self.status(status)
             self.statusHandler?(snapshot)
-            guard naturalEnd,
-                  self.naturalEndGate.shouldPublish(
-                      generation: status.diagnostics.generation,
-                      currentGeneration: self.currentPlaybackGeneration
-                  ) else { return }
-            self.naturalEndHandler?(snapshot)
+            if naturalEnd { self.naturalEndHandler?(snapshot) }
         }
     }
 

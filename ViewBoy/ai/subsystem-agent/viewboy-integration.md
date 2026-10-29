@@ -4,6 +4,11 @@ ViewBoy owns its AppKit host, Yoga canvas renderer, bitmap fonts, framebuffer, i
 
 ## Data and Playback
 
+Reconfiguration can replace the active native playback generation. ViewBoy
+adopts newer status for the active track, checks the playback token and track
+identity before applying a delayed reconfiguration reply, and uses the current
+native generation for completion retirement.
+
 The injected `window.viewBoy` bridge supplies read-only CatalogReader projections, shared favorite and playback-history operations, database/cache controls, frontend preferences, local-path selection, and VGMBoy transport. `window.ViewBoy.dispatch` is the macOS menu command boundary. Both names are local to ViewBoy. Long Play, Repeat One, and the `randomMode` (`off`, `playlist`, or `library`) preference are stored in `ViewBoyPreferencesSnapshot`; random shuffle history and per-cycle seen-track state stay in the renderer. Playlist Random chooses from the active queue without replacement until a cycle ends. Library Random weights catalog game groups by `trackCount`, queries only the selected game's tracks, and avoids immediately replaying the current track when another song is available. Previous and Next in either random mode use a renderer history capped at 256 track entries; Library Random history retains only each selected track rather than previously fetched game playlists. Successful native playback starts write shared `PlaybackHistoryCore` records; the Recent view reads these through `playbackHistoryList`.
 
 Catalog and favorite state belongs to the native/shared cores. JavaScript owns the visible tree, current view, table layout, display preferences, and hit testing. `CatalogBrowserCore` supplies console groups and game/path search results; `CatalogPlaylistSorting` supplies explicit playlist order. ViewBoy maps returned game, file, and track IDs into its canvas model rather than rebuilding those policies. It must not scan source paths or write the catalog. Track activation sends the native playback fields supplied by the bridge, including archive path and entry. Enter follows the most recent selection surface: it starts the selected playlist track, or runs the existing Play Now flow for the last clicked or right-clicked sidebar context (game, system, Path folder, or file). Selecting a playlist row or playlist tab returns Enter to playlist behavior.

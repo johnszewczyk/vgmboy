@@ -206,7 +206,7 @@ const bridge = {
   }),
   nativePlaybackReconfigure: async (request) => {
     reconfigureCalls.push(request);
-    return { transport_state: 'playing', generation };
+    return { transport_state: 'playing', generation: ++generation, status_sequence: generation };
   },
   nativePlaybackStart: async (request) => {
     calls.push(['start', request]);
@@ -543,7 +543,10 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   await tick();
   assert.equal(savedPreferences.at(-1).longPlayEnabled, true);
   assert.equal(savedPreferences.at(-1).repeatMode, 'one');
+  const reconfiguredGeneration = generation;
   await ended({ transport_state: 'ended', generation, status_sequence: generation + 1 });
+  assert.equal(calls.filter(([name]) => name === 'retire').at(-1)[1].generation, reconfiguredGeneration,
+    'completion after reconfiguration retires the new native generation');
   assert.equal(calls.filter(([name]) => name === 'start').at(-1)[1].path, '/music/b.spc',
     'Repeat One restarts the current track when playback completes');
   assert.equal(calls.filter(([name]) => name === 'start').at(-1)[1].longPlayEnabled, true,

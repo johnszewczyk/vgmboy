@@ -47,7 +47,8 @@ same typed endpoint operations.
   `PlaybackStatus.diagnostics`.
 - `PlaybackStatus.diagnostics.generation` identifies the loaded native session. Clients that defer
   a fade, status application, or completion handoff must discard the work when that generation
-  changes; pause, seek, and output-gain ramps preserve it.
+  changes; pause, seek, and output-gain ramps preserve it. Natural-end events carry the status
+  captured when that session drained, even if a replacement loads before callback delivery.
 - `PlaybackTempo` is the shared fraction representation for one global frontend speed setting. UI parsing accepts
   decimal or fractional input and snaps it to musical 1/32 increments before the host sends the
   typed `set_tempo` multiplier; decoder-family capability remains owned by `FormatRegistry` and
