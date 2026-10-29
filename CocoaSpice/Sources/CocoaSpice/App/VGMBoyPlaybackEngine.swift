@@ -80,7 +80,8 @@ final class PlaybackEngine: @unchecked Sendable {
         // made its elapsed clock continue beneath the newly selected row and
         // falsely looked like the new track had loaded. A failed request must
         // therefore be visibly stopped and surface its materialization error.
-        await transport.stop()
+        guard await transport.stopForPlaybackRequest(requestID),
+              transport.isCurrentPlaybackRequest(requestID) else { throw CancellationError() }
         currentTrack = nil
         let playableTrack = try transportTrack(for: track)
         try await transport.play(

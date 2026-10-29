@@ -42,6 +42,22 @@ private final class StatusRecorder: @unchecked Sendable {
     #expect(recorded.snapshot().isEmpty)
 }
 
+@Test func staleReplacementCannotStopCurrentPlayback() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.stale.replacement.stop")
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let staleRequest = transport.reservePlaybackRequest()
+    let currentRequest = transport.reservePlaybackRequest()
+    #expect(!(await transport.stopForPlaybackRequest(staleRequest)))
+    let stillPlaying = await transport.status()
+    #expect(stillPlaying.currentTrackID == url.path && stillPlaying.isPlaying)
+    #expect(await transport.stopForPlaybackRequest(currentRequest))
+    #expect(!(await transport.status()).trackLoaded)
+}
+
 @Test func sharedReconfigurationRetainsPausedPositionAndGatesUnsupportedTempo() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }

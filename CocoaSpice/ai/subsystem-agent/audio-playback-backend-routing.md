@@ -97,6 +97,9 @@
 - CocoaSpice is not the owner of ScanSong's vgmstream or Highly Complete inspection plugins. Those
   executables are built and handed off by VGMBoy; CocoaSpice only provides the shared upstream
   source/build inputs used by the app family.
+- Before preparing a replacement, CocoaSpice requests a shared transport stop
+  guarded by the newest playback request; a superseded request cannot stop the
+  session owned by a newer request.
 - Core status updates CocoaSpice display state, while the coordinator's
   one-shot natural-end event returns the shared completion target. After the
   main-actor handoff the adapter asynchronously refreshes transport status and

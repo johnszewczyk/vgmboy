@@ -47,3 +47,27 @@ func naturalEndHandoffDeliversCurrentTrackOnce() async throws {
     #expect(statusCount < 100, "status refresh must not create an event feedback loop")
     await engine.stop()
 }
+
+@MainActor
+@Test(.enabled(if: ProcessInfo.processInfo.environment["COCOASPICE_EVENT_WAV"] != nil,
+               "Set COCOASPICE_EVENT_WAV to a short WAV fixture."))
+func supersededCocoaSpiceStartDoesNotStopNewerTrack() async throws {
+    let path = try #require(ProcessInfo.processInfo.environment["COCOASPICE_EVENT_WAV"])
+    let engine = PlaybackEngine()
+    let track = TrackItem(url: URL(fileURLWithPath: path))
+    let plan = PlaybackPlan(preFadeSeconds: 150, fadeSeconds: 0, usesNativeEnding: true, isLongPlay: false)
+    let stale = engine.reservePlaybackRequest()
+    let current = engine.reservePlaybackRequest()
+    try await engine.play(track: track, plan: plan, tempo: .defaultValue, requestID: current)
+    do {
+        try await engine.play(track: track, plan: plan, tempo: .defaultValue, requestID: stale)
+        Issue.record("A superseded playback request should not start")
+    } catch is CancellationError {
+        // Expected: the older request cannot retire the current session.
+    }
+    let status = await engine.statusSnapshot()
+    #expect(status.currentTrackID == track.id)
+    #expect(status.isPlaying)
+    #expect(engine.currentTrack?.id == track.id)
+    await engine.stop()
+}
