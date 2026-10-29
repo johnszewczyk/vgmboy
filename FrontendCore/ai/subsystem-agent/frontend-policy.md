@@ -90,6 +90,8 @@ startup contracts shared by the VGMMan player frontends.
   shared coordinator checks it on the transport queue before touching output,
   rejecting a ramp for a retired or replaced session; requests without the
   field retain their legacy behavior.
+- Conditional stop has asynchronous and synchronous entry points; both check
+  the latest reserved playback request on the transport queue before retirement.
 - Timing previews use the decoder family's effective rate rather than the
   stored requested preference. Native status and preview calculations must
   agree when a backend clamps or rounds a requested rate. Preview durations

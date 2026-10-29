@@ -76,16 +76,13 @@ final class WKPlaybackBridge: @unchecked Sendable {
         transport.retireCompletedPlayback(request)
     }
 
-    func handle(method: String, args: [Any]) throws -> Any {
-        let requestID: Int?
-        if method == "nativePlaybackStart" {
-            requestID = transport.reservePlaybackRequest()
-        } else {
-            requestID = nil
-            if ["nativePlaybackStop", "nativePlaybackClose", "nativePlaybackUnload"].contains(method) {
-                transport.invalidatePlaybackRequests()
-            }
-        }
+    func reservePlaybackRequest(for method: String) -> Int? {
+        guard ["nativePlaybackStart", "nativePlaybackStop", "nativePlaybackClose", "nativePlaybackUnload", "clearArchiveCache"].contains(method) else { return nil }
+        return transport.reservePlaybackRequest()
+    }
+
+    func handle(method: String, args: [Any], requestID: Int? = nil) throws -> Any {
+        let requestID = requestID ?? reservePlaybackRequest(for: method)
         return try handleSerialized(method: method, args: args, requestID: requestID)
     }
 
@@ -158,7 +155,9 @@ final class WKPlaybackBridge: @unchecked Sendable {
             try perform(.pause)
             return statusResponse()
         case "nativePlaybackStop", "nativePlaybackClose", "nativePlaybackUnload":
-            try perform(.stop)
+            guard let requestID, transport.stopForPlaybackRequestSync(requestID) else {
+                throw PlaybackBridgeError.superseded
+            }
             return statusResponse()
         case "nativePlaybackSeek":
             let request: PlaybackTransportSeekRequest = try bridgeRequest(
