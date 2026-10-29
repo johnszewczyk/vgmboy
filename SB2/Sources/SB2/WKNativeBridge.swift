@@ -438,6 +438,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         let catalogScope = CatalogSessionScope.scope(for: method)
         let catalogGeneration = catalogScope.map { catalogSessions.begin($0) }
         let requestMethod = method
+        // Assign lifecycle ownership before detached work can be reordered.
+        let playbackRequestID = WKPlaybackBridge.shared.reservePlaybackRequest(for: method)
         var detachedArguments = args
         if method == "nativePlaybackReconfigure",
            var settings = args.first as? [String: Any],
@@ -456,7 +458,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                           let detachedArgs = try JSONSerialization.jsonObject(with: data) as? [Any] else {
                         throw BridgeError.invalidArguments
                     }
-                    let result = try Self.handle(method: requestMethod, args: detachedArgs, catalogURL: requestCatalogURL)
+                    let result = try Self.handle(method: requestMethod, args: detachedArgs, catalogURL: requestCatalogURL,
+                                                 playbackRequestID: playbackRequestID)
                     return (true, Self.json(result))
                 } catch {
                     print("[SPCBOY SB2] request \(requestMethod) failed: \(error.localizedDescription)")
@@ -548,7 +551,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         }
     }
 
-    nonisolated private static func handle(method: String, args: [Any], catalogURL: URL) throws -> Any {
+    nonisolated private static func handle(method: String, args: [Any], catalogURL: URL, playbackRequestID: Int?) throws -> Any {
         switch method {
         case "processCPUTimeMilliseconds":
             var usage = rusage()
@@ -700,7 +703,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         case "archiveCacheSummary":
             return SB2ArchiveMaterialization.cacheSummary()
         case "clearArchiveCache":
-            _ = try WKPlaybackBridge.shared.handle(method: "nativePlaybackStop", args: [])
+            _ = try WKPlaybackBridge.shared.handle(method: "nativePlaybackStop", args: [], requestID: playbackRequestID)
             try SB2ArchiveMaterialization.clearCache()
             return true
         case "setPlaybackPowerSaveBlocker":
@@ -712,7 +715,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
              "nativePlaybackClose", "nativePlaybackUnload", "nativePlaybackSeek",
              "nativePlaybackState", "nativePlaybackRampGain",
              "nativeExportAAC", "nativeExportAACCancel":
-            return try WKPlaybackBridge.shared.handle(method: method, args: args)
+            return try WKPlaybackBridge.shared.handle(method: method, args: args, requestID: playbackRequestID)
         default:
             throw BridgeError.unsupported(method)
         }

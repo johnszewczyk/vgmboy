@@ -51,11 +51,33 @@ private final class StatusRecorder: @unchecked Sendable {
     #expect(transport.perform(.init(command: .play)).kind != .error)
     let staleRequest = transport.reservePlaybackRequest()
     let currentRequest = transport.reservePlaybackRequest()
+    #expect(!transport.stopForPlaybackRequestSync(staleRequest))
     #expect(!(await transport.stopForPlaybackRequest(staleRequest)))
     let stillPlaying = await transport.status()
     #expect(stillPlaying.currentTrackID == url.path && stillPlaying.isPlaying)
     #expect(await transport.stopForPlaybackRequest(currentRequest))
     #expect(!(await transport.status()).trackLoaded)
+}
+
+@Test func reversedReservedStartsKeepNewestSession() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.reversed.starts")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    let first = transport.reservePlaybackRequest()
+    let second = transport.reservePlaybackRequest()
+    func start(_ id: String, _ request: Int) -> PlaybackContinuationStart {
+        .init(track: .init(id: id, path: url.path), payload: .init(path: url.path), requestID: request)
+    }
+    try transport.start(start("new", second))
+    #expect(throws: CancellationError.self) { try transport.start(start("old", first)) }
+    #expect(transport.statusSync().currentTrackID == "new")
+    #expect(!transport.stopForPlaybackRequestSync(first))
+    #expect(transport.statusSync().currentTrackID == "new")
+    let stop = transport.reservePlaybackRequest()
+    #expect(transport.stopForPlaybackRequestSync(stop))
+    #expect(!transport.statusSync().trackLoaded)
 }
 
 @Test func invalidFadeDurationsLeavePlaybackIntact() async throws {

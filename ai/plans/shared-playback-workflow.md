@@ -9,6 +9,17 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- SB2 lifecycle request ordering, 2026-10-29: SB2's detached workers previously
+  reserved start ownership after dispatch, allowing worker scheduling to invert
+  message order. Start, stop, unload and cache-clear now reserve at message
+  receipt, and stop checks ownership on the shared transport queue. Native
+  integration checks exercise reversed reserved starts and stale stops; the
+  optional slow-archive cancellation test also passed in this pass. All 48
+  transport and 20 SB2 playback renderer checks passed and SB2 built. In a
+  rebuilt isolated bundle, Stop followed by a second WAV start left the second
+  session playing with its clock advancing. This does not force a WebKit worker
+  inversion or scope unrelated control commands.
+
 - Session-scoped output ramps, 2026-10-29: delayed SB2 fade or restore requests
   could otherwise act on a replacement session. A typed optional generation
   travels with the ramp, and shared transport checks it on its serialized
