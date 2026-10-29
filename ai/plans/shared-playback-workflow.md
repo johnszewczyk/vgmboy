@@ -9,6 +9,16 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Packaged SB2 Long Play observation, 2026-10-29: an isolated bundle rebuilt
+  with the current producer and loop-boundary code displayed 3:06 for the
+  three-minute Long Play setting with six-second fade. After restart, the
+  displayed clock advanced to 1:29 and then 2:20 on the temporary SPC fixture.
+  UI automation timed out during the restart and was slow to reconnect; a
+  process sample showed the main event loop waiting and a refill reading SPC
+  PCM, rather than a blocked playback queue. These observations do not prove
+  pause/resume, audible continuity, or completion ordering. The test copy was
+  closed; the sample is `/private/tmp/sb2-mode-stall-sample.txt` while present.
+
 - In-memory source verification, 2026-10-29: the shared coordinator started,
   paused and reconfigured vendored SPC and SAP bytes using nonexistent file
   paths. Both retained track identity and paused state through a new generation;
