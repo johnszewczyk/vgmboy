@@ -243,10 +243,20 @@ func supersededArchiveStartNeverBeginsPlayback() async throws {
     zip.waitUntilExit()
     #expect(zip.terminationStatus == 0)
 
-    for route in ["typed", "async", "replacement"] {
+    for route in ["typed", "async", "replacement", "preserve", "async-preserve"] {
         try? FileManager.default.removeItem(at: marker)
         let transport = PlaybackTransportCoordinator(label: "test.superseded.archive.\(route)")
         defer { _ = transport.perform(.init(command: .stop)) }
+        var previousGeneration: Int?
+        if route.contains("preserve") {
+            let path = "/no-such-directory/previous.spc"
+            let initial = PlaybackContinuationStart(
+                track: .init(id: "previous", path: path, sourceData: try Data(contentsOf: fixture)),
+                payload: .init(path: path), requestID: transport.reservePlaybackRequest()
+            )
+            try transport.start(initial)
+            previousGeneration = transport.statusSync().generation
+        }
         let requestID = transport.reservePlaybackRequest()
         let request = PlaybackTransportStartRequest(
             trackID: "old", sourcePath: archive.path, archivePath: archive.path,
@@ -256,7 +266,7 @@ func supersededArchiveStartNeverBeginsPlayback() async throws {
         let track = PlaybackTransportTrack(id: "old", path: archive.path, archiveEntry: fixture.lastPathComponent)
         let plan = PlaybackTimingPlan(preFadeSeconds: 30, fadeSeconds: 0, usesNativeEnding: false, isLongPlay: true)
         let pending = Task.detached {
-            if route != "async" { try transport.start(start) }
+            if !route.hasPrefix("async") { try transport.start(start) }
             else { try await transport.play(track: track, plan: plan, tempo: .defaultValue, requestID: requestID) }
         }
         for _ in 0..<100 where !FileManager.default.fileExists(atPath: marker.path) {
@@ -282,6 +292,10 @@ func supersededArchiveStartNeverBeginsPlayback() async throws {
         if route == "replacement" {
             #expect(status.isPlaying && status.trackLoaded)
             #expect(status.currentTrackID == "new")
+        } else if route.contains("preserve") {
+            #expect(status.isPlaying && status.trackLoaded)
+            #expect(status.currentTrackID == "previous")
+            #expect(status.generation == previousGeneration)
         } else {
             #expect(!status.isPlaying, Comment(rawValue: route))
             #expect(!status.trackLoaded, Comment(rawValue: route))

@@ -59,6 +59,9 @@ same typed endpoint operations.
   state; a partially initialized replacement is stopped and released, including failures during
   track setup or metadata inspection. A failed mode change restores
   prior mode settings if source preparation failed before session replacement.
+- A request-aware load checks its caller-provided ownership predicate after
+  source and loop preparation and before changing timing or retiring the old
+  session. The caller must also handle invalidation after replacement begins.
 - `PlaybackTempo` is the shared fraction representation for one global frontend speed setting. UI parsing accepts
   decimal or fractional input and snaps it to musical 1/32 increments before the host sends the
   typed `set_tempo` multiplier; decoder-family capability remains owned by `FormatRegistry` and

@@ -9,6 +9,14 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Superseded preparation preservation, 2026-10-29: the first cancellation
+  fix still replaced and retired an already-playing track after an archive
+  request became stale. A signaling slow-archive test reproduced that loss.
+  Request-aware shared loading now checks ownership after preparation and
+  before timing changes or native replacement, preserving the previous playing
+  track and generation. Typed and async starts are both covered; invalidation
+  after replacement begins still follows the existing retirement boundary.
+
 - Superseded archive start, 2026-10-29: a signaling slow-7zz test reproduced
   an invalidated start loading and playing after source preparation. Shared
   start now rechecks request ownership after load, after seek and after play,
