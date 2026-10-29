@@ -76,9 +76,12 @@ members, use structural **format** `"USF Library"` with `role = "asset"`.
   source-timed USF member must carry a positive `Play Length (ms)` integer.
 - **Variant and issue labels** — Use reviewed filename qualifiers such as
   `(Demo)`, `(Beta)`, and `(Homebrew)` for distinct productions under the
-  AudioMan final-sort procedure. Do not put those production labels in UAC
-  `Status`; that field is reserved for `Mixed Versions`, `Incomplete`, and
-  `Corrupt` issues defined by the base profile.
+  AudioMan final-sort procedure. Use `[alt]` on a smaller same-game rip when
+  its playable stream-state multiset differs from the larger compared rip;
+  keep that alternate in Review. `[alt]` is a filename qualifier, not a UAC
+  status or an incompleteness claim. Do not put production or alternate labels
+  in UAC `Status`; that field is reserved for `Mixed Versions`, `Incomplete`,
+  and `Corrupt` issues defined by the base profile.
 - **Region and library names** — A `.usflib` serial such as
   `NUS-NTEA-USA.usflib` is a territory and serial clue, not a ROM revision
   claim. Use it with the full No-Intro candidate set; if all contained library
