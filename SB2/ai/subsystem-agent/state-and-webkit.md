@@ -8,7 +8,10 @@ existing owners.
 
 Timing and speed preference changes invalidate per-track timing plans. SB2
 refreshes the stopped track preview through the shared timing bridge, accepting
-its reply only while settings, playback and selected-track identity still match.
+its reply only while settings, playback and displayed-track identity still match.
+If settings change during start preparation, SB2 replans before native start;
+if they change during native start, it reconfigures the accepted session. A
+newer playback generation cancels either path.
 Late timing replies from older settings cannot repopulate the plan cache.
 
 ## Playback completion

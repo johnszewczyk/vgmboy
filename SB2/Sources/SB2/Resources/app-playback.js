@@ -835,9 +835,13 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
   }
 
   const generation = ++playbackGeneration;
+  const settingsGeneration = playbackSettingsGeneration;
   const timingPlan = await resolveTimingPlan(track, { force: true });
   if (generation !== playbackGeneration) {
     return;
+  }
+  if (settingsGeneration !== playbackSettingsGeneration) {
+    return playTrackNow(trackId, startSeconds, playbackOptions);
   }
   // Native-state broadcasts can arrive while the native playback request is in flight.
   // Keep this request's offset immutable so a prior track cannot leak its elapsed position.
@@ -891,6 +895,9 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
     }
     await ensureNativePlaybackInitialized(generation);
     if (generation !== playbackGeneration) return;
+    if (settingsGeneration !== playbackSettingsGeneration) {
+      return playTrackNow(trackId, startSeconds, playbackOptions);
+    }
     const snapshot = await window.spcBoySB2.nativePlaybackStart({
       trackId: track.id,
       path: track.path,
@@ -912,6 +919,7 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
     }
 
     await setPlaybackPowerSaveBlocker(true);
+    if (generation !== playbackGeneration) return;
     applyNativePlaybackSnapshot(track, snapshot, generation, {
       allowNativeGenerationChange: true,
       allowPositionRewind: true
@@ -924,6 +932,9 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
     // Native status events advance the readout and native completion events
     // drive the generation-checked end handoff. JavaScript does not poll.
     playbackApp.ui.refreshPlaylistPlaybackState();
+    if (settingsGeneration !== playbackSettingsGeneration) {
+      await refreshPlaybackForTimingChange();
+    }
   } catch (error) {
     if (generation !== playbackGeneration) {
       return;

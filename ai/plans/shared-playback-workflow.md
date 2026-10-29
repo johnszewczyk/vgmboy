@@ -9,6 +9,18 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- SB2 start/settings race, 2026-10-29: a timing change can overlap timing
+  planning, native initialization or native start. A start now replans if its
+  settings changed before native start, and reconfigures the accepted session
+  if they changed during the native request. A newer playback generation
+  cancels the old request. Four renderer tests exercise these interleavings:
+  three fail against the preceding checkpoint and all pass with the change.
+  All 11 SB2 focused tests and the SB2 Swift build pass. The build emits
+  WebKit delegate-signature warnings and warns that some linked Homebrew
+  libraries target a newer macOS than SB2; compatibility requires separate
+  investigation. Packaged playback and audible behavior for this race remain
+  unverified.
+
 - SB2 timing-preview pass, 2026-10-29: the isolated player showed a stopped
   track's old Long Play duration after the setting was disabled. Timing plans
   were cached by track ID and a settings change returned before invalidating
