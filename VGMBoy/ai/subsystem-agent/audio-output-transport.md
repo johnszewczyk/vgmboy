@@ -26,6 +26,9 @@ opens or manipulates an audio device.
 - Session teardown stops decoder production, then preserves already queued PCM until the output
   envelope reaches silence. It must never clear that ring before the envelope: doing so is a hard
   discontinuity at exactly the transition the envelope exists to protect.
+- Initial priming and periodic refill share one PCM producer for decoder reads, loop/long-play
+  handling, cap accounting and fades. Priming propagates decode errors to its caller; periodic
+  refill stops and publishes its error. Completion is published only after the ring drains.
 - The final callback multiplies post-EQ, post-volume PCM by the 10 ms envelope immediately before
   the default output device. `AudioOutput` gives that callback a 12 ms window before marking the
   transport inactive, while retaining a silent initialized unit for seamless next-track playback.

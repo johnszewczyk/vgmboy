@@ -124,6 +124,35 @@ private final class StatusRecorder: @unchecked Sendable {
     _ = transport.perform(.init(command: .stop))
 }
 
+@Test func boundedDecoderPlaybackDrainsAfterFade() async throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    for relative in [
+        "VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc",
+        "VGMBoy/vendor/zxtune/samples/chiptunes/Multi/vgm/TwinCobra.vgm"
+    ] {
+        let transport = PlaybackTransportCoordinator(label: "test.bounded.decoder.fade")
+        let ends = EndRecorder()
+        transport.setNaturalEndHandler { ends.record($0.generation) }
+        let load = transport.perform(.init(command: .load, payload: .init(
+            path: root.appendingPathComponent(relative).path,
+            playbackMode: .longPlay, playMilliseconds: 1_000, fadeMilliseconds: 1_000
+        )))
+        #expect(load.kind != .error, Comment(rawValue: relative))
+        let generation = try #require(load.status?.diagnostics.generation)
+        #expect(transport.perform(.init(command: .play)).kind != .error, Comment(rawValue: relative))
+        for _ in 0..<90 where ends.snapshot().isEmpty {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(ends.snapshot() == [generation], Comment(rawValue: relative))
+        let status = transport.statusSync()
+        #expect(status.reachedEnd, Comment(rawValue: relative))
+        #expect(status.bufferedFrames == 0, Comment(rawValue: relative))
+        _ = transport.perform(.init(command: .stop))
+    }
+}
+
 @Test func failedReplacementRetiresOnlyAfterSessionReplacementBegins() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
