@@ -222,6 +222,74 @@ func reconfigurationCapturesPositionAfterArchivePreparation() async throws {
     #expect(after.elapsedSeconds >= during.elapsedSeconds - 0.03)
 }
 
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VGM_TEST_SLOW_START_MARKER"] != nil,
+    "Run with a signaling, deliberately slow VGMBOY_7Z_BINARY."))
+func supersededArchiveStartNeverBeginsPlayback() async throws {
+    let marker = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["VGM_TEST_SLOW_START_MARKER"]))
+    try? FileManager.default.removeItem(at: marker)
+    defer { try? FileManager.default.removeItem(at: marker) }
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let fixture = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let archive = directory.appendingPathComponent("music.zip")
+    let zip = Process()
+    zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+    zip.arguments = ["-q", "-j", archive.path, fixture.path]
+    try zip.run()
+    zip.waitUntilExit()
+    #expect(zip.terminationStatus == 0)
+
+    for route in ["typed", "async", "replacement"] {
+        try? FileManager.default.removeItem(at: marker)
+        let transport = PlaybackTransportCoordinator(label: "test.superseded.archive.\(route)")
+        defer { _ = transport.perform(.init(command: .stop)) }
+        let requestID = transport.reservePlaybackRequest()
+        let request = PlaybackTransportStartRequest(
+            trackID: "old", sourcePath: archive.path, archivePath: archive.path,
+            archiveEntry: fixture.lastPathComponent, fadeMilliseconds: 0
+        )
+        let start = try request.continuationStart(requestID: requestID)
+        let track = PlaybackTransportTrack(id: "old", path: archive.path, archiveEntry: fixture.lastPathComponent)
+        let plan = PlaybackTimingPlan(preFadeSeconds: 30, fadeSeconds: 0, usesNativeEnding: false, isLongPlay: true)
+        let pending = Task.detached {
+            if route != "async" { try transport.start(start) }
+            else { try await transport.play(track: track, plan: plan, tempo: .defaultValue, requestID: requestID) }
+        }
+        for _ in 0..<100 where !FileManager.default.fileExists(atPath: marker.path) {
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        #expect(FileManager.default.fileExists(atPath: marker.path), Comment(rawValue: route))
+        let replacement: Task<Void, any Error>?
+        if route == "replacement" {
+            let newID = transport.reservePlaybackRequest()
+            let newPath = "/no-such-directory/new-fixture.spc"
+            let newStart = PlaybackContinuationStart(
+                track: .init(id: "new", path: newPath, sourceData: try Data(contentsOf: fixture)),
+                payload: .init(path: newPath), requestID: newID
+            )
+            replacement = Task.detached { try transport.start(newStart) }
+        } else {
+            transport.invalidatePlaybackRequests()
+            replacement = nil
+        }
+        await #expect(throws: CancellationError.self) { try await pending.value }
+        if let replacement { try await replacement.value }
+        let status = transport.statusSync()
+        if route == "replacement" {
+            #expect(status.isPlaying && status.trackLoaded)
+            #expect(status.currentTrackID == "new")
+        } else {
+            #expect(!status.isPlaying, Comment(rawValue: route))
+            #expect(!status.trackLoaded, Comment(rawValue: route))
+            #expect(status.currentTrackID == nil, Comment(rawValue: route))
+        }
+    }
+}
+
 @Test(.enabled(if: ProcessInfo.processInfo.environment["VGM_TXTP_ARCHIVE_FIXTURE_DIR"] != nil,
     "Set VGM_TXTP_ARCHIVE_FIXTURE_DIR to a directory containing ending3.txtp and ending3.rsf."))
 func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {

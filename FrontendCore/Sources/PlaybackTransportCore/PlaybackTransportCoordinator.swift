@@ -393,7 +393,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     ) async throws {
         try await run {
             guard self.isLatest(requestID) else { throw CancellationError() }
-            try self.load(track: track, plan: plan, tempo: tempo, resumeAt: 0, autoplay: true)
+            try self.load(track: track, plan: plan, tempo: tempo, resumeAt: 0, autoplay: true, requestID: requestID)
         }
     }
 
@@ -574,13 +574,16 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         }
         do {
             try requireSuccess(event)
+            guard isLatest(start.requestID) else { throw CancellationError() }
             if start.startMilliseconds > 0 {
                 try requireSuccess(controller.perform(.init(
                     command: .seek,
                     payload: .init(positionMilliseconds: start.startMilliseconds)
                 )))
             }
+            guard isLatest(start.requestID) else { throw CancellationError() }
             try requireSuccess(controller.perform(.init(command: .play)))
+            guard isLatest(start.requestID) else { throw CancellationError() }
         } catch {
             if event.kind != .error || event.status?.diagnostics.generation != currentPlaybackGeneration {
                 retirePlaybackLocked()
@@ -807,7 +810,8 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         plan: PlaybackTimingPlan,
         tempo: PlaybackTempo,
         resumeAt: TimeInterval,
-        autoplay: Bool
+        autoplay: Bool,
+        requestID: Int
     ) throws {
         let timing = try PlaybackTimingRequest.standard(
             path: track.archiveEntry ?? track.path,
@@ -838,6 +842,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         let previousGeneration = currentPlaybackGeneration
         do {
             try requireSuccess(event)
+            guard isLatest(requestID) else { throw CancellationError() }
             currentPlaybackGeneration = event.status?.diagnostics.generation
             if resumeAt > 0 {
                 try requireSuccess(controller.perform(.init(
@@ -845,7 +850,9 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
                     payload: .init(positionMilliseconds: Int(resumeAt * 1_000))
                 )))
             }
+            guard isLatest(requestID) else { throw CancellationError() }
             if autoplay { try requireSuccess(controller.perform(.init(command: .play))) }
+            guard isLatest(requestID) else { throw CancellationError() }
         } catch {
             if event.kind != .error || event.status?.diagnostics.generation != previousGeneration {
                 retirePlaybackLocked()

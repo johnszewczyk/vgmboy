@@ -9,6 +9,17 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Superseded archive start, 2026-10-29: a signaling slow-7zz test reproduced
+  an invalidated start loading and playing after source preparation. Shared
+  start now rechecks request ownership after load, after seek and after play,
+  retiring its replacement on cancellation. Both typed and async start routes
+  pass the test, including a queued newer in-memory SPC that remains loaded
+  and playing. Run the optional check with `VGM_TEST_SLOW_START_MARKER` and a
+  signaling `VGMBOY_7Z_BINARY`; the temporary wrapper used for this pass was
+  `/private/tmp/vgmman-signaling-7zz`. This is native integration evidence,
+  not a packaged reproduction or proof that an already executing play call
+  cannot produce a brief transition before cancellation is noticed.
+
 - Decoded tempo invariants, 2026-10-29: JSON decoding had bypassed the shared
   tempo initializer, allowing zero denominators, out-of-range components and
   unreduced fractions into preference calculations. Decoding now uses the same
