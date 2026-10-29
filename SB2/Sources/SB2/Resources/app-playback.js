@@ -808,7 +808,8 @@ async function stopPlaybackState({ declick = true, keepNativeOutput = false, nat
   playbackWindow = null;
   state.isPlaying = false;
   state.elapsedSeconds = 0;
-  state.totalSeconds = targetPlaybackSeconds();
+  const previewTrack = activeTrackInfo();
+  state.totalSeconds = previewTrack ? currentTotalSeconds(previewTrack) : targetPlaybackSeconds();
   resetNativePlaybackSnapshot();
   updatePlaybackReadout();
   updateNativeDiagnostics();

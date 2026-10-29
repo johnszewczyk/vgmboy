@@ -14,6 +14,8 @@ directly, using its millisecond fields when available; a local catalog estimate
 is used only until a preview is available. Timing, start and reconfiguration
 requests pass the selected speed to shared policy, which resolves backend limits;
 SB2's local speed projection applies only to the temporary estimate.
+On stop, the selected track's current preview supplies the displayed duration;
+the manual default is used when no track is selected.
 Live timing requests carry the observed native generation. The native bridge
 stamps a transport-owned settings revision when it receives each request,
 before dispatching work, so the counter survives WebView recreation and shared
