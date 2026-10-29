@@ -319,19 +319,22 @@ public struct PlaybackTransportReconfigurationRequest: Codable, Equatable, Senda
     public let fadeMilliseconds: Int
     public let unknownDurationMilliseconds: Int
     public let tempo: PlaybackTempo
+    public let expectedGeneration: Int?
 
     public init(
         longPlayEnabled: Bool,
         manualPlayMilliseconds: Int = 0,
         fadeMilliseconds: Int = 0,
         unknownDurationMilliseconds: Int = PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000,
-        tempo: PlaybackTempo = .defaultValue
+        tempo: PlaybackTempo = .defaultValue,
+        expectedGeneration: Int? = nil
     ) {
         self.longPlayEnabled = longPlayEnabled
         self.manualPlayMilliseconds = max(0, manualPlayMilliseconds)
         self.fadeMilliseconds = max(0, fadeMilliseconds)
         self.unknownDurationMilliseconds = max(1_000, unknownDurationMilliseconds)
         self.tempo = PlaybackTempo(numerator: tempo.numerator, denominator: tempo.denominator)
+        self.expectedGeneration = expectedGeneration
     }
 
     public var playbackModePayload: PlaybackControlPayload {

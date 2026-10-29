@@ -421,6 +421,9 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     /// Applies a complete bridge settings snapshot as one serialized reload.
     public func reconfigureSync(_ request: PlaybackTransportReconfigurationRequest) throws -> PlaybackTransportStatus {
         try queue.sync {
+            if let expected = request.expectedGeneration, expected != currentPlaybackGeneration {
+                throw CancellationError()
+            }
             var payload = request.playbackModePayload
             payload.tempo = request.tempo.multiplier
             return try reconfigureLocked(payload: payload)

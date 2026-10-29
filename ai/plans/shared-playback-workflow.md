@@ -9,6 +9,16 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Stale reconfiguration boundary, 2026-10-29: a focused native test reproduced
+  an old request reloading a replacement track. Shared reconfiguration now
+  accepts an optional expected native generation and rejects mismatches before
+  changing playback; requests that omit it remain compatible. The matching
+  generation still reconfigures. SB2 does not yet send the guard: two rapid
+  settings changes can both observe the same generation, so an earlier accepted
+  reload could cause the latest setting to be rejected. Resolve and test that
+  settings ordering before adopting the guard in SB2; the interference risk
+  remains open at that bridge.
+
 - Superseded preparation preservation, 2026-10-29: the first cancellation
   fix still replaced and retired an already-playing track after an archive
   request became stale. A signaling slow-archive test reproduced that loss.

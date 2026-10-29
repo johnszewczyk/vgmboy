@@ -79,6 +79,11 @@ startup contracts shared by the VGMMan player frontends.
   coordinator as one serialized operation; CocoaSpice's native timing-plan
   route uses the same coordinator operation. It gates tempo by decoder family
   and reloads with timing and tempo together, retaining track and source identity.
+- A reconfiguration request can supply an expected native generation. The
+  coordinator rejects a mismatched generation before touching the session;
+  omission retains the existing bridge contract. Clients must coordinate
+  overlapping settings updates before adopting this optional guard, because
+  an earlier accepted reconfiguration can legitimately create a new generation.
 - Timing previews use the decoder family's effective rate rather than the
   stored requested preference. Native status and preview calculations must
   agree when a backend clamps or rounds a requested rate. Preview durations
