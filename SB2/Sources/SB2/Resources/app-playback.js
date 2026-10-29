@@ -743,7 +743,8 @@ async function finalizePlaybackEnded() {
   });
   if (!retirementDecision) return;
   if (finalizationGeneration !== playbackGeneration
-      || state.currentTrackId !== completedTrackId) {
+      || state.currentTrackId !== completedTrackId
+      || (Number(state.nativePlayback?.generation) || nativeGeneration) !== nativeGeneration) {
     return;
   }
   await continueAfterPlaybackRetirement({

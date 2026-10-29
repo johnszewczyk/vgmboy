@@ -4,6 +4,11 @@ SB2 owns this host adaptation and presentation persistence. Shared catalog,
 playlist validation, preference normalization and playback policy retain their
 existing owners.
 
+## Playback completion
+
+After native completion retirement returns, advance only while the same track,
+frontend playback generation and native generation remain current.
+
 ## Preferences
 
 `settings-persistence.js` tracks the last observed snapshot and pending local
