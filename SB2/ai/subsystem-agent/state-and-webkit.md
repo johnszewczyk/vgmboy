@@ -24,6 +24,8 @@ If settings change during start preparation, SB2 replans before native start;
 if they change during native start, it reconfigures the accepted session. A
 newer playback generation cancels either path.
 Late timing replies from older settings cannot repopulate the plan cache.
+Fade-out and queued-skip restoration requests carry their originating native
+generation, so a delayed output ramp cannot modify a replacement session.
 
 ## Playback completion
 

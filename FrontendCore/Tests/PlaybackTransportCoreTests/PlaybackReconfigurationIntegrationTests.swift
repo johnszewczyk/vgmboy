@@ -79,6 +79,28 @@ private final class StatusRecorder: @unchecked Sendable {
     #expect(await transport.beginFadedSkip(duration: -Double.greatestFiniteMagnitude) == generation)
 }
 
+@Test func staleGainRampCannotAffectReplacementSession() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.stale.gain.ramp")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    let first = transport.perform(.init(command: .load, payload: .init(path: url.path)))
+    let oldGeneration = try #require(first.status?.diagnostics.generation)
+    let replacement = transport.perform(.init(command: .load, payload: .init(path: url.path)))
+    let currentGeneration = try #require(replacement.status?.diagnostics.generation)
+    #expect(oldGeneration != currentGeneration)
+    #expect(throws: CancellationError.self) {
+        try transport.rampOutputGainSync(.init(outputGain: 0, rampMilliseconds: 10,
+                                               expectedGeneration: oldGeneration))
+    }
+    #expect(transport.statusSync().generation == currentGeneration)
+    let accepted = try transport.rampOutputGainSync(.init(outputGain: 1, rampMilliseconds: 10,
+                                                          expectedGeneration: currentGeneration))
+    #expect(accepted.generation == currentGeneration)
+    _ = try transport.rampOutputGainSync(.init(outputGain: 1, rampMilliseconds: 10))
+}
+
 @Test func sharedReconfigurationRetainsPausedPositionAndGatesUnsupportedTempo() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }

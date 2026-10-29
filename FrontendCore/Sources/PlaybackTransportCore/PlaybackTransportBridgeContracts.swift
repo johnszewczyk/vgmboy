@@ -158,10 +158,12 @@ public struct PlaybackTransportSeekRequest: Codable, Equatable, Sendable {
 public struct PlaybackTransportRampGainRequest: Codable, Equatable, Sendable {
     public let outputGain: Float
     public let rampMilliseconds: Int
+    public let expectedGeneration: Int?
 
-    public init(outputGain: Float, rampMilliseconds: Int) {
+    public init(outputGain: Float, rampMilliseconds: Int, expectedGeneration: Int? = nil) {
         self.outputGain = outputGain.isFinite ? outputGain : 0
         self.rampMilliseconds = max(1, rampMilliseconds)
+        self.expectedGeneration = expectedGeneration
     }
 
     public var payload: PlaybackControlPayload {

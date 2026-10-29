@@ -280,4 +280,10 @@ func directTransportCommandContractsNormalizeNamedBridgeValues() throws {
     #expect(ramp.payload.outputGain == 0)
     #expect(ramp.payload.rampMilliseconds == 1)
     #expect(object["positionMilliseconds"] as? Int == 1_250)
+    let legacyRamp = try JSONDecoder().decode(PlaybackTransportRampGainRequest.self,
+        from: Data(#"{"outputGain":1,"rampMilliseconds":10}"#.utf8))
+    #expect(legacyRamp.expectedGeneration == nil)
+    let guardedRamp = try JSONDecoder().decode(PlaybackTransportRampGainRequest.self,
+        from: Data(#"{"outputGain":0,"rampMilliseconds":10,"expectedGeneration":42}"#.utf8))
+    #expect(guardedRamp.expectedGeneration == 42)
 }

@@ -172,8 +172,7 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 args,
                 errorMessage: "Playback output ramp requires gain and duration."
             )
-            try perform(.rampOutputGain, payload: request.payload)
-            return statusResponse()
+            return statusResponse(try transport.rampOutputGainSync(request))
         case "nativeExportAAC":
             let request: PlaybackTransportAACExportRequest = try bridgeRequest(
                 args,
