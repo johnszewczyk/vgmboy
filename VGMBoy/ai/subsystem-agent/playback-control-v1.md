@@ -57,6 +57,9 @@ same typed endpoint operations.
   decimal or fractional input and snaps it to musical 1/32 increments before the host sends the
   typed `set_tempo` multiplier; decoder-family capability remains owned by `FormatRegistry` and
   gates application to formats that support native tempo (currently libgme and libvgm).
+- A `set_playback_mode` request can include a tempo multiplier. VGMBoy applies
+  both to the same reload and resumes from the prior session position and play
+  state; it does not issue a separate in-place tempo change first.
 - The equalizer is CocoaSpice-compatible: ten parametric bands at 31, 62, 125, 250, 500, 1k,
   2k, 4k, 8k, and 16k Hz, each constrained to -12...+12 dB. It is applied before the direct
   AudioUnit ring so every decoder sees identical EQ behavior; the transport callback applies only

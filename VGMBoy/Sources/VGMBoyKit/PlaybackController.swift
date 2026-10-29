@@ -290,6 +290,9 @@ public final class PlaybackController: @unchecked Sendable {
         if let unknown = payload.unknownDurationMilliseconds, unknown <= 0 {
             throw PlaybackControlError.invalidPayload("Unknown-duration fallback must be positive.")
         }
+        if let tempo = payload.tempo, !tempo.isFinite || tempo <= 0 {
+            throw PlaybackControlError.invalidPayload("Tempo must be a positive finite value.")
+        }
         lock.lock()
         let previousMode = mode
         let previousPlay = explicitPlayMilliseconds
@@ -305,7 +308,7 @@ public final class PlaybackController: @unchecked Sendable {
         let previousStatus = session.status()
         do {
             try load(
-                PlaybackControlPayload(path: current.path, archiveEntry: current.archiveEntry, trackIndex: current.trackIndex, tempo: current.tempo, loop: current.loop),
+                PlaybackControlPayload(path: current.path, archiveEntry: current.archiveEntry, trackIndex: current.trackIndex, tempo: payload.tempo ?? current.tempo, loop: current.loop),
                 sourceData: current.sourceData
             )
             if previousStatus.elapsedSeconds > 0 { try session.seek(to: previousStatus.elapsedSeconds) }

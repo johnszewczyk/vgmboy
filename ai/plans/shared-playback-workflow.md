@@ -6,6 +6,23 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Third pass, 2026-10-29: SB2 and ViewBoy send the shared typed
+  reconfiguration request, and CocoaSpice's timing-plan route invokes the same
+  coordinator operation. Mode and tempo are applied in one controller reload;
+  unsupported decoder families receive 1×. Existing queue and app presentation
+  remain separate. This replaces the WebKit adapters' preceding in-place tempo
+  operation, but does not resolve source-time versus output-time seeking or the
+  direct tempo API's buffer handling and effective libvgm range.
+- Focused integration checks cover paused/playing transitions, end delivery,
+  unsupported tempo, CocoaSpice's native-plan entry and 1.5× reported status for
+  vendored SPC and VGM fixtures. Nine focused FrontendCore tests passed. The
+  existing libvgm fixture test also observed different PCM at 2×, but does not
+  measure a live reconfiguration transition. Reported tempo alone is not audible
+  or effective speed proof. SB2, ViewBoy and CocoaSpice Swift builds passed; packaged UI,
+  audible output, live seeking at changed tempo and archive-backed transitions
+  remain open. The pre-existing ViewBoy renderer failure and macOS 26/27 linker
+  warnings remain applicable.
+
 - Second pass: ordinary status callbacks are generation-filtered before
   publication; failed replacement clears partial session and controller state
   once native replacement begins, while failure during source preparation keeps

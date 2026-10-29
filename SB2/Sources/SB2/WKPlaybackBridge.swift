@@ -127,9 +127,7 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 args,
                 errorMessage: "Playback reconfiguration requires complete timing settings."
             )
-            try perform(.setTempo, payload: .init(tempo: request.tempo.multiplier))
-            try perform(.setPlaybackMode, payload: request.playbackModePayload)
-            return statusResponse()
+            return statusResponse(try transport.reconfigureSync(request))
         case "nativePlaybackSetTempo":
             let request: PlaybackTransportTempoRequest = try bridgeRequest(
                 args,
