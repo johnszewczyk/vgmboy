@@ -376,6 +376,47 @@ func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
     }
 }
 
+@Test func subsecondTimedWindowAndFadeRemainBounded() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.subsecond.timing")
+    let ends = EndRecorder()
+    transport.setNaturalEndHandler { ends.record($0.generation) }
+    let loaded = transport.perform(.init(command: .load, payload: .init(
+        path: url.path, playbackMode: .timed, playMilliseconds: 500, fadeMilliseconds: 250
+    )))
+    let generation = try #require(loaded.status?.diagnostics.generation)
+    #expect(loaded.kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    for _ in 0..<40 where ends.snapshot().isEmpty {
+        try await Task.sleep(for: .milliseconds(50))
+    }
+    #expect(ends.snapshot() == [generation])
+    let status = transport.statusSync()
+    #expect(status.reachedEnd)
+    #expect(status.bufferedFrames == 0)
+    #expect((0.70...0.80).contains(status.elapsedSeconds))
+    _ = transport.perform(.init(command: .stop))
+}
+
+@Test func oversizedTimingIsRejectedWithoutRetiringCurrentTrack() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 2).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.oversized.timing")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    let loaded = transport.perform(.init(command: .load, payload: .init(path: url.path)))
+    let generation = try #require(loaded.status?.diagnostics.generation)
+    let rejected = transport.perform(.init(command: .setPlaybackMode, payload: .init(
+        playbackMode: .timed, playMilliseconds: Int(Int32.max), fadeMilliseconds: 1
+    )))
+    #expect(rejected.kind == .error)
+    #expect(transport.statusSync().generation == generation)
+    #expect(transport.statusSync().trackLoaded)
+    #expect(transport.statusSync().currentTrackID == url.path)
+}
+
 @Test func explicitLoopMetadataSurvivesSharedReconfiguration() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }

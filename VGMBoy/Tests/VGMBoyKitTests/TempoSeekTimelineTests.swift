@@ -29,6 +29,29 @@ private func risingCrossings(_ samples: [Float]) -> Int {
     zip(samples, samples.dropFirst()).reduce(0) { $0 + ($1.0 <= 0 && $1.1 > 0 ? 1 : 0) }
 }
 
+@Test func timingPlanRetainsSubsecondPlayAndFade() {
+    let timed = PlaybackController.plan(
+        mode: .timed, playMilliseconds: 500, fadeMilliseconds: 250,
+        family: FormatRegistry.libgmeFamily
+    )
+    #expect(timed.preFadeMilliseconds == 500)
+    #expect(timed.fadeMilliseconds == 250)
+    #expect(timed.totalMilliseconds == 750)
+    #expect(!timed.usesNativeEnding)
+    let natural = PlaybackController.plan(
+        mode: .fileDefault, playMilliseconds: nil, fadeMilliseconds: 250,
+        family: FormatRegistry.libgmeFamily
+    )
+    #expect(natural.fadeMilliseconds == 250)
+    #expect(!natural.usesNativeEnding)
+    let unbounded = PlaybackController.plan(
+        mode: .longPlay, playMilliseconds: 0, fadeMilliseconds: 250,
+        family: FormatRegistry.libgmeFamily
+    )
+    #expect(unbounded.preFadeMilliseconds == 0)
+    #expect(unbounded.isLongPlay)
+}
+
 @Test func offlineTempoReloadRampsRealDecoderPCMThroughSilence() throws {
     let synthetic = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".vgm")
     defer { try? FileManager.default.removeItem(at: synthetic) }
@@ -89,6 +112,34 @@ private final class TimelineEndRecorder: @unchecked Sendable {
     private var value: PlaybackStatus?
     func record(_ status: PlaybackStatus) { lock.lock(); value = status; lock.unlock() }
     func snapshot() -> PlaybackStatus? { lock.lock(); defer { lock.unlock() }; return value }
+}
+
+@Test func nativeDecodersHonorSubsecondTimedFade() async throws {
+    let synthetic = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".vgm")
+    defer { try? FileManager.default.removeItem(at: synthetic) }
+    try timelineVGM().write(to: synthetic)
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let spc = root.appendingPathComponent("vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    for url in [synthetic, spc] {
+        let controller = PlaybackController()
+        let end = TimelineEndRecorder()
+        let token = controller.subscribe { event in
+            if event.kind == .ended, let status = event.status { end.record(status) }
+        }
+        let loaded = controller.perform(.init(command: .load, payload: .init(
+            path: url.path, playbackMode: .timed, playMilliseconds: 500, fadeMilliseconds: 250
+        )))
+        #expect(loaded.kind != .error, Comment(rawValue: url.lastPathComponent))
+        #expect(controller.perform(.init(command: .play)).kind != .error)
+        for _ in 0..<60 where end.snapshot() == nil {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        let finished = try #require(end.snapshot(), Comment(rawValue: url.lastPathComponent))
+        #expect(finished.diagnostics.bufferedFrames == 0)
+        #expect((0.70...0.80).contains(finished.elapsedSeconds), Comment(rawValue: url.lastPathComponent))
+        controller.unsubscribe(token)
+        _ = controller.perform(.init(command: .stop))
+    }
 }
 
 @Test func authoredLoopBoundsScaleWithNativeTempo() async throws {
