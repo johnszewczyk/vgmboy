@@ -204,7 +204,7 @@ check_renderer_js() {
 }
 
 run_renderer_tests() {
-  node --test Tests/*.test.js
+  node --test Tests/*.test.mjs
 }
 
 if [[ "$MODE" == "verify" ]]; then

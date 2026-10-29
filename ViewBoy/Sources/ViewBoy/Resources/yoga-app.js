@@ -6243,11 +6243,11 @@ async function loadGame(game) {
 }
 
 function applyNativeStatus(snapshot) {
-  if (!snapshot || typeof snapshot !== "object") return;
+  if (!snapshot || typeof snapshot !== "object") return false;
   const sequence = Number(snapshot.status_sequence) || 0;
   const generation = Number(snapshot.generation) || 0;
-  if (sequence && sequence < state.statusSequence) return;
-  if (generation && generation < state.nativeGeneration) return;
+  if (sequence && sequence < state.statusSequence) return false;
+  if (generation && generation < state.nativeGeneration) return false;
   state.statusSequence = sequence || state.statusSequence;
   state.nativeGeneration = generation || state.nativeGeneration;
   // A reconfiguration can reload the active session and publish its status
@@ -6266,6 +6266,7 @@ function applyNativeStatus(snapshot) {
   if (snapshot.error) state.status = `PLAYBACK ERROR: ${snapshot.error}`;
   if (priorTransport !== nextTransport || priorSecond !== Math.floor(state.positionMs / 1000)
       || snapshot.error) render();
+  return true;
 }
 
 function randomQueue() {
@@ -6396,7 +6397,7 @@ async function handleNativeEnded(snapshot) {
   const generation = Number(snapshot?.generation) || 0;
   if (!generation || generation !== state.playbackGeneration
       || generation <= state.retiredGeneration || !state.currentTrackId) return;
-  applyNativeStatus(snapshot);
+  if (!applyNativeStatus(snapshot) || snapshot.transport_state !== "ended") return;
   state.retiredGeneration = generation;
   const completedId = state.currentTrackId;
   const playbackToken = state.playbackToken;

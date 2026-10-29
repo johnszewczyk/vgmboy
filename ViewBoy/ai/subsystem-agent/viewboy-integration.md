@@ -7,9 +7,10 @@ ViewBoy owns its AppKit host, Yoga canvas renderer, bitmap fonts, framebuffer, i
 Reconfiguration can replace the active native playback generation. ViewBoy
 adopts newer status for the active track, checks the playback token and track
 identity before applying a delayed reconfiguration reply, and uses the current
-native generation for completion retirement. After the retirement reply and
-a delayed library-random selection, advance only if track, native generation
-and playback token still match; a declined retirement never advances.
+native generation for completion retirement. An end event rejected by status
+sequence or generation ordering cannot claim completion. After the retirement
+reply and a delayed library-random selection, advance only if track, native
+generation and playback token still match; a declined retirement never advances.
 
 The injected `window.viewBoy` bridge supplies read-only CatalogReader projections, shared favorite and playback-history operations, database/cache controls, frontend preferences, local-path selection, and VGMBoy transport. `window.ViewBoy.dispatch` is the macOS menu command boundary. Both names are local to ViewBoy. Long Play, Repeat One, and the `randomMode` (`off`, `playlist`, or `library`) preference are stored in `ViewBoyPreferencesSnapshot`; random shuffle history and per-cycle seen-track state stay in the renderer. Playlist Random chooses from the active queue without replacement until a cycle ends. Library Random weights catalog game groups by `trackCount`, queries only the selected game's tracks, and avoids immediately replaying the current track when another song is available. Previous and Next in either random mode use a renderer history capped at 256 track entries; Library Random history retains only each selected track rather than previously fetched game playlists. Successful native playback starts write shared `PlaybackHistoryCore` records; the Recent view reads these through `playbackHistoryList`.
 

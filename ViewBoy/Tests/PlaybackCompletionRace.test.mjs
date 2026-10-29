@@ -8,6 +8,10 @@ const source = await readFile(new URL('../Sources/ViewBoy/Resources/yoga-app.js'
 const start = source.indexOf('async function handleNativeEnded(snapshot) {');
 const end = source.indexOf('\nasync function openLocalPath()', start);
 assert.ok(start >= 0 && end > start, 'renderer completion handler is available');
+const statusStart = source.indexOf('function applyNativeStatus(snapshot) {');
+const statusEnd = source.indexOf('\nfunction randomQueue()', statusStart);
+assert.ok(statusStart >= 0 && statusEnd > statusStart, 'renderer status handler is available');
+const makeStatusHandler = new Function('state', 'render', `return (${source.slice(statusStart, statusEnd)});`);
 const makeHandler = new Function(
   'state', 'bridge', 'applyNativeStatus', 'trackID', 'pickPlaylistRandom',
   'pickLibraryRandom', 'visibleTracks', 'selectTrack', 'startTrack', 'render',
@@ -27,10 +31,11 @@ function harness({ retirement, library = async () => null, randomMode = 'off' })
     currentTrackId: 'a', playbackGeneration: 1, retiredGeneration: 0, playbackToken: 1,
     playbackQueue: [first, second], activeQueue: [first, second],
     preferences: { repeatMode: 'off', randomMode }, status: 'PLAYING',
+    statusSequence: 0, nativeGeneration: 0, positionMs: 0, transport: 'playing',
   };
   const starts = [];
   const handle = makeHandler(state, { playbackCompletionRetire: retirement },
-    () => {}, (track) => track.id, () => second, library, () => [], () => {},
+    makeStatusHandler(state, () => {}), (track) => track.id, () => second, library, () => [], () => {},
     async (track) => { starts.push(track.id); }, () => {});
   return { state, starts, handle, second };
 }
@@ -75,4 +80,24 @@ test('late random-library selection cannot replace a newer generation', async ()
   await completion;
   assert.deepEqual(run.starts, []);
   assert.equal(run.state.currentTrackId, 'a');
+});
+
+
+test('an older end status cannot retire the same generation after newer playback status', async () => {
+  let retirementCalls = 0;
+  const run = harness({ retirement: async () => { retirementCalls += 1; return { action: 'play', trackId: 'b' }; } });
+  run.state.statusSequence = 12;
+  run.state.nativeGeneration = 1;
+  await run.handle({ generation: 1, status_sequence: 11, transport_state: 'ended' });
+  assert.equal(retirementCalls, 0);
+  assert.deepEqual(run.starts, []);
+  assert.equal(run.state.currentTrackId, 'a');
+});
+
+test('a non-ended status cannot retire playback', async () => {
+  let retirementCalls = 0;
+  const run = harness({ retirement: async () => { retirementCalls += 1; return { action: 'play', trackId: 'b' }; } });
+  await run.handle({ generation: 1, status_sequence: 13, transport_state: 'playing' });
+  assert.equal(retirementCalls, 0);
+  assert.deepEqual(run.starts, []);
 });
