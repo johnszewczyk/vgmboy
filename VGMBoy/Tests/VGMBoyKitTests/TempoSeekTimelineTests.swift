@@ -29,6 +29,27 @@ private func risingCrossings(_ samples: [Float]) -> Int {
     zip(samples, samples.dropFirst()).reduce(0) { $0 + ($1.0 <= 0 && $1.1 > 0 ? 1 : 0) }
 }
 
+@Test func primingSmallRingDoesNotSkipDecodedFrames() throws {
+    let synthetic = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".vgm")
+    defer { try? FileManager.default.removeItem(at: synthetic) }
+    try timelineVGM().write(to: synthetic)
+    let output = AudioOutput(sampleRate: 44_100, capacitySeconds: 0.002)
+    let session = PlaybackSession(output: output)
+    defer { session.stop() }
+    let plan = PlaybackPlan(preFadeMilliseconds: 5_000, fadeMilliseconds: 0,
+                            isLongPlay: false, usesNativeEnding: false)
+    _ = try session.load(path: synthetic.path, trackIndex: 0, plan: plan, tempo: 1)
+    let status = session.status()
+    #expect(status.diagnostics.bufferedFrames > 0)
+    #expect(status.statistics.decodedFrames == Int64(status.diagnostics.bufferedFrames))
+    #expect(status.statistics.audiblePositionFrames == 0)
+    #expect(status.elapsedSeconds == 0)
+    try session.seek(to: 1)
+    let sought = session.status()
+    #expect(sought.diagnostics.bufferedFrames > 0)
+    #expect(abs(sought.elapsedSeconds - 1) < 0.01)
+}
+
 @Test func timingPlanRetainsSubsecondPlayAndFade() {
     let timed = PlaybackController.plan(
         mode: .timed, playMilliseconds: 500, fadeMilliseconds: 250,
