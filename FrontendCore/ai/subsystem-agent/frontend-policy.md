@@ -66,6 +66,10 @@ startup contracts shared by the VGMMan player frontends.
   request changes the decoder multiplier without recomputing the active timing
   cap. Frontends that scale a track's playback window by tempo must refresh the
   timing preview and reconfigure with both the new plan and tempo.
+- SB2 and ViewBoy submit `PlaybackTransportReconfigurationRequest` to the
+  coordinator as one serialized operation; CocoaSpice's native timing-plan
+  route uses the same coordinator operation. It gates tempo by decoder family
+  and reloads with timing and tempo together, retaining track and source identity.
 - `PlaybackTransportAudioConfigurationRequest` is the complete output snapshot
   for volume, EQ, and mono. `PlaybackTransportCoordinator.configureAudio(_:)`
   normalizes and serializes all three control commands; presentation adapters

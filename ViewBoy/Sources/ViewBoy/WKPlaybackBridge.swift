@@ -146,20 +146,16 @@ final class WKPlaybackBridge: @unchecked Sendable {
             guard let request = args.first as? [String: Any] else {
                 throw PlaybackBridgeError.invalid("Playback reconfiguration requires timing settings.")
             }
-            let mode: PlaybackMode = (request["longPlayEnabled"] as? Bool == true) ? .longPlay : .fileDefault
-            let payload = PlaybackControlPayload(
-                playbackMode: mode,
-                playMilliseconds: mode == .longPlay ? max(0, int(request["manualPlayMilliseconds"]) ?? 0) : nil,
-                fadeMilliseconds: max(0, int(request["fadeMilliseconds"]) ?? 0),
-                unknownDurationMilliseconds: max(
-                    1_000,
-                    int(request["unknownDurationMilliseconds"])
-                    ?? PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000
-                )
+            let tempo = min(8, max(1.0 / 32, tempoMultiplier(request["tempo"])))
+            let settings = PlaybackTransportReconfigurationRequest(
+                longPlayEnabled: request["longPlayEnabled"] as? Bool ?? false,
+                manualPlayMilliseconds: int(request["manualPlayMilliseconds"]) ?? 0,
+                fadeMilliseconds: int(request["fadeMilliseconds"]) ?? 0,
+                unknownDurationMilliseconds: int(request["unknownDurationMilliseconds"])
+                    ?? PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000,
+                tempo: PlaybackTempo(numerator: Int((tempo * 32).rounded()), denominator: 32)
             )
-            try perform(.setTempo, payload: .init(tempo: tempoMultiplier(request["tempo"])))
-            try perform(.setPlaybackMode, payload: payload)
-            return statusResponse()
+            return statusResponse(try transport.reconfigureSync(settings))
         case "nativePlaybackSetTempo":
             guard let request = args.first as? [String: Any] else {
                 throw PlaybackBridgeError.invalid("Tempo update requires a tempo value.")

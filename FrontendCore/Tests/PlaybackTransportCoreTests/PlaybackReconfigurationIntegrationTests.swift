@@ -28,6 +28,102 @@ private final class StatusRecorder: @unchecked Sendable {
     func snapshot() -> [PlaybackTransportStatus] { lock.lock(); defer { lock.unlock() }; return values }
 }
 
+@Test func sharedReconfigurationRetainsPausedPositionAndGatesUnsupportedTempo() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.shared.reconfiguration")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    let loaded = transport.perform(.init(command: .load, payload: .init(path: url.path)))
+    let original = try #require(loaded.status)
+    let updated = try transport.reconfigureSync(.init(
+        longPlayEnabled: true, manualPlayMilliseconds: 2_000,
+        fadeMilliseconds: 0, tempo: .init(numerator: 2, denominator: 1)
+    ))
+    #expect(updated.currentTrackID == url.path)
+    #expect(updated.generation != original.diagnostics.generation)
+    #expect(!updated.isPlaying)
+    #expect(updated.elapsedSeconds < 0.05)
+    #expect(updated.tempo == 1)
+}
+
+@Test func sharedReconfigurationRetiresFailedReload() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 2).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.shared.reconfiguration.failure")
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    try FileManager.default.removeItem(at: url)
+    #expect(throws: (any Error).self) {
+        _ = try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 1_000))
+    }
+    let status = transport.statusSync()
+    #expect(!status.trackLoaded)
+    #expect(status.currentTrackID == nil)
+    #expect(!status.isPlaying)
+}
+
+@Test func sharedReconfigurationAppliesTempoForNativeTempoFamilies() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    for relative in [
+        "VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc",
+        "VGMBoy/vendor/zxtune/samples/chiptunes/Multi/vgm/TwinCobra.vgm"
+    ] {
+        let path = root.appendingPathComponent(relative).path
+        let transport = PlaybackTransportCoordinator(label: "test.shared.reconfiguration.tempo")
+        let loaded = transport.perform(.init(command: .load, payload: .init(path: path)))
+        #expect(loaded.kind != .error, Comment(rawValue: relative))
+        let updated = try transport.reconfigureSync(.init(
+            longPlayEnabled: false, fadeMilliseconds: 0,
+            tempo: .init(numerator: 3, denominator: 2)
+        ))
+        #expect(updated.tempo == 1.5, Comment(rawValue: relative))
+        #expect(!updated.isPlaying, Comment(rawValue: relative))
+        #expect(updated.elapsedSeconds < 0.05, Comment(rawValue: relative))
+        _ = transport.perform(.init(command: .stop))
+    }
+}
+
+@Test func nativePlanReconfigurationUsesSharedSessionOperation() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.native.plan.reconfiguration")
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let before = transport.statusSync()
+    try await transport.reconfigureCurrentTrack(
+        plan: .init(preFadeSeconds: 2, fadeSeconds: 0, usesNativeEnding: false, isLongPlay: true),
+        tempo: .init(numerator: 2, denominator: 1)
+    )
+    let after = transport.statusSync()
+    #expect(after.generation != before.generation)
+    #expect(after.currentTrackID == before.currentTrackID)
+    #expect(!after.isPlaying)
+    #expect(after.elapsedSeconds < 0.05)
+    #expect(after.tempo == 1)
+    _ = transport.perform(.init(command: .stop))
+}
+
+@Test func sharedReconfigurationDeliversNaturalEnd() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 2).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.shared.reconfiguration.end")
+    let ends = EndRecorder()
+    transport.setNaturalEndHandler { ends.record($0.generation) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let updated = try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 1_000))
+    #expect(updated.isPlaying)
+    for _ in 0..<60 where ends.snapshot().isEmpty {
+        try await Task.sleep(for: .milliseconds(50))
+    }
+    #expect(ends.snapshot() == [updated.generation])
+    _ = transport.perform(.init(command: .stop))
+}
+
 @Test func failedReplacementRetiresOnlyAfterSessionReplacementBegins() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
