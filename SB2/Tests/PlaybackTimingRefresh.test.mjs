@@ -41,7 +41,7 @@ test('a late stopped preview cannot replace a newer selected track', async () =>
 const resolveStart = source.indexOf('async function resolveTimingPlan(');
 const resolveEnd = source.indexOf('\nfunction matchesCurrentPlaybackSettings(', resolveStart);
 assert.ok(resolveStart >= 0 && resolveEnd > resolveStart);
-const makeResolver = new Function('state', 'window', 'currentFadeSeconds', 'playbackSpeedForTrack', `
+const makeResolver = new Function('state', 'window', 'currentFadeSeconds', 'requestedPlaybackSpeed', `
   let playbackSettingsGeneration = 0;
   const timingPlans = new Map();
   ${source.slice(resolveStart, resolveEnd)}
@@ -69,4 +69,15 @@ test('shared millisecond timing survives the renderer bridge', async () => {
   assert.equal(preview.pre_fade_seconds, 0.375);
   assert.equal(preview.fade_seconds, 0.25);
   assert.equal(preview.total_seconds, 0.625);
+});
+
+test('timing requests forward the selected tempo for shared policy to resolve', async () => {
+  const state = { manualPlayTimeSeconds: 180, unknownDurationSeconds: 150, longPlayEnabled: false };
+  let request;
+  const run = makeResolver(state, { spcBoySB2: { nativePlaybackTiming: async value => {
+    request = value;
+    return { pre_fade_seconds: 20, fade_seconds: 0, total_seconds: 20, is_long_play: false };
+  } } }, () => 0, () => ({ numerator: 8, denominator: 1 }));
+  await run.resolveTimingPlan({ id: 'one', path: '/tmp/one.spc', basePlaybackSeconds: 80 });
+  assert.deepEqual(request.tempo, { numerator: 8, denominator: 1 });
 });
