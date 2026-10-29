@@ -51,7 +51,8 @@ same typed endpoint operations.
   captured when that session drained, even if a replacement loads before callback delivery.
 - A replacement preparation failure leaves the active decoder in place. Once a new session load
   starts, a failure retires the prior decoder, releases its materializer, and clears loaded-track
-  state; a partially initialized replacement is stopped and released. A failed mode change restores
+  state; a partially initialized replacement is stopped and released, including failures during
+  track setup or metadata inspection. A failed mode change restores
   prior mode settings if source preparation failed before session replacement.
 - `PlaybackTempo` is the shared fraction representation for one global frontend speed setting. UI parsing accepts
   decimal or fractional input and snaps it to musical 1/32 increments before the host sends the
