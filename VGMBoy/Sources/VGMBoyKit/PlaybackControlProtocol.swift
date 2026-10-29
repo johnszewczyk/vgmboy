@@ -46,12 +46,17 @@ public struct PlaybackTempo: Codable, Equatable, Sendable {
         guard parts.count <= 2,
               parts.allSatisfy({ $0.allSatisfy(\.isNumber) }),
               !text.isEmpty else { return nil }
-        let whole = parts.first.flatMap { Int($0.isEmpty ? "0" : String($0)) } ?? 0
+        guard let wholePart = parts.first,
+              let whole = Int(wholePart.isEmpty ? "0" : String(wholePart)) else { return nil }
         let fraction = parts.count == 2 ? String(parts[1]) : ""
         guard fraction.count <= maxDecimalPlaces,
               let fractional = Int(fraction.isEmpty ? "0" : fraction) else { return nil }
         let denominator = Int(pow(10.0, Double(fraction.count)))
-        let numerator = whole * denominator + fractional
+        let scaled = whole.multipliedReportingOverflow(by: denominator)
+        guard !scaled.overflow else { return nil }
+        let sum = scaled.partialValue.addingReportingOverflow(fractional)
+        guard !sum.overflow else { return nil }
+        let numerator = sum.partialValue
         guard numerator >= 1, numerator <= maxComponent, denominator <= maxComponent else { return nil }
         return Self.snappedToThirtySeconds(Self(numerator: numerator, denominator: denominator))
     }

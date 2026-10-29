@@ -693,6 +693,8 @@ struct PlaybackControlProtocolTests {
         #expect(PlaybackTempo(numerator: 101, denominator: 100).displayString == "1.01")
         #expect(PlaybackTempo(numerator: 1, denominator: 3).displayString == "1/3")
         #expect(PlaybackTempo.parse("1.0000001") == nil)
+        #expect(PlaybackTempo.parse("9223372036854775807.5") == nil)
+        #expect(PlaybackTempo.parse("999999999999999999999999.5") == nil)
     }
 
     @Test("v1 load control round-trips through Codable")

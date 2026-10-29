@@ -77,6 +77,26 @@ private final class StatusRecorder: @unchecked Sendable {
     #expect(updated.tempo == 1)
 }
 
+@Test func asyncSeekRejectsUnrepresentablePositionsWithoutChangingPlayback() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 2).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.seek.bounds")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let before = await transport.status()
+    for position in [Double.nan, Double.infinity, -Double.infinity, Double.greatestFiniteMagnitude,
+                     Double(Int32.max) / 1_000 + 1] {
+        await #expect(throws: (any Error).self) { try await transport.seek(to: position) }
+    }
+    let after = await transport.status()
+    #expect(after.currentTrackID == before.currentTrackID)
+    #expect(after.generation == before.generation)
+    #expect(after.bufferedFrames == before.bufferedFrames)
+    try await transport.seek(to: -1)
+    #expect((await transport.status()).elapsedSeconds == 0)
+}
+
 @Test func unchangedReconfigurationKeepsSessionAndBufferedPCM() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }

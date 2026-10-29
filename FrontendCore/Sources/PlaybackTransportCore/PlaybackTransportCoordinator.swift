@@ -689,10 +689,14 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     }
 
     public func seek(to seconds: TimeInterval) async throws {
+        guard seconds.isFinite, seconds <= Double(Int32.max) / 1_000 else {
+            throw PlaybackControlError.invalidPayload("Seek is outside the supported millisecond range.")
+        }
+        let milliseconds = Int(max(0, seconds) * 1_000)
         try await run {
             try self.requireSuccess(self.controller.perform(.init(
                 command: .seek,
-                payload: .init(positionMilliseconds: Int(max(0, seconds) * 1_000))
+                payload: .init(positionMilliseconds: milliseconds)
             )))
         }
     }
