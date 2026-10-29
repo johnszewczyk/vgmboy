@@ -58,6 +58,27 @@ private final class StatusRecorder: @unchecked Sendable {
     #expect(!(await transport.status()).trackLoaded)
 }
 
+@Test func invalidFadeDurationsLeavePlaybackIntact() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.invalid.fade.duration")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let generation = transport.statusSync().generation
+    for duration in [Double.nan, Double.infinity, -Double.infinity, Double.greatestFiniteMagnitude] {
+        #expect(await transport.beginFadedSkip(duration: duration) == nil)
+    }
+    let oversized = transport.perform(.init(command: .rampOutputGain,
+                                            payload: .init(outputGain: 0, rampMilliseconds: Int.max)))
+    #expect(oversized.kind == .error)
+    let status = transport.statusSync()
+    #expect(status.generation == generation && status.isPlaying)
+    #expect(await transport.beginFadedSkip(duration: 0.01) == generation)
+    #expect(await transport.beginFadedSkip(duration: -Double.greatestFiniteMagnitude) == generation)
+}
+
 @Test func sharedReconfigurationRetainsPausedPositionAndGatesUnsupportedTempo() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }

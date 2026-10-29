@@ -654,11 +654,12 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     }
 
     public func beginFadedSkip(duration: TimeInterval) async -> Int? {
-        await run {
+        guard duration.isFinite, duration <= Double(Int32.max) / 1_000 else { return nil }
+        return await run {
             guard self.currentTrack != nil else { return nil }
             let status = self.controller.perform(.init(command: .status)).status
             guard status?.isPlaying == true else { return nil }
-            let milliseconds = max(1, Int((duration * 1_000).rounded(.up)))
+            let milliseconds = max(1, Int((max(0, duration) * 1_000).rounded(.up)))
             let event = self.controller.perform(.init(
                 command: .rampOutputGain,
                 payload: .init(outputGain: 0, rampMilliseconds: milliseconds)

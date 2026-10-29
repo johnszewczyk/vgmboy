@@ -9,6 +9,14 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Fade duration bounds, 2026-10-29: shared faded skip rejects nonfinite and
+  unrepresentable durations before integer conversion; finite negative values
+  retain their minimum-duration behavior. The VGMBoy session rejects ramps
+  that cannot fit the audio unit's frame counter, including direct control
+  requests. A focused integration check exercises both entry points and verifies
+  the active generation survives rejected requests. All 46 transport tests
+  passed and SB2 built; this does not establish audible fade behavior.
+
 - SB2 guarded settings adoption, 2026-10-29: live timing requests now carry
   the observed native generation. The native bridge assigns a transport-owned
   settings revision on message receipt before detached dispatch, so revisions
