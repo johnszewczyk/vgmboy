@@ -229,11 +229,13 @@ public final class PlaybackController: @unchecked Sendable {
         return PlaybackControlEvent(requestID: request.requestID, kind: .response, status: session.status())
     }
 
-    private func load(_ payload: PlaybackControlPayload) throws {
+    @discardableResult
+    private func load(_ payload: PlaybackControlPayload) throws -> PlaybackStatus {
         try load(payload, sourceData: nil)
     }
 
-    private func load(_ payload: PlaybackControlPayload, sourceData: Data?) throws {
+    @discardableResult
+    private func load(_ payload: PlaybackControlPayload, sourceData: Data?) throws -> PlaybackStatus {
         guard let path = payload.path, !path.isEmpty else {
             throw PlaybackControlError.invalidPayload("Load requires a path.")
         }
@@ -269,8 +271,9 @@ public final class PlaybackController: @unchecked Sendable {
         }
         let plan = makePlan(family: family)
         let loop = payload.loop ?? (sourceData == nil ? PlaybackLoopTagReader.read(path: playablePath) : PlaybackLoopTagReader.read(data: sourceData ?? Data(), extensionName: URL(fileURLWithPath: playablePath).pathExtension))
+        let replacedStatus: PlaybackStatus
         do {
-            try session.load(path: playablePath, sourceData: sourceData, trackIndex: trackIndex, plan: plan, tempo: tempo, loop: loop)
+            replacedStatus = try session.load(path: playablePath, sourceData: sourceData, trackIndex: trackIndex, plan: plan, tempo: tempo, loop: loop)
         } catch {
             // Session load has already retired the previous decoder. Its
             // metadata and materializer must not outlive that failed session.
@@ -289,6 +292,7 @@ public final class PlaybackController: @unchecked Sendable {
         loaded = LoadedTrack(path: path, archiveEntry: archiveEntry, trackIndex: trackIndex, tempo: tempo, sourceData: sourceData, loop: loop)
         lock.unlock()
         previousMaterializer?.release()
+        return replacedStatus
     }
 
     private func configurePlaybackMode(_ payload: PlaybackControlPayload, reloadCurrent: Bool = true) throws {
@@ -321,15 +325,14 @@ public final class PlaybackController: @unchecked Sendable {
         let previousStatus = session.status()
         let family = FormatRegistry.family(for: current.archiveEntry ?? current.path)
         let nextTempo = FormatRegistry.effectiveTempo(payload.tempo ?? current.tempo, family: family)
-        let previousTempo = previousStatus.statistics.tempo
-        let resumeSeconds = previousStatus.elapsedSeconds * previousTempo / nextTempo
         do {
-            try load(
+            let replacedStatus = try load(
                 PlaybackControlPayload(path: current.path, archiveEntry: current.archiveEntry, trackIndex: current.trackIndex, tempo: payload.tempo ?? current.tempo, loop: current.loop),
                 sourceData: current.sourceData
             )
+            let resumeSeconds = replacedStatus.elapsedSeconds * replacedStatus.statistics.tempo / nextTempo
             if resumeSeconds > 0 { try session.seek(to: resumeSeconds) }
-            if previousStatus.isPlaying { try session.play() }
+            if replacedStatus.isPlaying { try session.play() }
         } catch {
             if session.status().diagnostics.generation == previousStatus.diagnostics.generation {
                 // Preparation failed before replacing the active decoder.

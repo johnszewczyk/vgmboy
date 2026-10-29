@@ -152,6 +152,7 @@ final class PlaybackSession: @unchecked Sendable {
         queue.async { self.completionStatusHandler = handler }
     }
 
+    @discardableResult
     public func load(
         path: String,
         sourceData: Data? = nil,
@@ -159,8 +160,15 @@ final class PlaybackSession: @unchecked Sendable {
         plan: PlaybackPlan,
         tempo: Double,
         loop: PlaybackLoopMetadata? = nil
-    ) throws {
+    ) throws -> PlaybackStatus {
         try queue.sync {
+            // Preparation happens before this session turn. Capture the old
+            // audible position only after its pause envelope has consumed PCM.
+            stopRefillTimer()
+            let wasPlaying = output.isRunning
+            output.pause()
+            var previousStatus = makeStatus()
+            previousStatus.isPlaying = wasPlaying
             releaseCurrent()
             generation += 1
             var loadedSuccessfully = false
@@ -263,6 +271,7 @@ final class PlaybackSession: @unchecked Sendable {
             try prime(to: output.primeFrameCount)
             loadedSuccessfully = true
             publishStatus()
+            return previousStatus
         }
     }
 

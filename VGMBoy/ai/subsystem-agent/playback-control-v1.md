@@ -68,6 +68,10 @@ same typed endpoint operations.
   settings; an unchanged effective rate is a no-op. A reload gets a new native
   generation. The logical output-time seek is rebased by old effective tempo
   divided by new effective tempo, including for authored-loop repetitions.
+- Reconfiguration prepares the replacement source while the prior session
+  continues. Once preparation succeeds, the old session pauses and completes
+  its transport ramp before its position and previous play state are captured
+  for the replacement. A preparation failure leaves the prior session active.
 - The equalizer is CocoaSpice-compatible: ten parametric bands at 31, 62, 125, 250, 500, 1k,
   2k, 4k, 8k, and 16k Hz, each constrained to -12...+12 dB. It is applied before the direct
   AudioUnit ring so every decoder sees identical EQ behavior; the transport callback applies only
