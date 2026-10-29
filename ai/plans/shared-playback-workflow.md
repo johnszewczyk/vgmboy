@@ -6,6 +6,38 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- ViewBoy history fix, 2026-10-29: the packaged UI played the SPC but did
+  not add it to shared history. The renderer passes one track dictionary to
+  `playbackHistoryRecord`, while ViewBoy's bridge tried to parse it directly
+  as an array. The bridge now wraps the validated dictionary before mapping
+  it, matching SB2. A clean isolated ViewBoy rebuild played the same SPC;
+  its temporary history grew from seven to eight records with `big-blue` at
+  the head, and Recent reported eight tracks. This verifies the renderer-to-
+  native history path for that fixture, not every format or timing race.
+
+- Isolated packaged UI pass, 2026-10-29: built SB2, ViewBoy and CocoaSpice
+  at `b8dbbab7` in a temporary detached checkout, using copied native decoder
+  products from the source build. The verification copies redirect shared
+  favorites, history, playlist files and frontend archive caches to temporary
+  paths and use separate bundle identifiers; the catalog remains read-only.
+  SB2 played a VGM member of a catalog UAC, and its displayed clock advanced.
+  ViewBoy loaded the vendored Big Blue SPC (SHA-256
+  `c2e3fbc4ecee60a2f9102acd374387438ac3a9ba5bfaca2f02a12fc6315bee85`),
+  played, paused, resumed after a mode change, and stopped. CocoaSpice played
+  the same catalog UAC member as SB2, paused, enabled Long Play, resumed,
+  advanced to the next member and stopped. These are partial UI checks, not
+  audible or sample-level continuity evidence. The user's history, favorites
+  database, SB2 tabs and CocoaSpice tabs had unchanged file hashes after the
+  checks. The previously running original SB2 process was no longer present
+  during this pass; its cause was not established and it was not restarted.
+  The full ViewBoy renderer run passed 9 of 10 tests; the existing
+  `YogaCanvas.test.mjs` default ink assertion failed and its mock also reported
+  a missing `playlistTabsReduce` after test termination. Homebrew FFmpeg and
+  libsidplayfp binaries generated macOS 27 versus deployment-target 26 linker
+  warnings; compatibility with macOS 26 is not established by these builds.
+  The ViewBoy UI pass also exposed a history bridge argument mismatch; see the
+  later history-fix checkpoint for its verification status.
+
 - Subsecond timing pass, 2026-10-29: a generated WAV reproduced the 500 ms
   timed play plus 250 ms fade request continuing beyond two seconds because
   both values were truncated to zero. The internal playback plan now retains
