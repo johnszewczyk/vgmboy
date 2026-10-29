@@ -14,7 +14,12 @@ Recheck paths, working-tree changes, and findings before continuing.
   focused completion-race checks pass. Family verification's ViewBoy test glob
   now selects `.test.mjs` files. The full renderer run passed 15 of 16 tests;
   the existing framebuffer-default assertion and missing tab-reducer mock still
-  fail. A rebuilt isolated package played two short WAVs, advanced to the second
+  fail. An isolated harness investigation found the test assumes gapless dots,
+  `#222222` ink and equal CIELAB spacing, while current defaults use an enabled
+  STN aperture, `#000000` ink and LCD reflectance mixing; the mock also lacks
+  the shared playlist-tab reducer. Updating this display fixture needs its own
+  rendering-contract review rather than changing production display behavior.
+  A rebuilt isolated package played two short WAVs, advanced to the second
   and stopped, recording both in temporary history. The stale-event race itself
   was tested in the renderer harness; audible behavior remains unverified.
 
