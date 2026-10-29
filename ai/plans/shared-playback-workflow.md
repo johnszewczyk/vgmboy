@@ -9,14 +9,24 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- SB2 guarded settings adoption, 2026-10-29: live timing requests now carry
+  the observed native generation. The native bridge assigns a transport-owned
+  settings revision on message receipt before detached dispatch, so revisions
+  remain monotonic across WebView recreation. Shared lineage and revision tests
+  cover consecutive and out-of-order changes and replacement; an SB2 renderer
+  test checks generation forwarding and missing identity. The SB2 build,
+  18 renderer checks and all 45 transport tests passed. Actual WebView recreation, packaged rapid settings
+  changes and audible behavior still require verification.
+
 - Ordered settings reconfiguration, 2026-10-29: shared transport accepts an
   earlier generation only within the current loaded track's reload lineage and
   rejects older settings revisions or a replacement track's old generation.
   Focused native tests cover successive reloads, out-of-order requests,
-  replacement and wire compatibility. SB2 adoption remains deferred: WebView
-  recreation can reset its local revision counter while the native session
-  survives. Resolve and test counter synchronization before enabling the guard;
-  packaged races and audible transitions remain unverified. Three focused
+  replacement and wire compatibility. At this checkpoint SB2 adoption was
+  deferred because WebView recreation can reset its local revision counter while
+  the native session survives. The later SB2 adoption checkpoint above moves
+  revision reservation into the native transport; live recreation still needs validation.
+  Packaged races and audible transitions remain unverified. Three focused
   transport checks and 17 SB2 renderer checks passed, and SB2 built. The full
   transport run failed device-driven drain cases with zero consumed frames; a
   focused retry and the same case in the earlier isolated checkout failed the
@@ -29,11 +39,10 @@ paths, working-tree changes, and findings before continuing.
   an old request reloading a replacement track. Shared reconfiguration now
   accepts an optional expected native generation and rejects mismatches before
   changing playback; requests that omit it remain compatible. The matching
-  generation still reconfigures. At this checkpoint SB2 did not send the guard: two rapid
-  settings changes can both observe the same generation, so an earlier accepted
-  reload could cause the latest setting to be rejected. Resolve and test that
-  settings ordering before adopting the guard in SB2; see the later shared
-  ordering checkpoint above for the remaining WebView lifecycle issue.
+  generation still reconfigures. At this checkpoint SB2 did not send the guard:
+  two rapid settings changes can both observe the same generation, so an earlier
+  accepted reload could cause the latest setting to be rejected. See the later
+  ordering and SB2 adoption checkpoints above for the follow-up.
 
 - Superseded preparation preservation, 2026-10-29: the first cancellation
   fix still replaced and retired an already-playing track after an archive

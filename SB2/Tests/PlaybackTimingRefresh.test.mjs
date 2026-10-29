@@ -38,6 +38,29 @@ test('a late stopped preview cannot replace a newer selected track', async () =>
   assert.equal(run.timingPlans.has('one'), false);
 });
 
+test('live timing changes target the observed native session', async () => {
+  const state = { currentTrackId: 'one', nativePlayback: { trackLoaded: true, generation: 42 }, unknownDurationSeconds: 150, elapsedSeconds: 0 };
+  const track = { id: 'one' }, requests = [];
+  const factory = new Function('state', 'track', 'window', `
+    let playbackSettingsGeneration = 0, playbackGeneration = 7, nativePlaybackInitialized = true;
+    const timingPlans = new Map();
+    const currentTrack = () => track, activeTrackInfo = () => track;
+    const resolveTimingPlan = async () => ({ is_long_play: true, pre_fade_seconds: 30, fade_seconds: 1 });
+    const matchesCurrentPlaybackSettings = (r, g, id) => r === playbackSettingsGeneration && g === playbackGeneration && state.currentTrackId === id;
+    const requestedPlaybackSpeed = () => ({ numerator: 1, denominator: 1 });
+    const applyNativePlaybackSnapshot = () => {}, effectiveTotalSeconds = () => 31;
+    const updateTimingSummary = () => {}, updatePlaybackReadout = () => {};
+    ${source.slice(start, end)}
+    return refreshPlaybackForTimingChange;
+  `);
+  const refresh = factory(state, track, { spcBoySB2: { nativePlaybackReconfigure: async value => { requests.push(value); return {}; } } });
+  await refresh();
+  assert.equal(requests[0].expectedGeneration, 42);
+  state.nativePlayback.generation = 0;
+  await assert.rejects(refresh(), /session identity is unavailable/);
+  assert.equal(requests.length, 1);
+});
+
 const resolveStart = source.indexOf('async function resolveTimingPlan(');
 const resolveEnd = source.indexOf('\nfunction matchesCurrentPlaybackSettings(', resolveStart);
 assert.ok(resolveStart >= 0 && resolveEnd > resolveStart);

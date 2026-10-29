@@ -14,6 +14,10 @@ directly, using its millisecond fields when available; a local catalog estimate
 is used only until a preview is available. Timing, start and reconfiguration
 requests pass the selected speed to shared policy, which resolves backend limits;
 SB2's local speed projection applies only to the temporary estimate.
+Live timing requests carry the observed native generation. The native bridge
+stamps a transport-owned settings revision when it receives each request,
+before dispatching work, so the counter survives WebView recreation and shared
+transport can reject stale settings or requests for a replaced track.
 If settings change during start preparation, SB2 replans before native start;
 if they change during native start, it reconfigures the accepted session. A
 newer playback generation cancels either path.

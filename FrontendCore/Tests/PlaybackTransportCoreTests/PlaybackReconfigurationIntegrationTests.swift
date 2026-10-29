@@ -113,24 +113,29 @@ private final class StatusRecorder: @unchecked Sendable {
     defer { _ = transport.perform(.init(command: .stop)) }
     let loaded = transport.perform(.init(command: .load, payload: .init(path: url.path)))
     let initial = try #require(loaded.status?.diagnostics.generation)
+    let firstRevision = transport.reserveSettingsRevision()
+    let secondRevision = transport.reserveSettingsRevision()
+    #expect(secondRevision > firstRevision)
     let first = try transport.reconfigureSync(.init(
-        longPlayEnabled: true, manualPlayMilliseconds: 1_000, expectedGeneration: initial, settingsRevision: 1
+        longPlayEnabled: true, manualPlayMilliseconds: 1_000, expectedGeneration: initial, settingsRevision: firstRevision
     ))
     let second = try transport.reconfigureSync(.init(
-        longPlayEnabled: true, manualPlayMilliseconds: 2_000, expectedGeneration: initial, settingsRevision: 2
+        longPlayEnabled: true, manualPlayMilliseconds: 2_000, expectedGeneration: initial, settingsRevision: secondRevision
     ))
     #expect(second.generation != first.generation)
     #expect(throws: CancellationError.self) {
         try transport.reconfigureSync(.init(
-            longPlayEnabled: true, manualPlayMilliseconds: 3_000, expectedGeneration: initial, settingsRevision: 1
+            longPlayEnabled: true, manualPlayMilliseconds: 3_000, expectedGeneration: initial, settingsRevision: firstRevision
         ))
     }
     #expect(transport.statusSync().generation == second.generation)
     #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
     let replacement = transport.statusSync()
+    let thirdRevision = transport.reserveSettingsRevision()
+    #expect(thirdRevision > secondRevision)
     #expect(throws: CancellationError.self) {
         try transport.reconfigureSync(.init(
-            longPlayEnabled: true, manualPlayMilliseconds: 4_000, expectedGeneration: initial, settingsRevision: 3
+            longPlayEnabled: true, manualPlayMilliseconds: 4_000, expectedGeneration: initial, settingsRevision: thirdRevision
         ))
     }
     #expect(transport.statusSync().generation == replacement.generation)

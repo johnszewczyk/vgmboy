@@ -326,6 +326,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     private let queue: PlaybackSerialExecutor
     private let requestLock = NSLock()
     private var latestPlaybackRequest = 0
+    private var settingsRevisionCounter = 0
     private var currentTrack: PlaybackTransportTrack?
     private var currentPlaybackPlan = PlaybackTimingPlan(
         preFadeSeconds: PlaybackTimingPreferences.defaultUnknownDurationSeconds,
@@ -373,6 +374,15 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         defer { requestLock.unlock() }
         latestPlaybackRequest += 1
         return latestPlaybackRequest
+    }
+
+    /// Reserve in the host's message-receipt order. Unlike a renderer-local
+    /// counter, this survives WebView recreation while this transport lives.
+    public func reserveSettingsRevision() -> Int {
+        requestLock.lock()
+        defer { requestLock.unlock() }
+        settingsRevisionCounter += 1
+        return settingsRevisionCounter
     }
 
     public func invalidatePlaybackRequests() {
