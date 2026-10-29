@@ -6,6 +6,20 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Controlled tempo timeline, 2026-10-29: `TempoSeekTimelineTests` generates
+  an eight-second VGM with a different SN76489 tone each source second. For
+  both the installed libgme and the vendored libvgm, after 1× playback followed
+  by 2×, a newly opened decoder at 2× sought to `sourceSeconds / 2` produces
+  the same tone as the continuous decoder; seeking to the old unconverted
+  output time produces a different tone. A second case follows 1×, 2× and
+  0.5× segments and confirms `sum(outputSeconds × segmentTempo) / newTempo`
+  selects the matching tone. Both focused decoder tests passed. This establishes
+  the seek-coordinate relationship for this synthetic SN76489 VGM through the
+  tested libraries; it does not prove sample-identical output, every libgme
+  format, loop mapping, or audible continuity. A session fix must account for
+  buffered old-rate PCM, loop repeats, elapsed-time presentation and effective
+  rates, not just multiply the last elapsed counter by its most recent tempo.
+
 - Effective tempo pass, 2026-10-29: the shared format registry now resolves
   the wrapper's accepted multiplier (libgme 0.02–4×, libvgm 0.05–4× rounded
   to 0.001, unsupported families 1×). Session status, shared timing preview,
