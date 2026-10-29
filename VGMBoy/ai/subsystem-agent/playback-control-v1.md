@@ -57,6 +57,10 @@ same typed endpoint operations.
   decimal or fractional input and snaps it to musical 1/32 increments before the host sends the
   typed `set_tempo` multiplier; decoder-family capability remains owned by `FormatRegistry` and
   gates application to formats that support native tempo (currently libgme and libvgm).
+- The preference stores the requested rate; `FormatRegistry.effectiveTempo` resolves the rate
+  accepted by the current wrapper. Libgme is limited to 0.02–4×, libvgm to 0.05–4× with
+  0.001 precision, and non-tempo families use 1×. Session status reports the applied rate.
+  An unsupported or already-effective direct tempo command leaves buffered PCM intact.
 - A `set_playback_mode` request can include a tempo multiplier. VGMBoy applies
   both to the same reload and resumes from the prior session position and play
   state; it does not issue a separate in-place tempo change first.

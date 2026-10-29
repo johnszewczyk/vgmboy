@@ -6,6 +6,20 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Effective tempo pass, 2026-10-29: the shared format registry now resolves
+  the wrapper's accepted multiplier (libgme 0.02–4×, libvgm 0.05–4× rounded
+  to 0.001, unsupported families 1×). Session status, shared timing preview,
+  ViewBoy timing preview, CocoaSpice playback timing and SB2 track timing use
+  that rate while the saved requested preference remains unchanged. Direct
+  commands that resolve to the current effective tempo no longer clear queued
+  PCM; direct changes to a different effective tempo still need the position
+  and buffer work below. All 28 PlaybackTransportCore tests passed, including
+  endpoint, paused-PCM and archive cases, and all three frontend Swift builds passed.
+  A focused SB2 JavaScript projection check verified the 8× and 1/32× libvgm
+  cases. This is not packaged-UI or audible verification; backend behavior at
+  other versions and source-time mapping still need validation. The existing
+  macOS 26/27 linker warnings remain.
+
 - Explicit-loop verification, 2026-10-29: a generated two-second PCM source
   with a supplied 0.25–0.75-second loop and two repeats was started through
   `PlaybackTransportStartRequest`, reconfigured through the shared operation,

@@ -70,6 +70,9 @@ startup contracts shared by the VGMMan player frontends.
   coordinator as one serialized operation; CocoaSpice's native timing-plan
   route uses the same coordinator operation. It gates tempo by decoder family
   and reloads with timing and tempo together, retaining track and source identity.
+- Timing previews use the decoder family's effective rate rather than the
+  stored requested preference. Native status and preview calculations must
+  agree when a backend clamps or rounds a requested rate.
 - `PlaybackTransportAudioConfigurationRequest` is the complete output snapshot
   for volume, EQ, and mono. `PlaybackTransportCoordinator.configureAudio(_:)`
   normalizes and serializes all three control commands; presentation adapters

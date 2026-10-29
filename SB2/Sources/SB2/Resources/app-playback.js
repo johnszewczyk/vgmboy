@@ -195,16 +195,22 @@ function playbackSpeedForTrack(track) {
     (candidate) => playbackBackends.normalizeExtension(candidate) === extension
   );
   if (backend?.playbackSpeedMode === "native-tempo" && supportsNativeTempo && state.playbackSpeedEnabled) {
-    return state.playbackSpeed;
+    const requested = state.playbackSpeed.numerator / state.playbackSpeed.denominator;
+    const minimum = Number(backend.tempoMinimum) || requested;
+    const maximum = Number(backend.tempoMaximum) || requested;
+    const precision = Number(backend.tempoPrecision) || 0;
+    const bounded = Math.min(maximum, Math.max(minimum, requested));
+    const effective = precision ? Math.round(bounded / precision) * precision : bounded;
+    if (Math.abs(effective - requested) < 1e-9) return state.playbackSpeed;
+    return { numerator: Math.round(effective * 1000), denominator: 1000 };
   }
   return { numerator: 1, denominator: 1 };
 }
 
 function currentOutputBasePlaybackSeconds(track) {
-  return playbackApp.scalePlaybackMilliseconds(
-    Math.round(currentBasePlaybackSeconds(track) * 1000),
-    playbackSpeedForTrack(track)
-  ) / 1000;
+  const speed = playbackSpeedForTrack(track);
+  const milliseconds = Math.max(0, Math.round(currentBasePlaybackSeconds(track) * 1000));
+  return Math.round(milliseconds * speed.denominator / speed.numerator) / 1000;
 }
 
 async function resolveTimingPlan(track, { force = false, cache = true } = {}) {

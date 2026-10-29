@@ -2965,7 +2965,10 @@ final class PlayerViewModel {
               family.supportsTempo else {
             return .defaultValue
         }
-        return playbackTempoEnabled ? playbackTempo : .defaultValue
+        guard playbackTempoEnabled else { return .defaultValue }
+        let effective = FormatRegistry.effectiveTempo(playbackTempo.multiplier, family: family)
+        if effective == playbackTempo.multiplier { return playbackTempo }
+        return PlaybackTempo(numerator: Int((effective * 1_000).rounded()), denominator: 1_000)
     }
 
     private func playbackFamily(forPathExtension pathExtension: String) -> DecoderFamily? {

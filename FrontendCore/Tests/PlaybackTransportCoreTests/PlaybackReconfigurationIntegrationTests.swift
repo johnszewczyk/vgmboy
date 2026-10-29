@@ -170,6 +170,53 @@ func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
     }
 }
 
+@Test func effectiveTempoMatchesNativeLimitsAndPreview() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    for relative in [
+        "VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc",
+        "VGMBoy/vendor/zxtune/samples/chiptunes/Multi/vgm/TwinCobra.vgm"
+    ] {
+        let path = root.appendingPathComponent(relative).path
+        let transport = PlaybackTransportCoordinator(label: "test.effective.tempo")
+        let loaded = transport.perform(.init(command: .load, payload: .init(path: path, tempo: 8)))
+        #expect(loaded.kind != .error, Comment(rawValue: relative))
+        #expect(loaded.status?.statistics.tempo == 4, Comment(rawValue: relative))
+        let preview = try PlaybackTimingPreviewRequest(
+            sourcePath: path, playMilliseconds: 90_000, fadeMilliseconds: 0,
+            tempo: .init(numerator: 8, denominator: 1)
+        ).preview()
+        #expect(preview.preFadeSeconds == 22, Comment(rawValue: relative))
+        if path.hasSuffix(".vgm") {
+            let changed = transport.perform(.init(command: .setTempo, payload: .init(tempo: 1.0 / 32)))
+            #expect(changed.kind != .error)
+            #expect(changed.status?.statistics.tempo == 0.05)
+            let slowPreview = try PlaybackTimingPreviewRequest(
+                sourcePath: path, playMilliseconds: 90_000, fadeMilliseconds: 0,
+                tempo: .init(numerator: 1, denominator: 32)
+            ).preview()
+            #expect(slowPreview.preFadeSeconds == 1_800)
+        }
+        _ = transport.perform(.init(command: .stop))
+    }
+}
+
+@Test func unsupportedDirectTempoDoesNotDiscardPausedPCM() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.unsupported.tempo")
+    let loaded = transport.perform(.init(command: .load, payload: .init(path: url.path)))
+    let before = try #require(loaded.status)
+    let changed = transport.perform(.init(command: .setTempo, payload: .init(tempo: 2)))
+    let after = try #require(changed.status)
+    #expect(after.statistics.tempo == 1)
+    #expect(after.elapsedSeconds == before.elapsedSeconds)
+    #expect(after.diagnostics.bufferedFrames == before.diagnostics.bufferedFrames)
+    _ = transport.perform(.init(command: .stop))
+}
+
 @Test func nativePlanReconfigurationUsesSharedSessionOperation() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
