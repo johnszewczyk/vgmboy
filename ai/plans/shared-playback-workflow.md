@@ -9,6 +9,14 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Failure and retry boundary, 2026-10-29: the existing shared integration
+  check verifies that archive preparation failure preserves the prior session,
+  while a failed replacement after decoder retirement clears the session and a
+  subsequent valid load succeeds. It passed in the 49-test transport run. An
+  isolated SB2 missing-WAV UI attempt could not be completed: computer-use
+  reported the app state changed during the attempted action. Packaged error
+  presentation and retry therefore remain unverified.
+
 - Session-scoped controls, 2026-10-29: SB2 now forwards its observed native
   generation for pause, resume and seek, and shared transport rejects delayed
   controls for a replaced session on its serialized queue. Existing callers may
