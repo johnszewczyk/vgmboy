@@ -6,6 +6,17 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Offline transition evidence, 2026-10-29: a focused VGMBoyKit test decoded
+  real non-silent PCM from the generated tone VGM and the vendored SPC, then
+  used `vgmboy_audio_unit_render_offline` to exercise a 441-frame fade-out,
+  buffer clear and 441-frame fade-in after a 1× to 2× decoder restart. For both
+  fixtures the faded-out final stereo sample was zero, and the first faded-in
+  stereo samples were at most 75 PCM16 units from zero. The offline transition
+  and five focused timing/loop tests passed. This exercises the callback and
+  decoder PCM in a controlled harness; it does not capture the live
+  `PlaybackSession` transition, prove musical phase continuity, or establish
+  audible or packaged-app behavior.
+
 - Reload-boundary pass, 2026-10-29: replacement preparation remains outside
   the active session, and the prior audible position is now captured after the
   old transport pauses and completes its short ramp. A focused integration

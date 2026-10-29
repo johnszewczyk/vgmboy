@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import VGMBoyCAudioUnit
 @testable import VGMBoyKit
 
 /// Eight one-second SN76489 tones make source position visible without
@@ -26,6 +27,61 @@ private func timelineVGM() -> Data {
 
 private func risingCrossings(_ samples: [Float]) -> Int {
     zip(samples, samples.dropFirst()).reduce(0) { $0 + ($1.0 <= 0 && $1.1 > 0 ? 1 : 0) }
+}
+
+@Test func offlineTempoReloadRampsRealDecoderPCMThroughSilence() throws {
+    let synthetic = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".vgm")
+    defer { try? FileManager.default.removeItem(at: synthetic) }
+    try timelineVGM().write(to: synthetic)
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let spc = root.appendingPathComponent("vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let families: [(String, () throws -> any AudioDecoder)] = [
+        ("libvgm", { try VGMDecoder(path: synthetic.path) }),
+        ("libgme", { try GMEDecoder(path: spc.path) })
+    ]
+    let rampFrames = 441
+    for (name, make) in families {
+        let oldDecoder = try make()
+        try oldDecoder.startTrack(0)
+        var last: (left: [Float], right: [Float]) = ([], [])
+        for _ in 0..<20 { last = try oldDecoder.readFrames(4_096) }
+        let newDecoder = try make()
+        try newDecoder.startTrack(0)
+        newDecoder.setTempo(2)
+        newDecoder.seek(milliseconds: Int((20.0 * 4_096 / 44_100 / 2 * 1_000).rounded()))
+        let next = try newDecoder.readFrames(rampFrames)
+        #expect(last.left.count >= rampFrames && next.left.count >= rampFrames, Comment(rawValue: name))
+
+        var config = VGMBoyAudioUnitConfig(sample_rate: 44_100, channel_count: 2, callback_frames: 512, ring_buffer_frames: 2_048)
+        var handle: OpaquePointer?
+        #expect(vgmboy_audio_unit_create(&handle, &config) == 0)
+        let output = try #require(handle)
+        defer { vgmboy_audio_unit_destroy(output) }
+        func interleave(_ left: ArraySlice<Float>, _ right: ArraySlice<Float>) -> [Int16] {
+            zip(left, right).flatMap { l, r in
+                [Int16(max(-32768, min(32767, (l * 32767).rounded()))),
+                 Int16(max(-32768, min(32767, (r * 32767).rounded())))]
+            }
+        }
+        var oldPCM = interleave(last.left.suffix(rampFrames), last.right.suffix(rampFrames))
+        #expect(vgmboy_audio_unit_enqueue_pcm(output, &oldPCM, rampFrames) == rampFrames)
+        vgmboy_audio_unit_set_transport_active(output, 1)
+        vgmboy_audio_unit_set_transport_gain(output, 1)
+        vgmboy_audio_unit_ramp_transport_gain(output, 0, UInt32(rampFrames))
+        var fadedOut = [Int16](repeating: 0, count: rampFrames * 2)
+        #expect(vgmboy_audio_unit_render_offline(output, &fadedOut, rampFrames) == rampFrames)
+        #expect(fadedOut.suffix(2).allSatisfy { $0 == 0 }, Comment(rawValue: name))
+        #expect(fadedOut.contains { $0 != 0 }, Comment(rawValue: name))
+
+        vgmboy_audio_unit_clear(output)
+        var newPCM = interleave(next.left.prefix(rampFrames), next.right.prefix(rampFrames))
+        #expect(vgmboy_audio_unit_enqueue_pcm(output, &newPCM, rampFrames) == rampFrames)
+        vgmboy_audio_unit_ramp_transport_gain(output, 1, UInt32(rampFrames))
+        var fadedIn = [Int16](repeating: 0, count: rampFrames * 2)
+        #expect(vgmboy_audio_unit_render_offline(output, &fadedIn, rampFrames) == rampFrames)
+        #expect(fadedIn.prefix(2).allSatisfy { abs(Int($0)) <= 75 }, Comment(rawValue: name))
+        #expect(fadedIn.contains { $0 != 0 }, Comment(rawValue: name))
+    }
 }
 
 private final class TimelineEndRecorder: @unchecked Sendable {
