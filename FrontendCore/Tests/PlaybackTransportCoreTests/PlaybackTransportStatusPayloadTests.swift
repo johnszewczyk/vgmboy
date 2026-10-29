@@ -195,8 +195,10 @@ func timingBridgeContractsKeepPolicyAndControlPayloadOutOfTheFrontend() throws {
     )
     let legacyRequest = try JSONDecoder().decode(PlaybackTransportReconfigurationRequest.self, from: JSONEncoder().encode(reconfiguration))
     #expect(legacyRequest.expectedGeneration == nil)
-    let guardedRequest = PlaybackTransportReconfigurationRequest(longPlayEnabled: false, expectedGeneration: 42)
-    #expect(try JSONDecoder().decode(PlaybackTransportReconfigurationRequest.self, from: JSONEncoder().encode(guardedRequest)).expectedGeneration == 42)
+    let guardedRequest = PlaybackTransportReconfigurationRequest(longPlayEnabled: false, expectedGeneration: 42, settingsRevision: 7)
+    let decodedGuarded = try JSONDecoder().decode(PlaybackTransportReconfigurationRequest.self, from: JSONEncoder().encode(guardedRequest))
+    #expect(decodedGuarded.expectedGeneration == 42)
+    #expect(decodedGuarded.settingsRevision == 7)
     let reconfigurationPayload = reconfiguration.playbackModePayload
     let tempoRequest = PlaybackTransportTempoRequest(tempo: .init(numerator: 3, denominator: 2))
 

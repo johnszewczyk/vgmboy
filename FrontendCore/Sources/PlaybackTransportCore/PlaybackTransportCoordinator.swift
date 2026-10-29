@@ -336,6 +336,8 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     private var statusHandler: StatusHandler?
     private var naturalEndHandler: NaturalEndHandler?
     private var currentPlaybackGeneration: Int?
+    private var currentTrackStartGeneration: Int?
+    private var latestSettingsRevision: Int?
     private var nextStatusSequence: UInt64 = 0
     private var naturalEndGate = PlaybackNaturalEndGate()
     private let continuationCoordinator = PlaybackContinuationCoordinator()
@@ -421,8 +423,14 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     /// Applies a complete bridge settings snapshot as one serialized reload.
     public func reconfigureSync(_ request: PlaybackTransportReconfigurationRequest) throws -> PlaybackTransportStatus {
         try queue.sync {
-            if let expected = request.expectedGeneration, expected != currentPlaybackGeneration {
-                throw CancellationError()
+            if let expected = request.expectedGeneration {
+                guard let start = currentTrackStartGeneration, let current = currentPlaybackGeneration,
+                      expected >= start, expected <= current else { throw CancellationError() }
+            }
+            if let revision = request.settingsRevision {
+                guard request.expectedGeneration != nil, revision >= 0,
+                      latestSettingsRevision.map({ revision > $0 }) ?? true else { throw CancellationError() }
+                latestSettingsRevision = revision
             }
             var payload = request.playbackModePayload
             payload.tempo = request.tempo.multiplier
@@ -592,6 +600,8 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         }
         currentTrack = start.track
         currentPlaybackGeneration = event.status?.diagnostics.generation
+        currentTrackStartGeneration = currentPlaybackGeneration
+        latestSettingsRevision = nil
     }
 
     private func completionDecisionLocked(
@@ -627,6 +637,8 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         _ = controller.perform(.init(command: .stop))
         currentTrack = nil
         currentPlaybackGeneration = nil
+        currentTrackStartGeneration = nil
+        latestSettingsRevision = nil
         naturalEndGate.reset()
         continuationCoordinator.reset()
     }
@@ -789,6 +801,8 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         case .stop, .shutdown:
             currentTrack = nil
             currentPlaybackGeneration = nil
+            currentTrackStartGeneration = nil
+            latestSettingsRevision = nil
             naturalEndGate.reset()
             continuationCoordinator.reset()
         default:
@@ -801,6 +815,10 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
                 continuationCoordinator.reset()
             }
             currentPlaybackGeneration = generation
+            if request.command == .load {
+                currentTrackStartGeneration = generation
+                latestSettingsRevision = nil
+            }
         }
         return event
     }
@@ -858,6 +876,8 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         }
         currentTrack = track
         currentPlaybackPlan = plan
+        currentTrackStartGeneration = currentPlaybackGeneration
+        latestSettingsRevision = nil
     }
 
     private func performOutputControl(_ command: PlaybackControlCommand, payload: PlaybackControlPayload) {
