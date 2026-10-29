@@ -9,6 +9,16 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Whole-second timing bounds, 2026-10-29: extreme public timing plans could
+  overflow while summing seconds or converting them to milliseconds before the
+  native validation boundary. Plan totals now saturate on integer overflow;
+  shared start, reconfigure and AAC export reject out-of-range seconds before
+  conversion. The direct AAC exporter also checks each duration and their sum
+  before opening a decoder or output file. A focused native check covers all
+  three fields, preserves the current session on rejection and exercises both
+  export boundaries. All 51 shared transport and 21 SB2 playback renderer
+  checks passed, as did a normal VGMBoy AAC export check and the SB2 build.
+
 - Ordered seeks, 2026-10-29: session identity alone did not order two seeks
   for the same loaded track. SB2 now reserves a transport-owned seek revision
   at message receipt; shared transport rejects an older numbered seek even if

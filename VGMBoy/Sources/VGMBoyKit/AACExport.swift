@@ -113,6 +113,12 @@ public enum AACExporter {
         guard request.playMilliseconds > 0, request.fadeMilliseconds >= 0 else {
             throw AACExportError.invalidRequest("AAC export requires a positive play length and a non-negative fade.")
         }
+        let maximumMilliseconds = Int(Int32.max)
+        guard request.playMilliseconds <= maximumMilliseconds,
+              request.fadeMilliseconds <= maximumMilliseconds,
+              request.playMilliseconds <= maximumMilliseconds - request.fadeMilliseconds else {
+            throw AACExportError.invalidRequest("AAC export timing exceeds the supported millisecond range.")
+        }
         guard FormatRegistry.family(for: request.sourcePath) != nil else {
             throw AACExportError.invalidRequest("AAC export requires a supported playable file.")
         }

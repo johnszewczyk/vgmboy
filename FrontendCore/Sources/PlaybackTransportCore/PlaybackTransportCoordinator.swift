@@ -425,9 +425,9 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             let timing = try PlaybackTimingRequest.standard(
                 path: track.archiveEntry ?? track.path,
                 longPlayEnabled: plan.isLongPlay,
-                manualPlayMilliseconds: plan.preFadeSeconds * 1_000,
-                fadeMilliseconds: plan.fadeSeconds * 1_000,
-                unknownDurationMilliseconds: plan.unknownDurationSeconds * 1_000
+                manualPlayMilliseconds: try self.timingMilliseconds(plan.preFadeSeconds),
+                fadeMilliseconds: try self.timingMilliseconds(plan.fadeSeconds),
+                unknownDurationMilliseconds: try self.timingMilliseconds(plan.unknownDurationSeconds)
             )
             _ = try self.reconfigureLocked(payload: .init(
                 tempo: tempo.multiplier,
@@ -823,8 +823,8 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             trackIndex: trackIndex,
             outputDirectory: outputDirectory,
             filenameStem: filenameStem,
-            playMilliseconds: plan.preFadeSeconds * 1_000,
-            fadeMilliseconds: plan.fadeSeconds * 1_000
+            playMilliseconds: try timingMilliseconds(plan.preFadeSeconds),
+            fadeMilliseconds: try timingMilliseconds(plan.fadeSeconds)
         ), cancellation: cancellation, progress: progress)
     }
 
@@ -890,6 +890,13 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         return event
     }
 
+    private func timingMilliseconds(_ seconds: Int) throws -> Int {
+        guard seconds >= 0, seconds <= Int(Int32.max) / 1_000 else {
+            throw PlaybackControlError.invalidPayload("Playback timing exceeds the supported millisecond range.")
+        }
+        return seconds * 1_000
+    }
+
     private func load(
         track: PlaybackTransportTrack,
         plan: PlaybackTimingPlan,
@@ -901,9 +908,9 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         let timing = try PlaybackTimingRequest.standard(
             path: track.archiveEntry ?? track.path,
             longPlayEnabled: plan.isLongPlay,
-            manualPlayMilliseconds: plan.preFadeSeconds * 1_000,
-            fadeMilliseconds: plan.fadeSeconds * 1_000,
-            unknownDurationMilliseconds: plan.unknownDurationSeconds * 1_000
+            manualPlayMilliseconds: try timingMilliseconds(plan.preFadeSeconds),
+            fadeMilliseconds: try timingMilliseconds(plan.fadeSeconds),
+            unknownDurationMilliseconds: try timingMilliseconds(plan.unknownDurationSeconds)
         )
         let payload = PlaybackControlPayload(
             path: track.archivePath ?? track.path,
