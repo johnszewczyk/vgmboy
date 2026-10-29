@@ -6,6 +6,23 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Tempo range research, 2026-10-29: on macOS 27.0.1 with the installed
+  Homebrew game-music-emu 0.6.5, temporary decoder harnesses rendered 131,072
+  frames in 4,096-frame calls at 1/32×, 0.05×, 1×, 4× and 8×. SPC and GBS
+  produced identical non-silent PCM at 4× and 8×, while their 1× and 4×
+  outputs differed. GBS produced different PCM at 1/32× versus 0.05×; SPC
+  produced identical non-silent PCM for that pair. The vendored libvgm VGM
+  fixture produced identical non-silent PCM at 4× and 8×, consistent with the
+  wrapper's 4× clamp; its first 131,072 low-tempo frames were silent, so the
+  low-end PCM comparison does not independently establish effective speed.
+  These are fixture-specific observations, not a universal capability matrix.
+  `sos.gbs` SHA-256:
+  `dc753eb0426082f1134246dc15e4ee84668f93f61330606dd94ca785960436d8`.
+  The transcript is `/private/tmp/vgmman-tempo-range-research.log` while it
+  exists. Do not silently display 8× as an established effective rate; decide
+  how to expose per-backend effective rates and preserve persisted preferences
+  before changing the shared UI range.
+
 - Archive verification, 2026-10-29: a generated ZIP containing the vendored
   SPC fixture was loaded, played and reconfigured, then its source archive was
   removed. A further reconfiguration failed during preparation while the
