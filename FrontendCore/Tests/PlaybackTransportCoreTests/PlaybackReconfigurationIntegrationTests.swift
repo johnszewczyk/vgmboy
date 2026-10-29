@@ -63,6 +63,90 @@ private final class StatusRecorder: @unchecked Sendable {
     #expect(!status.isPlaying)
 }
 
+@Test(.enabled(if: FileManager.default.isExecutableFile(atPath: "/usr/bin/zip")
+    && ["/opt/homebrew/bin/7zz", "/usr/local/bin/7zz", "/usr/bin/7zz"]
+        .contains { FileManager.default.isExecutableFile(atPath: $0) },
+    "The archive test needs zip and the configured 7zz tool."))
+func archiveReconfigurationKeepsActiveSessionWhenPreparationFails() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let fixture = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let archive = directory.appendingPathComponent("music.zip")
+    let zip = Process()
+    zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+    zip.arguments = ["-q", "-j", archive.path, fixture.path]
+    try zip.run()
+    zip.waitUntilExit()
+    #expect(zip.terminationStatus == 0)
+
+    let transport = PlaybackTransportCoordinator(label: "test.archive.reconfiguration")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    let loaded = transport.perform(.init(command: .load, payload: .init(
+        path: archive.path, archiveEntry: fixture.lastPathComponent
+    )))
+    #expect(loaded.kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let configured = try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 30_000))
+    #expect(configured.isPlaying)
+    let generation = configured.generation
+
+    // The active decoder has a prepared member, even after this test-owned
+    // archive disappears. Re-preparation must not retire that live session.
+    try FileManager.default.removeItem(at: archive)
+    #expect(throws: (any Error).self) {
+        _ = try transport.reconfigureSync(.init(longPlayEnabled: false))
+    }
+    let afterFailure = transport.statusSync()
+    #expect(afterFailure.generation == generation)
+    #expect(afterFailure.currentTrackID == archive.path)
+    #expect(afterFailure.trackLoaded)
+    #expect(afterFailure.isPlaying)
+}
+
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VGM_TXTP_ARCHIVE_FIXTURE_DIR"] != nil,
+    "Set VGM_TXTP_ARCHIVE_FIXTURE_DIR to a directory containing ending3.txtp and ending3.rsf."))
+func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
+    let fixtureDirectory = try #require(ProcessInfo.processInfo.environment["VGM_TXTP_ARCHIVE_FIXTURE_DIR"])
+    let fixture = URL(fileURLWithPath: fixtureDirectory, isDirectory: true)
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let archive = directory.appendingPathComponent("dependencies.zip")
+    let zip = Process()
+    zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+    zip.currentDirectoryURL = fixture
+    zip.arguments = ["-q", archive.path, "ending3.txtp", "ending3.rsf"]
+    try zip.run()
+    zip.waitUntilExit()
+    #expect(zip.terminationStatus == 0)
+
+    let transport = PlaybackTransportCoordinator(label: "test.dependency.archive.reconfiguration")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    let loaded = transport.perform(.init(command: .load, payload: .init(
+        path: archive.path, archiveEntry: "ending3.txtp"
+    )))
+    #expect(loaded.kind != .error, Comment(rawValue: loaded.message ?? ""))
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let configured = try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 30_000))
+    #expect(configured.isPlaying)
+    try FileManager.default.removeItem(at: archive)
+    #expect(throws: (any Error).self) {
+        _ = try transport.reconfigureSync(.init(longPlayEnabled: false))
+    }
+    let afterFailure = transport.statusSync()
+    #expect(afterFailure.generation == configured.generation)
+    #expect(afterFailure.trackLoaded && afterFailure.isPlaying)
+    #expect(afterFailure.currentTrackID == archive.path)
+    let seek = transport.perform(.init(command: .seek, payload: .init(positionMilliseconds: 2_000)))
+    #expect(seek.kind != .error, Comment(rawValue: seek.message ?? ""))
+    #expect(seek.status?.isPlaying == true)
+    #expect((seek.status?.diagnostics.bufferedFrames ?? 0) > 0)
+}
+
 @Test func sharedReconfigurationAppliesTempoForNativeTempoFamilies() throws {
     let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()
