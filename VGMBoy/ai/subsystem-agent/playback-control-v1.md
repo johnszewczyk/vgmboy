@@ -41,6 +41,8 @@ same typed endpoint operations.
   the member, chooses the format-owned preparation requirement, extracts the selected member or
   dependency set, and retains the temporary source for that session. Hosts do not extract a playback
   member before calling `load`.
+- Embedded loop-tag inspection reads files only for FLAC and APE, the formats it
+  parses. Invalid or overflowing derived loop boundaries are ignored.
 - `PlaybackStatus.statistics` is the shared diagnostic payload for decoder family, decoder/output
   rates, decoded frames, audible position frames, and tempo. It deliberately excludes title,
   filename, and other frontend “now playing” presentation fields. Device counters remain in
