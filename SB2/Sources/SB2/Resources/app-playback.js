@@ -373,7 +373,7 @@ function updateTimingSummary() {
   refs.queuedSkipsCheckbox.checked = state.queuedSkipsEnabled;
   refs.spcFadeCheckbox.checked = state.fadeEnabled;
   if (!shouldPreserveFieldValue(refs.sidebarFontSizeInput)) {
-    refs.sidebarFontSizeInput.value = String(state.sidebarFontSizePt);
+    refs.sidebarFontSizeInput.value = String(state.contentFontSizePt);
   }
   if (!shouldPreserveFieldValue(refs.sidebarWidthInput)) {
     refs.sidebarWidthInput.value = String(state.sidebarWidthPercent);

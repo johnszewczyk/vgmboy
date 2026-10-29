@@ -88,11 +88,10 @@ const state = {
   uiItemSpacingPx: 0,
   uiFontSizePt: 10,
   uiChromeFontSizePt: 10,
-  sidebarFontSizePt: 10,
+  contentFontSizePt: 10,
   sidebarTextColor: "#b6b7dc",
   sidebarMonospace: true,
   sidebarPathCounts: true,
-  playlistFontSizePt: 10,
   playlistTextColor: "#b6b7dc",
   playlistHeaderTextColor: "#777c9d",
   playlistMonospace: true,
@@ -382,11 +381,10 @@ async function loadSettings() {
     const chromeMonospace = Boolean(parsed.uiChromeMonospace ?? parsed.applicationMonospace ?? true);
     state.uiFontSizePt = chromeFontSize;
     state.uiChromeFontSizePt = chromeFontSize;
-    state.sidebarFontSizePt = contentFontSize;
+    state.contentFontSizePt = contentFontSize;
     state.sidebarTextColor = interfaceFontColor;
     state.sidebarMonospace = contentMonospace;
     state.sidebarPathCounts = parsed.sidebarPathCounts !== false;
-    state.playlistFontSizePt = contentFontSize;
     state.playlistTextColor = interfaceFontColor;
     state.playlistHeaderTextColor = normalizeFontColor(parsed.playlistHeaderTextColor ?? "#777c9d");
     state.playlistMonospace = contentMonospace;
@@ -472,12 +470,13 @@ function settingsSnapshot() {
     collapsedConsoleNames: state.collapsedConsoleNames,
     uiFontSizePt: state.uiFontSizePt,
     uiChromeFontSizePt: state.uiChromeFontSizePt,
-    contentFontSizePt: state.sidebarFontSizePt,
-    sidebarFontSizePt: state.sidebarFontSizePt,
+    contentFontSizePt: state.contentFontSizePt,
+    // Keep legacy keys in sync while older preference files are migrated.
+    sidebarFontSizePt: state.contentFontSizePt,
     sidebarTextColor: state.sidebarTextColor,
     sidebarMonospace: state.sidebarMonospace,
     sidebarPathCounts: state.sidebarPathCounts,
-    playlistFontSizePt: state.playlistFontSizePt,
+    playlistFontSizePt: state.contentFontSizePt,
     playlistTextColor: state.playlistTextColor,
     playlistHeaderTextColor: state.playlistHeaderTextColor,
     playlistMonospace: state.playlistMonospace,

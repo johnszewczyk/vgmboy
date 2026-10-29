@@ -20,10 +20,11 @@
   --progress-percent: 0%;
   --ui-font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mono-font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  --sidebar-font-size-pt: 10;
+  --content-font-size-pt: 10;
+  --sidebar-font-size-pt: var(--content-font-size-pt);
   --sidebar-text-color: #a9a9a9;
   --sidebar-font-family: var(--ui-font-family);
-  --playlist-font-size-pt: 10;
+  --playlist-font-size-pt: var(--content-font-size-pt);
   --playlist-text-color: #a9a9a9;
   --playlist-font-family: var(--ui-font-family);
   --playlist-header-text-color: gray;
@@ -1814,9 +1815,9 @@ body.sb2-frontend {
   --sb-button-hover-ink: #d4d8e8;
   --sb-button-selected-ink: #67c7ff;
   --sb-button-radius: var(--sb-space-050);
-  --sb-sidebar-font-size: calc(var(--sidebar-font-size-pt) * .78pt);
-  --sb-playlist-font-size: calc(var(--playlist-font-size-pt) * .78pt);
-  --sb-playlist-meta-font-size: calc(var(--playlist-font-size-pt) * .66pt);
+  --sb-sidebar-font-size: calc(var(--content-font-size-pt) * .78pt);
+  --sb-playlist-font-size: calc(var(--content-font-size-pt) * .78pt);
+  --sb-playlist-meta-font-size: calc(var(--content-font-size-pt) * .66pt);
   --bg-sidebar: #090b0f;
   --bg-chrome: #111419;
   --bg-panel: #090b0f;

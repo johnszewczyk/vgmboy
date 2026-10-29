@@ -4313,10 +4313,9 @@ function applyUISettings() {
   const rootStyle = document.documentElement.style;
   rootStyle.setProperty("--ui-font-size-pt", String(state.uiChromeFontSizePt ?? state.uiFontSizePt));
   rootStyle.setProperty("--app-font-family", state.uiChromeMonospace ? "var(--mono-font-family)" : "var(--ui-font-family)");
-  rootStyle.setProperty("--sidebar-font-size-pt", String(state.sidebarFontSizePt));
+  rootStyle.setProperty("--content-font-size-pt", String(state.contentFontSizePt));
   rootStyle.setProperty("--sidebar-text-color", state.sidebarTextColor);
   rootStyle.setProperty("--sidebar-font-family", state.contentMonospace || state.sidebarMonospace ? "var(--mono-font-family)" : "var(--ui-font-family)");
-  rootStyle.setProperty("--playlist-font-size-pt", String(state.playlistFontSizePt));
   rootStyle.setProperty("--playlist-text-color", state.playlistTextColor);
   rootStyle.setProperty("--playlist-header-text-color", state.playlistHeaderTextColor);
   rootStyle.setProperty("--playlist-font-family", state.contentMonospace || state.playlistMonospace ? "var(--mono-font-family)" : "var(--ui-font-family)");
@@ -4421,7 +4420,7 @@ function renderAll() {
   refs.optionsAudioSection.classList.toggle("is-hidden", !audioSelected);
   renderRoutingConflicts();
   if (refs.uiChromeFontSizeInput && document.activeElement !== refs.uiChromeFontSizeInput) refs.uiChromeFontSizeInput.value = String(state.uiChromeFontSizePt ?? state.uiFontSizePt);
-  if (document.activeElement !== refs.sidebarFontSizeInput) refs.sidebarFontSizeInput.value = String(state.sidebarFontSizePt);
+  if (document.activeElement !== refs.sidebarFontSizeInput) refs.sidebarFontSizeInput.value = String(state.contentFontSizePt);
   if (document.activeElement !== refs.sidebarTextColorInput) refs.sidebarTextColorInput.value = state.sidebarTextColor;
   if (refs.playlistHeaderTextColorInput && document.activeElement !== refs.playlistHeaderTextColorInput) {
     refs.playlistHeaderTextColorInput.value = state.playlistHeaderTextColor;
@@ -4807,8 +4806,7 @@ function setUiItemSpacing(nextSpacingPx) {
 
 function setContentFontSize(nextSize) {
   const size = uiApp.normalizeFontSize(nextSize);
-  state.sidebarFontSizePt = size;
-  state.playlistFontSizePt = size;
+  state.contentFontSizePt = size;
   persistSettings();
   renderAll();
 }
@@ -4838,7 +4836,7 @@ function commitFontSizeInput(rawValue) {
 
 function commitSidebarFontSizeInput(rawValue) {
   const parsedValue = uiApp.parseNumericInput(rawValue);
-  setContentFontSize(parsedValue ?? state.sidebarFontSizePt);
+  setContentFontSize(parsedValue ?? state.contentFontSizePt);
 }
 
 function setSidebarTextColor(color) {
@@ -4864,9 +4862,7 @@ function setSidebarPathCounts(enabled) {
 
 function commitPlaylistFontSizeInput(rawValue) {
   const parsedValue = uiApp.parseNumericInput(rawValue);
-  state.playlistFontSizePt = uiApp.normalizeFontSize(parsedValue ?? state.playlistFontSizePt);
-  persistSettings();
-  renderAll();
+  setContentFontSize(parsedValue ?? state.contentFontSizePt);
 }
 
 function setPlaylistTextColor(color) {
@@ -4958,9 +4954,7 @@ function applyAppearanceSettings(settings) {
   if (settings.sidebarWidthPercent !== undefined) state.sidebarWidthPercent = uiApp.normalizeSidebarWidth(settings.sidebarWidthPercent);
   const contentFontSize = settings.contentFontSizePt ?? settings.sidebarFontSizePt ?? settings.playlistFontSizePt;
   if (contentFontSize !== undefined) {
-    const size = uiApp.normalizeFontSize(contentFontSize);
-    state.sidebarFontSizePt = size;
-    state.playlistFontSizePt = size;
+    state.contentFontSizePt = uiApp.normalizeFontSize(contentFontSize);
   }
   const chromeFontSize = settings.uiChromeFontSizePt ?? settings.uiFontSizePt;
   if (chromeFontSize !== undefined) {
