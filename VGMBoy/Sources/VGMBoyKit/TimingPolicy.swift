@@ -1,8 +1,10 @@
 import Foundation
 
 struct PlaybackPlan: Sendable {
-    var preFadeSeconds: Int
-    var fadeSeconds: Int
+    var preFadeMilliseconds: Int
+    var fadeMilliseconds: Int
+    var preFadeSeconds: Int { preFadeMilliseconds / 1_000 }
+    var fadeSeconds: Int { fadeMilliseconds / 1_000 }
     var isLongPlay: Bool
     var usesNativeEnding: Bool
     var usesDecoderNaturalDuration: Bool
@@ -14,14 +16,29 @@ struct PlaybackPlan: Sendable {
         usesNativeEnding: Bool,
         usesDecoderNaturalDuration: Bool = false
     ) {
-        self.preFadeSeconds = preFadeSeconds
-        self.fadeSeconds = fadeSeconds
+        self.preFadeMilliseconds = preFadeSeconds * 1_000
+        self.fadeMilliseconds = fadeSeconds * 1_000
         self.isLongPlay = isLongPlay
         self.usesNativeEnding = usesNativeEnding
         self.usesDecoderNaturalDuration = usesDecoderNaturalDuration
     }
 
-    var totalSeconds: Int { preFadeSeconds > 0 ? preFadeSeconds + fadeSeconds : 0 }
+    init(
+        preFadeMilliseconds: Int,
+        fadeMilliseconds: Int,
+        isLongPlay: Bool,
+        usesNativeEnding: Bool,
+        usesDecoderNaturalDuration: Bool = false
+    ) {
+        self.preFadeMilliseconds = max(0, preFadeMilliseconds)
+        self.fadeMilliseconds = max(0, fadeMilliseconds)
+        self.isLongPlay = isLongPlay
+        self.usesNativeEnding = usesNativeEnding
+        self.usesDecoderNaturalDuration = usesDecoderNaturalDuration
+    }
+
+    var totalMilliseconds: Int { preFadeMilliseconds > 0 ? preFadeMilliseconds + fadeMilliseconds : 0 }
+    var totalSeconds: Int { totalMilliseconds / 1_000 }
 }
 
 enum TimingPolicy {

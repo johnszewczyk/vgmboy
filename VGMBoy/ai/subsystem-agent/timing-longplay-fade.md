@@ -19,20 +19,25 @@ the only standard mode that supplies a manual play length. An explicit `timed` r
 reserved for a caller that has an actual finite duration, such as a deliberate faded skip.
 Frontends must not manufacture a timed request with a missing duration.
 
-`TimingPolicy.plan` turns a requested mode and `TrackMetadata` into a `PlaybackPlan`
-(`preFadeSeconds`, `fadeSeconds`, `isLongPlay`, `usesNativeEnding`, `totalSeconds`).
+`TimingPolicy.plan` turns a requested mode and `TrackMetadata` into a `PlaybackPlan`.
+The controller's in-process millisecond request retains millisecond play and fade
+values in that plan; whole-second presentation callers keep their existing API.
+Requests exceeding the signed 32-bit millisecond window are rejected before
+replacing the active session, rather than overflowing a decoder boundary.
 `PlaybackSession.load` applies the plan: for a native ending it uses decoder-native ending only
 when the decoder also owns its fade. Libvgm exposes natural timing but its bridge does not start
 an internal fade at an ordinary file end, so it uses the same session-boundary fade as Highly
-Complete/mGBA. Capped windows call `configureFade` and cap the stream at `totalSeconds * sampleRate`.
+Complete/mGBA. Capped windows call `configureFade` and convert the total
+millisecond window to output frames.
 The controller also forces any nonzero requested fade through this bounded path, including when
 the public mode is `file_default`; this prevents a client from accidentally bypassing fade by
 combining a native-ending mode with an explicit fade value.
 
 ## Invariants
 
-- Position is decoder-authoritative via `absolutePlayedFrames`; seeks and reconfiguration never
-  lose the timeline.
+- Reported elapsed time derives from produced output frames minus buffered frames;
+  decoder position and logical elapsed position differ during buffering and repeats.
+  Tempo reloads translate logical output time through the old and new effective rates.
 - Long play caps the stream at (manual + fade) in the shell for every family. Native ending relies
   on the decoder's own `trackEnded` (capped only as a backstop).
 - A Long Play duration of zero is the explicit unbounded mode: the session applies no time cap or

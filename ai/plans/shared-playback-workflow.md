@@ -6,6 +6,17 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Subsecond timing pass, 2026-10-29: a generated WAV reproduced the 500 ms
+  timed play plus 250 ms fade request continuing beyond two seconds because
+  both values were truncated to zero. The internal playback plan now retains
+  millisecond play and fade values through session cap and fade calculation;
+  existing whole-second callers retain their interface, and zero Long Play
+  remains unbounded. The same WAV test now drains at about 0.75 seconds.
+  Focused tests also passed for generated VGM and vendored SPC at 500+250 ms.
+  Oversized millisecond windows are rejected without retiring the current track;
+  all 36 shared transport tests passed. This is package/core evidence, not
+  packaged-UI or audible verification.
+
 - Unchanged-request pass, 2026-10-29: when timing settings and effective tempo
   match the active controller configuration, reconfiguration retains the
   existing session, generation and queued PCM. A changed setting still reloads.
