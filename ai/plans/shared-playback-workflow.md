@@ -1,8 +1,34 @@
 # Shared playback workflow consolidation plan
 
-Status: research and implementation plan, 2026-10-28. No implementation or
-runtime playback verification is implied by this document. Recheck all paths,
-working-tree changes, and findings before implementing after the next session.
+Status: research and staged implementation plan, 2026-10-28. See the checkpoint
+below for the first pass and its verification limits; remaining phases are open.
+Recheck paths, working-tree changes, and findings before continuing.
+
+## Implementation checkpoint, 2026-10-28
+
+- Family work in progress was captured and pushed as `e8de10f2`; this is a
+  checkpoint, not a verified release. The generated Python bytecode cache was
+  left untracked. The checkpoint contains Markdown hard-break trailing spaces that
+  `git diff --check` reports.
+- First pass: a drained session's captured status now accompanies its end
+  callback; the coordinator updates generation after low-level mode reloads
+  and filters stale end events before publication. ViewBoy adopts new native
+  generations and guards delayed reconfiguration replies by playback token and
+  track ID. The public zero-argument session completion API remains available.
+- Four focused FrontendCore tests passed, including live silent-WAV reload/end
+  and a deliberately delayed completion after replacement. Swift builds of SB2,
+  ViewBoy and CocoaSpice and the ViewBoy JavaScript syntax check passed. The existing YogaCanvas test failed at
+  its LCD dot default assertion before playback checks; the same failure was
+  reproduced from the clean checkpoint in a temporary archive. Its new playback
+  assertion is therefore not yet verified. No packaged frontend interaction or
+  audible comparison was performed. Linker warnings report macOS 27 Homebrew
+  dylibs linked into macOS 26 targets.
+- Continue phase 1 with packaged SB2/ViewBoy/CocoaSpice verification and
+  ViewBoy renderer tests, including a completion arriving before a
+  reconfiguration reply and rapid replacement. Audit queued ordinary status
+  events across replacement as well as the now-filtered end events. Then address failure cleanup,
+  audible-position/tempo semantics and the shared typed transaction in later
+  phases; this pass does not complete the consolidation.
 
 ## Objective and boundaries
 
@@ -30,7 +56,7 @@ implementation.
 
 ## Research findings to reproduce
 
-These are source observations and risk hypotheses, not confirmed packaged-app
+These observations were recorded before the first pass above. They are source observations and risk hypotheses, not confirmed packaged-app
 or audible failures. The targeted sweep below adds bounded shared-core runtime
 reproductions. The working tree contains ongoing playback changes, so
 recheck exact code and report the revision and dirty inputs used for each result.

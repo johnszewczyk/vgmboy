@@ -32,9 +32,8 @@ public final class PlaybackController: @unchecked Sendable {
         session.setStatusHandler { [weak self] status in
             self?.emit(PlaybackControlEvent(kind: .status, status: status))
         }
-        session.setCompletionHandler { [weak self] in
-            guard let self else { return }
-            self.emit(PlaybackControlEvent(kind: .ended, status: self.session.status()))
+        session.setCompletionStatusHandler { [weak self] status in
+            self?.emit(PlaybackControlEvent(kind: .ended, status: status))
         }
     }
 

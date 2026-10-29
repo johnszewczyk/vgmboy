@@ -6250,6 +6250,12 @@ function applyNativeStatus(snapshot) {
   if (generation && generation < state.nativeGeneration) return;
   state.statusSequence = sequence || state.statusSequence;
   state.nativeGeneration = generation || state.nativeGeneration;
+  // A reconfiguration can reload the active session and publish its status
+  // before the bridge reply arrives. A pending start keeps this at zero until
+  // its own reply establishes which track owns the generation.
+  if (state.currentTrackId && state.playbackGeneration && generation > state.playbackGeneration) {
+    state.playbackGeneration = generation;
+  }
   state.nativePlaybackStatus = { ...snapshot };
   const nextTransport = snapshot.transport_state || "stopped";
   const priorTransport = state.transport;
@@ -6730,15 +6736,21 @@ async function setPreference(key, value, updateAudio = false) {
       "playbackSpeedEnabled",
     ].includes(key)) {
       const pref = state.preferences;
+      const playbackToken = state.playbackToken;
+      const playbackTrackId = state.currentTrackId;
       const currentTrack = state.activeQueue.find((track) => trackID(track) === state.currentTrackId)
         || tracks.find((track) => trackID(track) === state.currentTrackId);
-      applyNativeStatus(await bridge.nativePlaybackReconfigure({
+      const reconfigured = await bridge.nativePlaybackReconfigure({
         longPlayEnabled: pref.longPlayEnabled === true,
         manualPlayMilliseconds: Math.max(0, Number(pref.manualPlayTimeSeconds ?? 180)) * 1000,
         fadeMilliseconds: pref.fadeEnabled === false ? 0 : Math.max(0, Number(pref.spcFadeSeconds ?? 6)) * 1000,
         unknownDurationMilliseconds: Math.max(1, Number(pref.unknownDurationSeconds ?? 150)) * 1000,
         tempo: playbackTempoForTrack(currentTrack, pref),
-      }));
+      });
+      if (playbackToken !== state.playbackToken || playbackTrackId !== state.currentTrackId) return;
+      const generation = Number(reconfigured?.generation) || 0;
+      if (generation && generation >= state.nativeGeneration) state.playbackGeneration = generation;
+      applyNativeStatus(reconfigured);
     }
   } catch (error) {
     if (token !== state.preferenceMutationToken) return;

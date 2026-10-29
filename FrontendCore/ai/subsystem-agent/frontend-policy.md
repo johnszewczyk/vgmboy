@@ -29,6 +29,9 @@ startup contracts shared by the VGMMan player frontends.
 - `PlaybackTransportCore` owns serialized native commands, invalidation, timing
   reconfiguration, monotonic status ordering, completion retirement, and the
   shared faded-track-change eligibility and duration policy.
+- A successful low-level mode change can reload the native session. The
+  coordinator adopts its returned generation and resets completion claims;
+  stale natural-end events are discarded before status or end delivery.
 - `FrontendStartupCore` owns the shared four-stage startup sequence, progress
   state transitions, and reveal/ready timing policy. Frontends own startup
   rendering and app-specific loading operations.
