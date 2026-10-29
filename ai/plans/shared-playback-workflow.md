@@ -12,8 +12,10 @@ Recheck paths, working-tree changes, and findings before continuing.
   on its serialized queue before that replacement stop, and CocoaSpice uses it.
   A real-WAV CocoaSpice integration check verifies that an older request is
   cancelled while the newer track remains loaded and playing. All 38 shared
-  transport tests and three focused CocoaSpice checks passed. This is package
-  evidence; the post-change packaged UI and audible behavior remain unverified.
+  transport tests and three focused CocoaSpice checks passed. A rebuilt isolated
+  CocoaSpice package played a two-WAV M3U, advanced to the second track and
+  stopped, recording both in isolated history. This is not an audible check or
+  a packaged reproduction of the delayed-request race.
 
 - Post-fix packaged CocoaSpice check, 2026-10-29: using the corrected isolated
   package and an M3U containing two generated three-second WAVs, the player
