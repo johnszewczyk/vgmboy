@@ -651,7 +651,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         case "playbackHistoryList":
             return try Self.object(PlaybackHistoryStore().records())
         case "playbackHistoryRecord":
-            guard let snapshot = Self.favoriteSnapshots(args.first).first else {
+            guard let row = args.first as? [String: Any],
+                  let snapshot = Self.favoriteSnapshots([row]).first else {
                 throw BridgeError.invalidArguments
             }
             let playedAtMilliseconds = (args.dropFirst().first as? NSNumber)?.int64Value
