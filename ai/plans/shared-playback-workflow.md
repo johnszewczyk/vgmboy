@@ -9,6 +9,14 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Loop-tag file access, 2026-10-29: the shared reader opened every source
+  before checking whether it supported that format. It now opens only FLAC and
+  APE for tag inspection, leaving other decoders to perform their own reads.
+  A generated FLAC-comment test verifies the supported path and that SPC/WAV
+  bypass the loader; an overflowing loop-start plus length is rejected. This
+  removes unnecessary source I/O but does not establish the cause of the
+  Downloads-path stall recorded below.
+
 - Decoder setup cleanup, 2026-10-29: injected start and metadata failures showed
   that a newly created decoder was not explicitly closed before session
   ownership began. The session now owns the decoder immediately after creation,

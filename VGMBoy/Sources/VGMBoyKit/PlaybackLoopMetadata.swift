@@ -34,10 +34,12 @@ public struct PlaybackLoopMetadata: Codable, Equatable, Sendable {
 }
 
 enum PlaybackLoopTagReader {
-    static func read(path: String) -> PlaybackLoopMetadata? {
+    static func read(path: String, loadData: (URL) -> Data? = { try? Data(contentsOf: $0, options: .mappedIfSafe) }) -> PlaybackLoopMetadata? {
         let url = URL(fileURLWithPath: path)
-        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return nil }
-        return read(data: data, extensionName: url.pathExtension.lowercased())
+        let extensionName = url.pathExtension.lowercased()
+        guard extensionName == "flac" || extensionName == "ape" else { return nil }
+        guard let data = loadData(url) else { return nil }
+        return read(data: data, extensionName: extensionName)
     }
 
     static func read(data: Data, extensionName: String) -> PlaybackLoopMetadata? {
@@ -52,7 +54,9 @@ enum PlaybackLoopTagReader {
         if end == nil,
            let length = integer(tags, keys: ["LOOP_LENGTH_SAMPLES", "LOOPLENGTH", "LOOP_LENGTH"]),
            let start {
-            end = start + length
+            let sum = start.addingReportingOverflow(length)
+            guard !sum.overflow else { return nil }
+            end = sum.partialValue
         }
         guard let start, let end, end > start else { return nil }
         let sampleRate = integer(tags, keys: ["LOOP_SAMPLE_RATE", "LOOP_SAMPLERATE", "XA_SAMPLE_RATE", "SAMPLE_RATE", "SAMPLERATE"]) ?? 44_100
