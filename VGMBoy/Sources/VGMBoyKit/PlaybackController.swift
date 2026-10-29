@@ -315,6 +315,10 @@ public final class PlaybackController: @unchecked Sendable {
         let previousPlay = explicitPlayMilliseconds
         let previousFade = explicitFadeMilliseconds
         let previousUnknown = explicitUnknownDurationMilliseconds
+        let unchangedTiming = previousMode == requestedMode
+            && previousPlay == payload.playMilliseconds
+            && previousFade == payload.fadeMilliseconds
+            && previousUnknown == payload.unknownDurationMilliseconds
         mode = requestedMode
         explicitPlayMilliseconds = payload.playMilliseconds
         explicitFadeMilliseconds = payload.fadeMilliseconds
@@ -325,6 +329,7 @@ public final class PlaybackController: @unchecked Sendable {
         let previousStatus = session.status()
         let family = FormatRegistry.family(for: current.archiveEntry ?? current.path)
         let nextTempo = FormatRegistry.effectiveTempo(payload.tempo ?? current.tempo, family: family)
+        if unchangedTiming && nextTempo == previousStatus.statistics.tempo { return }
         do {
             let replacedStatus = try load(
                 PlaybackControlPayload(path: current.path, archiveEntry: current.archiveEntry, trackIndex: current.trackIndex, tempo: payload.tempo ?? current.tempo, loop: current.loop),

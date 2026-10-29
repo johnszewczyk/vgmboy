@@ -6,6 +6,13 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Unchanged-request pass, 2026-10-29: when timing settings and effective tempo
+  match the active controller configuration, reconfiguration retains the
+  existing session, generation and queued PCM. A changed setting still reloads.
+  The focused integration test covers both cases; all 34 shared transport
+  tests passed (the slow-archive case was skipped in that run and passed
+  separately with its temporary wrapper). Packaged playback remains unverified.
+
 - Offline transition evidence, 2026-10-29: a focused VGMBoyKit test decoded
   real non-silent PCM from the generated tone VGM and the vendored SPC, then
   used `vgmboy_audio_unit_render_offline` to exercise a 441-frame fade-out,
