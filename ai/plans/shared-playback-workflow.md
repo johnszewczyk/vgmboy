@@ -9,6 +9,16 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Precise shared timing preview, 2026-10-29: the shared bridge previously
+  rounded timing to whole seconds before SB2 used it, despite millisecond
+  playback support. It now supplies output-time millisecond fields alongside
+  the original whole-second fields and decodes older replies. SB2 consumes the
+  precise values when present. Contract checks cover 750 ms at 2x with a
+  250 ms fade, a subsecond Long Play window, unbounded Long Play, and old/new
+  wire decoding. All 15 SB2 renderer checks and 38 shared transport checks
+  passed, and SB2 built successfully. Packaged and audible verification of
+  these subsecond cases remains open.
+
 - Shared timing adoption, 2026-10-29: SB2 applied tempo scaling to an already
   scaled shared timing preview, producing 22.5 seconds from a 45-second preview
   at 2x. It now uses the shared output duration and total directly, including

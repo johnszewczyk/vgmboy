@@ -229,11 +229,19 @@ public struct PlaybackTimingPreviewRequest: Codable, Equatable, Sendable {
         let scaledPreFadeSeconds = plan.preFadeSeconds <= 0
             ? 0
             : max(1, Int((Double(plan.preFadeSeconds) / effectiveTempo).rounded(.down)))
+        let sourceMilliseconds = plan.isLongPlay
+            ? manualPlayMilliseconds
+            : (playMilliseconds > 0 ? playMilliseconds : unknownDurationMilliseconds)
+        let outputMilliseconds = sourceMilliseconds == 0
+            ? 0
+            : max(1, Int((Double(sourceMilliseconds) / effectiveTempo).rounded()))
         return .init(
             preFadeSeconds: scaledPreFadeSeconds,
             fadeSeconds: plan.fadeSeconds,
             isLongPlay: plan.isLongPlay,
-            usesNativeEnding: plan.usesNativeEnding
+            usesNativeEnding: plan.usesNativeEnding,
+            preFadeMilliseconds: outputMilliseconds,
+            fadeMilliseconds: fadeMilliseconds
         )
     }
 }
@@ -245,6 +253,9 @@ public struct PlaybackTimingPreview: Codable, Equatable, Sendable {
     public let preFadeSeconds: Int
     public let fadeSeconds: Int
     public let totalSeconds: Int
+    public let preFadeMilliseconds: Int
+    public let fadeMilliseconds: Int
+    public let totalMilliseconds: Int
     public let isLongPlay: Bool
     public let usesNativeEnding: Bool
 
@@ -252,11 +263,16 @@ public struct PlaybackTimingPreview: Codable, Equatable, Sendable {
         preFadeSeconds: Int,
         fadeSeconds: Int,
         isLongPlay: Bool,
-        usesNativeEnding: Bool
+        usesNativeEnding: Bool,
+        preFadeMilliseconds: Int? = nil,
+        fadeMilliseconds: Int? = nil
     ) {
         self.preFadeSeconds = max(0, preFadeSeconds)
         self.fadeSeconds = max(0, fadeSeconds)
         self.totalSeconds = self.preFadeSeconds > 0 ? self.preFadeSeconds + self.fadeSeconds : 0
+        self.preFadeMilliseconds = max(0, preFadeMilliseconds ?? self.preFadeSeconds * 1_000)
+        self.fadeMilliseconds = max(0, fadeMilliseconds ?? self.fadeSeconds * 1_000)
+        self.totalMilliseconds = self.preFadeMilliseconds > 0 ? self.preFadeMilliseconds + self.fadeMilliseconds : 0
         self.isLongPlay = isLongPlay
         self.usesNativeEnding = usesNativeEnding
     }
@@ -265,8 +281,23 @@ public struct PlaybackTimingPreview: Codable, Equatable, Sendable {
         case preFadeSeconds = "pre_fade_seconds"
         case fadeSeconds = "fade_seconds"
         case totalSeconds = "total_seconds"
+        case preFadeMilliseconds = "pre_fade_milliseconds"
+        case fadeMilliseconds = "fade_milliseconds"
+        case totalMilliseconds = "total_milliseconds"
         case isLongPlay = "is_long_play"
         case usesNativeEnding = "uses_native_ending"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            preFadeSeconds: try values.decode(Int.self, forKey: .preFadeSeconds),
+            fadeSeconds: try values.decode(Int.self, forKey: .fadeSeconds),
+            isLongPlay: try values.decode(Bool.self, forKey: .isLongPlay),
+            usesNativeEnding: try values.decode(Bool.self, forKey: .usesNativeEnding),
+            preFadeMilliseconds: try values.decodeIfPresent(Int.self, forKey: .preFadeMilliseconds),
+            fadeMilliseconds: try values.decodeIfPresent(Int.self, forKey: .fadeMilliseconds)
+        )
     }
 }
 

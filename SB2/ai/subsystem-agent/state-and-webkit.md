@@ -10,7 +10,8 @@ Timing and speed preference changes invalidate per-track timing plans. SB2
 refreshes the stopped track preview through the shared timing bridge, accepting
 its reply only while settings, playback and displayed-track identity still match.
 When present, the shared preview supplies the output-time duration and total
-directly; a local catalog estimate is used only until a preview is available.
+directly, using its millisecond fields when available; a local catalog estimate
+is used only until a preview is available.
 If settings change during start preparation, SB2 replans before native start;
 if they change during native start, it reconfigures the accepted session. A
 newer playback generation cancels either path.

@@ -139,6 +139,33 @@ func timingBridgeContractsKeepPolicyAndControlPayloadOutOfTheFrontend() throws {
     ).preview()
     #expect(longPlayPreview.preFadeSeconds == 45)
     #expect(longPlayPreview.totalSeconds == 51)
+    #expect(longPlayPreview.preFadeMilliseconds == 45_000)
+    #expect(longPlayPreview.totalMilliseconds == 51_000)
+
+    let precisePreview = try PlaybackTimingPreviewRequest(
+        sourcePath: "/music/track.spc", playMilliseconds: 750,
+        fadeMilliseconds: 250, tempo: .init(numerator: 2, denominator: 1)
+    ).preview()
+    #expect(precisePreview.preFadeMilliseconds == 375)
+    #expect(precisePreview.fadeMilliseconds == 250)
+    #expect(precisePreview.totalMilliseconds == 625)
+    #expect(try JSONDecoder().decode(PlaybackTimingPreview.self, from: JSONEncoder().encode(precisePreview)) == precisePreview)
+    let shortLongPlay = try PlaybackTimingPreviewRequest(
+        sourcePath: "/music/track.spc", manualPlayMilliseconds: 500,
+        fadeMilliseconds: 250, longPlayEnabled: true
+    ).preview()
+    #expect(shortLongPlay.preFadeMilliseconds == 500)
+    #expect(shortLongPlay.totalMilliseconds == 750)
+    let unbounded = try PlaybackTimingPreviewRequest(
+        sourcePath: "/music/track.spc", manualPlayMilliseconds: 0,
+        fadeMilliseconds: 250, longPlayEnabled: true
+    ).preview()
+    #expect(unbounded.preFadeMilliseconds == 0)
+    #expect(unbounded.totalMilliseconds == 0)
+    let legacyJSON = #"{"pre_fade_seconds":2,"fade_seconds":1,"total_seconds":3,"is_long_play":false,"uses_native_ending":false}"#
+    let legacy = try JSONDecoder().decode(PlaybackTimingPreview.self, from: Data(legacyJSON.utf8))
+    #expect(legacy.preFadeMilliseconds == 2_000)
+    #expect(legacy.totalMilliseconds == 3_000)
 
     let reconfiguration = PlaybackTransportReconfigurationRequest(
         longPlayEnabled: true,
