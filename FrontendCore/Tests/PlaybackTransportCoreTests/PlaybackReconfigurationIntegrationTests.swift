@@ -237,6 +237,35 @@ func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
     }
 }
 
+@Test func explicitLoopMetadataSurvivesSharedReconfiguration() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 2).write(to: url)
+    let loop = PlaybackLoopMetadata(
+        startSample: 11_025, endSample: 33_075, sampleRateHz: 44_100,
+        repeatCount: 2, source: "uac-manifest"
+    )
+    let transport = PlaybackTransportCoordinator(label: "test.shared.authoritative.loop")
+    let ends = EndRecorder()
+    transport.setNaturalEndHandler { ends.record($0.generation) }
+    let request = PlaybackTransportStartRequest(
+        trackID: "loop-track", sourcePath: url.path, fadeMilliseconds: 0, loop: loop
+    )
+    try transport.start(request.continuationStart(requestID: transport.reservePlaybackRequest()))
+    let configured = try transport.reconfigureSync(.init(longPlayEnabled: false, fadeMilliseconds: 0))
+    for _ in 0..<100 where ends.snapshot().isEmpty {
+        try await Task.sleep(for: .milliseconds(50))
+    }
+    #expect(ends.snapshot() == [configured.generation])
+    let status = transport.statusSync()
+    // A two-second source plus two 0.5-second loop repeats lasts about three
+    // seconds. The metadata must survive the controller's session reload.
+    #expect(status.reachedEnd)
+    #expect(status.bufferedFrames == 0)
+    #expect((2.9...3.1).contains(status.elapsedSeconds))
+    _ = transport.perform(.init(command: .stop))
+}
+
 @Test func failedReplacementRetiresOnlyAfterSessionReplacementBegins() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }

@@ -6,6 +6,14 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Explicit-loop verification, 2026-10-29: a generated two-second PCM source
+  with a supplied 0.25–0.75-second loop and two repeats was started through
+  `PlaybackTransportStartRequest`, reconfigured through the shared operation,
+  and completed after approximately three seconds with an empty output ring.
+  The focused FrontendCore test passed and verifies that the supplied loop
+  payload survives this reload. It does not verify UAC manifest parsing,
+  sample-level loop continuity, tempo changes inside a loop, or packaged UI.
+
 - Tempo range research, 2026-10-29: on macOS 27.0.1 with the installed
   Homebrew game-music-emu 0.6.5, temporary decoder harnesses rendered 131,072
   frames in 4,096-frame calls at 1/32×, 0.05×, 1×, 4× and 8×. SPC and GBS
