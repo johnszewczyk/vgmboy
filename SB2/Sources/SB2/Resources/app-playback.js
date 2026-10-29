@@ -1252,6 +1252,10 @@ async function refreshPlaybackForTimingChange() {
     return;
   }
 
+  const expectedGeneration = Number(state.nativePlayback.generation);
+  if (!Number.isSafeInteger(expectedGeneration) || expectedGeneration <= 0) {
+    throw new Error("Playback session identity is unavailable; retry the timing change.");
+  }
   let snapshot;
   try {
     snapshot = await window.spcBoySB2.nativePlaybackReconfigure({
@@ -1259,7 +1263,8 @@ async function refreshPlaybackForTimingChange() {
       manualPlayMilliseconds: Math.max(0, Math.round(plan.pre_fade_seconds * 1000)),
       fadeMilliseconds: Math.max(0, Math.round(plan.fade_seconds * 1000)),
       unknownDurationMilliseconds: Math.max(1, Math.round(state.unknownDurationSeconds * 1000)),
-      tempo: requestedPlaybackSpeed()
+      tempo: requestedPlaybackSpeed(),
+      expectedGeneration
     });
   } catch (error) {
     if (!matchesCurrentPlaybackSettings(requestGeneration, generation, trackID)) return;

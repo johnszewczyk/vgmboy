@@ -438,7 +438,16 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         let catalogScope = CatalogSessionScope.scope(for: method)
         let catalogGeneration = catalogScope.map { catalogSessions.begin($0) }
         let requestMethod = method
-        let requestArgumentsJSON = Self.json(args)
+        var detachedArguments = args
+        if method == "nativePlaybackReconfigure",
+           var settings = args.first as? [String: Any],
+           settings["expectedGeneration"] is Int {
+            // Stamp on the WebKit message handler before detached tasks can
+            // reorder work. The native counter outlives a recreated WebView.
+            settings["settingsRevision"] = WKPlaybackBridge.shared.reserveSettingsRevision()
+            detachedArguments[0] = settings
+        }
+        let requestArgumentsJSON = Self.json(detachedArguments)
         let requestCatalogURL = catalogURL
         Task { [weak self, webView = message.webView] in
             let response: (success: Bool, valueJSON: String) = await Task.detached(priority: .userInitiated) {

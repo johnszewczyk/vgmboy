@@ -48,6 +48,10 @@ final class WKPlaybackBridge: @unchecked Sendable {
         }
     }
 
+    func reserveSettingsRevision() -> Int {
+        transport.reserveSettingsRevision()
+    }
+
     func setStatusHandler(_ handler: (@Sendable (PlaybackTransportStatus) -> Void)?) {
         handlerLock.lock()
         defer { handlerLock.unlock() }

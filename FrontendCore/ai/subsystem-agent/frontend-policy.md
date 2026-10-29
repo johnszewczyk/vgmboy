@@ -84,7 +84,8 @@ startup contracts shared by the VGMMan player frontends.
   generations from the same loaded track's reload lineage, rejects generations
   from a replaced track and discards older revisions before changing playback.
   Omitting both values retains the existing bridge contract. A newly loaded
-  track resets the lineage and revision.
+  track resets the lineage and accepted revision; the transport's separate
+  revision reservation counter remains monotonic for its lifetime.
 - Timing previews use the decoder family's effective rate rather than the
   stored requested preference. Native status and preview calculations must
   agree when a backend clamps or rounds a requested rate. Preview durations
