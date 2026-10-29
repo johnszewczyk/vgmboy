@@ -391,8 +391,10 @@ final class PlaybackSession: @unchecked Sendable {
     }
 
     public func rampOutputGain(to gain: Float, durationMilliseconds: Int) throws {
-        guard gain.isFinite, (0...1).contains(gain), durationMilliseconds > 0 else {
-            throw PlaybackControlError.invalidPayload("Output ramp requires a gain between zero and one and a positive duration.")
+        let frames = (Double(sampleRate) * Double(durationMilliseconds) / 1_000).rounded(.up)
+        guard gain.isFinite, (0...1).contains(gain), durationMilliseconds > 0,
+              frames.isFinite, frames <= Double(UInt32.max) else {
+            throw PlaybackControlError.invalidPayload("Output ramp requires a gain between zero and one and a supported positive duration.")
         }
         queue.sync { output.rampTransportGain(to: gain, durationMilliseconds: durationMilliseconds) }
     }
