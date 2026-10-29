@@ -9,6 +9,15 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Isolated SB2 tempo UI, 2026-10-29: an app copy built from the current shared
+  bridge and SB2 renderer used a separate bundle ID and temporary playlist,
+  history, favorites and cache. With the vendored F-Zero SPC fixture and an
+  80-second catalog duration plus six-second fade, the UI showed 0:46 at 2x
+  and 0:26 at a requested 8x, reflecting the 4x decoder limit. Playback was
+  resumed at the latter setting and the displayed clock reached 0:26. The
+  renderer resource hash matched the source. The catalog was opened read-only;
+  this check does not prove audible continuity or every live transition.
+
 - Typed tempo integration, 2026-10-29: a shared transport test starts and
   reconfigures an SPC and generated WAV with requested 8x tempo and shared
   Long Play previews. Native status reports 4x for the SPC and 1x for WAV,
