@@ -94,7 +94,9 @@ startup contracts shared by the VGMMan player frontends.
   fields, or reconstruct `AACExportRequest`.
 - `PlaybackTransportSeekRequest` and `PlaybackTransportRampGainRequest` name
   the direct session controls at the bridge boundary. Their shared
-  normalization keeps a renderer from relying on scalar argument order.
+  normalization keeps a renderer from relying on scalar argument order. The
+  async seconds-based seek checks finiteness and native range before conversion;
+  finite negative values retain its existing clamp-to-zero behavior.
 - `PlaybackQueuedSkipFadeRequest` carries the complete faded-track-change
   policy input used by CocoaSpice and SB2 for playlist activation
   and Previous/Next. The shared request returns the bounded duration in seconds

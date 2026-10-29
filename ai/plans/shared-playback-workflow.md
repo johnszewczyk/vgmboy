@@ -9,6 +9,13 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Shared numeric input bounds, 2026-10-29: asynchronous transport seek now
+  rejects nonfinite and out-of-range values before converting to milliseconds,
+  retaining finite negative-value clamping. Shared decimal tempo parsing rejects
+  unrepresentable integers and arithmetic overflow. Focused tests check that
+  rejected seeks preserve a loaded session and that large tempo strings fail
+  parsing; ordinary fraction and decimal parsing remains covered.
+
 - Packaged SB2 Long Play observation, 2026-10-29: an isolated bundle rebuilt
   with the current producer and loop-boundary code displayed 3:06 for the
   three-minute Long Play setting with six-second fade. After restart, the

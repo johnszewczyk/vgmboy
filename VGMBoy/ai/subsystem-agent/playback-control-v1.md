@@ -62,7 +62,8 @@ same typed endpoint operations.
 - `PlaybackTempo` is the shared fraction representation for one global frontend speed setting. UI parsing accepts
   decimal or fractional input and snaps it to musical 1/32 increments before the host sends the
   typed `set_tempo` multiplier; decoder-family capability remains owned by `FormatRegistry` and
-  gates application to formats that support native tempo (currently libgme and libvgm).
+  gates application to formats that support native tempo (currently libgme and libvgm). Decimal
+  parsing rejects oversized or overflowing input before arithmetic or normalization.
 - The preference stores the requested rate; `FormatRegistry.effectiveTempo` resolves the rate
   accepted by the current wrapper. Libgme is limited to 0.02–4×, libvgm to 0.05–4× with
   0.001 precision, and non-tempo families use 1×. Session status reports the applied rate.
