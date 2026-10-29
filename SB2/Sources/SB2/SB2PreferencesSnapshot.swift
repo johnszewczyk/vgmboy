@@ -68,6 +68,7 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
     var uiFontSizePt: Double?
     var uiChromeFontSizePt: Double?
     var contentFontSizePt: Double?
+    // Legacy aliases are normalized to the single shared content size below.
     var sidebarFontSizePt: Double?
     var sidebarTextColor: String?
     var sidebarMonospace: Bool?
@@ -203,6 +204,14 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
         galleryGapRem = min(1, max(0, galleryGapRem ?? 0))
         galleryRadiusRem = min(1, max(0, galleryRadiusRem ?? 0))
         galleryFitMode = galleryFitMode == "pad" ? "pad" : "crop"
+        if let savedContentSize = contentFontSizePt ?? sidebarFontSizePt ?? playlistFontSizePt {
+            let sharedContentSize = savedContentSize.isFinite
+                ? min(18, max(8, savedContentSize.rounded()))
+                : 10
+            contentFontSizePt = sharedContentSize
+            sidebarFontSizePt = sharedContentSize
+            playlistFontSizePt = sharedContentSize
+        }
         normalizeSharedPlaybackPreferences()
         normalizePlaylistColumnPreferences()
         autoResizeAnimationMilliseconds = FrontendAnimationTimings.clamp(
