@@ -21,8 +21,9 @@ paths, working-tree changes, and findings before continuing.
   transport run failed device-driven drain cases with zero consumed frames; a
   focused retry and the same case in the earlier isolated checkout failed the
   same way. macOS listed the built-in speakers, but this does not establish why
-  the output callback did not drain. Recheck the output environment and rerun
-  those tests before claiming full validation.
+  the output callback did not drain. A later focused retry and the complete
+  transport suite passed after the output environment became active again:
+  45 tests passed. The earlier failure's precise cause remains unconfirmed.
 
 - Stale reconfiguration boundary, 2026-10-29: a focused native test reproduced
   an old request reloading a replacement track. Shared reconfiguration now
