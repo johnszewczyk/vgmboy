@@ -63,9 +63,9 @@ startup contracts shared by the VGMMan player frontends.
   bridge contracts. They own policy-preview scaling, playback-mode payload
   construction, and normalized tempo; a frontend passes user intent and never
   rebuilds those VGMBoy values from untyped bridge dictionaries. A direct tempo
-  request changes the decoder multiplier without recomputing the active timing
-  cap. Frontends that scale a track's playback window by tempo must refresh the
-  timing preview and reconfigure with both the new plan and tempo.
+  request retains the active timing settings and reloads when its effective
+  rate changes. Frontends that scale a track's playback window by tempo must
+  refresh the timing preview and reconfigure with both the new plan and tempo.
 - SB2 and ViewBoy submit `PlaybackTransportReconfigurationRequest` to the
   coordinator as one serialized operation; CocoaSpice's native timing-plan
   route uses the same coordinator operation. It gates tempo by decoder family

@@ -255,6 +255,33 @@ func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
     _ = transport.perform(.init(command: .stop))
 }
 
+@Test func directTempoReloadPublishesEndForNewGeneration() async throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let path = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc").path
+    let transport = PlaybackTransportCoordinator(label: "test.direct.tempo.end")
+    let ends = EndRecorder()
+    transport.setNaturalEndHandler { ends.record($0.generation) }
+    let loaded = transport.perform(.init(command: .load, payload: .init(
+        path: path, playbackMode: .timed, playMilliseconds: 1_000, fadeMilliseconds: 0
+    )))
+    let oldGeneration = try #require(loaded.status?.diagnostics.generation)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let changed = transport.perform(.init(command: .setTempo, payload: .init(tempo: 2)))
+    let newGeneration = try #require(changed.status?.diagnostics.generation)
+    #expect(changed.kind != .error)
+    #expect(newGeneration != oldGeneration)
+    try await transport.setTempo(.init(numerator: 3, denominator: 2))
+    let asyncGeneration = transport.statusSync().generation
+    #expect(asyncGeneration != newGeneration)
+    for _ in 0..<80 where ends.snapshot().isEmpty {
+        try await Task.sleep(for: .milliseconds(50))
+    }
+    #expect(ends.snapshot() == [asyncGeneration])
+    _ = transport.perform(.init(command: .stop))
+}
+
 @Test func boundedDecoderPlaybackDrainsAfterFade() async throws {
     let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()

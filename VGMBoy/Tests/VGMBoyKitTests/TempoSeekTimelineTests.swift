@@ -63,6 +63,56 @@ private final class TimelineEndRecorder: @unchecked Sendable {
     #expect((4.4...4.6).contains(finished.elapsedSeconds))
 }
 
+@Test func controllerTempoChangesPreserveLogicalSourcePosition() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".vgm")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try timelineVGM().write(to: url)
+    let controller = PlaybackController()
+    defer { _ = controller.perform(.init(command: .stop)) }
+    let loaded = controller.perform(.init(command: .load, payload: .init(
+        path: url.path, tempo: 1, playbackMode: .fileDefault, fadeMilliseconds: 0
+    )))
+    #expect(loaded.kind != .error)
+    #expect(controller.perform(.init(command: .seek, payload: .init(positionMilliseconds: 1_800))).kind != .error)
+    let fast = controller.perform(.init(command: .setPlaybackMode, payload: .init(
+        tempo: 2, playbackMode: .fileDefault, fadeMilliseconds: 0
+    )))
+    let fastStatus = try #require(fast.status)
+    #expect(fast.kind != .error)
+    #expect(abs(fastStatus.elapsedSeconds - 0.9) < 0.03)
+    #expect(fastStatus.statistics.tempo == 2)
+    #expect(fastStatus.diagnostics.generation != loaded.status?.diagnostics.generation)
+
+    let slow = controller.perform(.init(command: .setTempo, payload: .init(tempo: 0.5)))
+    let slowStatus = try #require(slow.status)
+    #expect(slow.kind != .error)
+    #expect(abs(slowStatus.elapsedSeconds - 3.6) < 0.04)
+    #expect(slowStatus.statistics.tempo == 0.5)
+    #expect(slowStatus.diagnostics.generation != fastStatus.diagnostics.generation)
+    let normal = controller.perform(.init(command: .setTempo, payload: .init(tempo: 1)))
+    #expect(normal.kind != .error)
+    #expect(abs((normal.status?.elapsedSeconds ?? 0) - 1.8) < 0.04)
+}
+
+@Test func tempoChangesPreservePositionAcrossAuthoredRepeats() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".vgm")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try timelineVGM().write(to: url)
+    let loop = PlaybackLoopMetadata(startSample: 11_025, endSample: 33_075, sampleRateHz: 44_100, repeatCount: 2)
+    let controller = PlaybackController()
+    defer { _ = controller.perform(.init(command: .stop)) }
+    #expect(controller.perform(.init(command: .load, payload: .init(
+        path: url.path, tempo: 1, playbackMode: .fileDefault, fadeMilliseconds: 0, loop: loop
+    ))).kind != .error)
+    #expect(controller.perform(.init(command: .seek, payload: .init(positionMilliseconds: 1_750))).kind != .error)
+    let fast = controller.perform(.init(command: .setTempo, payload: .init(tempo: 2)))
+    #expect(fast.kind != .error)
+    #expect(abs((fast.status?.elapsedSeconds ?? 0) - 0.875) < 0.04)
+    let slow = controller.perform(.init(command: .setTempo, payload: .init(tempo: 0.5)))
+    #expect(slow.kind != .error)
+    #expect(abs((slow.status?.elapsedSeconds ?? 0) - 3.5) < 0.05)
+}
+
 @Test func nativeTempoSeekUsesCurrentSpeedPlaybackTime() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".vgm")
     defer { try? FileManager.default.removeItem(at: url) }

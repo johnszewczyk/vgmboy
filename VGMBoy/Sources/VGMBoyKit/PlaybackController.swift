@@ -162,11 +162,23 @@ public final class PlaybackController: @unchecked Sendable {
             guard let tempo = request.payload.tempo, tempo.isFinite, tempo > 0 else {
                 throw PlaybackControlError.invalidPayload("Tempo must be a positive finite value.")
             }
-            try session.setTempo(tempo)
-            let effectiveTempo = session.status().statistics.tempo
             lock.lock()
-            if loaded != nil { loaded?.tempo = effectiveTempo }
+            let current = loaded
+            let currentMode = mode
+            let currentPlay = explicitPlayMilliseconds
+            let currentFade = explicitFadeMilliseconds
+            let currentUnknown = explicitUnknownDurationMilliseconds
             lock.unlock()
+            guard let current else { throw PlaybackSessionError.notLoaded }
+            let family = FormatRegistry.family(for: current.archiveEntry ?? current.path)
+            let effectiveTempo = FormatRegistry.effectiveTempo(tempo, family: family)
+            if effectiveTempo != session.status().statistics.tempo {
+                try configurePlaybackMode(.init(
+                    tempo: effectiveTempo, playbackMode: currentMode,
+                    playMilliseconds: currentPlay, fadeMilliseconds: currentFade,
+                    unknownDurationMilliseconds: currentUnknown
+                ))
+            }
         case .setPlaybackMode:
             try configurePlaybackMode(request.payload)
         case .setEqualizer:
@@ -307,12 +319,16 @@ public final class PlaybackController: @unchecked Sendable {
         lock.unlock()
         guard reloadCurrent, let current else { return }
         let previousStatus = session.status()
+        let family = FormatRegistry.family(for: current.archiveEntry ?? current.path)
+        let nextTempo = FormatRegistry.effectiveTempo(payload.tempo ?? current.tempo, family: family)
+        let previousTempo = previousStatus.statistics.tempo
+        let resumeSeconds = previousStatus.elapsedSeconds * previousTempo / nextTempo
         do {
             try load(
                 PlaybackControlPayload(path: current.path, archiveEntry: current.archiveEntry, trackIndex: current.trackIndex, tempo: payload.tempo ?? current.tempo, loop: current.loop),
                 sourceData: current.sourceData
             )
-            if previousStatus.elapsedSeconds > 0 { try session.seek(to: previousStatus.elapsedSeconds) }
+            if resumeSeconds > 0 { try session.seek(to: resumeSeconds) }
             if previousStatus.isPlaying { try session.play() }
         } catch {
             if session.status().diagnostics.generation == previousStatus.diagnostics.generation {

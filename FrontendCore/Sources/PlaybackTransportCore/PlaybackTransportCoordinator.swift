@@ -452,7 +452,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         try await run {
             guard let track = self.currentTrack,
                   FormatRegistry.family(for: track.archiveEntry ?? track.path)?.supportsTempo == true else { return }
-            try self.requireSuccess(self.controller.perform(.init(
+            try self.requireSuccess(self.performLocked(.init(
                 command: .setTempo,
                 payload: .init(tempo: tempo.multiplier)
             )))
@@ -743,44 +743,46 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     /// Shared low-level command access for a host bridge. The command is still
     /// serialized here; hosts do not retain their own PlaybackController.
     public func perform(_ request: PlaybackControlRequest) -> PlaybackControlEvent {
-        queue.sync {
-            let event = controller.perform(request)
-            guard event.kind != .error else {
-                if (request.command == .load || request.command == .setPlaybackMode),
-                   event.status?.diagnostics.generation != currentPlaybackGeneration {
-                    retirePlaybackLocked()
-                }
-                return event
-            }
-            switch request.command {
-            case .load:
-                if let path = request.payload.path, !path.isEmpty {
-                    self.naturalEndGate.reset()
-                    currentTrack = PlaybackTransportTrack(
-                        id: path,
-                        path: path,
-                        trackIndex: request.payload.trackIndex ?? 0,
-                        archiveEntry: request.payload.archiveEntry
-                    )
-                }
-            case .stop, .shutdown:
-                currentTrack = nil
-                currentPlaybackGeneration = nil
-                naturalEndGate.reset()
-                continuationCoordinator.reset()
-            default:
-                break
-            }
-            if request.command == .load || request.command == .setPlaybackMode {
-                let generation = event.status?.diagnostics.generation
-                if generation != currentPlaybackGeneration {
-                    naturalEndGate.reset()
-                    continuationCoordinator.reset()
-                }
-                currentPlaybackGeneration = generation
+        queue.sync { performLocked(request) }
+    }
+
+    private func performLocked(_ request: PlaybackControlRequest) -> PlaybackControlEvent {
+        let event = controller.perform(request)
+        guard event.kind != .error else {
+            if (request.command == .load || request.command == .setPlaybackMode || request.command == .setTempo),
+               event.status?.diagnostics.generation != currentPlaybackGeneration {
+                retirePlaybackLocked()
             }
             return event
         }
+        switch request.command {
+        case .load:
+            if let path = request.payload.path, !path.isEmpty {
+                self.naturalEndGate.reset()
+                currentTrack = PlaybackTransportTrack(
+                    id: path,
+                    path: path,
+                    trackIndex: request.payload.trackIndex ?? 0,
+                    archiveEntry: request.payload.archiveEntry
+                )
+            }
+        case .stop, .shutdown:
+            currentTrack = nil
+            currentPlaybackGeneration = nil
+            naturalEndGate.reset()
+            continuationCoordinator.reset()
+        default:
+            break
+        }
+        if request.command == .load || request.command == .setPlaybackMode || request.command == .setTempo {
+            let generation = event.status?.diagnostics.generation
+            if generation != currentPlaybackGeneration {
+                naturalEndGate.reset()
+                continuationCoordinator.reset()
+            }
+            currentPlaybackGeneration = generation
+        }
+        return event
     }
 
     private func load(
