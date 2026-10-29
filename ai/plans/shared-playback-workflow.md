@@ -14,8 +14,10 @@ paths, working-tree changes, and findings before continuing.
   ownership began. The session now owns the decoder immediately after creation,
   so setup and priming failures use the same cleanup path. Additional injected
   tests cover transient empty reads, invalid stereo PCM, thrown decode errors,
-  and recovery after an empty read; focused checks passed. Periodic-refill
-  failure and packaged playback with this follow-up still need verification.
+  and recovery after an empty read; focused checks passed. A further injected
+  periodic-refill failure stopped output, reported the error without reporting
+  natural end, and released the decoder on stop. Packaged playback with the
+  setup-cleanup follow-up still needs verification.
 
 - Packaged producer smoke, 2026-10-29: rebuilt isolated SB2 from `178e8bc1`
   producer sources and played the vendored SPC copied into the temporary test
