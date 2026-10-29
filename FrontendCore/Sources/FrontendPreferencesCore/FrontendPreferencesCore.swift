@@ -289,6 +289,21 @@ public struct FrontendPlaylistColumnDefinition: Codable, Equatable, Sendable {
         self.isSortable = isSortable
         self.isVisibleByDefault = isVisibleByDefault
     }
+
+    /// Standard shared columns exposed by the frontend core. Rendering, labels,
+    /// and measurement remain owned by each frontend.
+    public static var year: Self {
+        Self(id: FrontendPlaylistColumnID.year)
+    }
+
+    public static var dumper: Self {
+        Self(id: FrontendPlaylistColumnID.dumper)
+    }
+}
+
+public enum FrontendPlaylistColumnID {
+    public static let year = "year"
+    public static let dumper = "dumper"
 }
 
 /// The validated, renderer-neutral part of a playlist's column preferences.

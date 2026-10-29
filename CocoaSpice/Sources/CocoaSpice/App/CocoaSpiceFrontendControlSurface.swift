@@ -200,7 +200,7 @@ final class CocoaSpiceOptionsControlSurface {
         case .setLongPlayEnabled(let enabled):
             if model.longPlayEnabled != enabled { model.toggleLongPlayEnabled() }
         case .setManualPreFadeSeconds(let seconds):
-            model.manualPreFadeSeconds = max(30, seconds)
+            model.manualPreFadeSeconds = max(0, seconds)
             model.handleManualPlaySecondsChanged()
         case .setUnknownDurationSeconds(let seconds):
             model.setUnknownDurationSeconds(seconds)

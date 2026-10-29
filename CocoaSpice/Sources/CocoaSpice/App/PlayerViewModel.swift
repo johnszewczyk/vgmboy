@@ -65,6 +65,8 @@ private extension CatalogPlaylistSortColumn {
         case .game: "Game"
         case .author: "Author"
         case .system: "System"
+        case .year: "Year"
+        case .dumper: "Dumper"
         case .path: "Path"
         case .length: "Length"
         case .timestamp: "Date/Time"
@@ -89,6 +91,8 @@ final class PlayerViewModel {
         .init(id: "game"),
         .init(id: "author"),
         .init(id: "system"),
+        .year,
+        .dumper,
         .init(id: "path"),
         .init(id: "timestamp"),
         .init(id: "length")
@@ -2667,7 +2671,7 @@ final class PlayerViewModel {
     }
 
     func handleManualPlaySecondsChanged() {
-        manualPreFadeSeconds = max(30, manualPreFadeSeconds)
+        manualPreFadeSeconds = max(0, manualPreFadeSeconds)
         if longPlayEnabled && currentTrackSupportsLongPlay {
             applyPlaybackTiming()
         }
@@ -3990,7 +3994,7 @@ final class PlayerViewModel {
         switch column {
         case .index, .trackNumber, .file, .path, .timestamp:
             return false
-        case .title, .game, .author, .system, .length:
+        case .title, .game, .author, .system, .year, .dumper, .length:
             return true
         }
     }
@@ -4009,6 +4013,14 @@ final class PlayerViewModel {
 
     func systemText(for track: TrackItem) -> String {
         PlaylistPresentation.systemText(for: metadataCache[track.id])
+    }
+
+    func yearText(for track: TrackItem) -> String {
+        PlaylistPresentation.yearText(for: metadataCache[track.id])
+    }
+
+    func dumperText(for track: TrackItem) -> String {
+        PlaylistPresentation.dumperText(for: metadataCache[track.id])
     }
 
     func lengthText(for track: TrackItem) -> String {

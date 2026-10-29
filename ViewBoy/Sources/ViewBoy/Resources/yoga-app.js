@@ -1138,6 +1138,8 @@ async function applySharedPlaylistSort() {
     gameText: tableValue(track, "game", naturalOrder),
     authorText: tableValue(track, "artist", naturalOrder),
     systemText: tableValue(track, "system", naturalOrder),
+    yearText: tableValue(track, "year", naturalOrder),
+    dumperText: tableValue(track, "dumper", naturalOrder),
     pathText: tableValue(track, "path", naturalOrder),
     lengthMilliseconds: Math.max(0, Math.round(Number(track.playLengthMs) || 0)),
     timestampMilliseconds: track.timestampMilliseconds === null || track.timestampMilliseconds === undefined
@@ -2388,6 +2390,8 @@ function tableValue(track, key, rowIndex = 0) {
     case "game": return track.game || "";
     case "artist": return track.artist || track.author || "";
     case "system": return track.system || "";
+    case "year": return track.year || "";
+    case "dumper": return track.dumper || "";
     case "path": return track.archiveEntry
       ? `${track.path || track.archivePath} / ${track.archiveEntry}`
       : track.path || track.archivePath || "";
@@ -2403,6 +2407,8 @@ const configurableColumns = [
   { key: "game", title: "GAME" },
   { key: "artist", title: "ARTIST" },
   { key: "path", title: "PATH" },
+  { key: "year", title: "YEAR" },
+  { key: "dumper", title: "DUMPER" },
   { key: "timestamp", title: "DATE/TIME" },
 ];
 const tableContentLengthCache = new WeakMap();
@@ -2475,6 +2481,8 @@ function tableColumns(items = activeTracks()) {
     { key: "game", title: "GAME", width: 40 },
     { key: "artist", title: "ARTIST", width: 40 },
     { key: "system", title: "SYSTEM", width: 28, mandatory: true },
+    { key: "year", title: "YEAR", width: 8 },
+    { key: "dumper", title: "DUMPER", width: 28 },
     { key: "path", title: "PATH", width: 58 },
     { key: "length", title: "LENGTH", width: 32, align: "right", mandatory: true },
   ];

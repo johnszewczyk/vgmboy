@@ -15,6 +15,8 @@ public struct CatalogPlaylistDisplayFields: Equatable, Sendable {
     public let gameText: String
     public let authorText: String
     public let systemText: String
+    public let yearText: String
+    public let dumperText: String
     public let lengthText: String
 }
 
@@ -35,6 +37,8 @@ public struct CatalogPlaylistPresentationRow: Equatable, Sendable {
     public let author: String
     public let system: String
     public let comment: String
+    public let year: String
+    public let dumper: String
     public let introLengthMilliseconds: Int
     public let loopLengthMilliseconds: Int
     public let lengthMilliseconds: Int
@@ -52,6 +56,8 @@ public struct CatalogPlaylistColumnContentHints: Equatable, Sendable {
     public let gameText: String
     public let authorText: String
     public let systemText: String
+    public let yearText: String
+    public let dumperText: String
     public let pathText: String
     public let lengthText: String
 }
@@ -75,6 +81,8 @@ public struct CatalogPlaylistSortRecord: Codable, Equatable, Sendable {
     public let gameText: String
     public let authorText: String
     public let systemText: String
+    public let yearText: String?
+    public let dumperText: String?
     public let pathText: String
     public let lengthMilliseconds: Int
     public let timestampMilliseconds: Int64?
@@ -87,6 +95,8 @@ public struct CatalogPlaylistSortRecord: Codable, Equatable, Sendable {
         gameText: String,
         authorText: String,
         systemText: String,
+        yearText: String? = nil,
+        dumperText: String? = nil,
         pathText: String,
         lengthMilliseconds: Int,
         trackNumber: Int? = nil,
@@ -100,6 +110,8 @@ public struct CatalogPlaylistSortRecord: Codable, Equatable, Sendable {
         self.gameText = gameText
         self.authorText = authorText
         self.systemText = systemText
+        self.yearText = yearText
+        self.dumperText = dumperText
         self.pathText = pathText
         self.lengthMilliseconds = lengthMilliseconds
         self.timestampMilliseconds = timestampMilliseconds
@@ -114,6 +126,8 @@ public enum CatalogPlaylistSortColumn: String, CaseIterable, Codable, Sendable {
     case game
     case author
     case system
+    case year
+    case dumper
     case path
     case length
     case timestamp
@@ -130,6 +144,8 @@ public enum CatalogPlaylistSortColumn: String, CaseIterable, Codable, Sendable {
         case "game": self = .game
         case "author", "artist": self = .author
         case "system": self = .system
+        case "year": self = .year
+        case "dumper": self = .dumper
         case "path": self = .path
         case "length", "lengthLabel": self = .length
         case "timestamp": self = .timestamp
@@ -184,6 +200,16 @@ public enum CatalogPlaylistSorting {
                 // numbered track.
                 return lhs.trackNumber != nil
             }
+            if column == .year,
+               (CatalogPlaylistYear.yearValue(from: lhs.yearText) == nil)
+                != (CatalogPlaylistYear.yearValue(from: rhs.yearText) == nil) {
+                return CatalogPlaylistYear.yearValue(from: lhs.yearText) != nil
+            }
+            if column == .dumper,
+               (CatalogPlaylistDumper.sortableValue(from: lhs.dumperText) == nil)
+                != (CatalogPlaylistDumper.sortableValue(from: rhs.dumperText) == nil) {
+                return CatalogPlaylistDumper.sortableValue(from: lhs.dumperText) != nil
+            }
             let comparison = compare(lhs, rhs, by: column)
             if comparison == .orderedSame {
                 return lhs.naturalOrder < rhs.naturalOrder
@@ -214,6 +240,16 @@ public enum CatalogPlaylistSorting {
             return lhs.authorText.localizedStandardCompare(rhs.authorText)
         case .system:
             return lhs.systemText.localizedStandardCompare(rhs.systemText)
+        case .year:
+            return compareOptional(
+                CatalogPlaylistYear.yearValue(from: lhs.yearText),
+                CatalogPlaylistYear.yearValue(from: rhs.yearText)
+            )
+        case .dumper:
+            return compareOptional(
+                CatalogPlaylistDumper.sortableValue(from: lhs.dumperText),
+                CatalogPlaylistDumper.sortableValue(from: rhs.dumperText)
+            )
         case .path:
             return lhs.pathText.localizedStandardCompare(rhs.pathText)
         case .length:
@@ -257,6 +293,19 @@ public enum CatalogPlaylistSorting {
             return .orderedAscending
         }
     }
+
+    private static func compareOptional(_ lhs: String?, _ rhs: String?) -> ComparisonResult {
+        switch (lhs, rhs) {
+        case let (left?, right?):
+            return left.localizedStandardCompare(right)
+        case (nil, nil):
+            return .orderedSame
+        case (nil, _):
+            return .orderedDescending
+        case (_, nil):
+            return .orderedAscending
+        }
+    }
 }
 
 public enum CatalogPlaylistPresentation {
@@ -279,6 +328,8 @@ public enum CatalogPlaylistPresentation {
                 system: $0.system,
                 browserSystem: "",
                 comment: $0.comment,
+                year: $0.year,
+                dumper: $0.dumper,
                 introLengthMilliseconds: $0.introLengthMilliseconds,
                 loopLengthMilliseconds: $0.loopLengthMilliseconds,
                 lengthMilliseconds: $0.lengthMilliseconds,
@@ -306,6 +357,8 @@ public enum CatalogPlaylistPresentation {
                 system: $0.system,
                 browserSystem: $0.browserSystem,
                 comment: $0.comment,
+                year: $0.year,
+                dumper: $0.dumper,
                 introLengthMilliseconds: $0.introLengthMilliseconds,
                 loopLengthMilliseconds: $0.loopLengthMilliseconds,
                 lengthMilliseconds: $0.lengthMilliseconds,
@@ -329,6 +382,8 @@ public enum CatalogPlaylistPresentation {
         let system: String
         let browserSystem: String
         let comment: String
+        let year: String
+        let dumper: String
         let introLengthMilliseconds: Int
         let loopLengthMilliseconds: Int
         let lengthMilliseconds: Int
@@ -371,6 +426,8 @@ public enum CatalogPlaylistPresentation {
             gameText: nonEmpty(input.game) ?? groupName,
             authorText: nonEmpty(input.author) ?? "—",
             systemText: nonEmpty(input.system) ?? nonEmpty(input.browserSystem) ?? "—",
+            yearText: CatalogPlaylistYear.displayText(from: input.year),
+            dumperText: CatalogPlaylistDumper.displayText(from: input.dumper),
             lengthText: formattedDuration(milliseconds: input.lengthMilliseconds)
         )
         return CatalogPlaylistPresentationRow(
@@ -387,6 +444,8 @@ public enum CatalogPlaylistPresentation {
             author: input.author,
             system: input.system,
             comment: input.comment,
+            year: input.year,
+            dumper: input.dumper,
             introLengthMilliseconds: input.introLengthMilliseconds,
             loopLengthMilliseconds: input.loopLengthMilliseconds,
             lengthMilliseconds: input.lengthMilliseconds,
@@ -405,6 +464,8 @@ public enum CatalogPlaylistPresentation {
             gameText: longest(rows.map(\.display.gameText)),
             authorText: longest(rows.map(\.display.authorText)),
             systemText: longest(rows.map(\.display.systemText)),
+            yearText: longest(rows.map(\.display.yearText), default: "—"),
+            dumperText: longest(rows.map(\.display.dumperText), default: "—"),
             pathText: longest(rows.map { row in
                 guard let archiveEntry = row.archiveEntry else { return row.sourcePath }
                 return "\(row.archivePath ?? row.sourcePath)#\(archiveEntry)"

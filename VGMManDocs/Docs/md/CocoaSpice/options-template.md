@@ -52,12 +52,12 @@
 
 **Control:** [ ] `Enable extended playback`
 
-> Set the target duration used when Long Play is enabled.
+> Set the target duration used when Long Play is enabled. Enter `0:00` for unlimited playback.
 
 **Control:** `[text field: 3:00]`  
 **Placeholder:** `0:00`  
 **Format:** `m:ss`, monospaced, right-aligned, width `72`  
-**Range:** minimum `0:30` (`30` seconds)
+**Range:** minimum `0:00`; zero disables the playback time cap.
 
 **Label:** `Unknown-length default`
 
@@ -94,6 +94,7 @@
 
 **Tempo field format:** placeholder `1`, rounded-border style, width `72`.
 **Accepted input:** fractions and decimals.  
+**Range:** `1/32×` to `8×`  
 **Quantization:** `1/32` increments.
 
 ---

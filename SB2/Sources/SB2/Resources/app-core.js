@@ -11,6 +11,8 @@ const COLUMN_DEFS = [
   { id: "game", label: "Game" },
   { id: "artist", label: "Artist" },
   { id: "system", label: "System" },
+  { id: "year", label: "Year", className: "mono col-year" },
+  { id: "dumper", label: "Dumper" },
   { id: "path", label: "Path" },
   { id: "lengthLabel", label: "Length", className: "mono col-length" },
   { id: "timestamp", label: "Date/Time", className: "mono col-timestamp" }
@@ -24,6 +26,8 @@ const DEFAULT_COLUMN_WIDTHS = Object.freeze({
   game: 18,
   artist: 16,
   system: 10,
+  year: 8,
+  dumper: 18,
   path: 28,
   lengthLabel: 8,
   timestamp: 24

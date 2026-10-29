@@ -2180,6 +2180,9 @@ func catalogScannerExpandsKnownMultitrackFixtures() async throws {
         #expect(metadata.game == "Game")
         #expect(metadata.author == "Artist")
         #expect(metadata.comment == "Comment") // Date and converter remain available to MetaMan without changing the existing catalog projection.
+        let tags = try #require(inspection.tracks.first?.tags)
+        #expect(tags.contains { $0.normalizedName == "DATE" && $0.value == "1998/06/14" })
+        #expect(tags.contains { $0.normalizedName == "CONVERTED_BY" && $0.value == "Converter" })
         #expect(metadata.playLengthMs == 1_000)
         #expect(metadata.loopLengthMs == 500)
     }
@@ -2457,6 +2460,8 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
     var spc = makeSPCFile(id666Flag: 0x1A)
     writeBytes(&spc, at: 0x2E, value: "ID666 Song")
     writeBytes(&spc, at: 0x4E, value: "Track Game Variant")
+    writeBytes(&spc, at: 0x6E, value: "SPC payload dumper")
+    writeBytes(&spc, at: 0x9E, value: "01/02/1990")
     writeBytes(&spc, at: 0xB1, value: "Artist")
     // A truncated xID6 signature is recoverable. The SPC inspector can still
     // read these native tags, but UAC catalog fields must not use them.
@@ -2517,7 +2522,9 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
                 blake3: memberHash,
                 metadata: [
                     "game": .string("UAC Track Game"),
-                    "title": .string("Manifest Edited Title")
+                    "title": .string("Manifest Edited Title"),
+                    "year": .string("1999"),
+                    "dumper": .string("UAC manifest dumper")
                 ]
             ),
             UACMember(
@@ -2616,6 +2623,29 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
          LIMIT 1;
         """
     )
+    let uacYearRows = try queryRows(
+        database: try #require(database),
+        sql: """
+        SELECT tags.value
+          FROM track_metadata_tags tags
+          JOIN tracks t ON t.id=tags.track_id
+         WHERE t.archive_entry='variants/original/track.spc'
+           AND t.track_index=0 AND tags.normalized_name='YEAR'
+         ORDER BY tags.tag_index;
+        """
+    )
+    let uacDumperRow = try querySingleRow(
+        database: try #require(database),
+        sql: """
+        SELECT tags.value
+          FROM track_metadata_tags tags
+          JOIN tracks t ON t.id=tags.track_id
+         WHERE t.archive_entry='variants/original/track.spc'
+           AND t.track_index=0 AND tags.normalized_name='DUMPER'
+         ORDER BY tags.tag_index
+         LIMIT 1;
+        """
+    )
     sqlite3_close(database)
     #expect(row == [
         memberPath,
@@ -2628,6 +2658,8 @@ func catalogScannerInspectsCompressedSPCArchiveMembers() async throws {
         "2"
     ])
     #expect(titleSnapRow == ["Title Snap", "archive-member:\(snapMemberPath)"])
+    #expect(uacYearRows == [["1999"]])
+    #expect(uacDumperRow == ["UAC manifest dumper"])
 }
 
 @Test func uacCannotEnterThePayloadExtractionPath() async {

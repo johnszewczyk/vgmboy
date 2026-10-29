@@ -253,7 +253,10 @@ def normalize_recipe(recipe: dict) -> dict:
         if not isinstance(metadata, dict):
             raise UACError(f"Member metadata must be an object: {member_path}")
         override["metadata"] = normalize_authored_metadata_fields(
-            metadata, f"Member {member_path}"
+            metadata,
+            f"Member {member_path}",
+            # `loop` is a wrapper-defined structured property, not a tag name.
+            frozenset({"loop"}),
         )
 
     if not isinstance(recipe["variants"], list) or not recipe["variants"]:

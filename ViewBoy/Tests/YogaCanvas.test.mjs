@@ -1587,20 +1587,20 @@ test('canvas renders adaptive columns, grouped options, and native playback', as
   globalThis.ViewBoy.dispatch('settings');
   await tick();
   clickPage('METHODS');
-  clickTarget('LIBGME SPEED');
+  clickTarget('PLAYBACK SPEED');
   await tick();
   assert.equal(savedPreferences.at(-1).playbackSpeedEnabled, true,
-    'the Playback page enables libgme tempo through the shared preferences');
-  clickTarget('LIBGME RATE +');
+    'the Methods page enables shared tempo through the shared preferences');
+  clickTarget('PLAYBACK RATE +');
   await tick();
   assert.equal(savedPreferences.at(-1).playbackSpeed.numerator, 33,
-    'the libgme speed adjuster advances in 1/32 steps');
+    'the shared speed adjuster advances in 1/32 steps');
   assert.equal(reconfigureCalls.at(-1).tempo, 33 / 32,
     'a speed change updates the active native decoder immediately');
-  const libgmeRateInput = hitTargetSnapshot().find((target) => target.name === 'LIBGME RATE INPUT');
-  assert.equal(libgmeRateInput?.editableRateBackend, 'libgme',
-    'the decoder rate appears in an editable framed input');
-  clickTarget('LIBGME RATE INPUT');
+  const playbackRateInput = hitTargetSnapshot().find((target) => target.name === 'PLAYBACK RATE INPUT');
+  assert.equal(playbackRateInput?.editablePlaybackRate, true,
+    'the shared rate appears in an editable framed input');
+  clickTarget('PLAYBACK RATE INPUT');
   for (const key of ['1', '5', '/', '1', '6', 'Enter']) typeSearchKey(key);
   await tick();
   assert.equal(savedPreferences.at(-1).playbackSpeed.numerator, 15,

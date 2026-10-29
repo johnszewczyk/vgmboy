@@ -83,6 +83,10 @@
   rows into native queue models but does not retain duplicate source, folder, or path SQL.
 - CocoaSpice persists separate Long Play and unknown-duration values. The latter is sent through
   the shared typed request and applies only when the decoder provides no natural duration.
+- A persisted Long Play value of zero is meaningful and must survive the CocoaSpice options UI,
+  control surface, timing adjustment, and UserDefaults restoration. For PSF files without a
+  `_length` tag, file-default playback remains bounded by the unknown-duration preference; zero
+  Long Play removes that cap while the emulated driver continues producing audio.
 - AAC export passes the playlist display name and the already-effective finite playback timing to
   `PlaybackTransportCoordinator`, which calls `PlaybackController.exportAAC`.
   CocoaSpice never gives VGMBoy catalog access or asks it to derive

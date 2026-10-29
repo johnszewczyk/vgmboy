@@ -17,7 +17,7 @@
 
 ## Playback
 
-- Long Play: enable shared extended playback.
+- Long Play: enable shared extended playback and set its target duration. Enter `0:00` for unlimited playback; tracks that end naturally still stop when their decoder finishes.
 - Play Speed: one shared enable switch and rate for every format whose decoder advertises native tempo support. Decimal and fractional input is accepted and snapped to 1/32 steps from 1/32× through 8× before it is persisted through VGMBoy's shared `PlaybackPreferences` model. Older per-decoder values migrate to the active legacy rate; if both old switches were on with conflicting rates, the former libgme rate wins.
 - Duration: set a manual playback target.
 - End Fade: enable or disable the fade and configure its duration (default six seconds). With it off, metadata-timed tracks use their native ending.

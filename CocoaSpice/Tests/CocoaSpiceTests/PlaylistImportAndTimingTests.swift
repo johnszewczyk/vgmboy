@@ -567,6 +567,34 @@ func uacMemberLoopMetadataIsProjected() throws {
     #expect(unifiedPreferences.equalizerBandGains == [-12.0, -3.5, 4.0, 12.0])
 }
 
+@Test func zeroLongPlayDurationRestoresAsUnbounded() {
+    let suiteName = "CocoaSpiceTests.\(UUID().uuidString)"
+    guard let defaults = UserDefaults(suiteName: suiteName) else {
+        Issue.record("Failed to create isolated UserDefaults suite")
+        return
+    }
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    defaults.set(true, forKey: AppDefaultsKey.longPlayEnabled)
+    defaults.set(0, forKey: AppDefaultsKey.manualPreFadeSeconds)
+
+    let preferences = AppSessionPersistence.restorePlaybackPreferences(defaults: defaults)
+    #expect(preferences.longPlayEnabled)
+    #expect(preferences.manualPreFadeSeconds == 0)
+
+    let plan = PlaybackTimingPolicy.playbackPlan(
+        metadata: nil,
+        trackPathExtension: "psf",
+        longPlayEnabled: preferences.longPlayEnabled,
+        manualPreFadeSeconds: preferences.manualPreFadeSeconds ?? 180,
+        fadeSeconds: 6
+    )
+    #expect(plan.isLongPlay)
+    #expect(plan.preFadeSeconds == 0)
+    #expect(plan.totalSeconds == 0)
+}
+
 @Test func equalizerUsesTenStandardBandsAndClampsGain() {
     #expect(AudioEqualizer.bandFrequencies == [31, 62, 125, 250, 500, 1_000, 2_000, 4_000, 8_000, 16_000])
     #expect(AudioEqualizer.clampedGain(-20) == -12)

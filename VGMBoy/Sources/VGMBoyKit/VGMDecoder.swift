@@ -153,9 +153,9 @@ final class VGMDecoder: AudioDecoder, @unchecked Sendable {
         let rendered = max(0, Int(renderedFrames))
         absoluteFrames += Int64(rendered)
 
-        var left = [Float](repeating: 0, count: frameCount)
-        var right = [Float](repeating: 0, count: frameCount)
-        for index in 0..<min(rendered, frameCount) {
+        var left = [Float](repeating: 0, count: rendered)
+        var right = [Float](repeating: 0, count: rendered)
+        for index in 0..<rendered {
             left[index] = Float(interleaved[index * 2]) / 32768.0
             right[index] = Float(interleaved[index * 2 + 1]) / 32768.0
         }

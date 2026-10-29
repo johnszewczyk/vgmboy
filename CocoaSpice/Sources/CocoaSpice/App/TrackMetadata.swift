@@ -9,10 +9,38 @@ struct TrackMetadata: Codable, Equatable, Sendable {
     let system: String
     let author: String
     let comment: String
+    let year: String
+    let dumper: String
     let introLengthMs: Int
     let loopLengthMs: Int
     let playLengthMs: Int
     let fadeLengthMs: Int
+
+    init(
+        game: String,
+        song: String,
+        system: String,
+        author: String,
+        comment: String,
+        year: String = "",
+        dumper: String = "",
+        introLengthMs: Int,
+        loopLengthMs: Int,
+        playLengthMs: Int,
+        fadeLengthMs: Int
+    ) {
+        self.game = game
+        self.song = song
+        self.system = system
+        self.author = author
+        self.comment = comment
+        self.year = year
+        self.dumper = dumper
+        self.introLengthMs = introLengthMs
+        self.loopLengthMs = loopLengthMs
+        self.playLengthMs = playLengthMs
+        self.fadeLengthMs = fadeLengthMs
+    }
 
     var playbackTimingMetadata: PlaybackTimingMetadata {
         PlaybackTimingMetadata(

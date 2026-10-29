@@ -149,7 +149,7 @@ enum AppSessionPersistence {
                 denominator: defaults.object(forKey: denominatorKey) as? Int ?? 1
             )
         }
-        let storedLongPlaySeconds = defaults.integer(forKey: AppDefaultsKey.manualPreFadeSeconds)
+        let storedLongPlaySeconds = (defaults.object(forKey: AppDefaultsKey.manualPreFadeSeconds) as? NSNumber)?.intValue
         let storedUnknownDurationSeconds = defaults.integer(forKey: AppDefaultsKey.unknownDurationSeconds)
         let storedFadeSeconds = defaults.object(forKey: AppDefaultsKey.fadeSeconds)
             .flatMap { ($0 as? NSNumber)?.intValue } ?? PlaybackTimingPreferences.defaultFadeSeconds
@@ -163,9 +163,8 @@ enum AppSessionPersistence {
         let hasUnifiedTempo = defaults.object(forKey: AppDefaultsKey.playbackTempoNumerator) != nil
         let shared = PlaybackPreferences(
             timing: PlaybackTimingPreferences(
-                longPlaySeconds: storedLongPlaySeconds > 0
-                    ? storedLongPlaySeconds
-                    : PlaybackTimingPreferences.defaultLongPlaySeconds,
+                longPlaySeconds: storedLongPlaySeconds.map { max(0, $0) }
+                    ?? PlaybackTimingPreferences.defaultLongPlaySeconds,
                 unknownDurationSeconds: storedUnknownDurationSeconds > 0
                     ? storedUnknownDurationSeconds
                     : PlaybackTimingPreferences.defaultUnknownDurationSeconds,
@@ -187,7 +186,7 @@ enum AppSessionPersistence {
             longPlayEnabled: defaults.bool(forKey: AppDefaultsKey.longPlayEnabled),
             playlistFollowsCursor: defaults.object(forKey: AppDefaultsKey.playlistFollowsCursor) as? Bool ?? false,
             playlistLinkMode: defaults.object(forKey: AppDefaultsKey.playlistLinkMode) as? Bool ?? false,
-            manualPreFadeSeconds: storedLongPlaySeconds > 0 ? shared.timing.longPlaySeconds : nil,
+            manualPreFadeSeconds: storedLongPlaySeconds.map { max(0, $0) },
             unknownDurationSeconds: storedUnknownDurationSeconds > 0 ? shared.timing.unknownDurationSeconds : nil,
             endFadeEnabled: shared.fadeEnabled,
             fadeSeconds: max(0, storedFadeSeconds),

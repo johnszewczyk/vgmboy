@@ -105,6 +105,8 @@ struct PlaylistTableView: NSViewRepresentable {
             case game
             case author
             case system
+            case year
+            case dumper
             case path
             case timestamp
             case length
@@ -119,6 +121,8 @@ struct PlaylistTableView: NSViewRepresentable {
                 case .game: "Game"
                 case .author: "Author"
                 case .system: "System"
+                case .year: "Year"
+                case .dumper: "Dumper"
                 case .path: "Path"
                 case .timestamp: "Date/Time"
                 case .length: "Length"
@@ -426,6 +430,10 @@ struct PlaylistTableView: NSViewRepresentable {
                     return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.authorText(for: track), isCurrentTrack: model.isTrackPlayingInVisibleTab(track.id))
                 case .system:
                     return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.systemText(for: track), isCurrentTrack: model.isTrackPlayingInVisibleTab(track.id))
+                case .year:
+                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.yearText(for: track), isCurrentTrack: model.isTrackPlayingInVisibleTab(track.id), monospace: true)
+                case .dumper:
+                    return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.dumperText(for: track), isCurrentTrack: model.isTrackPlayingInVisibleTab(track.id))
                 case .path:
                     return configuredTextCell(in: tableView, row: row, identifier: column.rawValue, text: model.pathText(for: track), isCurrentTrack: model.isTrackPlayingInVisibleTab(track.id))
                 case .timestamp:
@@ -669,7 +677,7 @@ struct PlaylistTableView: NSViewRepresentable {
             let metadataColumns = IndexSet(tableView.tableColumns.enumerated().compactMap { index, tableColumn in
                 guard let column = Column(rawValue: tableColumn.identifier.rawValue) else { return nil }
                 return switch column {
-                case .title, .game, .author, .system, .length:
+                case .title, .game, .author, .system, .year, .dumper, .length:
                     index
                 case .favorite, .index, .trackNumber, .file, .path, .timestamp:
                     nil
@@ -886,7 +894,7 @@ struct PlaylistTableView: NSViewRepresentable {
                 }
             case .timestamp:
                 return model.visiblePlaylist.contains { $0.historyTimestampMilliseconds != nil }
-            case .title, .game, .author, .system, .length:
+            case .title, .game, .author, .system, .year, .dumper, .length:
                 if let hint = widthHintValue(for: column) {
                     return hasMeaningfulContent(hint)
                 }
@@ -1191,6 +1199,10 @@ struct PlaylistTableView: NSViewRepresentable {
                 hints.authorText
             case .system:
                 hints.systemText
+            case .year:
+                hints.yearText
+            case .dumper:
+                hints.dumperText
             case .path:
                 nil
             case .timestamp:
@@ -1218,6 +1230,10 @@ struct PlaylistTableView: NSViewRepresentable {
                 model.authorText(for: track)
             case .system:
                 model.systemText(for: track)
+            case .year:
+                model.yearText(for: track)
+            case .dumper:
+                model.dumperText(for: track)
             case .path:
                 model.pathText(for: track)
             case .timestamp:

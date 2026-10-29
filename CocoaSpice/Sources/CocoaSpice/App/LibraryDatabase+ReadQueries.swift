@@ -39,7 +39,7 @@ extension LibraryDatabase {
     ) throws -> (tracks: [TrackItem], metadata: [String: TrackMetadata], widthHints: PlaylistColumnWidthHints) {
         let normalizedItems = Array(NSOrderedSet(array: gameItems)) as? [DatabaseGameItem] ?? []
         guard !normalizedItems.isEmpty else {
-            return ([], [:], PlaylistColumnWidthHints(indexText: "1", fileText: "", titleText: "", gameText: "", authorText: "", systemText: "", lengthText: "—"))
+            return ([], [:], PlaylistColumnWidthHints(indexText: "1", fileText: "", titleText: "", gameText: "", authorText: "", systemText: "", yearText: "—", dumperText: "—", lengthText: "—"))
         }
 
         let selections = normalizedItems.map {
@@ -57,7 +57,7 @@ extension LibraryDatabase {
     static func tracksAndMetadataForFiles(databaseURL: URL, fileItems: [DatabaseFileItem]) throws -> (tracks: [TrackItem], metadata: [String: TrackMetadata], widthHints: PlaylistColumnWidthHints) {
         let normalizedItems = Array(NSOrderedSet(array: fileItems)) as? [DatabaseFileItem] ?? []
         guard !normalizedItems.isEmpty else {
-            return ([], [:], PlaylistColumnWidthHints(indexText: "1", fileText: "", titleText: "", gameText: "", authorText: "", systemText: "", lengthText: "—"))
+            return ([], [:], PlaylistColumnWidthHints(indexText: "1", fileText: "", titleText: "", gameText: "", authorText: "", systemText: "", yearText: "—", dumperText: "—", lengthText: "—"))
         }
 
         let catalog = try ReadOnlyCatalog(databaseURL: databaseURL)
@@ -81,7 +81,7 @@ extension LibraryDatabase {
             URL(fileURLWithPath: $0, isDirectory: false).standardizedFileURL.path
         })) as? [String] ?? []
         guard !normalizedPaths.isEmpty else {
-            return ([], [:], PlaylistColumnWidthHints(indexText: "1", fileText: "", titleText: "", gameText: "", authorText: "", systemText: "", lengthText: "—"))
+            return ([], [:], PlaylistColumnWidthHints(indexText: "1", fileText: "", titleText: "", gameText: "", authorText: "", systemText: "", yearText: "—", dumperText: "—", lengthText: "—"))
         }
 
         let catalog = try ReadOnlyCatalog(databaseURL: databaseURL)
@@ -372,6 +372,8 @@ extension LibraryDatabase {
                 system: row.display.systemText,
                 author: row.author,
                 comment: row.comment,
+                year: row.display.yearText,
+                dumper: row.display.dumperText,
                 introLengthMs: row.introLengthMilliseconds,
                 loopLengthMs: row.loopLengthMilliseconds,
                 playLengthMs: row.lengthMilliseconds,
@@ -390,6 +392,8 @@ extension LibraryDatabase {
                 gameText: hints.gameText,
                 authorText: hints.authorText,
                 systemText: hints.systemText,
+                yearText: hints.yearText,
+                dumperText: hints.dumperText,
                 lengthText: hints.lengthText
             )
         )

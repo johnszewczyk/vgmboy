@@ -1,4 +1,5 @@
 import Foundation
+import CatalogPlaylistCore
 import SQLite3
 
 private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
@@ -126,6 +127,8 @@ public struct CatalogTrack: Identifiable, Equatable, Sendable {
     public let author: String
     public let system: String
     public let comment: String
+    public let year: String
+    public let dumper: String
     public let browserGame: String
     public let browserSystem: String
     public let introLengthMilliseconds: Int
@@ -133,7 +136,7 @@ public struct CatalogTrack: Identifiable, Equatable, Sendable {
     public let lengthMilliseconds: Int
     public let fadeLengthMilliseconds: Int
 
-    public init(id: Int64, rootID: Int64, sourcePath: String, archivePath: String?, archiveEntry: String?, trackIndex: Int, trackCount: Int, trackNumber: Int? = nil, title: String, game: String, author: String, system: String, comment: String, browserGame: String, browserSystem: String, introLengthMilliseconds: Int, loopLengthMilliseconds: Int, lengthMilliseconds: Int, fadeLengthMilliseconds: Int) {
+    public init(id: Int64, rootID: Int64, sourcePath: String, archivePath: String?, archiveEntry: String?, trackIndex: Int, trackCount: Int, trackNumber: Int? = nil, title: String, game: String, author: String, system: String, comment: String, year: String = "", dumper: String = "", browserGame: String, browserSystem: String, introLengthMilliseconds: Int, loopLengthMilliseconds: Int, lengthMilliseconds: Int, fadeLengthMilliseconds: Int) {
         self.id = id
         self.rootID = rootID
         self.sourcePath = sourcePath
@@ -147,6 +150,8 @@ public struct CatalogTrack: Identifiable, Equatable, Sendable {
         self.author = author
         self.system = system
         self.comment = comment
+        self.year = year
+        self.dumper = dumper
         self.browserGame = browserGame
         self.browserSystem = browserSystem
         self.introLengthMilliseconds = introLengthMilliseconds
@@ -172,6 +177,7 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
     public static let supportedSchemaVersion = 25
     public static let supportedSchemaVersions: Set<Int> = [24, supportedSchemaVersion]
     private let database: OpaquePointer
+    private var metadataTagsAvailable = false
     private let gameSnapshotLock = NSLock()
     public let databaseURL: URL
 
@@ -198,6 +204,7 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
         guard Self.supportedSchemaVersions.contains(schema) else {
             throw CatalogReaderError.unsupportedSchema(schema)
         }
+        metadataTagsAvailable = schema >= 25
         established = true
     }
 
@@ -453,7 +460,9 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
                COALESCE(m.system, ''), COALESCE(m.comment, ''),
                COALESCE(t.browser_game, ''), COALESCE(t.browser_system, ''),
                COALESCE(m.intro_length_ms, 0), COALESCE(m.loop_length_ms, 0),
-               COALESCE(m.play_length_ms, 0), COALESCE(m.fade_length_ms, 0)
+               COALESCE(m.play_length_ms, 0), COALESCE(m.fade_length_ms, 0),
+               \(CatalogPlaylistYear.sqlExpression(metadataTagsAvailable: metadataTagsAvailable)),
+               \(CatalogPlaylistDumper.sqlExpression(metadataTagsAvailable: metadataTagsAvailable))
         FROM tracks t
         INNER JOIN library_roots r ON r.id=t.root_id
         LEFT JOIN track_metadata m ON m.track_id=t.id
@@ -487,7 +496,9 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
                COALESCE(m.system, ''), COALESCE(m.comment, ''),
                COALESCE(t.browser_game, ''), COALESCE(t.browser_system, ''),
                COALESCE(m.intro_length_ms, 0), COALESCE(m.loop_length_ms, 0),
-               COALESCE(m.play_length_ms, 0), COALESCE(m.fade_length_ms, 0)
+               COALESCE(m.play_length_ms, 0), COALESCE(m.fade_length_ms, 0),
+               \(CatalogPlaylistYear.sqlExpression(metadataTagsAvailable: metadataTagsAvailable)),
+               \(CatalogPlaylistDumper.sqlExpression(metadataTagsAvailable: metadataTagsAvailable))
         FROM tracks t
         INNER JOIN library_roots r ON r.id=t.root_id
         LEFT JOIN track_metadata m ON m.track_id=t.id
@@ -620,7 +631,9 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
                COALESCE(m.system, ''), COALESCE(m.comment, ''),
                COALESCE(t.browser_game, ''), COALESCE(t.browser_system, ''),
                COALESCE(m.intro_length_ms, 0), COALESCE(m.loop_length_ms, 0),
-               COALESCE(m.play_length_ms, 0), COALESCE(m.fade_length_ms, 0)
+               COALESCE(m.play_length_ms, 0), COALESCE(m.fade_length_ms, 0),
+               \(CatalogPlaylistYear.sqlExpression(metadataTagsAvailable: metadataTagsAvailable)),
+               \(CatalogPlaylistDumper.sqlExpression(metadataTagsAvailable: metadataTagsAvailable))
         FROM tracks t
         INNER JOIN library_roots r ON r.id=t.root_id
         LEFT JOIN track_metadata m ON m.track_id=t.id
@@ -715,6 +728,7 @@ public final class ReadOnlyCatalog: @unchecked Sendable {
             trackNumber: sqlite3_column_type(statement, 7) == SQLITE_NULL ? nil : Int(sqlite3_column_int64(statement, 7)),
             title: string(statement, 8), game: string(statement, 9), author: string(statement, 10),
             system: string(statement, 11), comment: string(statement, 12),
+            year: string(statement, 19), dumper: string(statement, 20),
             browserGame: string(statement, 13), browserSystem: string(statement, 14),
             introLengthMilliseconds: Int(sqlite3_column_int64(statement, 15)), loopLengthMilliseconds: Int(sqlite3_column_int64(statement, 16)),
             lengthMilliseconds: Int(sqlite3_column_int64(statement, 17)), fadeLengthMilliseconds: Int(sqlite3_column_int64(statement, 18))

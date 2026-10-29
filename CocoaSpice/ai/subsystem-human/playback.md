@@ -34,7 +34,7 @@
 
 ## Timing
 
-- Long Play: one shared setting for loop-capable game-music decoders, available in Playback Options and from the infinity button beside the main transport controls. Finite audio such as WAV, AIFF, FLAC, MP3, and M4A retains its native duration even when Long Play is on.
+- Long Play: one shared setting for loop-capable game-music decoders, available in Playback Options and from the infinity button beside the main transport controls. Set its duration to `0:00` for unbounded playback; PSF files without `_length`/`_fade` tags otherwise use the unknown-duration window. Finite audio such as WAV, AIFF, FLAC, MP3, and M4A retains its native duration even when Long Play is on.
 - Changing Play Speed for an active tempo-capable track updates its tempo-scaled timing window at the current position and preserves its paused or playing state.
 - Timing: supports manual duration and fade behavior.
 - Tracks without decoder-provided timing, including SID music, use the configurable unknown-length default in the Long Play options area plus the configured end fade unless Long Play is enabled.

@@ -3408,6 +3408,8 @@ function playlistSortRecords(playlist = state.playlist) {
     gameText: String(track.game || ""),
     authorText: String(track.artist || ""),
     systemText: String(track.system || ""),
+    yearText: String(track.year || ""),
+    dumperText: String(track.dumper || ""),
     pathText: playlistDisplayPath(track),
     lengthMilliseconds: Math.max(0, Math.round((Number(track.basePlaybackSeconds) || 0) * 1000)),
     timestampMilliseconds: Number.isFinite(Number(track.timestampMilliseconds))
@@ -4042,7 +4044,7 @@ function refreshPlaylistFavoriteRows() {
 function playlistSortDependsOnMetadata() {
   return !isCatalogPlaylistProjection()
     && state.playlistSortEnabled
-    && ["title", "game", "artist", "system", "lengthLabel"].includes(state.sortColumn);
+    && ["title", "game", "artist", "system", "year", "dumper", "lengthLabel"].includes(state.sortColumn);
 }
 
 function syncPlaylistTableColumnGroups(columns) {
@@ -5099,27 +5101,34 @@ async function sampleSB2CPU() {
   if (!refs.sb2CPUValue || !window.spcBoySB2?.processCPUTimeMilliseconds) return;
   let previousCPU = null;
   let previousWall = null;
+  let samplePending = false;
   const sample = async () => {
+    if (samplePending) return;
+    samplePending = true;
     try {
       const cpuMilliseconds = Number(await window.spcBoySB2.processCPUTimeMilliseconds());
       const wallMilliseconds = performance.now();
       if (Number.isFinite(cpuMilliseconds) && previousCPU !== null && previousWall !== null) {
-        // Show this process's use of one logical core, with enough precision
-        // to make the low but steady audio/UI workload visible.
+        // The native bridge reports the SB2 host process in milliseconds.
+        // Keep the one-logical-core percentage precise enough to reveal the
+        // small steady audio workload common during ordinary playback.
         const percent = Math.max(0, Math.min(100,
           ((cpuMilliseconds - previousCPU) / Math.max(1, wallMilliseconds - previousWall)) * 100
         ));
-        refs.sb2CPUValue.textContent = `${percent.toFixed(1)}%`;
+        refs.sb2CPUValue.textContent = `${percent.toFixed(2)}%`;
         refs.sb2CPUFill.style.width = `${percent}%`;
+        refs.sb2CPUFill.parentElement?.setAttribute("aria-valuenow", percent.toFixed(2));
       }
       previousCPU = cpuMilliseconds;
       previousWall = wallMilliseconds;
     } catch (error) {
       console.error("[SPCBOY SB2] CPU sample failed", error);
+    } finally {
+      samplePending = false;
     }
   };
   await sample();
-  window.setInterval(sample, 1_000);
+  window.setInterval(sample, 250);
 }
 
 async function toggleAllSidebarNodes() {
@@ -5383,6 +5392,7 @@ uiApp.ui = {
   setTitlebarTextColor,
   setTitlebarBold,
   setColumnAutoSize,
+  setPlaylistLinkMode,
   setAnimationTiming,
   setAnimationEnabled,
   setWindowAlwaysOnTop,

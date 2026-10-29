@@ -983,6 +983,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                     gameText: track.display.gameText,
                     authorText: track.display.authorText,
                     systemText: track.display.systemText,
+                    yearText: track.display.yearText,
+                    dumperText: track.display.dumperText,
                     pathText: track.sourcePath,
                     lengthMilliseconds: track.lengthMilliseconds
                 )
@@ -1010,6 +1012,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "game": hints.gameText,
             "artist": hints.authorText,
             "system": hints.systemText,
+            "year": hints.yearText,
+            "dumper": hints.dumperText,
             "path": hints.pathText,
             "lengthLabel": hints.lengthText
         ]
@@ -1042,6 +1046,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "gameText": track.display.gameText,
             "authorText": track.display.authorText,
             "systemText": track.display.systemText,
+            "yearText": track.display.yearText,
+            "dumperText": track.display.dumperText,
             "lengthText": track.display.lengthText,
             "archivePath": archivePath ?? NSNull(),
             "archiveEntry": archiveEntry ?? NSNull(),
@@ -1055,6 +1061,8 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             "game": track.game,
             "artist": track.author,
             "system": track.system,
+            "year": track.display.yearText,
+            "dumper": track.display.dumperText,
             "playLengthMs": track.lengthMilliseconds
         ]
     }
