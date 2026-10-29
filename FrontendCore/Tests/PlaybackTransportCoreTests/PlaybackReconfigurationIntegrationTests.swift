@@ -28,6 +28,20 @@ private final class StatusRecorder: @unchecked Sendable {
     func snapshot() -> [PlaybackTransportStatus] { lock.lock(); defer { lock.unlock() }; return values }
 }
 
+@Test func statusSnapshotReadsDoNotPublishEvents() async {
+    let transport = PlaybackTransportCoordinator(label: "test.status.nonemitting")
+    let recorded = StatusRecorder()
+    transport.setStatusHandler { recorded.record($0) }
+    _ = transport.statusSync() // Wait for handler installation and earlier events.
+    recorded.clear()
+    for _ in 0..<8 {
+        _ = await transport.status()
+        _ = transport.statusSync()
+    }
+    _ = transport.statusSync() // Drain events queued by any status reads.
+    #expect(recorded.snapshot().isEmpty)
+}
+
 @Test func sharedReconfigurationRetainsPausedPositionAndGatesUnsupportedTempo() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
