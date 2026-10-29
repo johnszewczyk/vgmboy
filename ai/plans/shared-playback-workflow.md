@@ -6,6 +6,19 @@ Recheck paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Loop seek mapping, 2026-10-29: a regression test showed that seeking to
+  1.75 seconds in a two-repeat 0.25–0.75-second loop incorrectly ended a
+  two-second source at 3.5 seconds instead of 3.0. Session seeking now maps
+  logical elapsed output through completed authored repeats and restores repeat
+  counts on backward seeks; unbounded loops map through their cycle. Authored
+  loop sample bounds also account for the effective native tempo. Four focused
+  shared-transport tests passed for finite, backward, unbounded and reconfigured
+  loops. A generated eight-second VGM at 2× with two half-second source repeats
+  drained at approximately 4.5 seconds; two decoder timeline tests also passed.
+  All 31 PlaybackTransportCore tests and all three frontend Swift builds passed.
+  This does not yet establish source-position preservation across a speed change
+  or sample-identical loop audio, nor does it verify a packaged frontend.
+
 - Controlled tempo timeline, 2026-10-29: `TempoSeekTimelineTests` generates
   an eight-second VGM with a different SN76489 tone each source second. For
   both the installed libgme and the vendored libvgm, after 1× playback followed

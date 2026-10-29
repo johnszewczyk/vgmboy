@@ -313,6 +313,76 @@ func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
     _ = transport.perform(.init(command: .stop))
 }
 
+@Test func seekingInsideRepeatedLoopPreservesLogicalTimeline() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 2).write(to: url)
+    let loop = PlaybackLoopMetadata(
+        startSample: 11_025, endSample: 33_075, sampleRateHz: 44_100,
+        repeatCount: 2, source: "uac-manifest"
+    )
+    let transport = PlaybackTransportCoordinator(label: "test.seek.repeated.loop")
+    let ends = EndRecorder()
+    transport.setNaturalEndHandler { ends.record($0.generation) }
+    let loaded = transport.perform(.init(command: .load, payload: .init(
+        path: url.path, playbackMode: .fileDefault, fadeMilliseconds: 0, loop: loop
+    )))
+    let generation = try #require(loaded.status?.diagnostics.generation)
+    let seek = transport.perform(.init(command: .seek, payload: .init(positionMilliseconds: 1_750)))
+    #expect(seek.kind != .error)
+    #expect(abs((seek.status?.elapsedSeconds ?? 0) - 1.75) < 0.05)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    for _ in 0..<100 where ends.snapshot().isEmpty {
+        try await Task.sleep(for: .milliseconds(50))
+    }
+    #expect(ends.snapshot() == [generation])
+    let status = transport.statusSync()
+    #expect(status.reachedEnd)
+    #expect((2.9...3.1).contains(status.elapsedSeconds))
+    _ = transport.perform(.init(command: .stop))
+}
+
+@Test func seekingBeforeLoopRestoresItsRepeatCount() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 2).write(to: url)
+    let loop = PlaybackLoopMetadata(
+        startSample: 11_025, endSample: 33_075, sampleRateHz: 44_100, repeatCount: 2
+    )
+    let transport = PlaybackTransportCoordinator(label: "test.seek.before.loop")
+    let ends = EndRecorder()
+    transport.setNaturalEndHandler { ends.record($0.generation) }
+    let loaded = transport.perform(.init(command: .load, payload: .init(
+        path: url.path, playbackMode: .fileDefault, fadeMilliseconds: 0, loop: loop
+    )))
+    let generation = try #require(loaded.status?.diagnostics.generation)
+    #expect(transport.perform(.init(command: .seek, payload: .init(positionMilliseconds: 200))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    for _ in 0..<100 where ends.snapshot().isEmpty {
+        try await Task.sleep(for: .milliseconds(50))
+    }
+    #expect(ends.snapshot() == [generation])
+    #expect((2.9...3.1).contains(transport.statusSync().elapsedSeconds))
+    _ = transport.perform(.init(command: .stop))
+}
+
+@Test func unboundedLoopSeekMapsLogicalPosition() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 2).write(to: url)
+    let loop = PlaybackLoopMetadata(startSample: 11_025, endSample: 33_075, sampleRateHz: 44_100)
+    let transport = PlaybackTransportCoordinator(label: "test.seek.unbounded.loop")
+    #expect(transport.perform(.init(command: .load, payload: .init(
+        path: url.path, playbackMode: .fileDefault, fadeMilliseconds: 0, loop: loop
+    ))).kind != .error)
+    let seek = transport.perform(.init(command: .seek, payload: .init(positionMilliseconds: 5_250)))
+    #expect(seek.kind != .error)
+    #expect(abs((seek.status?.elapsedSeconds ?? 0) - 5.25) < 0.05)
+    #expect(seek.status?.reachedEnd == false)
+    #expect((seek.status?.diagnostics.bufferedFrames ?? 0) > 0)
+    _ = transport.perform(.init(command: .stop))
+}
+
 @Test func failedReplacementRetiresOnlyAfterSessionReplacementBegins() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }

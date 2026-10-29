@@ -28,6 +28,41 @@ private func risingCrossings(_ samples: [Float]) -> Int {
     zip(samples, samples.dropFirst()).reduce(0) { $0 + ($1.0 <= 0 && $1.1 > 0 ? 1 : 0) }
 }
 
+private final class TimelineEndRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: PlaybackStatus?
+    func record(_ status: PlaybackStatus) { lock.lock(); value = status; lock.unlock() }
+    func snapshot() -> PlaybackStatus? { lock.lock(); defer { lock.unlock() }; return value }
+}
+
+@Test func authoredLoopBoundsScaleWithNativeTempo() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".vgm")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try timelineVGM().write(to: url)
+    let loop = PlaybackLoopMetadata(startSample: 11_025, endSample: 33_075, sampleRateHz: 44_100, repeatCount: 2)
+    let controller = PlaybackController()
+    let end = TimelineEndRecorder()
+    let token = controller.subscribe { event in
+        if event.kind == .ended, let status = event.status { end.record(status) }
+    }
+    defer {
+        controller.unsubscribe(token)
+        _ = controller.perform(.init(command: .stop))
+    }
+    let loaded = controller.perform(.init(command: .load, payload: .init(
+        path: url.path, tempo: 2, playbackMode: .fileDefault, fadeMilliseconds: 0, loop: loop
+    )))
+    #expect(loaded.kind != .error)
+    #expect(controller.perform(.init(command: .play)).kind != .error)
+    for _ in 0..<140 where end.snapshot() == nil {
+        try await Task.sleep(for: .milliseconds(50))
+    }
+    let finished = try #require(end.snapshot())
+    #expect(finished.diagnostics.bufferedFrames == 0)
+    // Eight source seconds plus two half-second repeats, played at 2×.
+    #expect((4.4...4.6).contains(finished.elapsedSeconds))
+}
+
 @Test func nativeTempoSeekUsesCurrentSpeedPlaybackTime() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".vgm")
     defer { try? FileManager.default.removeItem(at: url) }

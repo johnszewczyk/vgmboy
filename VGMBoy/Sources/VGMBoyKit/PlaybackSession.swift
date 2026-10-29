@@ -118,6 +118,7 @@ final class PlaybackSession: @unchecked Sendable {
     private var currentTrackIndex = 0
     private var decoderFamily: String?
     private var currentTempo = 1.0
+    private var initialLoop: PlaybackLoopMetadata?
     private var playbackLoop: PlaybackLoopMetadata?
     private var remainingLoopRepeats: Int?
     private var longPlayRepeatsVGMAtEnd = false
@@ -247,6 +248,7 @@ final class PlaybackSession: @unchecked Sendable {
             }
 
             self.decoder = decoder
+            initialLoop = validLoop
             playbackLoop = validLoop
             remainingLoopRepeats = validLoop?.repeatCount
             sessionFrames = 0
@@ -291,7 +293,17 @@ final class PlaybackSession: @unchecked Sendable {
             stopRefillTimer()
             reachedEnd = false
             let requestedFrames = Int64(max(0, seconds) * Double(sampleRate))
-            if longPlayRepeatsVGMAtEnd, longPlayVGMTrackFrames > 0 {
+            if let loop = initialLoop, let bounds = loopOutputBounds(loop) {
+                let length = bounds.end - bounds.start
+                let completed = requestedFrames >= bounds.end
+                    ? (requestedFrames - bounds.start) / length : 0
+                let repeats = loop.repeatCount.map { min(completed, Int64(max(0, $0))) } ?? completed
+                let sourceFrames = requestedFrames - repeats * length
+                playbackLoop = loop
+                remainingLoopRepeats = loop.repeatCount.map { max(0, $0 - Int(repeats)) }
+                decoder.seek(milliseconds: Int(sourceFrames * 1_000 / Int64(sampleRate)))
+                sessionFrames = requestedFrames
+            } else if longPlayRepeatsVGMAtEnd, longPlayVGMTrackFrames > 0 {
                 let sourceFrames = requestedFrames % longPlayVGMTrackFrames
                 decoder.seek(milliseconds: Int(sourceFrames * 1_000 / Int64(sampleRate)))
                 sessionFrames = requestedFrames
@@ -588,9 +600,9 @@ final class PlaybackSession: @unchecked Sendable {
               loop.sampleRateHz > 0 else {
             return try decoder.readFrames(requested)
         }
-        let startOutput = Int64((Double(loop.startSample) * Double(sampleRate) / Double(loop.sampleRateHz)).rounded())
-        let endOutput = Int64((Double(loop.endSample) * Double(sampleRate) / Double(loop.sampleRateHz)).rounded())
-        guard endOutput > startOutput else { return try decoder.readFrames(requested) }
+        guard let bounds = loopOutputBounds(loop) else { return try decoder.readFrames(requested) }
+        let startOutput = bounds.start
+        let endOutput = bounds.end
 
         if decoder.absolutePlayedFrames >= endOutput {
             if let remaining = remainingLoopRepeats {
@@ -600,11 +612,18 @@ final class PlaybackSession: @unchecked Sendable {
                 }
                 remainingLoopRepeats = remaining - 1
             }
-            decoder.seek(milliseconds: Int((Double(loop.startSample) * 1_000 / Double(loop.sampleRateHz)).rounded()))
+            decoder.seek(milliseconds: Int((Double(startOutput) * 1_000 / Double(sampleRate)).rounded()))
         }
 
         let available = max(1, endOutput - decoder.absolutePlayedFrames)
         return try decoder.readFrames(min(requested, Int(min(Int64(requested), available))))
+    }
+
+    private func loopOutputBounds(_ loop: PlaybackLoopMetadata) -> (start: Int64, end: Int64)? {
+        let scale = Double(sampleRate) / Double(loop.sampleRateHz) / currentTempo
+        let start = Int64((Double(loop.startSample) * scale).rounded())
+        let end = Int64((Double(loop.endSample) * scale).rounded())
+        return end > start ? (start, end) : nil
     }
 
     private func releaseCurrent() {
@@ -617,6 +636,7 @@ final class PlaybackSession: @unchecked Sendable {
         decoder = nil
         decoderFamily = nil
         currentTempo = 1
+        initialLoop = nil
         playbackLoop = nil
         remainingLoopRepeats = nil
         longPlayRepeatsVGMAtEnd = false
