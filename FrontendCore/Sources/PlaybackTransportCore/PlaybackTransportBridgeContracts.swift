@@ -299,12 +299,22 @@ public struct PlaybackTimingPreview: Codable, Equatable, Sendable {
     ) {
         self.preFadeSeconds = max(0, preFadeSeconds)
         self.fadeSeconds = max(0, fadeSeconds)
-        self.totalSeconds = self.preFadeSeconds > 0 ? self.preFadeSeconds + self.fadeSeconds : 0
-        self.preFadeMilliseconds = max(0, preFadeMilliseconds ?? self.preFadeSeconds * 1_000)
-        self.fadeMilliseconds = max(0, fadeMilliseconds ?? self.fadeSeconds * 1_000)
-        self.totalMilliseconds = self.preFadeMilliseconds > 0 ? self.preFadeMilliseconds + self.fadeMilliseconds : 0
+        self.totalSeconds = self.preFadeSeconds > 0 ? Self.saturatingAdd(self.preFadeSeconds, self.fadeSeconds) : 0
+        self.preFadeMilliseconds = max(0, preFadeMilliseconds ?? Self.saturatingMilliseconds(self.preFadeSeconds))
+        self.fadeMilliseconds = max(0, fadeMilliseconds ?? Self.saturatingMilliseconds(self.fadeSeconds))
+        self.totalMilliseconds = self.preFadeMilliseconds > 0 ? Self.saturatingAdd(self.preFadeMilliseconds, self.fadeMilliseconds) : 0
         self.isLongPlay = isLongPlay
         self.usesNativeEnding = usesNativeEnding
+    }
+
+    private static func saturatingAdd(_ lhs: Int, _ rhs: Int) -> Int {
+        let (value, overflow) = lhs.addingReportingOverflow(rhs)
+        return overflow ? Int.max : value
+    }
+
+    private static func saturatingMilliseconds(_ seconds: Int) -> Int {
+        let (value, overflow) = seconds.multipliedReportingOverflow(by: 1_000)
+        return overflow ? Int.max : value
     }
 
     private enum CodingKeys: String, CodingKey {
