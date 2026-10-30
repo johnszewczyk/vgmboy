@@ -26,6 +26,9 @@ newer playback generation cancels either path.
 Late timing replies from older settings cannot repopulate the plan cache.
 Fade-out and queued-skip restoration requests carry their originating native
 generation, so a delayed output ramp cannot modify a replacement session.
+Both queued-skip timer paths share a status check; if that check fails, the
+current queued skip is canceled and its originating session is asked to restore
+gain. A late failure cannot cancel a newer queued skip.
 Start, stop, unload and cache-clear operations reserve playback request
 ownership at WebKit message receipt, before detached workers can reorder them;
 the shared transport rejects a superseded start or stop.

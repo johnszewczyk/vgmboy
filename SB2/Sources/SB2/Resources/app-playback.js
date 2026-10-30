@@ -1056,6 +1056,32 @@ function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playba
   });
 }
 
+async function completeQueuedSkip() {
+  const request = queuedSkipRequest;
+  if (!request || request.generation !== playbackGeneration) return;
+  let snapshot;
+  try {
+    snapshot = await window.spcBoySB2.nativePlaybackState();
+  } catch (error) {
+    // A failed status lookup must not strand the retained session at zero gain.
+    // Only cancel the request that initiated the lookup; a newer skip owns its
+    // own envelope and must be left alone.
+    if (request === queuedSkipRequest && request.generation === playbackGeneration) {
+      await cancelQueuedSkip({ restoreOutput: true });
+    }
+    throw error;
+  }
+  if (request !== queuedSkipRequest || request.generation !== playbackGeneration) return;
+  if (request.nativeGeneration > 0
+      && Number(snapshot?.generation) !== request.nativeGeneration) {
+    await cancelQueuedSkip({ restoreOutput: true });
+    return;
+  }
+  queuedSkipTimer = 0;
+  // Share the native one-shot completion claim with a simultaneous natural end.
+  await finalizePlaybackEnded();
+}
+
 async function playTrackWithFadedSkip(trackId, startSeconds = 0, playbackOptions = null) {
   const track = (playbackOptions?.pendingQueue || playbackPlaylist()).find((entry) => entry.id === trackId);
   if (!track) return;
@@ -1085,19 +1111,7 @@ async function playTrackWithFadedSkip(trackId, startSeconds = 0, playbackOptions
     console.error("[SPCBoy] faded playlist activation failed", error);
   });
   queuedSkipTimer = window.setTimeout(() => {
-    void (async () => {
-      const request = queuedSkipRequest;
-      if (!request || request.generation !== playbackGeneration) return;
-      const snapshot = await window.spcBoySB2.nativePlaybackState();
-      if (request !== queuedSkipRequest || request.generation !== playbackGeneration) return;
-      if (request.nativeGeneration > 0
-          && Number(snapshot?.generation) !== request.nativeGeneration) {
-        await cancelQueuedSkip({ restoreOutput: true });
-        return;
-      }
-      queuedSkipTimer = 0;
-      await finalizePlaybackEnded();
-    })().catch((error) => console.error("[SPCBoy] faded playlist activation failed", error));
+    void completeQueuedSkip().catch((error) => console.error("[SPCBoy] faded playlist activation failed", error));
   }, fadeDurationMs);
 }
 
@@ -1179,22 +1193,7 @@ async function playAdjacentNow(delta) {
     console.error(error);
   });
   queuedSkipTimer = window.setTimeout(() => {
-    void (async () => {
-      const request = queuedSkipRequest;
-      if (!request || request.generation !== playbackGeneration) return;
-      const snapshot = await window.spcBoySB2.nativePlaybackState();
-      if (request !== queuedSkipRequest || request.generation !== playbackGeneration) return;
-      if (request.nativeGeneration > 0
-          && Number(snapshot?.generation) !== request.nativeGeneration) {
-        await cancelQueuedSkip({ restoreOutput: true });
-        return;
-      }
-      queuedSkipTimer = 0;
-      // Route timer completion through the same single-flight finalizer as a
-      // natural end, so an end event arriving on the same callback cannot
-      // advance the playlist twice.
-      await finalizePlaybackEnded();
-    })().catch((error) => console.error("[SPCBoy] faded skip failed", error));
+    void completeQueuedSkip().catch((error) => console.error("[SPCBoy] faded skip failed", error));
   }, fadeDurationMs);
 }
 
