@@ -44,6 +44,14 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- SB2 pause failure, 2026-10-30: a rejected native Pause after the fade could
+  leave a still-running session at zero gain. A focused renderer check
+  reproduced the missing restore; SB2 now requests a generation-guarded gain
+  restore for the still-current pause, leaves newer intents alone and preserves
+  the original error if restoration also fails. These are simulated bridge
+  checks, not packaged or audible evidence. Native builds remain deferred to
+  avoid recreating large caches during disk-space recovery.
+
 - SB2 stale start error, 2026-10-30: an older failed start could show its error
   after a newer playback intent began. A renderer check reproduced the stale
   toast; errors now display only for the current intent, including after an

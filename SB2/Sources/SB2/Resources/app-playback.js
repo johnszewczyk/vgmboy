@@ -1246,6 +1246,12 @@ async function togglePlayback() {
       updatePlaybackReadout();
       return;
     } catch (error) {
+      if (generation === playbackGeneration && nativePlaybackInitialized && state.nativePlayback?.trackLoaded) {
+        try {
+          await window.spcBoySB2.nativePlaybackRampGain({ outputGain: 1, rampMilliseconds: TRANSPORT_DECLICK_MS,
+            expectedGeneration });
+        } catch {}
+      }
       throw error;
     }
   }
