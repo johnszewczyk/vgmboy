@@ -25,7 +25,7 @@ function harness(ramp) {
     const completeQueuedSkip = async () => { queuedSkipRequest.completing = true; completions.push(true); };
     ${fade}
     ${schedule}
-    return { start: () => scheduleQueuedSkipFade(queuedSkipRequest, 6000, 'failed'),
+    return { start: () => scheduleQueuedSkipFade(queuedSkipRequest, { durationMilliseconds: 6000, fallbackMilliseconds: 8000 }, 'failed'),
       cancel: () => { queuedSkipRequest = null; clearQueuedSkipTimer(); }, supersede: () => { playbackGeneration++; clearQueuedSkipTimer(); } };
   `)(ramp, timers, completions);
   return { ...run, timers, completions };

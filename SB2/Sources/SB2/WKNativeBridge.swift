@@ -239,6 +239,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             playbackQueueAdjacent: (...args) => request("playbackQueueAdjacent", args),
             playbackCompletionRetire: (...args) => request("playbackCompletionRetire", args),
             playbackFadeDuration: (...args) => request("playbackFadeDuration", args),
+            playbackFadePlan: (...args) => request("playbackFadePlan", args),
             favoritesList: (...args) => request("favoritesList", args),
             favoritesToggle: (...args) => request("favoritesToggle", args),
             favoritesRevision: () => request("favoritesRevision"),
@@ -659,7 +660,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 from: JSONSerialization.data(withJSONObject: payload)
             )
             return try Self.object(request.response)
-        case "playbackFadeDuration":
+        case "playbackFadeDuration", "playbackFadePlan":
             guard let payload = args.first as? [String: Any],
                   JSONSerialization.isValidJSONObject(payload) else {
                 throw BridgeError.invalidArguments
@@ -668,6 +669,10 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                 PlaybackQueuedSkipFadeRequest.self,
                 from: JSONSerialization.data(withJSONObject: payload)
             )
+            if method == "playbackFadePlan" {
+                guard let plan = request.plan else { return NSNull() }
+                return try Self.object(plan)
+            }
             return request.durationMilliseconds ?? NSNull()
         case "favoritesList":
             return try favoriteResponses(FavoriteStore().snapshots(), order: favoriteSortOrder(args.first))

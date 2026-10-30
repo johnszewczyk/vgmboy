@@ -129,8 +129,11 @@ startup contracts shared by the VGMMan player frontends.
 - `PlaybackQueuedSkipFadeRequest` carries the complete faded-track-change
   policy input used by CocoaSpice and SB2 for playlist activation
   and Previous/Next. The shared request returns the bounded duration in seconds
-  or milliseconds. Each renderer owns its delayed target handoff and
-  cancellation; both reach the same VGMBoy output-gain ramp command.
+  or milliseconds. Its optional `PlaybackQueuedSkipFadePlan` adds integer
+  milliseconds and a two-second bridge-reply fallback, bounded to the WebKit
+  timer range; the audio device validates its own ramp capacity. Each renderer
+  owns its delayed target handoff and cancellation; both reach the same VGMBoy
+  output-gain ramp command. Duration-only callers remain supported.
 - FrontendCore does not decode audio, ramp output gain, store UI models, or own
   renderer focus and selection.
 - `FrontendPlaylistColumnSchema` normalizes persisted layout/sort inputs before

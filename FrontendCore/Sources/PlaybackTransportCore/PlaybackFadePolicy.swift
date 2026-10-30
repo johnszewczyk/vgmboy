@@ -1,5 +1,12 @@
 import Foundation
 
+/// Portable millisecond schedule for a queued fade and its bridge-reply fallback.
+/// The fallback fits WebKit timer bounds; the audio device validates its ramp.
+public struct PlaybackQueuedSkipFadePlan: Codable, Equatable, Sendable {
+    public let durationMilliseconds: Int
+    public let fallbackMilliseconds: Int
+}
+
 /// Typed transport facts used to decide whether a user-requested track change
 /// should use the shared bounded fade. Playlist activation and adjacent
 /// navigation submit this same value instead of unpacking parallel policy
@@ -45,6 +52,18 @@ public struct PlaybackQueuedSkipFadeRequest: Codable, Equatable, Sendable {
 
     public var durationMilliseconds: TimeInterval? {
         duration.map { $0 * 1_000 }
+    }
+
+    /// Round up sub-millisecond fades and keep the fallback timer representable.
+    /// Existing duration-only callers retain their original contract.
+    public var plan: PlaybackQueuedSkipFadePlan? {
+        guard let milliseconds = durationMilliseconds, milliseconds.isFinite, milliseconds > 0 else { return nil }
+        let graceMilliseconds = 2_000
+        let maxDuration = Int(Int32.max) - graceMilliseconds
+        guard milliseconds <= Double(maxDuration) else { return nil }
+        let duration = Int(milliseconds.rounded(.up))
+        return PlaybackQueuedSkipFadePlan(durationMilliseconds: duration,
+                                          fallbackMilliseconds: duration + graceMilliseconds)
     }
 }
 

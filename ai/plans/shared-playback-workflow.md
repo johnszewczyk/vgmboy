@@ -45,6 +45,15 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Shared queued-fade schedule, 2026-10-30: FrontendCore now produces a typed
+  integral ramp duration and bounded fallback timer; SB2 passes this shared plan
+  through both activation and adjacent navigation instead of choosing its own
+  grace period. The legacy duration-only bridge remains available. Fractional
+  milliseconds round up, invalid or unrepresentable schedules are declined,
+  and timer ownership and target handoff remain in the renderer for now. All
+  53 shared transport tests, 62 SB2 playback checks and the SB2 debug build
+  passed with the disk guard. Packaged and audible verification remain open.
+
 - Fresh VGMBoy suite, 2026-10-30: all 96 tests across 10 suites passed at
   `ba293c0c` using the rebuilt dependencies and a separate two-job scratch build.
   Coverage includes live transport pause/seek/resume, decoder fade and loop
