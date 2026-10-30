@@ -12,10 +12,11 @@ paths, working-tree changes, and findings before continuing.
 The checkpoints below are historical; later entries may resolve earlier gaps.
 The remaining work is grouped by the current SB2-first scope:
 
-1. Verify the current SB2 faded handoff in a packaged app: prove the fade is
-   queued before a missing or valid replacement; exercise a second Next/Previous,
-   direct selection, old-session end during preparation, and newer stop/start.
-   Check track identity, output gain, queue and history, not just the clock.
+1. Extend packaged SB2 faded-handoff verification to the current renderer:
+   an earlier instrumented build proved a queued fade, repeated Next, a missing
+   target, a valid selection and Stop. Still exercise old-session end during
+   preparation, newer start/stop and the latest timer changes. Check track
+   identity, output gain, queue and history, not just the clock.
 2. Assess what remains duplicated between SB2's renderer and shared transport,
    especially queued-fade lifecycle and cancellation. Move UI-neutral ownership
    to FrontendCore where its contract can preserve the existing queue behavior;
@@ -43,6 +44,13 @@ No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
+
+- Fresh VGMBoy suite, 2026-10-30: all 96 tests across 10 suites passed at
+  `ba293c0c` using the rebuilt dependencies and a separate two-job scratch build.
+  Coverage includes live transport pause/seek/resume, decoder fade and loop
+  timing, producer failure cleanup and AAC tempo. The 12 GiB stop guard stayed
+  active; the scratch build used about 375 MB and roughly 24 GiB remained free.
+  Package tests do not establish packaged SB2 races or audible continuity.
 
 - Bounded slow-archive verification, 2026-10-30: after dependency cleanup, a
   fresh native build at `b204a2b2` used a 12 GiB free-space stop guard, reduced
