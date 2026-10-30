@@ -33,6 +33,10 @@ Pause, resume and seek carry the native session generation captured at the
 start of the renderer operation; stale controls are rejected by shared transport.
 The native bridge also stamps seek revisions at message receipt, before worker
 dispatch, so the shared transport can reject an older seek for the same session.
+For immediate replacement, SB2 keeps the prior native session and presentation
+identity while shared source preparation runs. It adopts the new track and a
+staged cross-tab queue after native start succeeds. On failure it checks native
+status before cleanup; an unchanged loaded generation remains active.
 
 ## Playback completion
 
