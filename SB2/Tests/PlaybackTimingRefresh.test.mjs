@@ -68,6 +68,7 @@ test('stopping shows the selected track timing rather than the manual default', 
   const state = { currentTrackId: 'one', currentTrackInfo: {}, isPlaying: true, elapsedSeconds: 12 };
   const run = new Function('state', `
     let queuedSkipRequest = {}, playbackGeneration = 0, playbackWindow = {};
+    const cancelPlaybackIntent = () => {};
     const clearQueuedSkipTimer = () => {}, stopAllOutput = async () => {};
     const setPlaybackPowerSaveBlocker = async () => {};
     const targetPlaybackSeconds = () => 186, activeTrackInfo = () => ({ id: 'one' });

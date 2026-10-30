@@ -23,6 +23,37 @@ let playbackClockHandle = 0;
 let playbackClockUsesAnimationFrame = false;
 let nativeClockAnchor = null;
 const timingPlans = new Map();
+let pendingPlaybackIntent = null;
+let deferredNativeEnds = [];
+
+function beginPlaybackIntent(trackId = null) {
+  const intent = { trackId };
+  pendingPlaybackIntent = intent;
+  return intent;
+}
+
+async function finishPlaybackIntent(intent) {
+  if (pendingPlaybackIntent !== intent) return;
+  pendingPlaybackIntent = null;
+  const deferred = deferredNativeEnds.find(item => state.currentTrackId === item.trackId
+    && Number(state.nativePlayback?.generation) === item.nativeGeneration);
+  deferredNativeEnds = [];
+  if (deferred) {
+    // A start reply may already report this generation as ended with a newer
+    // sequence than the one-shot event. Preserve that confirmed end while
+    // still letting ordinary stale-event checks reject a resumed session.
+    const event = state.nativePlayback?.transportState === "ended"
+      ? { ...deferred.event, status_sequence: Math.max(Number(deferred.event.status_sequence) || 0,
+          Number(state.nativePlayback.statusSequence) || 0) }
+      : deferred.event;
+    await handleNativePlaybackEnded(event);
+  }
+}
+
+function cancelPlaybackIntent() {
+  pendingPlaybackIntent = null;
+  deferredNativeEnds = [];
+}
 
 function clearPlaybackError() {
   window.clearTimeout(playbackErrorTimer);
@@ -601,6 +632,15 @@ async function handleNativePlaybackEnded(event) {
   const generation = playbackGeneration;
   const expectedNativeGeneration = Number(state.nativePlayback?.generation) || 0;
   const observedNativeGeneration = Number(event?.generation) || 0;
+  if (pendingPlaybackIntent && observedNativeGeneration > 0 && event?.transport_state === "ended") {
+    const trackId = observedNativeGeneration === expectedNativeGeneration && state.currentTrackId
+      ? state.currentTrackId : pendingPlaybackIntent.trackId;
+    if (trackId) {
+      deferredNativeEnds = deferredNativeEnds.filter(item => item.nativeGeneration !== observedNativeGeneration);
+      deferredNativeEnds.push({ event, trackId, nativeGeneration: observedNativeGeneration });
+    }
+    return;
+  }
   if (!activeTrackInfo() || !state.currentTrackId
       || (expectedNativeGeneration > 0
           && observedNativeGeneration > 0
@@ -802,6 +842,7 @@ async function continueAfterPlaybackRetirement({
 }
 
 async function stopPlaybackState({ declick = true, keepNativeOutput = false, nativeAlreadyRetired = false } = {}) {
+  cancelPlaybackIntent();
   queuedSkipRequest = null;
   clearQueuedSkipTimer();
   const generation = ++playbackGeneration;
@@ -987,6 +1028,7 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
 
 function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playbackOptions = null) {
   clearPlaybackError();
+  const intent = beginPlaybackIntent(trackId);
   const replacingQueuedSkip = !preserveQueuedSkip && Boolean(queuedSkipRequest);
   if (!preserveQueuedSkip) {
     queuedSkipRequest = null;
@@ -1006,7 +1048,7 @@ function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playba
   } else {
     request = playTrackNow(trackId, startSeconds, requestOptions);
   }
-  return Promise.resolve(request).catch((error) => {
+  return Promise.resolve(request).finally(() => finishPlaybackIntent(intent)).catch((error) => {
     showPlaybackError(error);
     throw error;
   });
@@ -1084,7 +1126,8 @@ async function advanceToAdjacent(delta, generation = playbackGeneration) {
 }
 
 function playAdjacent(delta) {
-  return playAdjacentNow(delta).catch((error) => {
+  const intent = beginPlaybackIntent();
+  return playAdjacentNow(delta).finally(() => finishPlaybackIntent(intent)).catch((error) => {
     console.error("[SPCBoy] adjacent playback failed", error);
   });
 }

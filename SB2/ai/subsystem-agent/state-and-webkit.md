@@ -42,6 +42,9 @@ status before cleanup; an unchanged loaded generation remains active.
 
 After native completion retirement returns, advance only while the same track,
 frontend playback generation and native generation remain current.
+During an explicit start or navigation, defer native end events until that
+intent settles. Replay only an event matching the accepted or retained track and
+generation, including an incoming track that ended before its start reply.
 
 ## Preferences
 
