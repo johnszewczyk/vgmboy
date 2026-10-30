@@ -328,6 +328,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     private var latestPlaybackRequest = 0
     private var settingsRevisionCounter = 0
     private var seekRevisionCounter = 0
+    private var rampRevisionCounter = 0
     private var currentTrack: PlaybackTransportTrack?
     private var currentPlaybackPlan = PlaybackTimingPlan(
         preFadeSeconds: PlaybackTimingPreferences.defaultUnknownDurationSeconds,
@@ -341,6 +342,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     private var currentTrackStartGeneration: Int?
     private var latestSettingsRevision: Int?
     private var latestSeekRevision: Int?
+    private var latestRampRevision: Int?
     private var nextStatusSequence: UInt64 = 0
     private var naturalEndGate = PlaybackNaturalEndGate()
     private let continuationCoordinator = PlaybackContinuationCoordinator()
@@ -393,6 +395,14 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         defer { requestLock.unlock() }
         seekRevisionCounter += 1
         return seekRevisionCounter
+    }
+
+    /// Reserve before dispatch so fade and restore commands retain host receipt order.
+    public func reserveRampRevision() -> Int {
+        requestLock.lock()
+        defer { requestLock.unlock() }
+        rampRevisionCounter += 1
+        return rampRevisionCounter
     }
 
     public func invalidatePlaybackRequests() {
@@ -513,6 +523,11 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             if let expected = request.expectedGeneration,
                expected != currentPlaybackGeneration {
                 throw CancellationError()
+            }
+            if let revision = request.rampRevision {
+                guard request.expectedGeneration != nil, revision > 0,
+                      latestRampRevision.map({ revision > $0 }) ?? true else { throw CancellationError() }
+                latestRampRevision = revision
             }
             let event = controller.perform(.init(command: .rampOutputGain, payload: request.payload))
             try requireSuccess(event)

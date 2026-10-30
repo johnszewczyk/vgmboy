@@ -33,6 +33,8 @@ newer playback generation cancels either path.
 Late timing replies from older settings cannot repopulate the plan cache.
 Fade-out and queued-skip restoration requests carry their originating native
 generation, so a delayed output ramp cannot modify a replacement session.
+The native bridge assigns ramp revisions at message receipt, allowing shared
+transport to reject an older fade after a newer restore for the same session.
 Both queued-skip timer paths share a status check; if that check fails, the
 current queued skip is canceled and its originating session is asked to restore
 gain. A late failure cannot cancel a newer queued skip.

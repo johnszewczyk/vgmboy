@@ -44,6 +44,20 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Ordered SB2 output ramps, 2026-10-30: with fades active, detached native
+  workers can reorder fade and restore requests for the same generation. SB2
+  now reserves a shared transport ramp revision at message receipt, and the
+  coordinator rejects an older numbered request on its serialized queue.
+  Legacy unnumbered calls remain supported. A native integration check sends a
+  newer restore before an older fade, verifies rejection and exercises later
+  and legacy requests. The full shared transport suite passed 52 tests, the
+  SB2 renderer suite passed 50, and SB2 built. This deterministically tests
+  command ordering. An isolated release app with test-only fade tracing queued
+  a 6,000 ms fade, accepted repeated Next, showed the missing-source error and
+  kept the original WAV's clock moving from 0:07 to 0:09. Stop during a later
+  queued fade stayed stopped beyond the six-second timer. This did not force
+  detached-worker reordering or measure the audible envelope.
+
 - SB2 scalar bridge replies and faded handoff, 2026-10-30: an instrumented
   isolated package using `3656a811` and temporary state showed a valid shared
   fade request returning null: the host serializer rejected top-level numbers.

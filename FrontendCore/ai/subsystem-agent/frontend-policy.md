@@ -89,7 +89,9 @@ startup contracts shared by the VGMMan player frontends.
 - Renderer output-gain ramps may carry an expected native generation. The
   shared coordinator checks it on the transport queue before touching output,
   rejecting a ramp for a retired or replaced session; requests without the
-  field retain their legacy behavior.
+  field retain their legacy behavior. An optional host-reserved ramp revision
+  orders same-session ramps before detached dispatch; older revisions are
+  rejected on the transport queue. Numbered ramps require a generation.
 - Conditional stop has asynchronous and synchronous entry points; both check
   the latest reserved playback request on the transport queue before retirement.
 - Session-scoped pause, resume and seek commands optionally carry the expected
