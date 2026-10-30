@@ -22,7 +22,7 @@ function harness({ fade = async () => {}, start = async () => {}, navigate = asy
       playbackQueueAdjacent: request => { events.push(['navigate', request]); return navigate(request); },
       nativePlaybackRampGain: async request => events.push(['ramp', request]) } };
     const clearQueuedSkipTimer = () => events.push(['clear']);
-    const fadeActiveOutput = ms => { events.push(['fade', ms]); return fade(); };
+    const fadeActiveOutput = (ms, options) => { events.push(['fade', ms, options]); return fade(); };
     const beginPlaybackIntent = () => ({}), finishPlaybackIntent = async () => {};
     const cancelQueuedSkip = async value => { events.push(['cancel', value]); queuedSkipRequest = null; };
     const playTrack = (...args) => { playbackGeneration++; events.push(['start', ...args]); return start(); };
@@ -57,4 +57,12 @@ test('a newer intent during the short fade cancels the older navigation', async 
   const old = run.playAdjacentNow(1);
   run.supersede(); fade.resolve(); await old;
   assert.equal(run.events.some(event => event[0] === 'navigate' || event[0] === 'start'), false);
+});
+
+test('repeated navigation fades only the queued native session', async () => {
+  const run = harness();
+  run.state.nativePlayback.generation = 43;
+  await run.playAdjacentNow(1);
+  assert.deepEqual(run.events.find(event => event[0] === 'fade'),
+    ['fade', 10, { expectedGeneration: 42 }]);
 });

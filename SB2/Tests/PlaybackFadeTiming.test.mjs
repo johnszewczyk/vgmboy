@@ -11,12 +11,12 @@ function section(startMarker, endMarker) {
 const fade = section('async function fadeActiveOutput(', '\nfunction clearQueuedSkipTimer(');
 const schedule = section('function scheduleQueuedSkipFade(', '\nfunction monotonicNow(');
 function deferred() { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; }
-function harness(ramp) {
+function harness(ramp, currentGeneration = 42) {
   const timers = [], completions = [];
-  const run = new Function('ramp', 'timers', 'completions', `
+  const run = new Function('ramp', 'timers', 'completions', 'currentGeneration', `
     let playbackGeneration = 7, queuedSkipTimer = 0, nativePlaybackInitialized = true;
     let queuedSkipRequest = { generation: 7, nativeGeneration: 42 };
-    const TRANSPORT_DECLICK_MS = 10, state = { nativePlayback: { generation: 42 } };
+    const TRANSPORT_DECLICK_MS = 10, state = { nativePlayback: { generation: currentGeneration } };
     const activeTrackInfo = () => ({ id: 'one' }), waitForAudioEnvelope = async () => {};
     const window = { spcBoySB2: { nativePlaybackRampGain: ramp },
       setTimeout: (callback, duration) => { timers.push({ callback, duration, canceled: false }); return timers.length; },
@@ -27,7 +27,7 @@ function harness(ramp) {
     ${schedule}
     return { start: () => scheduleQueuedSkipFade(queuedSkipRequest, { durationMilliseconds: 6000, fallbackMilliseconds: 8000 }, 'failed'),
       cancel: () => { queuedSkipRequest = null; clearQueuedSkipTimer(); }, supersede: () => { playbackGeneration++; clearQueuedSkipTimer(); } };
-  `)(ramp, timers, completions);
+  `)(ramp, timers, completions, currentGeneration);
   return { ...run, timers, completions };
 }
 
@@ -45,6 +45,13 @@ test('queued fade interval begins after the native ramp reply', async () => {
   run.timers[1].callback();
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(run.completions.length, 1);
+});
+
+test('queued fade addresses its captured generation even if the snapshot changes', async () => {
+  const requests = [], run = harness(async request => { requests.push(request); }, 43);
+  run.start();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(requests[0].expectedGeneration, 42);
 });
 
 test('cancellation and supersession do not arm a delayed fade timer', async () => {

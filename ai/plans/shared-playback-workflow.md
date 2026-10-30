@@ -45,6 +45,14 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Queued-fade session binding, 2026-10-30: SB2 now sends the native
+  generation captured by the queued skip for both its scheduled fade and
+  repeated-navigation short fade. A newer native snapshot cannot redirect the
+  old skip's gain command to a different session; the existing shared
+  transport generation guard rejects the stale command. All 64 SB2 playback
+  renderer checks passed, including captured-generation regressions. This is
+  simulated bridge evidence; packaged races and audible output remain open.
+
 - Shared timing-preview overflow, 2026-10-30: the public preview value and
   its Codable path could overflow while deriving totals and legacy millisecond
   fields, even though preview requests already had native input bounds. Those
