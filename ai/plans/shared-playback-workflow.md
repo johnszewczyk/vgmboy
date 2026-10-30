@@ -9,6 +9,29 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Open SB2 replacement handoff, 2026-10-29: with Faded Skip disabled, an
+  isolated SB2 bundle based on `4c62c869` played a valid 30-second WAV. A
+  double-click on an unavailable ZIP member showed the expected missing-source
+  error, but the previous WAV stopped; selecting the valid WAV again restarted
+  it. SB2's `playTrackNow` calls `stopAllOutput` and clears the native snapshot
+  before submitting the replacement, so the shared controller's pre-load
+  preservation cannot protect that session. This is a confirmed frontend gap.
+  The follow-up must retain the old identity and native session through source
+  preparation, hand off to the new identity only after accepted start, and
+  distinguish preparation failure from a failed replacement after native
+  retirement. Cover stale status/end, newer start/stop, and faded-skip behavior
+  before removing the frontend unload; verify the packaged reproduction and
+  audible transition rather than assuming the shared guard alone fixes it.
+
+- Packaged SB2 failure and recovery, 2026-10-29: an isolated SB2 bundle based
+  on `4c62c869`, with temporary user data and a two-game test catalog, showed
+  a playback-failed message for a missing WAV. A subsequent valid 30-second
+  WAV started, its displayed clock advanced to 0:04, and isolated history
+  recorded the valid source without recording the failed attempt. Valid WAV
+  SHA-256: `16fa5b7e500f1e23848800a953a097eb7815400a5885af18ca6d38c436914d93`.
+  This resolves the earlier missing-WAV UI evidence gap; it does not exercise
+  archive preparation failure, every retry sequence, or audible output.
+
 - Whole-second timing bounds, 2026-10-29: extreme public timing plans could
   overflow while summing seconds or converting them to milliseconds before the
   native validation boundary. Plan totals now saturate on integer overflow;
