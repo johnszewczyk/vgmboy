@@ -23,6 +23,9 @@ finite AAC export; it has no catalog, queue, or UI policy.
   routes the required archive operation, prepares format dependencies, and
   holds the temporary result for the active playback session. AAC export uses
   the same preparation rules in an independent temporary session.
+- Playback source preparation also returns the selected UAC member's validated
+  authored loop, if present. An absent UAC loop remains absent; member FLAC or
+  APE tags do not fill it. AAC export currently does not apply authored loops.
 - UAC manifest, seek-table, and member-range validation remain in
   `UACWrapperCore`; `UACZstandardCLIFrameCodec` supplies bounded Zstandard
   frame decoding. Seekable UAC selected-member reads use only frames that

@@ -4,6 +4,7 @@ import Foundation
 enum VgmstreamDecoderError: LocalizedError {
     case createFailed(String)
     case trackSelectionFailed(String)
+    case renderFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -11,6 +12,8 @@ enum VgmstreamDecoderError: LocalizedError {
             "vgmstream could not open the file. \(message)"
         case .trackSelectionFailed(let message):
             "vgmstream could not select the subsong. \(message)"
+        case .renderFailed(let message):
+            "vgmstream could not render audio. \(message)"
         }
     }
 }
@@ -137,19 +140,26 @@ final class VgmstreamDecoder: AudioDecoder, @unchecked Sendable {
         vgmstream_player_track_ended(handle) != 0
     }
 
-    func readFrames(_ frameCount: Int) -> (left: [Float], right: [Float]) {
+    func readFrames(_ frameCount: Int) throws -> (left: [Float], right: [Float]) {
         let interleaved = UnsafeMutablePointer<Int16>.allocate(capacity: frameCount * 2)
         defer { interleaved.deallocate() }
         var renderedFrames: Int32 = 0
         var error: UnsafeMutablePointer<CChar>?
-        _ = vgmstream_player_render_s16(handle, Int32(frameCount), interleaved, &renderedFrames, &error)
+        guard vgmstream_player_render_s16(handle, Int32(frameCount), interleaved, &renderedFrames, &error) == 0 else {
+            let message = error.map { String(cString: $0) } ?? "Unknown vgmstream error."
+            if let error { vgmstream_error_message_free(error) }
+            throw VgmstreamDecoderError.renderFailed(message)
+        }
         if let error { vgmstream_error_message_free(error) }
-        let rendered = max(0, Int(renderedFrames))
+        let rendered = Int(renderedFrames)
+        guard rendered >= 0, rendered <= frameCount else {
+            throw VgmstreamDecoderError.renderFailed("The decoder returned an invalid frame count.")
+        }
         absoluteFrames += Int64(rendered)
 
-        var left = [Float](repeating: 0, count: frameCount)
-        var right = [Float](repeating: 0, count: frameCount)
-        for index in 0..<min(rendered, frameCount) {
+        var left = [Float](repeating: 0, count: rendered)
+        var right = [Float](repeating: 0, count: rendered)
+        for index in 0..<rendered {
             left[index] = Float(interleaved[index * 2]) / 32768.0
             right[index] = Float(interleaved[index * 2 + 1]) / 32768.0
         }

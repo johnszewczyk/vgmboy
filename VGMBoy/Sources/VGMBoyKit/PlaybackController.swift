@@ -261,6 +261,8 @@ public final class PlaybackController: @unchecked Sendable {
         }
         let archiveEntry = payload.archiveEntry?.trimmingCharacters(in: .whitespacesAndNewlines)
         let playablePath: String
+        var uacMember = false
+        var uacLoop: PlaybackLoopMetadata?
         var nextArchiveMaterializer: ArchiveMaterializer?
         defer { nextArchiveMaterializer?.release() }
         if let archiveEntry, !archiveEntry.isEmpty {
@@ -269,11 +271,18 @@ public final class PlaybackController: @unchecked Sendable {
             }
             let materializer = ArchiveMaterializer()
             nextArchiveMaterializer = materializer
-            playablePath = try materializer.materialize(
+            let prepared = try materializer.materializeSource(
                 archivePath: path,
                 entry: archiveEntry,
                 requirement: requirement
-            ).path
+            )
+            playablePath = prepared.url.path
+            uacMember = prepared.isUAC
+            if let loop = prepared.authoredLoop {
+                uacLoop = PlaybackLoopMetadata(startSample: loop.startSamples, endSample: loop.endSamples,
+                                               sampleRateHz: loop.sampleRateHz, repeatCount: loop.repeatCount,
+                                               source: loop.source ?? "uac-manifest")
+            }
         } else {
             nextArchiveMaterializer = nil
             playablePath = path
@@ -286,7 +295,12 @@ public final class PlaybackController: @unchecked Sendable {
         guard trackIndex >= 0, let family = FormatRegistry.family(for: playablePath) else {
             throw PlaybackControlError.invalidPayload("Track index must be non-negative and the file format must be supported.")
         }
-        let loop = payload.loop ?? (sourceData == nil ? PlaybackLoopTagReader.read(path: playablePath) : PlaybackLoopTagReader.read(data: sourceData ?? Data(), extensionName: URL(fileURLWithPath: playablePath).pathExtension))
+        // UAC member metadata is authoritative, including an absent loop.
+        // Standalone files and other archives retain their existing override
+        // and embedded-tag precedence.
+        let loop = uacMember ? uacLoop : (payload.loop ?? (sourceData == nil
+            ? PlaybackLoopTagReader.read(path: playablePath)
+            : PlaybackLoopTagReader.read(data: sourceData ?? Data(), extensionName: URL(fileURLWithPath: playablePath).pathExtension)))
         guard isCurrent?() ?? true else { throw CancellationError() }
         if payload.playbackMode != nil || payload.playMilliseconds != nil || payload.fadeMilliseconds != nil || payload.unknownDurationMilliseconds != nil {
             try configurePlaybackMode(payload, reloadCurrent: false)

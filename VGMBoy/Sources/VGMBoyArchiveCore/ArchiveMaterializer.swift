@@ -2,6 +2,22 @@ import Foundation
 import UACWrapperCore
 import VGMBoyFormatCore
 
+/// Manifest loop values for one selected UAC member, in source samples.
+public struct ArchiveAuthoredLoop: Equatable, Sendable {
+    public let startSamples: Int64
+    public let endSamples: Int64
+    public let sampleRateHz: Int
+    public let repeatCount: Int?
+    public let source: String?
+}
+
+/// Source preparation keeps UAC metadata attached to the selected member.
+public struct MaterializedArchiveSource: Sendable {
+    public let url: URL
+    public let isUAC: Bool
+    public let authoredLoop: ArchiveAuthoredLoop?
+}
+
 /// A shared native materializer for a catalog-selected archive entry.
 ///
 /// CatalogReader remains responsible for archive identity and membership. The
@@ -51,6 +67,25 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         entry: String,
         requirement: VGMArchiveMaterializationRequirement
     ) throws -> URL {
+        try materializeSource(archivePath: archivePath, entry: entry, requirement: requirement,
+                              includePlaybackMetadata: false).url
+    }
+
+    public func materializeSource(
+        archivePath: String,
+        entry: String,
+        requirement: VGMArchiveMaterializationRequirement
+    ) throws -> MaterializedArchiveSource {
+        try materializeSource(archivePath: archivePath, entry: entry, requirement: requirement,
+                              includePlaybackMetadata: true)
+    }
+
+    private func materializeSource(
+        archivePath: String,
+        entry: String,
+        requirement: VGMArchiveMaterializationRequirement,
+        includePlaybackMetadata: Bool
+    ) throws -> MaterializedArchiveSource {
         let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
         guard FileManager.default.fileExists(atPath: archiveURL.path) else {
             throw ArchiveMaterializationError.missingSource(archiveURL.path)
@@ -72,7 +107,8 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         let output = directory.appendingPathComponent(normalizedEntry)
 
         do {
-            try validateUACIfNeeded(archiveURL, entryPath: normalizedEntry)
+            let member = try selectedUACMemberIfNeeded(archiveURL, entryPath: normalizedEntry)
+            let authoredLoop = includePlaybackMetadata ? try member.flatMap { try Self.authoredLoop($0) } : nil
             switch requirement {
             case .selectedEntry:
                 try extractArchiveEntry(archiveURL: archiveURL, entry: normalizedEntry, output: output)
@@ -93,13 +129,12 @@ public final class ArchiveMaterializer: @unchecked Sendable {
             let attributes = try FileManager.default.attributesOfItem(atPath: output.path)
             let byteCount = (attributes[.size] as? NSNumber)?.int64Value ?? 0
             guard byteCount > 0 else { throw ArchiveMaterializationError.emptyOutput }
+            session.replace(with: directory)
+            return MaterializedArchiveSource(url: output, isUAC: member != nil, authoredLoop: authoredLoop)
         } catch {
             try? FileManager.default.removeItem(at: directory)
             throw error
         }
-
-        session.replace(with: directory)
-        return output
     }
 
     /// Lists source members through the same host-tool boundary used for
@@ -190,15 +225,43 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         }
     }
 
-    private func validateUACIfNeeded(_ archiveURL: URL, entryPath: String) throws {
-        guard ArchiveContainerKind(archiveURL: archiveURL) == .uac else { return }
+    private func selectedUACMemberIfNeeded(_ archiveURL: URL, entryPath: String) throws -> UACMember? {
+        guard ArchiveContainerKind(archiveURL: archiveURL) == .uac else { return nil }
         let container = try UACContainerReader.read(
             from: archiveURL,
             decompressManifestFrame: decompressUACManifestFrame ?? uacZstandardCodec.manifestDecoder
         )
-        guard container.manifest.members.contains(where: { $0.path == entryPath }) else {
+        guard let member = container.manifest.members.first(where: { $0.path == entryPath }) else {
             throw ArchiveMaterializationError.invalidEntry
         }
+        return member
+    }
+
+    private static func authoredLoop(_ member: UACMember) throws -> ArchiveAuthoredLoop? {
+        guard let raw = member.metadata["loop"] else { return nil }
+        guard case .object(let loop) = raw,
+              case .integer(let start)? = loop["startSamples"], start >= 0,
+              case .integer(let end)? = loop["endSamples"], end > start,
+              case .integer(let rate)? = loop["sampleRateHz"], rate > 0,
+              let sampleRate = Int(exactly: rate),
+              case .string(let mode)? = loop["mode"], mode.lowercased() == "forward" else {
+            throw ArchiveMaterializationError.extractFailed("The selected UAC member has invalid loop metadata.")
+        }
+        let repeatCount: Int?
+        switch loop["repeat"] {
+        case .string("forever")?: repeatCount = nil
+        case .integer(let value)? where value >= 0:
+            guard let count = Int(exactly: value) else {
+                throw ArchiveMaterializationError.extractFailed("The selected UAC loop repeat count is out of range.")
+            }
+            repeatCount = count
+        default:
+            throw ArchiveMaterializationError.extractFailed("The selected UAC loop has an invalid repeat count.")
+        }
+        let source: String?
+        if case .string(let value)? = loop["source"] { source = value } else { source = nil }
+        return ArchiveAuthoredLoop(startSamples: start, endSamples: end, sampleRateHz: sampleRate,
+                                   repeatCount: repeatCount, source: source)
     }
 
     private func extractArchiveEntryOnce(archiveURL: URL, entry: String, output: URL) throws {

@@ -221,6 +221,11 @@ extern "C" int32_t vgmstream_player_seek_milliseconds(vgmstream_player_handle_t 
   auto* player = static_cast<VgmPlayer*>(handle);
   if (player == nullptr || player->decoder == nullptr || milliseconds < 0) { setError(error, "Invalid vgmstream seek request."); return 1; }
   const int64_t sample = static_cast<int64_t>(milliseconds) * player->source_sample_rate / 1000;
+  // libvgmstream_seek updates position but does not clear its decode_done
+  // state after EOF. Reset first so a seek into an authored loop can render.
+  if (player->decoder->decoder != nullptr && player->decoder->decoder->done) {
+    libvgmstream_reset(player->decoder);
+  }
   libvgmstream_seek(player->decoder, sample);
   resetResampler(player);
   return 0;
