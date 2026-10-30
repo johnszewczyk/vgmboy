@@ -44,23 +44,14 @@ test('late status failure does not cancel a newer skip', async () => {
 test('matching status starts the shared replacement without retirement', async () => {
   const run = harness({ request: { targetTrackId: 'new', startSeconds: 2 } });
   await run.completeQueuedSkip();
-  assert.deepEqual(run.events, [['begin', 'new'], ['start', 'new', 2, true, null], ['finish']]);
+  assert.deepEqual(run.events, [['begin', 'new'], ['start', 'new', 2, true, null, 42], ['finish']]);
   assert.equal(run.getRequest(), null);
 });
 
-test('failed replacement restores only the original native generation', async () => {
+test('replacement receives the original generation for failure recovery', async () => {
   const run = harness({ request: { targetTrackId: 'new' }, startTrack: async () => { throw new Error('missing archive'); } });
   await assert.rejects(run.completeQueuedSkip(), /missing archive/);
-  assert.deepEqual(run.events.find(event => event[0] === 'ramp'), ['ramp', { outputGain: 1, rampMilliseconds: 10, expectedGeneration: 42 }]);
-});
-
-test('a superseded failed replacement does not restore a newer intent', async () => {
-  const pending = deferred(), run = harness({ request: { targetTrackId: 'new' }, startTrack: () => pending.promise });
-  const completion = run.completeQueuedSkip();
-  await new Promise(resolve => setImmediate(resolve));
-  run.supersede(); pending.reject(new Error('superseded'));
-  await assert.rejects(completion, /superseded/);
-  assert.equal(run.events.some(event => event[0] === 'ramp'), false);
+  assert.deepEqual(run.events.find(event => event[0] === 'start'), ['start', 'new', 0, true, null, 42]);
 });
 
 test('duplicate completion cannot start twice and navigation failure restores', async () => {

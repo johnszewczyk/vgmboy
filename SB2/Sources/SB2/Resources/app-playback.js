@@ -1020,10 +1020,11 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
   }
 }
 
-function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playbackOptions = null) {
+function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playbackOptions = null, restoreNativeGeneration = 0) {
   clearPlaybackError();
   const intent = beginPlaybackIntent(trackId);
-  const replacingQueuedSkip = !preserveQueuedSkip && Boolean(queuedSkipRequest);
+  const replacedQueuedSkip = !preserveQueuedSkip ? queuedSkipRequest : null;
+  const replacingQueuedSkip = Boolean(replacedQueuedSkip);
   if (!preserveQueuedSkip) {
     queuedSkipRequest = null;
     clearQueuedSkipTimer();
@@ -1042,10 +1043,18 @@ function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playba
   } else {
     request = playTrackNow(trackId, startSeconds, requestOptions);
   }
-  return Promise.resolve(request).finally(() => finishPlaybackIntent(intent)).catch((error) => {
+  const restoreGeneration = Number(replacedQueuedSkip?.nativeGeneration) || restoreNativeGeneration;
+  return Promise.resolve(request).catch(async (error) => {
+    if (pendingPlaybackIntent === intent && state.currentTrackId
+        && state.nativePlayback?.trackLoaded && restoreGeneration > 0) {
+      try {
+        await window.spcBoySB2.nativePlaybackRampGain({ outputGain: 1, rampMilliseconds: TRANSPORT_DECLICK_MS,
+          expectedGeneration: restoreGeneration });
+      } catch {}
+    }
     showPlaybackError(error);
     throw error;
-  });
+  }).finally(() => finishPlaybackIntent(intent));
 }
 
 async function completeQueuedSkip() {
@@ -1077,20 +1086,8 @@ async function completeQueuedSkip() {
     }
     queuedSkipRequest = null;
     clearQueuedSkipTimer();
-    const starting = playTrack(target, request.startSeconds || 0, true, request.playbackOptions || null);
-    const startGeneration = playbackGeneration;
-    try {
-      await starting;
-    } catch (error) {
-      if (startGeneration === playbackGeneration && state.currentTrackId
-          && state.nativePlayback?.trackLoaded && request.nativeGeneration > 0) {
-        try {
-          await window.spcBoySB2.nativePlaybackRampGain({ outputGain: 1, rampMilliseconds: TRANSPORT_DECLICK_MS,
-            expectedGeneration: request.nativeGeneration });
-        } catch {}
-      }
-      throw error;
-    }
+    await playTrack(target, request.startSeconds || 0, true, request.playbackOptions || null,
+      request.nativeGeneration);
   } catch (error) {
     if (request === queuedSkipRequest && request.generation === playbackGeneration) {
       await cancelQueuedSkip({ restoreOutput: true });
@@ -1175,14 +1172,18 @@ async function playAdjacentNow(delta) {
   }
 
   if (queuedSkipRequest) {
-    const request = queuedSkipRequest;
-    queuedSkipRequest = null;
+    const previousRequest = queuedSkipRequest;
     clearQueuedSkipTimer();
+    // The newer navigation takes over the short remaining fade, then uses the
+    // same replacement-safe handoff as an ordinary queued skip.
+    queuedSkipRequest = {
+      delta: delta || previousRequest.delta,
+      generation,
+      nativeGeneration: previousRequest.nativeGeneration
+    };
     await fadeActiveOutput(TRANSPORT_DECLICK_MS);
     if (generation !== playbackGeneration) return;
-    await stopPlaybackState({ declick: false });
-    if (playbackGeneration !== generation + 1) return;
-    await advanceToAdjacent(delta || request.delta, generation + 1);
+    await completeQueuedSkip();
     return;
   }
 
