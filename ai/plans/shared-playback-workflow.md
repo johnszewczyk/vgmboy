@@ -45,6 +45,17 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Producer drain and callback screening, 2026-10-30: an injected decoder
+  supplied partial PCM, an empty read, more PCM, and an end. The real native
+  output path recovered, drained its ring, and published exactly one end;
+  all 98 VGMBoy tests passed. An optimized offline benchmark compared the
+  callback source before `37bc72aa` with the current source, rendering 50,000
+  silent callbacks per run, six alternating runs per variant. Median new/old
+  ratios were 1.065/1.038 at 256 frames, 0.988/1.007 at 512, and 1.011/1.004
+  at 1,024, respectively without/with a ramp command every 32 callbacks.
+  This is an empty-ring offline screening, not live-device callback timing,
+  audible verification, or proof for every decoder and device.
+
 - Shared queued-fade scheduling, 2026-10-30: FrontendCore now owns the
   token-checked native deadline, rearming after the gain reply and rejecting
   canceled, replaced and completed work. SB2 forwards scheduler transitions in
