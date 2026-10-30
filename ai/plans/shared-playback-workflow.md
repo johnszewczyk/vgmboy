@@ -26,6 +26,8 @@ The remaining work is grouped by the current SB2-first scope:
    reconfiguration while paused or buffered, and representative archive/UAC
    sources including dependencies and authored loop metadata. Distinguish cases
    already covered by injected or native tests from missing packaged coverage.
+   AAC export still does not apply authored loops; establish and implement the
+   intended common offline-render behavior before declaring loop parity.
 4. Measure live audio transitions and callback performance around pause, fade,
    seek, loop, speed and mode changes. Controlled offline PCM results do not
    prove live audible continuity or performance; investigate any regression.
@@ -44,6 +46,27 @@ No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
+
+- UAC authored-loop playback, 2026-10-30: VGMBoy now carries the selected
+  UAC member's authoritative loop through source preparation into playback;
+  an absent UAC loop does not fall back to enclosed tags or a caller override.
+  Invalid objects fail preparation without replacing the playing session.
+  The real Game Rips SOTN XA package contains 28 such loops; its first loop
+  resolved to 2,153,088–5,310,144 samples at 37,800 Hz, with unbounded repeat.
+  A test crossed that boundary after a near-end seek and playback continued.
+  The check exposed a vgmstream seek-after-EOF failure and padded short reads;
+  the bridge now resets completed decoders before seeking, and the adapter
+  returns actual frames and propagates errors. Generated WAV UAC fixtures
+  confirmed finite loop duration, absent-loop precedence and retained playback
+  on malformed metadata. The VGMBoy suite passed 100 tests with both generated
+  and SOTN fixture paths enabled; 56 shared transport and 66 SB2 renderer
+  checks also passed and SB2 built. The SOTN XA package SHA-256 is
+  `c7647fbb9f86244e93fcc526d96fc6690c411a28ade6de1a0df23ac9abb2b3f4`;
+  it was read only. Disposable generated fixtures can be reproduced with
+  `python3 -B VGMBoy/scripts/make_uac_loop_fixtures.py <new-directory>` and
+  the tests enabled with `VGMBOY_UAC_LOOP_FIXTURES` and `VGMBOY_SOTN_XA_UAC`.
+  AAC export loop parity and packaged SB2,
+  audible, and wider-format validation remain open.
 
 - Producer drain and callback screening, 2026-10-30: an injected decoder
   supplied partial PCM, an empty read, more PCM, and an end. The real native

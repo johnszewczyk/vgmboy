@@ -41,8 +41,11 @@ same typed endpoint operations.
   the member, chooses the format-owned preparation requirement, extracts the selected member or
   dependency set, and retains the temporary source for that session. Hosts do not extract a playback
   member before calling `load`.
-- Embedded loop-tag inspection reads files only for FLAC and APE, the formats it
-  parses. Invalid or overflowing derived loop boundaries are ignored.
+- Embedded loop-tag inspection reads standalone and non-UAC archive members
+  only for FLAC and APE. For UAC playback, the selected member's manifest loop
+  is authoritative and an absent object stays absent; malformed objects reject
+  preparation before the current session is replaced. Invalid or overflowing
+  embedded-tag-derived loop boundaries are ignored.
 - Seek positions and scaled loop boundaries must fit the native signed 32-bit
   millisecond range. Reject unrepresentable requests before pausing or seeking;
   a loop that collapses below one output frame is also rejected at load.

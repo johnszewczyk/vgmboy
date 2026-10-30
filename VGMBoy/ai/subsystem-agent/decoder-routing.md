@@ -69,12 +69,17 @@ deliberately exclusive to one family.
   to `PlaybackSession`.
 - Standard audio, including FLAC, is finite and never supports Long Play unless
   an authored loop object is supplied. FLAC and APE comments use the shared
-  `LOOP_*` sample vocabulary; a UAC `metadata.loop` object supplied through
-  the playback payload takes precedence. The session performs the sample-boundary
+  `LOOP_*` sample vocabulary; for UAC members VGMBoy reads the selected
+  `metadata.loop` object directly and does not infer an absent loop from member
+  tags or a caller override. Malformed authored UAC loop objects reject the
+  replacement before the current session is retired. The session performs the sample-boundary
   seek, so the source decoder remains a finite PCM reader.
   Its AVAudioFile reader
   is reopened for track starts and seeks so the macOS compressed-file reader and converter state
   are reset without using the unsupported FLAC `framePosition` setter.
+- vgmstream resets its completed decoder before a seek and returns only the
+  PCM frames it actually produced; decode failures propagate instead of being
+  converted into padded silence.
 - APE, MP2, and TAK use the finite `FFmpegAudioDecoder` playback route. ScanSong reads APE
   container timing and common tags directly, with no FFmpeg scanner process or playback-core link;
   the source is never converted into a different catalog format.
