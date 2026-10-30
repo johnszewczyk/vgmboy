@@ -52,6 +52,8 @@ ownership at WebKit message receipt, before detached workers can reorder them;
 the shared transport rejects a superseded start or stop.
 Pause, resume and seek carry the native session generation captured at the
 start of the renderer operation; stale controls are rejected by shared transport.
+If Pause fails after its fade, SB2 requests a generation-guarded gain restore
+only while that pause remains the current renderer operation.
 The native bridge also stamps seek revisions at message receipt, before worker
 dispatch, so the shared transport can reject an older seek for the same session.
 For immediate replacement, SB2 keeps the prior native session and presentation
