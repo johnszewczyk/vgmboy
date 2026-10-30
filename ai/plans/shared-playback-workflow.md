@@ -9,6 +9,15 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- SB2 repeated navigation, 2026-10-30: a second Next/Previous during a queued
+  fade now hands off through replacement preparation instead of stopping the
+  current session first. Direct track selection superseding a queued fade also
+  requests a generation-guarded gain restore on failure. Restore ownership uses
+  playback intent rather than renderer generation, so timing replanning does not
+  suppress it and a newer intent is not overwritten. All 49 SB2 renderer checks
+  and the SB2 build passed. These are simulated renderer and package-build
+  checks; packaged interaction and audible envelope behavior remain unverified.
+
 - SB2 faded replacement, 2026-10-30: a completed queued fade now resolves its
   target and calls the existing replacement transaction without retiring the old
   session first. Preparation failure requests a guarded gain restore; newer
