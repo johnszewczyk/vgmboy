@@ -44,6 +44,14 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- SB2 canceled-fade seek, 2026-10-30: a failed queued-skip gain restore could
+  abort a later seek, and an already-replaced session received an unnecessary
+  stale restore request. Cancellation now skips obsolete generations and treats
+  restoration errors as best effort; the subsequent seek still uses its own
+  native generation guard. Focused renderer tests reproduce both cases; all 56
+  SB2 playback checks passed. This is simulated bridge evidence; packaged and
+  audible verification remain open.
+
 - SB2 pause failure, 2026-10-30: a rejected native Pause after the fade could
   leave a still-running session at zero gain. A focused renderer check
   reproduced the missing restore; SB2 now requests a generation-guarded gain

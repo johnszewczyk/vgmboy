@@ -83,7 +83,7 @@ test('stopping shows the selected track timing rather than the manual default', 
   assert.equal(state.elapsedSeconds, 0);
 });
 
-test('fade and restore commands retain the originating native generation', async () => {
+test('fade requests retain their origin and skip stale restoration', async () => {
   const fadeStart = source.indexOf('async function fadeActiveOutput(');
   const fadeEnd = source.indexOf('\nfunction clearQueuedSkipTimer(', fadeStart);
   const cancelStart = source.indexOf('async function cancelQueuedSkip(');
@@ -103,7 +103,7 @@ test('fade and restore commands retain the originating native generation', async
   await run.fadeActiveOutput(25);
   run.state.nativePlayback.generation = 43;
   await run.cancelQueuedSkip({ restoreOutput: true });
-  assert.deepEqual(requests.map(request => request.expectedGeneration), [42, 42]);
+  assert.deepEqual(requests.map(request => request.expectedGeneration), [42]);
 });
 
 test('pause, resume and seek carry their observed native session', async () => {
