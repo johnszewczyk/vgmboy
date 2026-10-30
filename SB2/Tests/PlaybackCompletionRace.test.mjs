@@ -9,7 +9,7 @@ function section(startMarker, endMarker) {
   assert.ok(start >= 0 && end > start, `${startMarker} is present`);
   return source.slice(start, end);
 }
-const finalizeSource = section('async function finalizePlaybackEnded() {', '\nasync function continueAfterPlaybackRetirement(');
+const finalizeSource = section('async function finalizePlaybackEnded(event = null) {', '\nasync function continueAfterPlaybackRetirement(');
 const makeFinalizer = new Function('state', 'window', 'playbackPlaylist', 'continueAfterPlaybackRetirement', `
   let playbackGeneration = 7;
   let queuedSkipRequest = null;
@@ -41,6 +41,20 @@ test('a current native retirement continues the intended queue', async () => {
   assert.equal(run.continued[0].retirementDecision.trackId, 'b');
 });
 
+test('a queued skip preserves the end event until replacement settles', async () => {
+  const state = { currentTrackId: 'a', nativePlayback: { generation: 12 } };
+  const event = { generation: 12, transport_state: 'ended' };
+  const run = new Function('state', `
+    let playbackGeneration = 7, queuedSkipRequest = {}, deferredNativeEnds = [], completed = 0;
+    const completeQueuedSkip = async () => { completed++; };
+    ${finalizeSource}
+    return { finalizePlaybackEnded, deferred: () => deferredNativeEnds, completed: () => completed };
+  `)(state);
+  await run.finalizePlaybackEnded(event);
+  assert.deepEqual(run.deferred(), [{ event, trackId: 'a', nativeGeneration: 12 }]);
+  assert.equal(run.completed(), 1);
+});
+
 test('rejected retirement never advances playback', async () => {
   const run = harness();
   const completion = run.finalizePlaybackEnded();
@@ -62,7 +76,7 @@ test('delayed retirement cannot advance after track, frontend or native generati
   }
 });
 
-const statusSource = section('function applyNativePlaybackSnapshot(', '\nasync function finalizePlaybackEnded()');
+const statusSource = section('function applyNativePlaybackSnapshot(', '\nasync function finalizePlaybackEnded(');
 const endedSource = section('async function handleNativePlaybackEnded(event) {', '\nasync function setPlaybackPowerSaveBlocker(');
 const makeEndedHandler = new Function('state', 'activeTrackInfo', 'effectiveTotalSeconds', 'finalizePlaybackEnded', `
   let playbackGeneration = 7;

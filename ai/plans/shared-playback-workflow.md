@@ -9,6 +9,16 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- SB2 faded replacement, 2026-10-30: a completed queued fade now resolves its
+  target and calls the existing replacement transaction without retiring the old
+  session first. Preparation failure requests a guarded gain restore; newer
+  intents are not modified. Native ends are deferred during the handoff and an
+  end arriving before it is retained for replay. Renderer checks cover failure,
+  duplicate completion, supersession and the early-end handoff; all 44 SB2
+  playback checks and the SB2 build passed. This is simulated bridge evidence,
+  not packaged or audible proof. A second navigation while a skip is already
+  queued still follows the older stop-and-advance path and needs separate review.
+
 - SB2 faded-skip status failure, 2026-10-30: both delayed skip paths now use
   one completion helper. A failed native status lookup cancels the still-current
   skip and requests a generation-guarded gain restore; a late failure leaves a
