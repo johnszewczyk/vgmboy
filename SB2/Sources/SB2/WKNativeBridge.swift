@@ -453,6 +453,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                   seek["expectedGeneration"] is Int {
             seek["seekRevision"] = WKPlaybackBridge.shared.reserveSeekRevision()
             detachedArguments[0] = seek
+        } else if method == "nativePlaybackRampGain",
+                  var ramp = args.first as? [String: Any],
+                  ramp["expectedGeneration"] is Int {
+            ramp["rampRevision"] = WKPlaybackBridge.shared.reserveRampRevision()
+            detachedArguments[0] = ramp
         }
         let requestArgumentsJSON = Self.json(detachedArguments)
         let requestCatalogURL = catalogURL

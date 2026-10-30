@@ -123,6 +123,30 @@ private final class StatusRecorder: @unchecked Sendable {
     _ = try transport.rampOutputGainSync(.init(outputGain: 1, rampMilliseconds: 10))
 }
 
+@Test func orderedGainRampsRejectLateFadeAfterRestore() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.ordered.gain.ramps")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    let loaded = transport.perform(.init(command: .load, payload: .init(path: url.path)))
+    let generation = try #require(loaded.status?.diagnostics.generation)
+    let oldFade = transport.reserveRampRevision(), restore = transport.reserveRampRevision()
+    _ = try transport.rampOutputGainSync(.init(outputGain: 1, rampMilliseconds: 10,
+                                               expectedGeneration: generation, rampRevision: restore))
+    #expect(throws: CancellationError.self) {
+        try transport.rampOutputGainSync(.init(outputGain: 0, rampMilliseconds: 5000,
+                                               expectedGeneration: generation, rampRevision: oldFade))
+    }
+    #expect(throws: CancellationError.self) {
+        try transport.rampOutputGainSync(.init(outputGain: 0, rampMilliseconds: 10, rampRevision: restore + 1))
+    }
+    let next = transport.reserveRampRevision()
+    _ = try transport.rampOutputGainSync(.init(outputGain: 0, rampMilliseconds: 10,
+                                               expectedGeneration: generation, rampRevision: next))
+    _ = try transport.rampOutputGainSync(.init(outputGain: 1, rampMilliseconds: 10))
+}
+
 @Test func staleSessionControlsCannotChangeReplacement() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
