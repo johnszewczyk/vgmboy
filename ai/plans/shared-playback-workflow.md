@@ -12,11 +12,11 @@ paths, working-tree changes, and findings before continuing.
 The checkpoints below are historical; later entries may resolve earlier gaps.
 The remaining work is grouped by the current SB2-first scope:
 
-1. Extend packaged SB2 faded-handoff verification to the current renderer:
-   an earlier instrumented build proved a queued fade, repeated Next, a missing
-   target, a valid selection and Stop. Still exercise old-session end during
-   preparation, newer start/stop and the latest timer changes. Check track
-   identity, output gain, queue and history, not just the clock.
+1. Extend packaged SB2 faded-handoff verification: instrumented builds have
+   exercised a queued fade, repeated Next, missing and valid targets, and Stop,
+   including the shared-plan bridge. Still exercise old-session end during
+   preparation and newer start/stop races. Check output gain and audible behavior
+   as well as track identity, queue, history and clock.
 2. Assess what remains duplicated between SB2's renderer and shared transport,
    especially queued-fade lifecycle and cancellation. Move UI-neutral ownership
    to FrontendCore where its contract can preserve the existing queue behavior;
@@ -44,6 +44,22 @@ No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
+
+- Packaged shared fade plan, 2026-10-30: an isolated SB2 debug app from
+  `82cc6ba6` used a separate bundle ID and temporary catalog, playlist, history,
+  favorites and cache. Test-only rendering displayed the real bridge reply:
+  6,000 ms duration and 8,000 ms fallback. A missing ZIP reported its error
+  while the first WAV continued from 0:05 to 0:17. A faded Previous started
+  the second WAV, and isolated history showed one.wav then two.wav. Stop during
+  another queued fade stayed stopped beyond its timer. Generated 30-second WAV
+  SHA-256 values were `41c1781c2374272f7b823e0e404d753ebc751cd12bd6d7aba990dd3a29c9d113`
+  and `78ade8e4a4dd506509179004c76bb2f7cfac2e600f614479864ecff7b75ae255`.
+  The test source included temporary path redirects and an on-screen trace; it
+  does not establish audible envelopes or force old-end/start races. The copied
+  checkout plus decoder products used approximately 947 MB and its build 397 MB;
+  the 12 GiB stop guard remained active and about 19 GiB was free afterward.
+  The disposable checkout was removed after saving its isolation diff; the app,
+  build, temporary fixtures and logs remain for follow-up while available.
 
 - Shared queued-fade schedule, 2026-10-30: FrontendCore now produces a typed
   integral ramp duration and bounded fallback timer; SB2 passes this shared plan
