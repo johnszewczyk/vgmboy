@@ -47,6 +47,15 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Exact EOF loop boundary, 2026-10-30: an injected decoder that marks itself
+  ended while returning the final frame exposed a missing repeat at an authored
+  loop boundary. Playback and export now share the decision to rewind an ended
+  decoder only when it reached the authored boundary and has repeats left.
+  The regression produced 6,615 frames instead of stopping at 4,410; a separate
+  early-end case remained at 4,410. The full VGMBoy suite passed 103 tests with
+  the generated UAC and read-only SOTN XA fixtures enabled; 56 shared transport
+  checks passed and SB2 built under the disk guard.
+
 - Packaged UAC attempt, 2026-10-30: an isolated SB2 debug app built from
   `bb7d70c5` with redirected temporary state and a test-only playlist for the
   generated UAC and SOTN XA package. The UI displayed both rows, but the

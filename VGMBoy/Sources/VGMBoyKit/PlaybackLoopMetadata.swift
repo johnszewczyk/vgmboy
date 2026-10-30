@@ -44,6 +44,13 @@ enum PlaybackLoopReader {
         return (Int64(start), Int64(end))
     }
 
+    static func canRewindEndedDecoder(_ decoder: any AudioDecoder, loop: PlaybackLoopMetadata?,
+                                      remainingRepeats: Int?, sampleRate: Int, tempo: Double) -> Bool {
+        guard let loop, loop.isValid, let bounds = bounds(loop, sampleRate: sampleRate, tempo: tempo),
+              decoder.absolutePlayedFrames >= bounds.end else { return false }
+        return remainingRepeats.map { $0 > 0 } ?? true
+    }
+
     static func read(decoder: any AudioDecoder, requested: Int, sampleRate: Int, tempo: Double,
                      loop: inout PlaybackLoopMetadata?, remainingRepeats: inout Int?) throws -> (left: [Float], right: [Float]) {
         guard requested > 0 else { return ([], []) }

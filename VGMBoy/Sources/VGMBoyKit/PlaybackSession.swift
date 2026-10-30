@@ -524,7 +524,10 @@ final class PlaybackSession: @unchecked Sendable {
                 reachedEnd = true
                 break
             }
-            if decoder.trackEnded {
+            if decoder.trackEnded && !PlaybackLoopReader.canRewindEndedDecoder(
+                decoder, loop: playbackLoop, remainingRepeats: remainingLoopRepeats,
+                sampleRate: sampleRate, tempo: currentTempo
+            ) {
                 guard rewindVGMForLongPlayIfNeeded(decoder) else {
                     reachedEnd = true
                     break

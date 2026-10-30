@@ -207,10 +207,8 @@ public enum AACExporter {
         while renderedFrames < capFrames {
             if cancellation?.isCancelled == true { throw AACExportError.cancelled }
             if decoder.trackEnded {
-                guard let current = loop,
-                      let bounds = PlaybackLoopReader.bounds(current, sampleRate: sampleRate, tempo: effectiveTempo),
-                      decoder.absolutePlayedFrames >= bounds.end,
-                      remainingRepeats.map({ $0 > 0 }) ?? true else { break }
+                guard PlaybackLoopReader.canRewindEndedDecoder(decoder, loop: loop, remainingRepeats: remainingRepeats,
+                                                              sampleRate: sampleRate, tempo: effectiveTempo) else { break }
             }
             let wanted = min(chunkFrames, Int(capFrames - renderedFrames))
             let frames = try PlaybackLoopReader.read(decoder: decoder, requested: wanted, sampleRate: sampleRate,

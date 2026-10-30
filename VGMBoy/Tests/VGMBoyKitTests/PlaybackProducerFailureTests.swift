@@ -14,6 +14,7 @@ private final class ScriptedProducerDecoder: AudioDecoder {
     var closed = false
     var failStart = false
     var failMetadata = false
+    var naturalEndFrame: Int64?
     var steps: [Step]
     init(_ steps: [Step] = []) { self.steps = steps }
     func startTrack(_ index: Int) throws { if failStart { throw ProducerFixtureError.injected } }
@@ -24,7 +25,7 @@ private final class ScriptedProducerDecoder: AudioDecoder {
     func setTempo(_ tempo: Double) {}
     func configureFade(playMs: Int, fadeMs: Int) {}
     func configureNativeEnding(playMs: Int, fadeMs: Int) {}
-    func seek(milliseconds: Int) { absolutePlayedFrames = Int64(milliseconds * sampleRate / 1000) }
+    func seek(milliseconds: Int) { absolutePlayedFrames = Int64(milliseconds * sampleRate / 1000); trackEnded = false }
     func readFrames(_ count: Int) throws -> (left: [Float], right: [Float]) {
         let step = steps.isEmpty ? .pcm : steps.removeFirst()
         switch step {
@@ -40,12 +41,52 @@ private final class ScriptedProducerDecoder: AudioDecoder {
             let pcm = [Float](repeating: 0.25, count: partialCount)
             return (pcm, pcm)
         case .pcm:
-            absolutePlayedFrames += Int64(count)
-            let pcm = [Float](repeating: 0, count: count)
+            let produced = naturalEndFrame.map { max(0, min(count, Int($0 - absolutePlayedFrames))) } ?? count
+            absolutePlayedFrames += Int64(produced)
+            if let naturalEndFrame, absolutePlayedFrames >= naturalEndFrame { trackEnded = true }
+            let pcm = [Float](repeating: 0, count: produced)
             return (pcm, pcm)
         }
     }
     func close() { closed = true }
+}
+
+@Test func authoredLoopRepeatsWhenDecoderEndsAtItsBoundary() async throws {
+    let decoder = ScriptedProducerDecoder()
+    decoder.naturalEndFrame = 4_410
+    let session = PlaybackSession(output: AudioOutput(sampleRate: 44_100, capacitySeconds: 0.1),
+                                  makeDecoder: { _, _, _ in decoder })
+    let recorder = CompletionRecorder()
+    session.setCompletionStatusHandler { recorder.record($0) }
+    defer { session.stop() }
+    let plan = PlaybackPlan(preFadeMilliseconds: 0, fadeMilliseconds: 0, isLongPlay: false,
+                            usesNativeEnding: true, usesDecoderNaturalDuration: true)
+    let loop = PlaybackLoopMetadata(startSample: 2_205, endSample: 4_410, sampleRateHz: 44_100, repeatCount: 1)
+    _ = try session.load(path: "/fixture.spc", trackIndex: 0, plan: plan, tempo: 1, loop: loop)
+    try session.play()
+    for _ in 0..<100 where recorder.snapshot.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
+    let end = try #require(recorder.snapshot.first)
+    #expect(end.statistics.decodedFrames == 6_615)
+    #expect(end.diagnostics.bufferedFrames == 0)
+}
+
+@Test func decoderEndingBeforeAuthoredLoopBoundaryDoesNotInventARepeat() async throws {
+    let decoder = ScriptedProducerDecoder()
+    decoder.naturalEndFrame = 4_410
+    let session = PlaybackSession(output: AudioOutput(sampleRate: 44_100, capacitySeconds: 0.1),
+                                  makeDecoder: { _, _, _ in decoder })
+    let recorder = CompletionRecorder()
+    session.setCompletionStatusHandler { recorder.record($0) }
+    defer { session.stop() }
+    let plan = PlaybackPlan(preFadeMilliseconds: 0, fadeMilliseconds: 0, isLongPlay: false,
+                            usesNativeEnding: true, usesDecoderNaturalDuration: true)
+    let loop = PlaybackLoopMetadata(startSample: 2_205, endSample: 8_820, sampleRateHz: 44_100, repeatCount: 1)
+    _ = try session.load(path: "/fixture.spc", trackIndex: 0, plan: plan, tempo: 1, loop: loop)
+    try session.play()
+    for _ in 0..<100 where recorder.snapshot.isEmpty { try await Task.sleep(for: .milliseconds(20)) }
+    let end = try #require(recorder.snapshot.first)
+    #expect(end.statistics.decodedFrames == 4_410)
+    #expect(end.diagnostics.bufferedFrames == 0)
 }
 
 private final class CompletionRecorder: @unchecked Sendable {
