@@ -14,6 +14,7 @@ final class AppBoyNativeBridge: NSObject, WKScriptMessageHandler {
         self.store = store
         self.playback = playback
         super.init()
+        playback.applyPreferences(store.preferences)
 
         playback.onStateChanged = { [weak self] snapshot in
             guard let self, let payload = Self.encodeJSONValue(snapshot) else { return }
@@ -43,10 +44,17 @@ final class AppBoyNativeBridge: NSObject, WKScriptMessageHandler {
         let host = (url.host ?? "").lowercased()
         let pathPart = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let allowedViews: Set<String> = ["library", "playlist", "gallery", "favorites", "recent", "options"]
-        let allowedTransports: Set<String> = ["pause", "stop", "next", "previous", "togglePlayPause"]
+        let allowedOptionTabs: Set<String> = ["interface", "fonts", "gallery", "audio", "playback", "source"]
+        let allowedTransports: Set<String> = ["pause", "stop", "next", "previous", "togglePlayPause", "newTab"]
         var eventPayload: [String: Any]?
         if host == "view", allowedViews.contains(pathPart.lowercased()) {
             eventPayload = ["action": "view", "target": pathPart.lowercased()]
+        } else if host == "options" {
+            let tab = pathPart.lowercased()
+            eventPayload = [
+                "action": "options",
+                "target": allowedOptionTabs.contains(tab) ? tab : "interface"
+            ]
         } else if host == "play" {
             var payload: [String: Any] = ["action": "play"]
             if !pathPart.isEmpty {
@@ -120,6 +128,7 @@ final class AppBoyNativeBridge: NSObject, WKScriptMessageHandler {
                 playbackSeek: (seconds, generation) => request("playbackSeek", [seconds, generation]),
                 playbackSetRate: (rate) => request("playbackSetRate", [rate]),
                 playbackSetVolume: (volume) => request("playbackSetVolume", [volume]),
+                playbackSetEqualizer: (enabled, bandsDB) => request("playbackSetEqualizer", [enabled, bandsDB]),
                 onNativePlaybackState: (listener) => on("nativePlaybackState", listener),
                 onNativePlaybackEnded: (listener) => on("nativePlaybackEnded", listener),
                 onRemoteCommand: (listener) => on("remoteCommand", listener),
@@ -234,9 +243,7 @@ final class AppBoyNativeBridge: NSObject, WKScriptMessageHandler {
                 throw NSError(domain: "APPBOY.Bridge", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid settings patch"])
             }
             let updated = try store.applyPreferencesPatch(patch)
-            _ = playback.setVolume(updated.appVolume)
-            let effectiveRate = updated.playbackSpeedEnabled ? updated.playbackSpeedRate : 1.0
-            _ = playback.setRate(effectiveRate)
+            playback.applyPreferences(updated)
             let encoded = Self.encodeJSONValue(updated) ?? [:]
             publishEvent(name: "settingsChanged", payload: encoded)
             return encoded
@@ -255,15 +262,7 @@ final class AppBoyNativeBridge: NSObject, WKScriptMessageHandler {
                 throw NSError(domain: "APPBOY.Bridge", code: 404, userInfo: [NSLocalizedDescriptionKey: "Track not found in catalog"])
             }
             store.recordHistory(trackId: track.id)
-            let prefs = store.preferences
-            let effectiveRate = prefs.playbackSpeedEnabled ? prefs.playbackSpeedRate : 1.0
-            let overrideDuration: Double? = prefs.longPlayEnabled ? prefs.manualPlayTimeSeconds : nil
-            let snap = playback.start(
-                track: track,
-                playbackRate: effectiveRate,
-                volume: prefs.appVolume,
-                overrideDurationSeconds: overrideDuration
-            )
+            let snap = playback.start(track: track, preferences: store.preferences)
             return Self.encodeJSONValue(snap) ?? [:]
 
         case "playbackPause":
@@ -295,6 +294,13 @@ final class AppBoyNativeBridge: NSObject, WKScriptMessageHandler {
         case "playbackSetVolume":
             let volume = (args.first as? NSNumber)?.doubleValue ?? 1.0
             let snap = playback.setVolume(volume)
+            return Self.encodeJSONValue(snap) ?? [:]
+
+        case "playbackSetEqualizer":
+            let enabled = (args.first as? Bool) ?? false
+            let rawBands = (args.count > 1 ? args[1] as? [Any] : nil) ?? []
+            let bands = rawBands.map { ($0 as? NSNumber)?.doubleValue ?? 0.0 }
+            let snap = playback.setEqualizer(enabled: enabled, bandsDB: bands)
             return Self.encodeJSONValue(snap) ?? [:]
 
         default:

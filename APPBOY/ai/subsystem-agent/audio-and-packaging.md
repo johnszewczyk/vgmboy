@@ -2,17 +2,23 @@
 
 ## Scope
 
-Background audio session lifecycle, generation-fenced `AVPlayer` transport,
-system Now Playing / Remote Command integration, and standalone iOS `.app` /
-`.ipa` build packaging.
+Background audio session lifecycle, generation-fenced `AVAudioEngine` processing
+(10-band EQ, Mono downmix, seamless Long Play looping, End Fade Out, and
+pitch-preserving Playback Speed) with `AVPlayer` remote stream fallback, system
+Now Playing / Remote Command integration, and standalone iOS `.app` / `.ipa`
+build packaging.
 
 ## Ownership
 
-- `AppBoyPlaybackCoordinator.swift` owns `AVAudioSession`, `AVPlayer`, periodic
-  progress observation, interruption/route-change recovery,
-  `MPNowPlayingInfoCenter`, and `MPRemoteCommandCenter`.
-- `AppBoyChiptuneSynth.swift` owns deterministic in-memory PCM WAV synthesis for
-  `synth://` starter catalog preview URIs so playback, scrubbing, background
+- `AppBoyPlaybackCoordinator.swift` owns `AVAudioSession`, the local/synthesized
+  `AVAudioEngine` graph (`AVAudioPlayerNode` → `AVAudioUnitTimePitch` →
+  `AVAudioUnitEQ(numberOfBands: 10)` → `mainMixerNode`), the `AVPlayer` fallback
+  for remote HTTP(S) streams, periodic progress observation,
+  interruption/route-change/configuration recovery, `MPNowPlayingInfoCenter`,
+  and `MPRemoteCommandCenter`.
+- `AppBoyChiptuneSynth.swift` owns deterministic stereo `44.1 kHz` 16-bit PCM
+  WAV loop synthesis for `synth://` starter catalog URIs so all 10 EQ bands up
+  to `16 kHz`, Mono downmix, seamless Long Play looping, scrubbing, background
   audio, and lock-screen transport work without external servers or fixtures.
 - `Package.swift`, `app-info.plist`, `app-icon.png`, and `build.sh` own SwiftPM
   cross-compilation (`iphoneos` and `iphonesimulator`), bundle assembly, code
@@ -22,8 +28,16 @@ system Now Playing / Remote Command integration, and standalone iOS `.app` /
 
 - Configure `AVAudioSession` with category `.playback`, mode `.default`, and
   policy `.longFormAudio`, paired with `UIBackgroundModes = ["audio"]` in
-  `app-info.plist`, before starting `AVPlayer` so audio continues across screen
-  lock and app switching.
+  `app-info.plist`, before starting `AVAudioEngine` or `AVPlayer` so audio
+  continues across screen lock and app switching.
+- Apply 10 parametric peaking EQ bands at `31, 62, 125, 250, 500, 1k, 2k, 4k,
+  8k, 16k` Hz (`-12` to `+12 dB`, `0.5 dB` steps, `1.0` octave bandwidth) with
+  non-clipping headroom attenuation `10^(-maxPositiveBoostDB / 20)` on
+  `mainMixerNode` combined with `appVolume`.
+- Loop local/synthesized PCM frames modulo `fileLengthFrames` when `Long Play`
+  is enabled up to `manualPlayTimeSeconds`, applying transitional end-fade gain
+  over `fadeOutSeconds` when `fadeOutEnabled` is active, and re-anchoring active
+  buffers live when `Long Play`, `Mono`, or `Fade Out` settings change mid-track.
 - Stamp every `playbackStart` with a monotonically increasing native
   `generation`. Reject `pause`, `resume`, `stop`, `seek`, and end-of-item
   notifications from superseded generations so rapid track switching cannot

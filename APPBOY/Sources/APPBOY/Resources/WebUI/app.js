@@ -85,6 +85,9 @@
   refs.repeatBtn?.addEventListener("click", () => {
     app.playback.cycleRepeatMode();
   });
+  refs.eqBtn?.addEventListener("click", () => {
+    app.playback.toggleEqualizer();
+  });
   refs.longPlayBtn?.addEventListener("click", () => {
     app.playback.toggleLongPlay();
   });
@@ -193,29 +196,92 @@
     app.queueSettingsPatch({ galleryRadiusRem: Number(ev.target.value) || 0 });
   });
 
-  refs.optSpeedEnabled?.addEventListener("change", (ev) => {
+  // Options > Audio: 10-Band Equalizer + Mono + Volume
+  refs.optEqEnabled?.addEventListener("change", (ev) => {
     const enabled = ev.target.checked;
-    app.queueSettingsPatch({ playbackSpeedEnabled: enabled });
-    const rate = enabled ? Number(state.preferences.playbackSpeedRate || 1.25) : 1.0;
-    window.appBoy?.playbackSetRate?.(rate).catch(() => {});
+    const bands = (state.preferences.equalizerBandsDB || []).slice();
+    app.queueSettingsPatch({ equalizerEnabled: enabled });
+    window.appBoy?.playbackSetEqualizer?.(enabled, bands).catch(() => {});
     app.playback.renderTransportChrome();
-  });
-  refs.optSpeedRate?.addEventListener("change", (ev) => {
-    const rate = Math.min(2.0, Math.max(0.5, Number(ev.target.value) || 1.25));
-    app.queueSettingsPatch({ playbackSpeedRate: rate });
-    if (state.preferences.playbackSpeedEnabled) {
-      window.appBoy?.playbackSetRate?.(rate).catch(() => {});
-    }
-    app.playback.renderTransportChrome();
-  });
-  refs.optLongPlayEnabled?.addEventListener("change", (ev) => {
-    app.queueSettingsPatch({ longPlayEnabled: ev.target.checked });
-    app.playback.renderTransportChrome();
-  });
-  refs.optManualDuration?.addEventListener("change", (ev) => {
-    app.queueSettingsPatch({ manualPlayTimeSeconds: Math.max(15, Number(ev.target.value) || 180) });
   });
 
+  document.querySelectorAll("[data-equalizer-band]").forEach((input) => {
+    input.addEventListener("input", (ev) => {
+      const idx = Number(ev.target.dataset.equalizerBand);
+      const gain = Number(ev.target.value) || 0;
+      if (!state.preferences.equalizerEnabled) {
+        // Automatically engage Equalizer when dragging a band slider so adjustments are immediately audible.
+        state.preferences.equalizerEnabled = true;
+        app.queueSettingsPatch({ equalizerEnabled: true });
+      }
+      app.playback.setEqualizerBand(idx, gain);
+    });
+  });
+
+  refs.optEqResetBtn?.addEventListener("click", () => {
+    app.playback.resetEqualizer();
+  });
+
+  refs.optMonoEnabled?.addEventListener("change", (ev) => {
+    app.queueSettingsPatch({ monoEnabled: ev.target.checked });
+  });
+
+  refs.optAppVolume?.addEventListener("input", (ev) => {
+    app.playback.setAppVolume(Number(ev.target.value));
+  });
+
+  // Options > Playback: Long Play + Fade Out + Playback Speed
+  refs.optLongPlayEnabled?.addEventListener("change", (ev) => {
+    const enabled = ev.target.checked;
+    app.queueSettingsPatch({ longPlayEnabled: enabled });
+    if (state.playback.trackMeta) {
+      state.playback.durationSeconds = enabled
+        ? Number(state.preferences.manualPlayTimeSeconds || 180)
+        : Number(state.playback.trackMeta.durationSeconds || state.playback.durationSeconds);
+    }
+    app.ui.renderPlaylistRows();
+    app.playback.renderTransportChrome();
+  });
+
+  refs.optManualDuration?.addEventListener("change", (ev) => {
+    const parsed = app.parseDurationInput(ev.target.value, 15, 3600, 180);
+    ev.target.value = app.formatTime(parsed);
+    app.queueSettingsPatch({ manualPlayTimeSeconds: parsed });
+    if (state.preferences.longPlayEnabled && state.playback.trackMeta) {
+      state.playback.durationSeconds = parsed;
+    }
+    app.ui.renderPlaylistRows();
+    app.playback.renderTransportChrome();
+  });
+
+  refs.optFadeEnabled?.addEventListener("change", (ev) => {
+    app.queueSettingsPatch({ fadeOutEnabled: ev.target.checked });
+  });
+
+  refs.optFadeDuration?.addEventListener("change", (ev) => {
+    const parsed = app.parseDurationInput(ev.target.value, 0, 30, 5);
+    ev.target.value = app.formatTime(parsed);
+    app.queueSettingsPatch({ fadeOutSeconds: parsed });
+  });
+
+  refs.optSpeedEnabled?.addEventListener("change", (ev) => {
+    app.playback.setPlaybackSpeed(ev.target.checked, state.preferences.playbackSpeedRate || 1.25);
+  });
+
+  refs.optSpeedRate?.addEventListener("change", (ev) => {
+    const rate = Math.min(2.0, Math.max(0.5, Number(ev.target.value) || 1.25));
+    ev.target.value = rate.toFixed(2);
+    app.playback.setPlaybackSpeed(state.preferences.playbackSpeedEnabled, rate);
+  });
+
+  document.querySelectorAll("[data-speed-preset]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const rate = Number(btn.dataset.speedPreset) || 1.0;
+      app.playback.setPlaybackSpeed(true, rate);
+    });
+  });
+
+  // Options > Catalog Source
   refs.optRemoteURL?.addEventListener("change", (ev) => {
     app.queueSettingsPatch({ remoteCatalogURL: ev.target.value.trim() });
   });
@@ -223,7 +289,7 @@
     refs.optSourceStatus.textContent = "Reloading…";
     await app.flushSettings();
     if (!window.appBoy?.reloadCatalog) {
-      refs.optSourceStatus.textContent = "Native bridge unavailable.";
+      refs.optSourceStatus.textContent = "Bridge unavailable.";
       return;
     }
     try {
@@ -280,6 +346,9 @@
         app.ui.setOptionsOpen(false);
         app.ui.setMobilePane(target);
       }
+    } else if (action === "options") {
+      app.ui.setOptionsSection(target || "interface");
+      app.ui.setOptionsOpen(true);
     } else if (action === "play") {
       app.ui.setOptionsOpen(false);
       if (target) {
@@ -291,7 +360,12 @@
       }
       void app.playback.togglePlayback();
     } else if (action === "transport" && target) {
-      app.playback.handleRemoteCommand({ command: target });
+      if (target === "newTab") {
+        app.ui.createNewTab();
+        app.ui.setMobilePane("playlist");
+      } else {
+        app.playback.handleRemoteCommand({ command: target });
+      }
     }
   }
 
@@ -309,6 +383,15 @@
     });
     window.appBoy.onRemoteCommand?.((payload) => {
       app.playback.handleRemoteCommand(payload);
+    });
+    window.appBoy.onSettingsChanged?.((prefs) => {
+      if (prefs && typeof prefs === "object") {
+        Object.assign(state.preferences, prefs);
+        app.applyPreferencesToDOM();
+        app.syncOptionsInputsFromState();
+        app.ui.renderPlaylistRows();
+        app.playback.renderTransportChrome();
+      }
     });
     window.appBoy.onDeepLink?.((payload) => {
       if (!bootstrapDone) {
@@ -362,7 +445,7 @@
       }
       app.ui.renderAll();
     } catch (err) {
-      app.showErrorToast(err?.message || "APPBOY bootstrap failed.");
+      app.showErrorToast(err?.message || "SPCBoy bootstrap failed.");
       app.ui.renderAll();
     } finally {
       bootstrapDone = true;

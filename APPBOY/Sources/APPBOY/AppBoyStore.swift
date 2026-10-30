@@ -172,6 +172,13 @@ final class AppBoyStore {
         if let v = Self.doubleValue(patch["galleryGapRem"]) { next.galleryGapRem = v }
         if let v = Self.doubleValue(patch["galleryRadiusRem"]) { next.galleryRadiusRem = v }
         if let v = patch["repeatMode"] as? String { next.repeatMode = v }
+        if let v = patch["equalizerEnabled"] as? Bool { next.equalizerEnabled = v }
+        if let rawBands = patch["equalizerBandsDB"] as? [Any] {
+            next.equalizerBandsDB = rawBands.map { Self.doubleValue($0) ?? 0.0 }
+        }
+        if let v = patch["monoEnabled"] as? Bool { next.monoEnabled = v }
+        if let v = patch["fadeOutEnabled"] as? Bool { next.fadeOutEnabled = v }
+        if let v = Self.doubleValue(patch["fadeOutSeconds"]) { next.fadeOutSeconds = v }
         if let v = patch["longPlayEnabled"] as? Bool { next.longPlayEnabled = v }
         if let v = Self.doubleValue(patch["manualPlayTimeSeconds"]) { next.manualPlayTimeSeconds = v }
         if let v = patch["playbackSpeedEnabled"] as? Bool { next.playbackSpeedEnabled = v }
@@ -305,12 +312,17 @@ final class AppBoyStore {
             year: "2026",
             trackCount: importedTracks.count,
             totalDurationSeconds: Double(importedTracks.count) * 180.0,
-            artworkDataURL: Self.cartridgeSVGDataURL(code: "IOS", title: "DOCUMENTS", accent: "#38aaff")
+            artworkDataURL: Self.cartridgeSVGDataURL(
+                systemLabel: "LOCAL",
+                title: "DOCUMENTS",
+                subtitle: "Imported Audio",
+                accent: "#38aaff"
+            )
         )
         let localGroup = AppBoyConsoleGroup(
             id: "local",
             name: "Local Files",
-            shortCode: "IOS",
+            shortCode: "LOCAL",
             albums: [localAlbum]
         )
         var consoles = [localGroup]
@@ -360,11 +372,22 @@ final class AppBoyStore {
         try data.write(to: url, options: .atomic)
     }
 
-    private static func cartridgeSVGDataURL(code: String, title: String, accent: String) -> String {
-        let shortTitle = String(title.prefix(18))
+    private static func xmlEscape(_ text: String, maxLength: Int) -> String {
+        String(text.prefix(maxLength))
             .replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;")
             .replacingOccurrences(of: ">", with: "&gt;")
+    }
+
+    private static func cartridgeSVGDataURL(
+        systemLabel: String,
+        title: String,
+        subtitle: String,
+        accent: String
+    ) -> String {
+        let cleanSystem = xmlEscape(systemLabel, maxLength: 14)
+        let shortTitle = xmlEscape(title, maxLength: 18)
+        let shortSub = xmlEscape(subtitle, maxLength: 20)
         let svg = """
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
           <rect width="160" height="160" fill="#0b0d12"/>
@@ -372,9 +395,9 @@ final class AppBoyStore {
           <rect x="10" y="10" width="140" height="4" fill="\(accent)"/>
           <rect x="22" y="28" width="116" height="68" fill="#090b0f" stroke="#252c38" stroke-width="1"/>
           <path d="M22 76 L138 76 M22 84 L138 84" stroke="\(accent)" stroke-opacity="0.35" stroke-width="1"/>
-          <text x="28" y="52" fill="\(accent)" font-family="ui-monospace,Menlo,monospace" font-size="15" font-weight="700" letter-spacing="2">\(code)</text>
-          <text x="22" y="118" fill="#e0e1eb" font-family="ui-monospace,Menlo,monospace" font-size="10" letter-spacing="0.5">\(shortTitle)</text>
-          <text x="22" y="136" fill="#737a96" font-family="ui-monospace,Menlo,monospace" font-size="9" letter-spacing="1.2">SPCBOY // APPBOY</text>
+          <text x="28" y="54" fill="\(accent)" font-family="ui-monospace,Menlo,monospace" font-size="13" font-weight="700" letter-spacing="1.6">\(cleanSystem)</text>
+          <text x="22" y="118" fill="#e0e1eb" font-family="ui-monospace,Menlo,monospace" font-size="10" letter-spacing="0.4">\(shortTitle)</text>
+          <text x="22" y="135" fill="#737a96" font-family="ui-monospace,Menlo,monospace" font-size="9" letter-spacing="0.4">\(shortSub)</text>
         </svg>
         """
         let base64 = Data(svg.utf8).base64EncodedString()
@@ -403,7 +426,7 @@ final class AppBoyStore {
         }
 
         let seeds: [SeedConsole] = [
-            SeedConsole(id: "snes", name: "Super Nintendo", code: "SPC700", albums: [
+            SeedConsole(id: "snes", name: "Super Nintendo", code: "SNES", albums: [
                 SeedAlbum(id: "snes-chrono-echoes", title: "Chrono Horizon", artist: "Yasunori Lab", year: "1995", format: "SPC", accent: "#38aaff", tracks: [
                     ("Premonition Clockwork", 24.0),
                     ("Millennial Fairgrounds", 28.0),
@@ -417,13 +440,13 @@ final class AppBoyStore {
                     ("Maridia Glass Tube", 27.0),
                     ("Lower Norfair Pulse", 31.0)
                 ]),
-                SeedAlbum(id: "snes-donkey-mist", title: "Aquatic Canopy", artist: " Eveline & Wise", year: "1995", format: "SPC", accent: "#67c7ff", tracks: [
+                SeedAlbum(id: "snes-donkey-mist", title: "Aquatic Canopy", artist: "Eveline & Wise", year: "1995", format: "SPC", accent: "#67c7ff", tracks: [
                     ("Stickerbush Horizon", 34.0),
                     ("Mining Melancholy", 26.0),
                     ("Forest Interlude", 30.0)
                 ])
             ]),
-            SeedConsole(id: "genesis", name: "Sega Genesis", code: "YM2612", albums: [
+            SeedConsole(id: "genesis", name: "Sega Genesis", code: "GENESIS", albums: [
                 SeedAlbum(id: "md-bare-knuckle-neon", title: "Streets of Midnight", artist: "Yuzo FM Unit", year: "1992", format: "VGM", accent: "#ff79c6", tracks: [
                     ("Go Straight (FM Mix)", 28.0),
                     ("Dreamer in Shibuya", 26.0),
@@ -436,40 +459,40 @@ final class AppBoyStore {
                     ("Flying Battery Act 1", 27.0)
                 ])
             ]),
-            SeedConsole(id: "nes", name: "Nintendo (NES / Famicom)", code: "2A03", albums: [
-                SeedAlbum(id: "nes-wily-fortress", title: "Titanium Fortress II", artist: "Takashi 2A03", year: "1988", format: "NSF", accent: "#7dcfff", tracks: [
+            SeedConsole(id: "nes", name: "Nintendo (NES / Famicom)", code: "NES", albums: [
+                SeedAlbum(id: "nes-wily-fortress", title: "Titanium Fortress II", artist: "Takashi Sound", year: "1988", format: "NSF", accent: "#7dcfff", tracks: [
                     ("Rooftop Opening", 22.0),
                     ("Metal Blade Factory", 24.0),
                     ("Flash Stopper", 25.0),
                     ("Dr. Wily Stage 1", 30.0)
                 ]),
-                SeedAlbum(id: "nes-moonlight-castlevania", title: "Clocktower Nocturne", artist: "VRC6 Ensemble", year: "1989", format: "NSF", accent: "#bb9af7", tracks: [
-                    ("Beginning (VRC6)", 26.0),
+                SeedAlbum(id: "nes-moonlight-castlevania", title: "Clocktower Nocturne", artist: "Konami Ensemble", year: "1989", format: "NSF", accent: "#bb9af7", tracks: [
+                    ("Beginning", 26.0),
                     ("Aquarius Flowing", 24.0),
                     ("Stream of Shadows", 28.0)
                 ])
             ]),
-            SeedConsole(id: "gb", name: "Game Boy", code: "LR35902", albums: [
+            SeedConsole(id: "gb", name: "Game Boy", code: "GAME BOY", albums: [
                 SeedAlbum(id: "gb-koholint-waves", title: "Koholint Dreaming", artist: "Kazumi Wave", year: "1993", format: "GBS", accent: "#9ece6a", tracks: [
                     ("Mabe Village Morning", 22.0),
                     ("Tal Tal Heights", 28.0),
                     ("Ballad of the Wind Fish", 30.0)
                 ]),
-                SeedAlbum(id: "gb-brick-matrix", title: "Dot Matrix Pulse", artist: "DMG Chiptune", year: "1990", format: "GBS", accent: "#73daca", tracks: [
+                SeedAlbum(id: "gb-brick-matrix", title: "Dot Matrix Pulse", artist: "DMG Studio", year: "1990", format: "GBS", accent: "#73daca", tracks: [
                     ("Type-A Korobeiniki", 23.0),
                     ("Rocket Launch Complete", 21.0),
                     ("High Score Telemetry", 24.0)
                 ])
             ]),
-            SeedConsole(id: "pce", name: "PC Engine / TurboGrafx", code: "HUC6280", albums: [
-                SeedAlbum(id: "pce-star-soldier", title: "Blazing Lazers Orbit", artist: "Hudson PSG", year: "1989", format: "HES", accent: "#ff9e64", tracks: [
+            SeedConsole(id: "pce", name: "PC Engine / TurboGrafx", code: "PC ENGINE", albums: [
+                SeedAlbum(id: "pce-star-soldier", title: "Blazing Lazers Orbit", artist: "Hudson Sound", year: "1989", format: "HES", accent: "#ff9e64", tracks: [
                     ("Area 01 Ion Drift", 25.0),
                     ("Subspace Interceptor", 27.0),
                     ("Final Core Approach", 29.0)
                 ])
             ]),
-            SeedConsole(id: "psx", name: "PlayStation", code: "SPU-XA", albums: [
-                SeedAlbum(id: "psx-symphony-marble", title: "Inverted Cathedral", artist: "Michiru SPU", year: "1997", format: "PSF", accent: "#38aaff", tracks: [
+            SeedConsole(id: "psx", name: "PlayStation", code: "PSX", albums: [
+                SeedAlbum(id: "psx-symphony-marble", title: "Inverted Cathedral", artist: "Michiru Ensemble", year: "1997", format: "PSF", accent: "#38aaff", tracks: [
                     ("Dracula's Castle", 31.0),
                     ("Marble Gallery", 26.0),
                     ("Wood Carving Partita", 29.0),
@@ -487,6 +510,7 @@ final class AppBoyStore {
             for seedAlbum in seedConsole.albums {
                 var albumTracks: [AppBoyTrack] = []
                 var totalDuration = 0.0
+                let cleanArtist = seedAlbum.artist.trimmingCharacters(in: .whitespaces)
                 for (index, item) in seedAlbum.tracks.enumerated() {
                     let trackId = "\(seedAlbum.id)-t\(String(format: "%02d", index + 1))"
                     let track = AppBoyTrack(
@@ -497,7 +521,7 @@ final class AppBoyStore {
                         albumTitle: seedAlbum.title,
                         trackNumber: index + 1,
                         title: item.0,
-                        artist: seedAlbum.artist.trimmingCharacters(in: .whitespaces),
+                        artist: cleanArtist,
                         year: seedAlbum.year,
                         format: seedAlbum.format,
                         durationSeconds: item.1,
@@ -513,13 +537,14 @@ final class AppBoyStore {
                     consoleId: seedConsole.id,
                     consoleName: seedConsole.name,
                     title: seedAlbum.title,
-                    artist: seedAlbum.artist.trimmingCharacters(in: .whitespaces),
+                    artist: cleanArtist,
                     year: seedAlbum.year,
                     trackCount: albumTracks.count,
                     totalDurationSeconds: totalDuration,
                     artworkDataURL: cartridgeSVGDataURL(
-                        code: seedConsole.code,
+                        systemLabel: seedConsole.code,
                         title: seedAlbum.title.uppercased(),
+                        subtitle: "\(cleanArtist) · \(seedAlbum.year)",
                         accent: seedAlbum.accent
                     )
                 ))
@@ -534,7 +559,7 @@ final class AppBoyStore {
 
         let albumCount = consoles.reduce(0) { $0 + $1.albums.count }
         let snapshot = AppBoyCatalogSnapshot(
-            sourceLabel: "Built-in VGM",
+            sourceLabel: "Starter Catalog",
             consoleCount: consoles.count,
             albumCount: albumCount,
             trackCount: tracksById.count,

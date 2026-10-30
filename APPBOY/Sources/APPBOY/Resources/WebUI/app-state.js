@@ -35,7 +35,7 @@
     searchQuery: "",
     expandedConsoleIds: new Set(),
     catalog: {
-      sourceLabel: "Built-in VGM",
+      sourceLabel: "Starter Catalog",
       consoleCount: 0,
       albumCount: 0,
       trackCount: 0,
@@ -68,6 +68,11 @@
       galleryGapRem: 0.35,
       galleryRadiusRem: 0.2,
       repeatMode: "off",
+      equalizerEnabled: false,
+      equalizerBandsDB: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      monoEnabled: false,
+      fadeOutEnabled: true,
+      fadeOutSeconds: 5,
       longPlayEnabled: false,
       manualPlayTimeSeconds: 180,
       playbackSpeedEnabled: false,
@@ -92,7 +97,6 @@
     indicator: document.getElementById("sb2-selection-indicator"),
     consoleLabel: document.getElementById("sb2-console-label"),
     albumLabel: document.getElementById("sb2-album-label"),
-    sourceChip: document.getElementById("sb2-source-chip"),
     mobileModeBar: document.getElementById("mobile-mode-bar"),
     searchInput: document.getElementById("sidebar-search-input"),
     splitGalleryBtn: document.getElementById("split-gallery-button"),
@@ -112,6 +116,8 @@
     galleryGrid: document.getElementById("gallery-grid"),
     nowPlayingTitle: document.getElementById("now-playing-title"),
     nowPlayingMeta: document.getElementById("now-playing-meta"),
+    eqBadge: document.getElementById("eq-readout-badge"),
+    longPlayBadge: document.getElementById("long-play-readout-badge"),
     speedBadge: document.getElementById("speed-readout-badge"),
     repeatBadge: document.getElementById("repeat-readout-badge"),
     progressSlider: document.getElementById("progress-slider"),
@@ -121,6 +127,7 @@
     playBtn: document.getElementById("play-button"),
     nextBtn: document.getElementById("next-button"),
     repeatBtn: document.getElementById("repeat-button"),
+    eqBtn: document.getElementById("equalizer-toolbar-button"),
     longPlayBtn: document.getElementById("long-play-button"),
     speedBtn: document.getElementById("playback-speed-button"),
     volumeWrap: document.getElementById("toolbar-volume-control"),
@@ -158,10 +165,18 @@
     optGalleryGapOut: document.getElementById("opt-gallery-gap-out"),
     optGalleryRadius: document.getElementById("opt-gallery-radius"),
     optGalleryRadiusOut: document.getElementById("opt-gallery-radius-out"),
+    optEqEnabled: document.getElementById("opt-eq-enabled"),
+    optEqResetBtn: document.getElementById("opt-eq-reset-button"),
+    optEqBandsWrap: document.getElementById("equalizer-bands"),
+    optMonoEnabled: document.getElementById("opt-mono-enabled"),
+    optAppVolume: document.getElementById("opt-app-volume"),
+    optAppVolumeValue: document.getElementById("opt-app-volume-value"),
     optSpeedEnabled: document.getElementById("opt-speed-enabled"),
     optSpeedRate: document.getElementById("opt-speed-rate"),
     optLongPlayEnabled: document.getElementById("opt-long-play-enabled"),
     optManualDuration: document.getElementById("opt-manual-duration"),
+    optFadeEnabled: document.getElementById("opt-fade-enabled"),
+    optFadeDuration: document.getElementById("opt-fade-duration"),
     optSourceLabel: document.getElementById("opt-source-label"),
     optRemoteURL: document.getElementById("opt-remote-url"),
     optReloadCatalogBtn: document.getElementById("opt-reload-catalog-button"),
@@ -182,6 +197,48 @@
       return `${hrs}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
     }
     return `${mins}:${String(secs).padStart(2, "0")}`;
+  }
+
+  function parseDurationInput(rawText, minSec, maxSec, fallbackSec) {
+    const text = String(rawText ?? "").trim();
+    if (!text) return fallbackSec;
+    let total = NaN;
+    if (text.includes(":")) {
+      const parts = text.split(":").map((part) => Number(part.trim()));
+      if (parts.every((n) => Number.isFinite(n) && n >= 0)) {
+        if (parts.length === 2) {
+          total = parts[0] * 60 + parts[1];
+        } else if (parts.length === 3) {
+          total = parts[0] * 3600 + parts[1] * 60 + parts[2];
+        }
+      }
+    } else {
+      total = Number(text);
+    }
+    if (!Number.isFinite(total)) return fallbackSec;
+    return Math.min(maxSec, Math.max(minSec, Math.round(total)));
+  }
+
+  function effectiveTrackDuration(track) {
+    if (!track) return 0;
+    if (state.preferences.longPlayEnabled) {
+      return Math.max(15, Number(state.preferences.manualPlayTimeSeconds) || 180);
+    }
+    return Math.max(0, Number(track.durationSeconds) || 0);
+  }
+
+  function formatGainDB(gain) {
+    const num = Number.isFinite(gain) ? Math.round(gain * 2) / 2 : 0;
+    const sign = num > 0 ? "+" : "";
+    return `${sign}${num.toFixed(1)} dB`;
+  }
+
+  function setRangeSliderPercent(inputEl, pct) {
+    const shell = inputEl?.closest(".range-slider");
+    if (shell) {
+      const clamped = Math.min(100, Math.max(0, Number(pct) || 0));
+      shell.style.setProperty("--range-percent", `${clamped.toFixed(2)}%`);
+    }
   }
 
   function showErrorToast(message) {
@@ -223,36 +280,76 @@
 
   function syncOptionsInputsFromState() {
     const p = state.preferences;
-    if (document.activeElement !== refs.optAccentColor) refs.optAccentColor.value = p.accentColor;
-    if (document.activeElement !== refs.optChromePrimary) refs.optChromePrimary.value = p.uiChromePrimaryColor;
-    if (document.activeElement !== refs.optChromePane) refs.optChromePane.value = p.uiChromePaneColor;
-    refs.optSelectionAnimEnabled.checked = Boolean(p.selectionAnimationEnabled);
-    if (document.activeElement !== refs.optSelectionAnimMs) refs.optSelectionAnimMs.value = String(p.selectionAnimationMilliseconds);
-    refs.optLinkMode.checked = Boolean(p.playlistLinkMode);
-    refs.optSidebarCounts.checked = Boolean(p.sidebarTrackCounts);
-    refs.optFavSort.value = p.favoriteSortOrder || "historical";
+    if (refs.optAccentColor && document.activeElement !== refs.optAccentColor) refs.optAccentColor.value = p.accentColor;
+    if (refs.optChromePrimary && document.activeElement !== refs.optChromePrimary) refs.optChromePrimary.value = p.uiChromePrimaryColor;
+    if (refs.optChromePane && document.activeElement !== refs.optChromePane) refs.optChromePane.value = p.uiChromePaneColor;
+    if (refs.optSelectionAnimEnabled) refs.optSelectionAnimEnabled.checked = Boolean(p.selectionAnimationEnabled);
+    if (refs.optSelectionAnimMs && document.activeElement !== refs.optSelectionAnimMs) refs.optSelectionAnimMs.value = String(p.selectionAnimationMilliseconds);
+    if (refs.optLinkMode) refs.optLinkMode.checked = Boolean(p.playlistLinkMode);
+    if (refs.optSidebarCounts) refs.optSidebarCounts.checked = Boolean(p.sidebarTrackCounts);
+    if (refs.optFavSort) refs.optFavSort.value = p.favoriteSortOrder || "historical";
 
-    if (document.activeElement !== refs.optChromeFontPt) refs.optChromeFontPt.value = String(p.uiChromeFontSizePt);
-    if (document.activeElement !== refs.optContentFontPt) refs.optContentFontPt.value = String(p.contentFontSizePt);
-    if (document.activeElement !== refs.optSidebarTextColor) refs.optSidebarTextColor.value = p.sidebarTextColor;
-    refs.optChromeMono.checked = Boolean(p.uiChromeMonospace);
-    refs.optContentMono.checked = Boolean(p.contentMonospace);
+    if (refs.optChromeFontPt && document.activeElement !== refs.optChromeFontPt) refs.optChromeFontPt.value = String(p.uiChromeFontSizePt);
+    if (refs.optContentFontPt && document.activeElement !== refs.optContentFontPt) refs.optContentFontPt.value = String(p.contentFontSizePt);
+    if (refs.optSidebarTextColor && document.activeElement !== refs.optSidebarTextColor) refs.optSidebarTextColor.value = p.sidebarTextColor;
+    if (refs.optChromeMono) refs.optChromeMono.checked = Boolean(p.uiChromeMonospace);
+    if (refs.optContentMono) refs.optContentMono.checked = Boolean(p.contentMonospace);
 
-    refs.optGalleryFit.value = p.galleryFitMode || "crop";
-    refs.optGalleryScale.value = String(p.galleryFrameScale);
-    refs.optGalleryScaleOut.textContent = `${Number(p.galleryFrameScale).toFixed(2)}×`;
-    refs.optGalleryGap.value = String(p.galleryGapRem);
-    refs.optGalleryGapOut.textContent = `${Number(p.galleryGapRem).toFixed(2)}rem`;
-    refs.optGalleryRadius.value = String(p.galleryRadiusRem);
-    refs.optGalleryRadiusOut.textContent = `${Number(p.galleryRadiusRem).toFixed(2)}rem`;
+    if (refs.optGalleryFit) refs.optGalleryFit.value = p.galleryFitMode || "crop";
+    if (refs.optGalleryScale) refs.optGalleryScale.value = String(p.galleryFrameScale);
+    if (refs.optGalleryScaleOut) refs.optGalleryScaleOut.textContent = `${Number(p.galleryFrameScale).toFixed(2)}×`;
+    if (refs.optGalleryGap) refs.optGalleryGap.value = String(p.galleryGapRem);
+    if (refs.optGalleryGapOut) refs.optGalleryGapOut.textContent = `${Number(p.galleryGapRem).toFixed(2)}rem`;
+    if (refs.optGalleryRadius) refs.optGalleryRadius.value = String(p.galleryRadiusRem);
+    if (refs.optGalleryRadiusOut) refs.optGalleryRadiusOut.textContent = `${Number(p.galleryRadiusRem).toFixed(2)}rem`;
 
-    refs.optSpeedEnabled.checked = Boolean(p.playbackSpeedEnabled);
-    if (document.activeElement !== refs.optSpeedRate) refs.optSpeedRate.value = String(p.playbackSpeedRate);
-    refs.optLongPlayEnabled.checked = Boolean(p.longPlayEnabled);
-    if (document.activeElement !== refs.optManualDuration) refs.optManualDuration.value = String(p.manualPlayTimeSeconds);
+    // Audio: 10-Band Equalizer + Mono + Volume
+    if (refs.optEqEnabled) refs.optEqEnabled.checked = Boolean(p.equalizerEnabled);
+    refs.optEqBandsWrap?.classList.toggle("is-bypassed", !p.equalizerEnabled);
+    const bands = Array.isArray(p.equalizerBandsDB) ? p.equalizerBandsDB : [];
+    document.querySelectorAll("[data-equalizer-band]").forEach((input) => {
+      const idx = Number(input.dataset.equalizerBand);
+      const gain = Number.isFinite(bands[idx]) ? Math.min(12, Math.max(-12, Number(bands[idx]))) : 0;
+      if (document.activeElement !== input) {
+        input.value = String(gain);
+      }
+      setRangeSliderPercent(input, ((gain + 12) / 24) * 100);
+      const out = document.querySelector(`[data-equalizer-value="${idx}"]`);
+      if (out) out.textContent = formatGainDB(gain);
+    });
 
-    refs.optSourceLabel.textContent = state.catalog.sourceLabel || "Built-in VGM";
-    if (document.activeElement !== refs.optRemoteURL) refs.optRemoteURL.value = p.remoteCatalogURL || "";
+    if (refs.optMonoEnabled) refs.optMonoEnabled.checked = Boolean(p.monoEnabled);
+    const vol = Math.min(1, Math.max(0, Number(p.appVolume ?? 1)));
+    if (refs.optAppVolume) {
+      if (document.activeElement !== refs.optAppVolume) refs.optAppVolume.value = String(vol);
+      setRangeSliderPercent(refs.optAppVolume, vol * 100);
+    }
+    if (refs.optAppVolumeValue) refs.optAppVolumeValue.textContent = `${Math.round(vol * 100)}%`;
+
+    // Playback: Long Play + Fade Out + Speed
+    if (refs.optLongPlayEnabled) refs.optLongPlayEnabled.checked = Boolean(p.longPlayEnabled);
+    if (refs.optManualDuration && document.activeElement !== refs.optManualDuration) {
+      refs.optManualDuration.value = formatTime(p.manualPlayTimeSeconds);
+    }
+    if (refs.optFadeEnabled) refs.optFadeEnabled.checked = Boolean(p.fadeOutEnabled);
+    if (refs.optFadeDuration && document.activeElement !== refs.optFadeDuration) {
+      refs.optFadeDuration.value = formatTime(p.fadeOutSeconds);
+    }
+
+    if (refs.optSpeedEnabled) refs.optSpeedEnabled.checked = Boolean(p.playbackSpeedEnabled);
+    if (refs.optSpeedRate && document.activeElement !== refs.optSpeedRate) {
+      refs.optSpeedRate.value = Number(p.playbackSpeedRate || 1.25).toFixed(2);
+    }
+    document.querySelectorAll("[data-speed-preset]").forEach((btn) => {
+      const presetVal = Number(btn.dataset.speedPreset);
+      const active = Boolean(p.playbackSpeedEnabled) && Math.abs(presetVal - Number(p.playbackSpeedRate)) < 0.01;
+      btn.classList.toggle("is-selected", active);
+    });
+
+    if (refs.optSourceLabel) refs.optSourceLabel.textContent = state.catalog.sourceLabel || "Starter Catalog";
+    if (refs.optRemoteURL && document.activeElement !== refs.optRemoteURL) {
+      refs.optRemoteURL.value = p.remoteCatalogURL || "";
+    }
   }
 
   function queueSettingsPatch(patch) {
@@ -318,7 +415,7 @@
     try {
       await window.appBoy.workspaceSave(buildWorkspacePayload());
     } catch (err) {
-      console.error("[APPBOY] workspace save error", err);
+      console.error("[SPCBoy] workspace save error", err);
     }
   }
 
@@ -341,6 +438,10 @@
     state,
     refs,
     formatTime,
+    parseDurationInput,
+    effectiveTrackDuration,
+    formatGainDB,
+    setRangeSliderPercent,
     showErrorToast,
     applyPreferencesToDOM,
     syncOptionsInputsFromState,

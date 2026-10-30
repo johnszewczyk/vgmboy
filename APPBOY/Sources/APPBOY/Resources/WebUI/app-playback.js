@@ -13,8 +13,14 @@
 
   function updateProgressVisuals() {
     const pb = state.playback;
-    const duration = Math.max(0, Number(pb.durationSeconds) || 0);
-    const elapsed = Math.min(duration || 0, Math.max(0, Number(pb.elapsedSeconds) || 0));
+    const activeSelected = app.activeTracks().find((t) => t.id === app.activeTab()?.selectedTrackId);
+    const fallbackDuration = pb.transportState === "stopped"
+      ? app.effectiveTrackDuration(pb.trackMeta || activeSelected)
+      : 0;
+    const duration = Math.max(0, Number(pb.durationSeconds) || fallbackDuration || 0);
+    const elapsed = pb.transportState === "stopped"
+      ? 0
+      : Math.min(duration || 0, Math.max(0, Number(pb.elapsedSeconds) || 0));
     const pct = duration > 0 ? Math.min(100, (elapsed / duration) * 100) : 0;
 
     document.documentElement.style.setProperty("--progress-percent", `${pct.toFixed(2)}%`);
@@ -27,7 +33,7 @@
     refs.songLengthLabel.textContent = app.formatTime(duration);
 
     const playlistTotal = app.activeTracks().reduce(
-      (sum, t) => sum + (Number(t.durationSeconds) || 0),
+      (sum, t) => sum + app.effectiveTrackDuration(t),
       0
     );
     refs.playlistTotalLabel.textContent = app.formatTime(playlistTotal);
@@ -46,7 +52,16 @@
     refs.repeatBadge.classList.toggle("is-hidden", !repeatActive);
     refs.repeatBadge.textContent = p.repeatMode === "one" ? "RPT 1" : "RPT ALL";
 
-    refs.longPlayBtn.setAttribute("aria-pressed", p.longPlayEnabled ? "true" : "false");
+    const eqActive = Boolean(p.equalizerEnabled);
+    refs.eqBtn?.setAttribute("aria-pressed", eqActive ? "true" : "false");
+    refs.eqBadge?.classList.toggle("is-hidden", !eqActive);
+
+    const longPlayActive = Boolean(p.longPlayEnabled);
+    refs.longPlayBtn.setAttribute("aria-pressed", longPlayActive ? "true" : "false");
+    refs.longPlayBadge?.classList.toggle("is-hidden", !longPlayActive);
+    if (refs.longPlayBadge) {
+      refs.longPlayBadge.textContent = `LP ${app.formatTime(p.manualPlayTimeSeconds)}`;
+    }
 
     refs.speedBtn.setAttribute("aria-pressed", p.playbackSpeedEnabled ? "true" : "false");
     refs.speedBadge.classList.toggle("is-hidden", !p.playbackSpeedEnabled);
@@ -59,7 +74,7 @@
     const meta = pb.trackMeta || findTrackInAnyTab(pb.trackId);
     if (meta) {
       refs.nowPlayingTitle.textContent = meta.title;
-      refs.nowPlayingMeta.textContent = `${meta.artist} · ${meta.albumTitle} [${meta.consoleName}]`;
+      refs.nowPlayingMeta.textContent = `${meta.artist} · ${meta.albumTitle}`;
     } else {
       const selected = app.activeTracks().find((t) => t.id === app.activeTab()?.selectedTrackId);
       if (selected) {
@@ -67,7 +82,7 @@
         refs.nowPlayingMeta.textContent = `${selected.artist} · ${selected.albumTitle}`;
       } else {
         refs.nowPlayingTitle.textContent = "Select a track";
-        refs.nowPlayingMeta.textContent = "SPCBOY // READY";
+        refs.nowPlayingMeta.textContent = "—";
       }
     }
 
@@ -92,7 +107,7 @@
     if (!window.appBoy?.playbackStart) {
       state.playback.transportState = "playing";
       state.playback.elapsedSeconds = 0;
-      state.playback.durationSeconds = track.durationSeconds || 30;
+      state.playback.durationSeconds = app.effectiveTrackDuration(track) || 30;
       renderTransportChrome();
       app.ui?.renderPlaylistRows();
       return;
@@ -201,18 +216,59 @@
     renderTransportChrome();
   }
 
+  function toggleEqualizer() {
+    const next = !state.preferences.equalizerEnabled;
+    const bands = (state.preferences.equalizerBandsDB || []).slice();
+    app.queueSettingsPatch({ equalizerEnabled: next });
+    window.appBoy?.playbackSetEqualizer?.(next, bands).catch(() => {});
+    renderTransportChrome();
+  }
+
+  function setEqualizerBand(index, gainDB) {
+    const clamped = Math.round(Math.min(12, Math.max(-12, Number(gainDB) || 0)) * 2) / 2;
+    const bands = Array.isArray(state.preferences.equalizerBandsDB)
+      ? state.preferences.equalizerBandsDB.slice()
+      : Array(10).fill(0);
+    while (bands.length < 10) bands.push(0);
+    bands[index] = clamped;
+    app.queueSettingsPatch({ equalizerBandsDB: bands });
+    window.appBoy?.playbackSetEqualizer?.(Boolean(state.preferences.equalizerEnabled), bands).catch(() => {});
+    renderTransportChrome();
+  }
+
+  function resetEqualizer() {
+    const zeroBands = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    app.queueSettingsPatch({ equalizerBandsDB: zeroBands });
+    window.appBoy?.playbackSetEqualizer?.(Boolean(state.preferences.equalizerEnabled), zeroBands).catch(() => {});
+    renderTransportChrome();
+  }
+
   function toggleLongPlay() {
     const next = !state.preferences.longPlayEnabled;
     app.queueSettingsPatch({ longPlayEnabled: next });
+    if (state.playback.trackMeta) {
+      state.playback.durationSeconds = next
+        ? Number(state.preferences.manualPlayTimeSeconds || 180)
+        : Number(state.playback.trackMeta.durationSeconds || state.playback.durationSeconds);
+    }
+    app.ui?.renderPlaylistRows();
+    renderTransportChrome();
+  }
+
+  function setPlaybackSpeed(enabled, rate) {
+    const cleanRate = Math.round(Math.min(2.0, Math.max(0.5, Number(rate) || 1.25)) * 100) / 100;
+    app.queueSettingsPatch({
+      playbackSpeedEnabled: Boolean(enabled),
+      playbackSpeedRate: cleanRate
+    });
+    const activeRate = enabled ? cleanRate : 1.0;
+    window.appBoy?.playbackSetRate?.(activeRate).catch(() => {});
     renderTransportChrome();
   }
 
   function togglePlaybackSpeed() {
     const next = !state.preferences.playbackSpeedEnabled;
-    app.queueSettingsPatch({ playbackSpeedEnabled: next });
-    const rate = next ? Number(state.preferences.playbackSpeedRate || 1.25) : 1.0;
-    window.appBoy?.playbackSetRate?.(rate).catch(() => {});
-    renderTransportChrome();
+    setPlaybackSpeed(next, state.preferences.playbackSpeedRate || 1.25);
   }
 
   function setAppVolume(normalizedVolume) {
@@ -287,7 +343,11 @@
     playAdjacent,
     seekTo,
     cycleRepeatMode,
+    toggleEqualizer,
+    setEqualizerBand,
+    resetEqualizer,
     toggleLongPlay,
+    setPlaybackSpeed,
     togglePlaybackSpeed,
     setAppVolume,
     renderTransportChrome,

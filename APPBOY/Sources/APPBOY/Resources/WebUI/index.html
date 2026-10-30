@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>SPCBOY APPBOY</title>
+    <title>SPCBoy</title>
     <link rel="stylesheet" href="./styles.css" />
     <link rel="stylesheet" href="./sb-presentation.css" />
   </head>
@@ -38,17 +38,15 @@
     <div class="app-shell">
       <div id="sb2-selection-indicator" class="sb2-selection-indicator is-hidden" aria-hidden="true"></div>
 
-      <header class="sb-titlebar" aria-label="SPCBOY APPBOY status">
+      <header class="sb-titlebar" aria-label="SPCBoy status">
         <div class="sb-titlebar-inner">
           <strong class="sb-brand">SPCBOY</strong>
-          <span class="sb-badge">IOS</span>
           <span id="sb2-console-label" class="sb-console">—</span>
-          <span id="sb2-album-label" class="sb-album">LOADING</span>
-          <span id="sb2-source-chip" class="sb-source-chip">BUILT-IN</span>
+          <span id="sb2-album-label" class="sb-album">NO PLAYLIST</span>
         </div>
       </header>
 
-      <nav id="mobile-mode-bar" class="mobile-mode-bar" aria-label="Mobile workspace view">
+      <nav id="mobile-mode-bar" class="mobile-mode-bar" aria-label="Workspace view">
         <button id="mode-library-button" class="tool-button mode-button is-selected" type="button" data-mobile-target="library" data-selector-target>
           <svg class="ui-icon" aria-hidden="true"><use href="#icon-sidebar-views"></use></svg>
           <span>LIB</span>
@@ -74,7 +72,7 @@
       <main class="workspace">
         <aside id="library-pane" class="sidebar" aria-label="Catalog library">
           <div class="sidebar-search-wrap toolbar">
-            <input id="sidebar-search-input" class="sidebar-search-input" type="search" placeholder="Search consoles or albums…" autocomplete="off" autocapitalize="off" spellcheck="false" />
+            <input id="sidebar-search-input" class="sidebar-search-input" type="search" placeholder="Search" autocomplete="off" autocapitalize="off" spellcheck="false" />
             <div class="sidebar-library-actions" role="group" aria-label="Library controls">
               <button id="split-gallery-button" class="sidebar-mode-button split-only-control" type="button" title="Gallery" aria-label="Gallery" aria-pressed="false" data-selector-target>
                 <svg class="ui-icon" aria-hidden="true"><use href="#icon-gallery"></use></svg>
@@ -109,7 +107,7 @@
                 <span class="col-num">#</span>
                 <button id="sort-title-button" class="col-header-button col-title" type="button">TITLE</button>
                 <button id="sort-album-button" class="col-header-button col-album split-only-col" type="button">ALBUM</button>
-                <span class="col-sys split-only-col">SYS</span>
+                <span class="col-sys split-only-col">SYSTEM</span>
                 <span class="col-fav" aria-label="Favorite"><svg class="ui-icon" aria-hidden="true"><use href="#icon-star"></use></svg></span>
                 <button id="sort-time-button" class="col-header-button col-time" type="button">TIME</button>
               </div>
@@ -127,8 +125,10 @@
         <div class="now-playing-row">
           <div class="now-playing-copy">
             <span id="now-playing-title" class="now-playing-title">Select a track</span>
-            <span id="now-playing-meta" class="now-playing-meta">SPCBOY // READY</span>
+            <span id="now-playing-meta" class="now-playing-meta">—</span>
           </div>
+          <span id="eq-readout-badge" class="transport-pill is-hidden">EQ</span>
+          <span id="long-play-readout-badge" class="transport-pill is-hidden">LP</span>
           <span id="speed-readout-badge" class="transport-pill is-hidden">1.25×</span>
           <span id="repeat-readout-badge" class="transport-pill is-hidden">RPT</span>
         </div>
@@ -165,6 +165,9 @@
           <button id="repeat-button" class="tool-button glyph-button" type="button" title="Repeat mode" aria-label="Repeat mode" aria-pressed="false" data-selector-target>
             <svg class="ui-icon" aria-hidden="true"><use href="#icon-repeat-2"></use></svg>
           </button>
+          <button id="equalizer-toolbar-button" class="tool-button glyph-button" type="button" title="Toggle Equalizer" aria-label="Toggle Equalizer" aria-pressed="false" data-selector-target>
+            <svg class="ui-icon" aria-hidden="true"><use href="#icon-sliders-horizontal"></use></svg>
+          </button>
           <button id="long-play-button" class="tool-button glyph-button" type="button" title="Toggle Long Play" aria-label="Toggle Long Play" aria-pressed="false" data-selector-target>
             <svg class="ui-icon" aria-hidden="true"><use href="#icon-infinity"></use></svg>
           </button>
@@ -190,7 +193,7 @@
       <footer class="sb-status" aria-label="Playback and library status">
         <div class="sb-status-inner">
           <div class="sb-status-sidebar">
-            <span id="sidebar-stats" class="sb-sidebar-stats" role="status" aria-live="polite">LOADING LIBRARY</span>
+            <span id="sidebar-stats" class="sb-sidebar-stats" role="status" aria-live="polite">—</span>
           </div>
           <div class="sb-status-divider" aria-hidden="true"></div>
           <div class="sb-status-content">
@@ -215,7 +218,7 @@
     <div id="options-overlay" class="options-overlay" aria-hidden="true">
       <div class="options-panel" role="dialog" aria-modal="true" aria-label="Options">
         <div class="options-header">
-          <span>SPCBOY // OPTIONS</span>
+          <span>OPTIONS</span>
           <button id="options-close-button" class="tool-button glyph-button" type="button" title="Close Options" aria-label="Close Options">
             <svg class="ui-icon" aria-hidden="true"><use href="#icon-xmark"></use></svg>
           </button>
@@ -225,11 +228,11 @@
           <nav class="options-nav" aria-label="Options sections">
             <button class="tool-button options-nav-item is-selected" type="button" data-options-tab="interface">
               <svg class="ui-icon" aria-hidden="true"><use href="#icon-palette"></use></svg>
-              <span>UI Chrome</span>
+              <span>Chrome</span>
             </button>
             <button class="tool-button options-nav-item" type="button" data-options-tab="fonts">
               <svg class="ui-icon" aria-hidden="true"><use href="#icon-scroll-text"></use></svg>
-              <span>UI Fonts</span>
+              <span>Fonts</span>
             </button>
             <button class="tool-button options-nav-item" type="button" data-options-tab="gallery">
               <svg class="ui-icon" aria-hidden="true"><use href="#icon-gallery"></use></svg>
@@ -239,15 +242,19 @@
               <svg class="ui-icon" aria-hidden="true"><use href="#icon-sliders-horizontal"></use></svg>
               <span>Audio</span>
             </button>
+            <button class="tool-button options-nav-item" type="button" data-options-tab="playback">
+              <svg class="ui-icon" aria-hidden="true"><use href="#icon-speed"></use></svg>
+              <span>Playback</span>
+            </button>
             <button class="tool-button options-nav-item" type="button" data-options-tab="source">
               <svg class="ui-icon" aria-hidden="true"><use href="#icon-database"></use></svg>
-              <span>Source</span>
+              <span>Catalog</span>
             </button>
           </nav>
 
           <div class="options-content sb-scroll-fade">
             <div class="options-page" data-options-page="interface">
-              <h1 class="options-page-title">APPBOY / UI Chrome</h1>
+              <h1 class="options-page-title">UI Chrome</h1>
 
               <div class="options-subpanel">
                 <h2 class="options-subpanel-title">Palette Presets &amp; Tokens</h2>
@@ -272,9 +279,9 @@
               </div>
 
               <div class="options-subpanel">
-                <h2 class="options-subpanel-title">Motion &amp; Touch Behavior</h2>
+                <h2 class="options-subpanel-title">Motion &amp; Behavior</h2>
                 <label class="options-field options-toggle-field">
-                  <span class="options-field-copy"><span>Selection Motion</span><small>Animate the shared SB2 selector across controls and tabs.</small></span>
+                  <span class="options-field-copy"><span>Selection Motion</span><small>Animate the selection indicator across controls and tabs.</small></span>
                   <input id="opt-selection-anim-enabled" type="checkbox" checked />
                 </label>
                 <label class="options-field">
@@ -282,7 +289,7 @@
                   <input id="opt-selection-anim-ms" class="options-input options-short-input" type="number" min="0" max="600" step="20" value="180" inputmode="numeric" />
                 </label>
                 <label class="options-field options-toggle-field">
-                  <span class="options-field-copy"><span>Link Mode (Single-Tap Play)</span><small>Start playback immediately when tapping a playlist row.</small></span>
+                  <span class="options-field-copy"><span>Link Mode</span><small>Start playback immediately when tapping a playlist row.</small></span>
                   <input id="opt-link-mode" type="checkbox" checked />
                 </label>
                 <label class="options-field options-toggle-field">
@@ -300,7 +307,7 @@
             </div>
 
             <div class="options-page is-hidden" data-options-page="fonts">
-              <h1 class="options-page-title">APPBOY / UI Fonts</h1>
+              <h1 class="options-page-title">UI Fonts</h1>
               <div class="options-subpanel">
                 <h2 class="options-subpanel-title">Typography &amp; Scale</h2>
                 <label class="options-field">
@@ -327,7 +334,7 @@
             </div>
 
             <div class="options-page is-hidden" data-options-page="gallery">
-              <h1 class="options-page-title">APPBOY / Gallery</h1>
+              <h1 class="options-page-title">Gallery</h1>
               <div class="options-subpanel">
                 <h2 class="options-subpanel-title">Picture Frames</h2>
                 <label class="options-field">
@@ -353,37 +360,102 @@
             </div>
 
             <div class="options-page is-hidden" data-options-page="audio">
-              <h1 class="options-page-title">Playback / Audio &amp; Timing</h1>
+              <h1 class="options-page-title">Audio</h1>
+
               <div class="options-subpanel">
-                <h2 class="options-subpanel-title">Background Session &amp; Rate</h2>
-                <p class="options-help-text">Native iOS <code>AVAudioSession</code> (.playback, .longFormAudio) keeps music active when locked and syncs Lock Screen / Dynamic Island transport controls.</p>
+                <div class="options-subpanel-header">
+                  <h2 class="options-subpanel-title">Equalizer</h2>
+                  <button id="opt-eq-reset-button" class="tool-button eq-reset-button" type="button">Reset</button>
+                </div>
                 <label class="options-field options-toggle-field">
-                  <span class="options-field-copy"><span>Enable Custom Speed</span><small>Apply configured playback rate without altering saved preset when toggled off.</small></span>
-                  <input id="opt-speed-enabled" type="checkbox" />
+                  <span class="options-field-copy"><span>Equalizer</span><small>10-band peaking equalizer with automatic headroom compensation.</small></span>
+                  <input id="opt-eq-enabled" type="checkbox" />
                 </label>
-                <label class="options-field">
-                  <span class="options-field-copy"><span>Saved Speed Rate</span><small>0.50× to 2.00× time-domain pitch-preserving rate.</small></span>
-                  <input id="opt-speed-rate" class="options-input options-short-input" type="number" min="0.5" max="2.0" step="0.05" value="1.25" inputmode="decimal" />
-                </label>
+                <div id="equalizer-bands" class="equalizer-bands">
+                  <label class="equalizer-band"><span>31 Hz</span><span class="range-slider"><input data-equalizer-band="0" type="range" min="-12" max="12" step="0.5" value="0" aria-label="31 Hz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-zero"></span><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="0">0.0 dB</output></label>
+                  <label class="equalizer-band"><span>62 Hz</span><span class="range-slider"><input data-equalizer-band="1" type="range" min="-12" max="12" step="0.5" value="0" aria-label="62 Hz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-zero"></span><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="1">0.0 dB</output></label>
+                  <label class="equalizer-band"><span>125 Hz</span><span class="range-slider"><input data-equalizer-band="2" type="range" min="-12" max="12" step="0.5" value="0" aria-label="125 Hz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-zero"></span><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="2">0.0 dB</output></label>
+                  <label class="equalizer-band"><span>250 Hz</span><span class="range-slider"><input data-equalizer-band="3" type="range" min="-12" max="12" step="0.5" value="0" aria-label="250 Hz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-zero"></span><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="3">0.0 dB</output></label>
+                  <label class="equalizer-band"><span>500 Hz</span><span class="range-slider"><input data-equalizer-band="4" type="range" min="-12" max="12" step="0.5" value="0" aria-label="500 Hz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-zero"></span><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="4">0.0 dB</output></label>
+                  <label class="equalizer-band"><span>1 kHz</span><span class="range-slider"><input data-equalizer-band="5" type="range" min="-12" max="12" step="0.5" value="0" aria-label="1 kHz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-zero"></span><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="5">0.0 dB</output></label>
+                  <label class="equalizer-band"><span>2 kHz</span><span class="range-slider"><input data-equalizer-band="6" type="range" min="-12" max="12" step="0.5" value="0" aria-label="2 kHz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-zero"></span><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="6">0.0 dB</output></label>
+                  <label class="equalizer-band"><span>4 kHz</span><span class="range-slider"><input data-equalizer-band="7" type="range" min="-12" max="12" step="0.5" value="0" aria-label="4 kHz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-zero"></span><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="7">0.0 dB</output></label>
+                  <label class="equalizer-band"><span>8 kHz</span><span class="range-slider"><input data-equalizer-band="8" type="range" min="-12" max="12" step="0.5" value="0" aria-label="8 kHz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-zero"></span><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="8">0.0 dB</output></label>
+                  <label class="equalizer-band"><span>16 kHz</span><span class="range-slider"><input data-equalizer-band="9" type="range" min="-12" max="12" step="0.5" value="0" aria-label="16 kHz equalizer gain" /><span class="range-slider-track" aria-hidden="true"><span class="range-slider-zero"></span><span class="range-slider-fill"></span><span class="range-slider-thumb"></span></span></span><output data-equalizer-value="9">0.0 dB</output></label>
+                </div>
+              </div>
+
+              <div class="options-subpanel">
+                <h2 class="options-subpanel-title">Output</h2>
                 <label class="options-field options-toggle-field">
-                  <span class="options-field-copy"><span>Long Play Override</span><small>Use manual play duration for looping tracks.</small></span>
-                  <input id="opt-long-play-enabled" type="checkbox" />
+                  <span class="options-field-copy"><span>Mono</span><small>Mix left and right channels equally to both speakers.</small></span>
+                  <input id="opt-mono-enabled" type="checkbox" />
                 </label>
-                <label class="options-field">
-                  <span class="options-field-copy"><span>Manual Duration (sec)</span><small>Duration used while Long Play is active.</small></span>
-                  <input id="opt-manual-duration" class="options-input options-short-input" type="number" min="15" max="3600" step="5" value="180" inputmode="numeric" />
+                <label class="equalizer-band equalizer-volume">
+                  <span>Volume</span>
+                  <span class="range-slider">
+                    <input id="opt-app-volume" type="range" min="0" max="1" step="0.05" value="1" aria-label="App volume" />
+                    <span class="range-slider-track" aria-hidden="true">
+                      <span class="range-slider-fill"></span>
+                      <span class="range-slider-thumb"></span>
+                    </span>
+                  </span>
+                  <output id="opt-app-volume-value">100%</output>
                 </label>
               </div>
             </div>
 
-            <div class="options-page is-hidden" data-options-page="source">
-              <h1 class="options-page-title">APPBOY / Catalog Source</h1>
+            <div class="options-page is-hidden" data-options-page="playback">
+              <h1 class="options-page-title">Playback</h1>
+
               <div class="options-subpanel">
-                <h2 class="options-subpanel-title">Local Files &amp; SBO Stream Adapter</h2>
-                <p class="options-help-text">Active source: <strong id="opt-source-label">Built-in VGM</strong>. Drop audio files (<code>.m4a</code>, <code>.aac</code>, <code>.mp3</code>, <code>.wav</code>, <code>.flac</code>) or <code>catalog.json</code> into <strong>On My iPhone &gt; APPBOY</strong> in the Files app, or configure an SBO JSON catalog endpoint below.</p>
+                <h2 class="options-subpanel-title">Play Time &amp; End Fade</h2>
+                <label class="options-field options-toggle-field">
+                  <span class="options-field-copy"><span>Long Play</span><small>Loop tracks seamlessly up to the manual play duration.</small></span>
+                  <input id="opt-long-play-enabled" type="checkbox" />
+                </label>
+                <label class="options-field">
+                  <span class="options-field-copy"><span>Long Play Duration</span><small>Accepts m:ss (e.g. 3:00) or seconds (15–3600).</small></span>
+                  <input id="opt-manual-duration" class="options-input options-short-input" type="text" inputmode="numeric" value="3:00" aria-label="Long Play duration" />
+                </label>
+                <label class="options-field options-toggle-field">
+                  <span class="options-field-copy"><span>Fade Out</span><small>Apply smooth volume fade before song end.</small></span>
+                  <input id="opt-fade-enabled" type="checkbox" checked />
+                </label>
+                <label class="options-field">
+                  <span class="options-field-copy"><span>Fade Length</span><small>Transitional end fade duration (0:00–0:30).</small></span>
+                  <input id="opt-fade-duration" class="options-input options-short-input" type="text" inputmode="numeric" value="0:05" aria-label="Fade length" />
+                </label>
+              </div>
+
+              <div class="options-subpanel">
+                <h2 class="options-subpanel-title">Playback Speed</h2>
+                <label class="options-field options-toggle-field">
+                  <span class="options-field-copy"><span>Enable Playback Speed</span><small>Apply custom tempo while keeping your saved preset when toggled off.</small></span>
+                  <input id="opt-speed-enabled" type="checkbox" />
+                </label>
+                <label class="options-field">
+                  <span class="options-field-copy"><span>Speed Rate</span><small>0.50× to 2.00× pitch-preserving tempo.</small></span>
+                  <input id="opt-speed-rate" class="options-input options-short-input" type="number" min="0.5" max="2.0" step="0.05" value="1.25" inputmode="decimal" />
+                </label>
+                <div class="speed-preset-strip" role="group" aria-label="Playback speed presets">
+                  <button class="tool-button speed-preset-button" type="button" data-speed-preset="0.75">0.75×</button>
+                  <button class="tool-button speed-preset-button" type="button" data-speed-preset="1">1.00×</button>
+                  <button class="tool-button speed-preset-button" type="button" data-speed-preset="1.25">1.25×</button>
+                  <button class="tool-button speed-preset-button" type="button" data-speed-preset="1.5">1.50×</button>
+                  <button class="tool-button speed-preset-button" type="button" data-speed-preset="2">2.00×</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="options-page is-hidden" data-options-page="source">
+              <h1 class="options-page-title">Catalog</h1>
+              <div class="options-subpanel">
+                <h2 class="options-subpanel-title">Library Source</h2>
+                <p class="options-help-text">Active catalog: <strong id="opt-source-label">Starter Catalog</strong>. Add audio files or <code>catalog.json</code> in Files, or enter a catalog endpoint below.</p>
                 <label class="options-field options-stacked-field">
-                  <span class="options-field-copy"><span>Remote Catalog JSON URL (Optional)</span><small>Fetched natively via URLSession while keeping WebKit CSP offline-isolated.</small></span>
-                  <input id="opt-remote-url" class="options-input options-wide-input" type="url" placeholder="https://example.com/api/appboy/catalog.json" autocomplete="off" autocapitalize="off" spellcheck="false" />
+                  <span class="options-field-copy"><span>Catalog JSON URL</span><small>Optional remote catalog endpoint.</small></span>
+                  <input id="opt-remote-url" class="options-input options-wide-input" type="url" placeholder="https://example.com/api/catalog.json" autocomplete="off" autocapitalize="off" spellcheck="false" />
                 </label>
                 <div class="options-actions-row">
                   <button id="opt-reload-catalog-button" class="tool-button action-pill" type="button">Reload Catalog</button>
