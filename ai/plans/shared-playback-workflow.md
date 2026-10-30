@@ -45,6 +45,15 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Shared timing-preview overflow, 2026-10-30: the public preview value and
+  its Codable path could overflow while deriving totals and legacy millisecond
+  fields, even though preview requests already had native input bounds. Those
+  derivations now saturate at `Int.max`; native playback/export validation
+  remains separate. A focused native test covers direct and decoded extremes,
+  explicit milliseconds and unbounded Long Play. All 54 transport and 62 SB2
+  renderer tests passed, and the SB2 debug build passed with the disk guard.
+  This is contract and native-package evidence, not packaged or audible proof.
+
 - Packaged shared fade plan, 2026-10-30: an isolated SB2 debug app from
   `82cc6ba6` used a separate bundle ID and temporary catalog, playlist, history,
   favorites and cache. Test-only rendering displayed the real bridge reply:

@@ -59,6 +59,31 @@ func timingPreviewRejectsOutOfRangeValuesBeforeScaling() throws {
 }
 
 @Test
+func timingPreviewSaturatesOverflowInDirectAndDecodedValues() throws {
+    let direct = PlaybackTimingPreview(preFadeSeconds: Int.max, fadeSeconds: 1,
+        isLongPlay: false, usesNativeEnding: false)
+    #expect(direct.totalSeconds == Int.max)
+    #expect(direct.preFadeMilliseconds == Int.max)
+    #expect(direct.fadeMilliseconds == 1_000)
+    #expect(direct.totalMilliseconds == Int.max)
+
+    let json = """
+    {"pre_fade_seconds":\(Int.max),"fade_seconds":1,"is_long_play":false,"uses_native_ending":false}
+    """
+    let decoded = try JSONDecoder().decode(PlaybackTimingPreview.self, from: Data(json.utf8))
+    #expect(decoded == direct)
+
+    let explicit = PlaybackTimingPreview(preFadeSeconds: 1, fadeSeconds: 1,
+        isLongPlay: false, usesNativeEnding: false, preFadeMilliseconds: Int.max, fadeMilliseconds: 1)
+    #expect(explicit.totalSeconds == 2)
+    #expect(explicit.totalMilliseconds == Int.max)
+    let unbounded = PlaybackTimingPreview(preFadeSeconds: 0, fadeSeconds: Int.max,
+        isLongPlay: true, usesNativeEnding: false)
+    #expect(unbounded.totalSeconds == 0 && unbounded.totalMilliseconds == 0)
+    #expect(unbounded.fadeMilliseconds == Int.max)
+}
+
+@Test
 func statusPayloadCanRepresentDrainedNaturalEnd() {
     let status = PlaybackTransportStatus(
         currentTrackID: "track-a",
