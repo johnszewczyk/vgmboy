@@ -7,7 +7,52 @@ returning to ViewBoy and CocoaSpice; LineBoy is deprecated and excluded. Earlier
 cross-frontend checkpoints are historical evidence, not current scope. Recheck
 paths, working-tree changes, and findings before continuing.
 
+## Remaining work, 2026-10-30
+
+The checkpoints below are historical; later entries may resolve earlier gaps.
+The remaining work is grouped by the current SB2-first scope:
+
+1. Verify the current SB2 faded handoff in a packaged app: prove the fade is
+   queued before a missing or valid replacement; exercise a second Next/Previous,
+   direct selection, old-session end during preparation, and newer stop/start.
+   Check track identity, output gain, queue and history, not just the clock.
+2. Assess what remains duplicated between SB2's renderer and shared transport,
+   especially queued-fade lifecycle and cancellation. Move UI-neutral ownership
+   to FrontendCore where its contract can preserve the existing queue behavior;
+   do not treat renderer-only consolidation as shared-module completion.
+3. Finish the shared producer and transport verification gates: live drain and
+   exactly-once end, loop/repeat boundaries, partial/zero/error decoding,
+   reconfiguration while paused or buffered, and representative archive/UAC
+   sources including dependencies and authored loop metadata. Distinguish cases
+   already covered by injected or native tests from missing packaged coverage.
+4. Measure live audio transitions and callback performance around pause, fade,
+   seek, loop, speed and mode changes. Controlled offline PCM results do not
+   prove live audible continuity or performance; investigate any regression.
+5. Complete the SB2 end-to-end matrix: repeat/shuffle, timed skip, rapid controls,
+   failure/retry, WebView recreation and persistence, plus effective tempo and
+   timing for representative formats. Check supported macOS packaging, including
+   the previously observed macOS 26/27 dependency linker warnings.
+6. After the shared module and SB2 gate are complete, return to ViewBoy and
+   CocoaSpice for adapter migration and compatibility/regression checks. Review
+   direct VGMBoy clients and any affected hosted integration before declaring
+   shared API compatibility. LineBoy remains excluded.
+7. Refresh owner documentation, run the applicable package and documentation
+   checks, record fixture and release evidence, and commit/push task-owned work.
+
+No reliable percentage is assigned: implementation is substantial, but the
+remaining live verification and deferred frontend work are not yet bounded.
+
 ## Implementation checkpoint, 2026-10-28
+
+- Isolated SB2 missing-source check, 2026-10-30: a packaged test app used the
+  renderer from `5f96ad8d` (SHA-256
+  `7d8e84920d318896581f979a2a3562885d671cac224ab441549bec58a3b35bbf`),
+  a separate bundle ID, temporary state and catalog, and generated WAV fixture
+  SHA-256 `3b3d841026ae67ff1e39853ee25b3e0edaa4415f184a1b4f844ab4a15390247c`.
+  With Faded Skip enabled, a missing ZIP request displayed its error while the
+  WAV retained a Pause control and the displayed clock advanced from 0:03 to
+  0:09. The UI observations did not establish that the queued fade had begun,
+  and do not prove audible gain recovery or repeated-navigation behavior.
 
 - SB2 repeated navigation, 2026-10-30: a second Next/Previous during a queued
   fade now hands off through replacement preparation instead of stopping the
