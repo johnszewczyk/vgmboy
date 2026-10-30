@@ -84,7 +84,7 @@ function waitForAudioEnvelope(durationMs) {
   return new Promise((resolve) => window.setTimeout(resolve, Math.max(0, Math.ceil(durationMs))));
 }
 
-async function fadeActiveOutput(durationMs = TRANSPORT_DECLICK_MS) {
+async function fadeActiveOutput(durationMs = TRANSPORT_DECLICK_MS, { onRampReady = null } = {}) {
   const activeTrack = activeTrackInfo();
   const expectedGeneration = Number(state.nativePlayback?.generation);
   if (nativePlaybackInitialized && activeTrack && Number.isSafeInteger(expectedGeneration) && expectedGeneration > 0) {
@@ -95,6 +95,10 @@ async function fadeActiveOutput(durationMs = TRANSPORT_DECLICK_MS) {
       // the transition request and its short output envelope.
     }
   }
+  if (onRampReady) {
+    onRampReady();
+    return;
+  }
   await waitForAudioEnvelope(durationMs);
 }
 
@@ -102,6 +106,21 @@ function clearQueuedSkipTimer() {
   if (!queuedSkipTimer) return;
   window.clearTimeout(queuedSkipTimer);
   queuedSkipTimer = 0;
+}
+
+function scheduleQueuedSkipFade(request, durationMs, errorContext) {
+  const arm = (delay) => {
+    if (queuedSkipRequest !== request || request.generation !== playbackGeneration || request.completing) return;
+    clearQueuedSkipTimer();
+    queuedSkipTimer = window.setTimeout(() => {
+      void completeQueuedSkip().catch(error => console.error(errorContext, error));
+    }, delay);
+  };
+  // Keep a bounded fallback if the bridge never replies. Normally the reply
+  // rearms the timer for the full fade, after the native ramp is accepted.
+  arm(durationMs + 2000);
+  void fadeActiveOutput(durationMs, { onRampReady: () => arm(durationMs) })
+    .catch(error => console.error(errorContext, error));
 }
 
 function monotonicNow() {
@@ -1130,12 +1149,7 @@ async function playTrackWithFadedSkip(trackId, startSeconds = 0, playbackOptions
     generation,
     nativeGeneration: Number(state.nativePlayback.generation) || 0
   };
-  fadeActiveOutput(fadeDurationMs).catch((error) => {
-    console.error("[SPCBoy] faded playlist activation failed", error);
-  });
-  queuedSkipTimer = window.setTimeout(() => {
-    void completeQueuedSkip().catch((error) => console.error("[SPCBoy] faded playlist activation failed", error));
-  }, fadeDurationMs);
+  scheduleQueuedSkipFade(queuedSkipRequest, fadeDurationMs, "[SPCBoy] faded playlist activation failed");
 }
 
 async function advanceToAdjacent(delta, generation = playbackGeneration) {
@@ -1216,12 +1230,7 @@ async function playAdjacentNow(delta) {
     generation: playbackGeneration,
     nativeGeneration: Number(state.nativePlayback.generation) || 0
   };
-  fadeActiveOutput(fadeDurationMs).catch((error) => {
-    console.error(error);
-  });
-  queuedSkipTimer = window.setTimeout(() => {
-    void completeQueuedSkip().catch((error) => console.error("[SPCBoy] faded skip failed", error));
-  }, fadeDurationMs);
+  scheduleQueuedSkipFade(queuedSkipRequest, fadeDurationMs, "[SPCBoy] faded skip failed");
 }
 
 async function togglePlayback() {

@@ -37,7 +37,10 @@ The native bridge assigns ramp revisions at message receipt, allowing shared
 transport to reject an older fade after a newer restore for the same session.
 Both queued-skip timer paths share a status check; if that check fails, the
 current queued skip is canceled and its originating session is asked to restore
-gain. A late failure cannot cancel a newer queued skip. Cancellation skips an
+gain. A late failure cannot cancel a newer queued skip. The fade timer starts
+after the native ramp reply; a two-second grace period provides a bounded
+fallback if that reply does not arrive. Late replies cannot arm a timer for a
+canceled, superseded or already-completing skip. Cancellation skips an
 obsolete session's restore and treats restore failure as best effort, so a later
 seek can proceed under its own native-generation guard.
 A completed queued fade starts its target through the same replacement path as
