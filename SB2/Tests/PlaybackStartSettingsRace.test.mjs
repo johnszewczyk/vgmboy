@@ -182,6 +182,7 @@ test('a cross-tab start stages the new queue until the handoff', async () => {
   let options;
   const run = new Function('state', 'receive', `
     let queuedSkipRequest = null;
+    const beginPlaybackIntent = () => ({}), finishPlaybackIntent = async () => {};
     const clearPlaybackError = () => {}, clearQueuedSkipTimer = () => {}, showPlaybackError = () => {};
     const playTrackWithFadedSkip = async (_, __, value) => receive(value);
     const playTrackNow = playTrackWithFadedSkip;

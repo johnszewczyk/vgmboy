@@ -66,6 +66,7 @@ const statusSource = section('function applyNativePlaybackSnapshot(', '\nasync f
 const endedSource = section('async function handleNativePlaybackEnded(event) {', '\nasync function setPlaybackPowerSaveBlocker(');
 const makeEndedHandler = new Function('state', 'activeTrackInfo', 'effectiveTotalSeconds', 'finalizePlaybackEnded', `
   let playbackGeneration = 7;
+  let pendingPlaybackIntent = null, deferredNativeEnds = [];
   ${statusSource}
   ${endedSource}
   return handleNativePlaybackEnded;
@@ -78,4 +79,98 @@ test('older same-generation end status cannot claim retirement', async () => {
   await handle({ generation: 12, status_sequence: 29, transport_state: 'ended' });
   assert.equal(finalized, 0);
   assert.equal(state.currentTrackId, 'a');
+});
+
+const intentGateSource = section('let pendingPlaybackIntent = null;', '\nfunction clearPlaybackError()');
+const makeIntentGate = new Function('state', 'finalize', `
+  let playbackGeneration = 7;
+  const activeTrackInfo = () => state.currentTrackId ? { id: state.currentTrackId } : null;
+  const applyNativePlaybackSnapshot = (_, event) => !state.nativePlayback.statusSequence
+    || (Number(event.status_sequence) || 0) >= state.nativePlayback.statusSequence;
+  const finalizePlaybackEnded = finalize;
+  ${intentGateSource}
+  ${endedSource}
+  return { beginPlaybackIntent, finishPlaybackIntent, cancelPlaybackIntent, handleNativePlaybackEnded };
+`);
+
+test('old end waits for a pending replacement and resumes after failure', async () => {
+  const state = { currentTrackId: 'old', nativePlayback: { generation: 12 } };
+  let claims = 0;
+  const gate = makeIntentGate(state, async () => { claims++; });
+  const intent = gate.beginPlaybackIntent();
+  await gate.handleNativePlaybackEnded({ generation: 12, transport_state: 'ended' });
+  assert.equal(claims, 0);
+  await gate.finishPlaybackIntent(intent);
+  assert.equal(claims, 1);
+});
+
+test('accepted replacement discards deferred old completion', async () => {
+  const state = { currentTrackId: 'old', nativePlayback: { generation: 12 } };
+  let claims = 0;
+  const gate = makeIntentGate(state, async () => { claims++; });
+  const intent = gate.beginPlaybackIntent();
+  await gate.handleNativePlaybackEnded({ generation: 12, transport_state: 'ended' });
+  state.currentTrackId = 'new'; state.nativePlayback.generation = 13;
+  await gate.finishPlaybackIntent(intent);
+  assert.equal(claims, 0);
+});
+
+test('a new session that ends before its start reply is completed once', async () => {
+  const state = { currentTrackId: 'old', nativePlayback: { generation: 12 } };
+  let claims = 0;
+  const gate = makeIntentGate(state, async () => { claims++; });
+  const intent = gate.beginPlaybackIntent('new');
+  await gate.handleNativePlaybackEnded({ generation: 12, transport_state: 'ended' });
+  await gate.handleNativePlaybackEnded({ generation: 13, transport_state: 'ended' });
+  state.currentTrackId = 'new'; state.nativePlayback.generation = 13;
+  await gate.finishPlaybackIntent(intent);
+  assert.equal(claims, 1);
+});
+
+test('an initial session ending before its start reply is not lost', async () => {
+  const state = { currentTrackId: null, nativePlayback: { generation: 0 } };
+  let claims = 0;
+  const gate = makeIntentGate(state, async () => { claims++; });
+  const intent = gate.beginPlaybackIntent('new');
+  await gate.handleNativePlaybackEnded({ generation: 13, transport_state: 'ended' });
+  state.currentTrackId = 'new'; state.nativePlayback.generation = 13;
+  await gate.finishPlaybackIntent(intent);
+  assert.equal(claims, 1);
+});
+
+test('an ended start reply can be newer than its deferred end event', async () => {
+  const state = { currentTrackId: null, nativePlayback: { generation: 0 } };
+  let claims = 0;
+  const gate = makeIntentGate(state, async () => { claims++; });
+  const intent = gate.beginPlaybackIntent('new');
+  await gate.handleNativePlaybackEnded({ generation: 13, status_sequence: 19, transport_state: 'ended' });
+  state.currentTrackId = 'new';
+  state.nativePlayback = { generation: 13, statusSequence: 20, transportState: 'ended' };
+  await gate.finishPlaybackIntent(intent);
+  assert.equal(claims, 1);
+});
+
+test('a newer playing status still rejects a deferred stale end', async () => {
+  const state = { currentTrackId: 'old', nativePlayback: { generation: 12 } };
+  let claims = 0;
+  const gate = makeIntentGate(state, async () => { claims++; });
+  const intent = gate.beginPlaybackIntent('new');
+  await gate.handleNativePlaybackEnded({ generation: 12, status_sequence: 19, transport_state: 'ended' });
+  state.nativePlayback = { generation: 12, statusSequence: 20, transportState: 'playing' };
+  await gate.finishPlaybackIntent(intent);
+  assert.equal(claims, 0);
+});
+
+test('superseded intent leaves completion to the newest intent and stop cancels it', async () => {
+  const state = { currentTrackId: 'old', nativePlayback: { generation: 12 } };
+  let claims = 0;
+  const gate = makeIntentGate(state, async () => { claims++; });
+  const first = gate.beginPlaybackIntent();
+  await gate.handleNativePlaybackEnded({ generation: 12, transport_state: 'ended' });
+  const second = gate.beginPlaybackIntent();
+  await gate.finishPlaybackIntent(first);
+  assert.equal(claims, 0);
+  gate.cancelPlaybackIntent();
+  await gate.finishPlaybackIntent(second);
+  assert.equal(claims, 0);
 });

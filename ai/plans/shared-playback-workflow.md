@@ -9,6 +9,14 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- SB2 completion during replacement, 2026-10-29: renderer completion now waits
+  while an explicit start or navigation is pending. It replays an end for the
+  retained session after failure, drops an old end after successful replacement,
+  and retains a new session's end if it arrives before the start reply. Renderer
+  checks cover these cases, supersession, stop and newer status ordering. The
+  isolated package completed a two-WAV queue with the earlier gate revision;
+  the short-new-session race remains simulated, not packaged or audible proof.
+
 - SB2 immediate replacement handoff, 2026-10-29: SB2 now leaves the current
   session and identity in place while the shared start prepares a replacement,
   adopting the new track and staged queue only after an accepted start. It
