@@ -1291,8 +1291,11 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     }
 
     nonisolated private static func json(_ value: Any) -> String {
-        guard JSONSerialization.isValidJSONObject(value), let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]) else {
-            if let string = value as? String { return "\"\(string.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\"" }
+        // Native bridge replies can be scalar JSON values as well as objects.
+        // Foundation's default validity check rejects top-level numbers, so
+        // using it here silently turns fade durations and generations into null.
+        guard JSONSerialization.isValidJSONObject([value]),
+              let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys, .fragmentsAllowed]) else {
             return "null"
         }
         return String(decoding: data, as: UTF8.self)

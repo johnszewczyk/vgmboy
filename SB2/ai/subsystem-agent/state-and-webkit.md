@@ -4,6 +4,13 @@ SB2 owns this host adaptation and presentation persistence. Shared catalog,
 playlist validation, preference normalization and playback policy retain their
 existing owners.
 
+## Native bridge replies
+
+Bridge replies serialize scalar JSON values as well as arrays and objects. The
+shared fade policy returns a numeric duration in milliseconds (or null), and
+catalog invalidation returns a numeric generation; neither can be represented
+by an object-only JSON validity check. Invalid JSON values return null.
+
 ## Playback timing preview
 
 Timing and speed preference changes invalidate per-track timing plans. SB2

@@ -44,6 +44,20 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- SB2 scalar bridge replies and faded handoff, 2026-10-30: an instrumented
+  isolated package using `3656a811` and temporary state showed a valid shared
+  fade request returning null: the host serializer rejected top-level numbers.
+  Bridge serialization now admits valid JSON fragments and rejects invalid
+  values before encoding. A focused test covers numbers, booleans, null, escaped
+  strings, objects and nonfinite numbers. After rebuilding, the same test app
+  reported a 6,000 ms queued fade. A second Next led to the missing-source
+  error while the original WAV continued (0:07 to 0:10); a later faded
+  selection started the second WAV and the isolated history recorded it. The
+  renderer included a test-only on-screen trace, and its behavior was not an
+  audible or sample-level gain measurement. Old-end/stop races and broader
+  packaged verification remain open. Full VGMBoy (96), shared transport (51),
+  and SB2 playback renderer checks passed on this host.
+
 - Isolated SB2 missing-source check, 2026-10-30: a packaged test app used the
   renderer from `5f96ad8d` (SHA-256
   `7d8e84920d318896581f979a2a3562885d671cac224ab441549bec58a3b35bbf`),
