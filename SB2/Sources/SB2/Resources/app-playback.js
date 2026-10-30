@@ -17,6 +17,9 @@ let mediaSessionHandlersBound = false;
 const playbackBackends = window.SB2PlaybackBackends;
 let queuedSkipRequest = null;
 let queuedSkipTimer = 0;
+let queuedSkipToken = null;
+let queuedSkipSerial = 0;
+const queuedSkipSession = `${Date.now()}-${Math.random()}`;
 let playbackErrorTimer = 0;
 let playbackWindow = null;
 let playbackClockHandle = 0;
@@ -103,25 +106,49 @@ async function fadeActiveOutput(durationMs = TRANSPORT_DECLICK_MS, { onRampReady
 }
 
 function clearQueuedSkipTimer() {
-  if (!queuedSkipTimer) return;
-  window.clearTimeout(queuedSkipTimer);
+  if (queuedSkipTimer) window.clearTimeout(queuedSkipTimer);
   queuedSkipTimer = 0;
+  const token = queuedSkipToken;
+  queuedSkipToken = null;
+  if (token) void window.spcBoySB2.queuedFadeCancel({ token }).catch(() => {});
 }
 
 function scheduleQueuedSkipFade(request, plan, errorContext) {
-  const arm = (delay) => {
-    if (queuedSkipRequest !== request || request.generation !== playbackGeneration || request.completing) return;
-    clearQueuedSkipTimer();
+  const token = `${queuedSkipSession}-${++queuedSkipSerial}`;
+  queuedSkipToken = token;
+  request.fadeErrorContext = errorContext;
+  let sharedStarted = false;
+  const current = () => queuedSkipToken === token && queuedSkipRequest === request
+    && request.generation === playbackGeneration && !request.completing;
+  const armFallback = (delay) => {
+    if (!current()) return;
+    if (queuedSkipTimer) window.clearTimeout(queuedSkipTimer);
     queuedSkipTimer = window.setTimeout(() => {
+      if (!current()) return;
       void completeQueuedSkip().catch(error => console.error(errorContext, error));
     }, delay);
   };
-  // Keep a bounded fallback if the bridge never replies. Normally the reply
-  // rearms the timer for the full fade, after the native ramp is accepted.
-  arm(plan.fallbackMilliseconds);
+  // Keep a bounded local fallback if a bridge reply or native event is lost.
+  // Both paths check the same request before completing.
+  armFallback(plan.fallbackMilliseconds);
+  void window.spcBoySB2.queuedFadeStart({ token, ...plan }).then(() => {
+    if (!current()) return;
+    sharedStarted = true;
+    armFallback(plan.fallbackMilliseconds);
+  }).catch(error => console.error(errorContext, error));
   void fadeActiveOutput(plan.durationMilliseconds, { expectedGeneration: request.nativeGeneration,
-    onRampReady: () => arm(plan.durationMilliseconds) })
-    .catch(error => console.error(errorContext, error));
+    onRampReady: () => {
+      if (!current()) return;
+      armFallback(sharedStarted ? plan.fallbackMilliseconds : plan.durationMilliseconds);
+      void window.spcBoySB2.queuedFadeRampReady({ token }).catch(error => console.error(errorContext, error));
+    } }).catch(error => console.error(errorContext, error));
+}
+
+function handleQueuedFadeReady(event) {
+  const request = queuedSkipRequest;
+  if (!request || event?.token !== queuedSkipToken || request.generation !== playbackGeneration || request.completing) return;
+  clearQueuedSkipTimer();
+  void completeQueuedSkip().catch(error => console.error(request.fadeErrorContext, error));
 }
 
 function monotonicNow() {
@@ -1417,6 +1444,7 @@ playbackApp.playback = {
   updateNativeDiagnostics,
   handleNativePlaybackState,
   handleNativePlaybackEnded,
+  handleQueuedFadeReady,
   stopPlaybackState,
   playTrack,
   finalizePlaybackEnded,

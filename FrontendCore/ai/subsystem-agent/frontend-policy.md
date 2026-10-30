@@ -134,8 +134,13 @@ startup contracts shared by the VGMMan player frontends.
   and Previous/Next. The shared request returns the bounded duration in seconds
   or milliseconds. Its optional `PlaybackQueuedSkipFadePlan` adds integer
   milliseconds and a two-second bridge-reply fallback, bounded to the WebKit
-  timer range; the audio device validates its own ramp capacity. Each renderer
-  owns its delayed target handoff and cancellation; both reach the same VGMBoy
+  timer range; the audio device validates its own ramp capacity.
+  `PlaybackQueuedFadeScheduler` owns a single token-checked native deadline:
+  the fallback starts first, ramp acknowledgement rearms the full duration,
+  and cancellation, replacement and completion invalidate stale deadlines.
+  SB2 submits those transitions in WebKit message-receipt order and retains a
+  local fallback if a bridge reply or event is lost. Frontends still own their
+  target handoff and request identity; both reach the same VGMBoy
   output-gain ramp command. Duration-only callers remain supported.
 - FrontendCore does not decode audio, ramp output gain, store UI models, or own
   renderer focus and selection.
