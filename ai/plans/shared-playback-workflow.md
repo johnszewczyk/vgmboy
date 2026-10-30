@@ -47,6 +47,14 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Packaged UAC attempt, 2026-10-30: an isolated SB2 debug app built from
+  `bb7d70c5` with redirected temporary state and a test-only playlist for the
+  generated UAC and SOTN XA package. The UI displayed both rows, but the
+  attempted test controls did not produce a confirmed playback state or AAC
+  export. This is not evidence of packaged UAC playback success or a diagnosed
+  production defect. The isolated checkout was removed; the native SOTN and
+  generated-fixture results below remain separate evidence.
+
 - AAC loop and fade parity, 2026-10-30: live playback and AAC export now use
   one sample-boundary loop reader. AAC preparation adopts the selected UAC
   member's authoritative loop, including an absent loop, and the exporter
