@@ -45,6 +45,19 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Shared callback ramp ordering, 2026-10-30: a control-thread ramp could
+  arrive during audio rendering and have its remaining-frame count overwritten
+  by the older callback. Envelope progress is now callback-owned, with coherent
+  nonblocking command snapshots and independently preserved gain resets.
+  A forced offline interleaving of the actual callback path reproduced an
+  incomplete four-frame restore in the previous source and reached its target
+  with the new source; the harness inserted a test-only synchronization hook.
+  Native regression coverage also checks rapid reset and ramp replacement.
+  The VGMBoy suite passed 97 tests, the shared transport suite passed 54,
+  and SB2 built with the 12 GiB free-space guard. The existing macOS 26/27
+  dependency linker warnings remain. This does not establish live audible
+  continuity or callback performance.
+
 - Queued-fade session binding, 2026-10-30: SB2 now sends the native
   generation captured by the queued skip for both its scheduled fade and
   repeated-navigation short fade. A newer native snapshot cannot redirect the
