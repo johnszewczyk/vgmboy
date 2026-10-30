@@ -108,7 +108,7 @@ function clearQueuedSkipTimer() {
   queuedSkipTimer = 0;
 }
 
-function scheduleQueuedSkipFade(request, durationMs, errorContext) {
+function scheduleQueuedSkipFade(request, plan, errorContext) {
   const arm = (delay) => {
     if (queuedSkipRequest !== request || request.generation !== playbackGeneration || request.completing) return;
     clearQueuedSkipTimer();
@@ -118,8 +118,8 @@ function scheduleQueuedSkipFade(request, durationMs, errorContext) {
   };
   // Keep a bounded fallback if the bridge never replies. Normally the reply
   // rearms the timer for the full fade, after the native ramp is accepted.
-  arm(durationMs + 2000);
-  void fadeActiveOutput(durationMs, { onRampReady: () => arm(durationMs) })
+  arm(plan.fallbackMilliseconds);
+  void fadeActiveOutput(plan.durationMilliseconds, { onRampReady: () => arm(plan.durationMilliseconds) })
     .catch(error => console.error(errorContext, error));
 }
 
@@ -1130,7 +1130,7 @@ async function playTrackWithFadedSkip(trackId, startSeconds = 0, playbackOptions
 
   const generation = ++playbackGeneration;
   const current = currentTrack();
-  const fadeDurationMs = await window.spcBoySB2.playbackFadeDuration({
+  const fadePlan = await window.spcBoySB2.playbackFadePlan({
     enabled: state.queuedSkipsEnabled,
     isPlaying: state.isPlaying,
     hasCurrentTrack: Boolean(current),
@@ -1140,7 +1140,7 @@ async function playTrackWithFadedSkip(trackId, startSeconds = 0, playbackOptions
     totalSeconds: currentTotalSeconds(current)
   });
   if (generation !== playbackGeneration) return;
-  if (!fadeDurationMs) return playTrackNow(trackId, startSeconds, playbackOptions);
+  if (!fadePlan) return playTrackNow(trackId, startSeconds, playbackOptions);
 
   queuedSkipRequest = {
     targetTrackId: trackId,
@@ -1149,7 +1149,7 @@ async function playTrackWithFadedSkip(trackId, startSeconds = 0, playbackOptions
     generation,
     nativeGeneration: Number(state.nativePlayback.generation) || 0
   };
-  scheduleQueuedSkipFade(queuedSkipRequest, fadeDurationMs, "[SPCBoy] faded playlist activation failed");
+  scheduleQueuedSkipFade(queuedSkipRequest, fadePlan, "[SPCBoy] faded playlist activation failed");
 }
 
 async function advanceToAdjacent(delta, generation = playbackGeneration) {
@@ -1210,7 +1210,7 @@ async function playAdjacentNow(delta) {
 
   const track = currentTrack();
   const fadeSeconds = currentFadeSeconds(track);
-  const fadeDurationMs = await window.spcBoySB2.playbackFadeDuration({
+  const fadePlan = await window.spcBoySB2.playbackFadePlan({
     enabled: state.queuedSkipsEnabled,
     isPlaying: state.isPlaying,
     hasCurrentTrack: Boolean(track),
@@ -1220,7 +1220,7 @@ async function playAdjacentNow(delta) {
     totalSeconds: currentTotalSeconds(track)
   });
   if (generation !== playbackGeneration) return;
-  if (!fadeDurationMs) {
+  if (!fadePlan) {
     await advanceToAdjacent(delta, generation);
     return;
   }
@@ -1230,7 +1230,7 @@ async function playAdjacentNow(delta) {
     generation: playbackGeneration,
     nativeGeneration: Number(state.nativePlayback.generation) || 0
   };
-  scheduleQueuedSkipFade(queuedSkipRequest, fadeDurationMs, "[SPCBoy] faded skip failed");
+  scheduleQueuedSkipFade(queuedSkipRequest, fadePlan, "[SPCBoy] faded skip failed");
 }
 
 async function togglePlayback() {

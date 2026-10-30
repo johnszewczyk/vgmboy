@@ -69,3 +69,27 @@ func queuedSkipRequestCarriesTheCommonPolicyInput() throws {
     #expect(request.duration == 6)
     #expect(request.durationMilliseconds == 6_000)
 }
+
+@Test
+func queuedFadePlanUsesIntegralBoundedBridgeTimers() throws {
+    func request(fade: Double) -> PlaybackQueuedSkipFadeRequest {
+        .init(enabled: true, isPlaying: true, hasCurrentTrack: true,
+              elapsedSeconds: 0, preFadeSeconds: 1, fadeSeconds: fade, totalSeconds: max(1, fade))
+    }
+    let plan = try #require(request(fade: 0.0001).plan)
+    #expect(plan.durationMilliseconds == 1)
+    #expect(plan.fallbackMilliseconds == 2_001)
+    let encoded = try JSONEncoder().encode(plan)
+    let decoded = try JSONDecoder().decode(PlaybackQueuedSkipFadePlan.self, from: encoded)
+    #expect(decoded == plan)
+    let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Int])
+    #expect(object == ["durationMilliseconds": 1, "fallbackMilliseconds": 2_001])
+    let maxMilliseconds = Int(Int32.max) - 2_000
+    let boundary = try #require(request(fade: Double(maxMilliseconds) / 1_000).plan)
+    #expect(boundary.fallbackMilliseconds == Int(Int32.max))
+    #expect(request(fade: Double(Int32.max) / 1_000).plan == nil)
+    #expect(request(fade: Double.greatestFiniteMagnitude).plan == nil)
+    let disabled = PlaybackQueuedSkipFadeRequest(enabled: false, isPlaying: true, hasCurrentTrack: true,
+        elapsedSeconds: 0, preFadeSeconds: 1, fadeSeconds: 1, totalSeconds: 2)
+    #expect(disabled.plan == nil)
+}
