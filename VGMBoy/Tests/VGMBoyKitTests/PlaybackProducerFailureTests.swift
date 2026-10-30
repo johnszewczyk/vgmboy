@@ -4,7 +4,7 @@ import Testing
 
 private enum ProducerFixtureError: Error { case injected }
 private final class ScriptedProducerDecoder: AudioDecoder {
-    enum Step { case empty, pcm, failure, mismatched }
+    enum Step { case empty, pcm, partial, end, failure, mismatched }
     let sampleRate = 44_100
     let trackCount = 1
     let systemName = "fixture"
@@ -31,6 +31,14 @@ private final class ScriptedProducerDecoder: AudioDecoder {
         case .empty: return ([], [])
         case .failure: throw ProducerFixtureError.injected
         case .mismatched: return ([0.5], [])
+        case .end:
+            trackEnded = true
+            return ([], [])
+        case .partial:
+            let partialCount = max(1, count / 2)
+            absolutePlayedFrames += Int64(partialCount)
+            let pcm = [Float](repeating: 0.25, count: partialCount)
+            return (pcm, pcm)
         case .pcm:
             absolutePlayedFrames += Int64(count)
             let pcm = [Float](repeating: 0, count: count)
@@ -38,6 +46,39 @@ private final class ScriptedProducerDecoder: AudioDecoder {
         }
     }
     func close() { closed = true }
+}
+
+private final class CompletionRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var statuses: [PlaybackStatus] = []
+    func record(_ status: PlaybackStatus) { lock.lock(); statuses.append(status); lock.unlock() }
+    var snapshot: [PlaybackStatus] { lock.lock(); defer { lock.unlock() }; return statuses }
+}
+
+@Test func partialAndEmptyReadsRecoverAndPublishOneDrainedEnd() async throws {
+    let decoder = ScriptedProducerDecoder([.partial, .empty, .pcm, .end])
+    let session = PlaybackSession(output: AudioOutput(sampleRate: 44_100, capacitySeconds: 0.1),
+                                  makeDecoder: { _, _, _ in decoder })
+    let recorder = CompletionRecorder()
+    session.setCompletionStatusHandler { recorder.record($0) }
+    defer { session.stop() }
+    _ = try session.load(path: "/fixture.spc", trackIndex: 0, plan: fixturePlan, tempo: 1)
+    let primed = session.status()
+    #expect(primed.statistics.decodedFrames > 0)
+    #expect(!primed.reachedEnd)
+    try session.play()
+    for _ in 0..<100 where recorder.snapshot.isEmpty {
+        try await Task.sleep(for: .milliseconds(20))
+    }
+    try await Task.sleep(for: .milliseconds(100))
+    let ends = recorder.snapshot
+    #expect(ends.count == 1)
+    let end = try #require(ends.first)
+    #expect(end.reachedEnd)
+    #expect(!end.isPlaying)
+    #expect(end.diagnostics.bufferedFrames == 0)
+    #expect(end.statistics.decodedFrames > primed.statistics.decodedFrames)
+    #expect(end.errorMessage == nil)
 }
 
 @Test func periodicDecodeFailureStopsOutputAndReportsError() async throws {
