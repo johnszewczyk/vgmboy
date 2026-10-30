@@ -9,6 +9,15 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- SB2 faded-skip status failure, 2026-10-30: both delayed skip paths now use
+  one completion helper. A failed native status lookup cancels the still-current
+  skip and requests a generation-guarded gain restore; a late failure leaves a
+  newer skip alone. Renderer checks cover failure, supersession and matching or
+  mismatched generations. This is simulated bridge evidence, not a packaged or
+  audible reproduction. Replacement after the fade still retires the previous
+  session before the target is prepared, so failed-target preservation remains
+  outstanding.
+
 - AAC export speed, 2026-10-30: SB2 captures one speed for the timing preview
   and export request, and the shared exporter applies the prepared decoder
   family's effective tempo. Missing tempo remains 1x for older callers. Native
