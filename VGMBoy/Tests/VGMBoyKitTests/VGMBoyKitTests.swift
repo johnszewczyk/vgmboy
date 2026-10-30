@@ -993,6 +993,34 @@ struct RealtimeTransportTests {
         #expect(vgmboy_audio_unit_snapshot(output, &snapshot) == 0)
         #expect(snapshot.buffered_frames == 2)
     }
+
+    @Test("callback applies the latest ramp and retains an unrendered gain reset")
+    func callbackEnvelopeCommandReplacement() throws {
+        var config = VGMBoyAudioUnitConfig(sample_rate: 44_100, channel_count: 2,
+            callback_frames: 8, ring_buffer_frames: 32)
+        var handle: OpaquePointer?
+        #expect(vgmboy_audio_unit_create(&handle, &config) == 0)
+        let output = try #require(handle)
+        defer { vgmboy_audio_unit_destroy(output) }
+        var input = [Int16](repeating: 24_000, count: 48)
+        #expect(vgmboy_audio_unit_enqueue_pcm(output, &input, 24) == 24)
+        vgmboy_audio_unit_set_transport_active(output, 1)
+        vgmboy_audio_unit_set_transport_gain(output, 0)
+        vgmboy_audio_unit_ramp_transport_gain(output, 1, 8)
+        var rendered = [Int16](repeating: 0, count: 16)
+        #expect(vgmboy_audio_unit_render_offline(output, &rendered, 8) == 8)
+        #expect(abs(Int(rendered[0]) - 3_000) < 3)
+        #expect(abs(Int(rendered[14]) - 24_000) < 3)
+
+        vgmboy_audio_unit_ramp_transport_gain(output, 0, 8)
+        #expect(vgmboy_audio_unit_render_offline(output, &rendered, 4) == 4)
+        vgmboy_audio_unit_set_transport_gain(output, 0.5)
+        vgmboy_audio_unit_ramp_transport_gain(output, 0, 8)
+        vgmboy_audio_unit_ramp_transport_gain(output, 1, 4)
+        #expect(vgmboy_audio_unit_render_offline(output, &rendered, 4) == 4)
+        #expect(abs(Int(rendered[0]) - 15_000) < 3)
+        #expect(abs(Int(rendered[6]) - 24_000) < 3)
+    }
 }
 
 @Suite("TimingPolicy")

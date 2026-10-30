@@ -23,8 +23,15 @@ struct VGMBoyAudioUnit {
   _Atomic int running;
   _Atomic int transport_active;
   _Atomic uint64_t callback_count, underrun_count, frames_requested, frames_supplied, frames_written;
-  _Atomic float transport_gain, transport_target;
-  _Atomic uint32_t transport_ramp_frames;
+  /* The callback alone owns envelope progress. Control threads publish a
+     coherent command snapshot; a callback never writes over a newer command. */
+  pthread_mutex_t envelope_lock;
+  _Atomic uint64_t envelope_revision, envelope_reset_revision;
+  _Atomic float envelope_reset_gain, envelope_target;
+  _Atomic uint32_t envelope_frames;
+  uint64_t applied_envelope_revision, applied_reset_revision;
+  float callback_gain, callback_target;
+  uint32_t callback_remaining;
   pthread_mutex_t producer_lock;
   float volume;
   int mono, equalizer_enabled;
@@ -83,9 +90,27 @@ static void render_frames(VGMBoyAudioUnit* output, int16_t* samples, uint32_t fr
     memset((unsigned char*)samples + supplied_bytes, 0, bytes - supplied_bytes);
     if (active) atomic_fetch_add_explicit(&output->underrun_count, 1, memory_order_relaxed);
   }
-  float gain = atomic_load_explicit(&output->transport_gain, memory_order_acquire), target = atomic_load_explicit(&output->transport_target, memory_order_acquire); uint32_t remaining = atomic_load_explicit(&output->transport_ramp_frames, memory_order_acquire);
+  // Never wait for a control writer: if its snapshot is in flight, keep the
+  // current envelope for this buffer and try again on the next callback.
+  const uint64_t revision = atomic_load_explicit(&output->envelope_revision, memory_order_seq_cst);
+  if (!(revision & 1) && revision != output->applied_envelope_revision) {
+    const uint64_t reset_revision = atomic_load_explicit(&output->envelope_reset_revision, memory_order_seq_cst);
+    const float reset_gain = atomic_load_explicit(&output->envelope_reset_gain, memory_order_seq_cst);
+    const float next_target = atomic_load_explicit(&output->envelope_target, memory_order_seq_cst);
+    const uint32_t next_frames = atomic_load_explicit(&output->envelope_frames, memory_order_seq_cst);
+    if (revision == atomic_load_explicit(&output->envelope_revision, memory_order_seq_cst)) {
+      if (reset_revision != output->applied_reset_revision) {
+        output->callback_gain = reset_gain;
+        output->applied_reset_revision = reset_revision;
+      }
+      output->callback_target = next_target;
+      output->callback_remaining = next_frames;
+      output->applied_envelope_revision = revision;
+    }
+  }
+  float gain = output->callback_gain, target = output->callback_target; uint32_t remaining = output->callback_remaining;
   for (UInt32 frame = 0; frame < frames; frame += 1) { gain = remaining ? gain + (target - gain) / (float)remaining-- : target; const size_t index = (size_t)frame * 2; samples[index] = (int16_t)lrintf(clampf((float)samples[index] * gain, -32768, 32767)); samples[index + 1] = (int16_t)lrintf(clampf((float)samples[index + 1] * gain, -32768, 32767)); }
-  atomic_store_explicit(&output->transport_gain, gain, memory_order_release); atomic_store_explicit(&output->transport_ramp_frames, remaining, memory_order_release);
+  output->callback_gain = gain; output->callback_remaining = remaining;
 }
 static OSStatus render(void* context, AudioUnitRenderActionFlags* flags, const AudioTimeStamp* timestamp, UInt32 bus, UInt32 frames, AudioBufferList* buffers) {
   (void)flags; (void)timestamp; (void)bus;
@@ -107,20 +132,40 @@ int vgmboy_audio_unit_create(VGMBoyAudioUnit** result, const VGMBoyAudioUnitConf
   if (!result || !config || config->sample_rate <= 0 || config->channel_count != 2 || !config->ring_buffer_frames) return 1;
   VGMBoyAudioUnit* output = calloc(1, sizeof(*output)); if (!output) return 1; output->capacity_bytes = (size_t)config->ring_buffer_frames * VGMBOY_BYTES_PER_FRAME; output->ring = calloc(output->capacity_bytes, 1);
   if (!output->ring || pthread_mutex_init(&output->producer_lock, NULL)) { free(output->ring); free(output); return 1; }
+  if (pthread_mutex_init(&output->envelope_lock, NULL)) { pthread_mutex_destroy(&output->producer_lock); free(output->ring); free(output); return 1; }
   output->format.mSampleRate = config->sample_rate; output->format.mFormatID = kAudioFormatLinearPCM; output->format.mFormatFlags = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked; output->format.mFramesPerPacket = 1; output->format.mChannelsPerFrame = 2; output->format.mBitsPerChannel = 16; output->format.mBytesPerFrame = VGMBOY_BYTES_PER_FRAME; output->format.mBytesPerPacket = VGMBOY_BYTES_PER_FRAME; output->volume = 1;
-  atomic_init(&output->transport_active, 0); atomic_init(&output->transport_gain, 1); atomic_init(&output->transport_target, 1); atomic_init(&output->transport_ramp_frames, 0);
+  atomic_init(&output->transport_active, 0); atomic_init(&output->envelope_revision, 0); atomic_init(&output->envelope_reset_revision, 0); atomic_init(&output->envelope_reset_gain, 1); atomic_init(&output->envelope_target, 1); atomic_init(&output->envelope_frames, 0); output->callback_gain = 1; output->callback_target = 1;
   for (size_t i = 0; i < VGMBOY_BAND_COUNT; i += 1) configure_biquad(&output->equalizer[i], band_frequencies[i], 0, config->sample_rate); *result = output; return 0;
 }
-void vgmboy_audio_unit_destroy(VGMBoyAudioUnit* output) { if (!output) return; if (output->unit) { AudioOutputUnitStop(output->unit); AudioUnitUninitialize(output->unit); AudioComponentInstanceDispose(output->unit); } pthread_mutex_destroy(&output->producer_lock); free(output->ring); free(output); }
+void vgmboy_audio_unit_destroy(VGMBoyAudioUnit* output) { if (!output) return; if (output->unit) { AudioOutputUnitStop(output->unit); AudioUnitUninitialize(output->unit); AudioComponentInstanceDispose(output->unit); } pthread_mutex_destroy(&output->envelope_lock); pthread_mutex_destroy(&output->producer_lock); free(output->ring); free(output); }
 int vgmboy_audio_unit_start(VGMBoyAudioUnit* output) { if (!output) return 1; if (atomic_load_explicit(&output->running, memory_order_acquire)) return 0; if (prepare_unit(output) || AudioOutputUnitStart(output->unit) != noErr) return 1; atomic_store_explicit(&output->running, 1, memory_order_release); return 0; }
 int vgmboy_audio_unit_stop(VGMBoyAudioUnit* output) { if (!output) return 1; if (!atomic_load_explicit(&output->running, memory_order_acquire)) return 0; if (AudioOutputUnitStop(output->unit) != noErr) return 1; atomic_store_explicit(&output->running, 0, memory_order_release); return 0; }
 void vgmboy_audio_unit_clear(VGMBoyAudioUnit* output) { if (output) atomic_store_explicit(&output->read_index, atomic_load_explicit(&output->write_index, memory_order_relaxed), memory_order_release); }
 void vgmboy_audio_unit_reset_counters(VGMBoyAudioUnit* output) { if (output) { atomic_store(&output->callback_count, 0); atomic_store(&output->underrun_count, 0); atomic_store(&output->frames_requested, 0); atomic_store(&output->frames_supplied, 0); atomic_store(&output->frames_written, 0); } }
 void vgmboy_audio_unit_set_volume(VGMBoyAudioUnit* output, float volume) { if (output) { pthread_mutex_lock(&output->producer_lock); output->volume = clampf(volume, 0, 1); pthread_mutex_unlock(&output->producer_lock); } }
 void vgmboy_audio_unit_set_mono(VGMBoyAudioUnit* output, int enabled) { if (output) { pthread_mutex_lock(&output->producer_lock); output->mono = enabled != 0; pthread_mutex_unlock(&output->producer_lock); } }
-void vgmboy_audio_unit_set_transport_gain(VGMBoyAudioUnit* output, float gain) { if (output) { const float safe = clampf(gain, 0, 1); atomic_store(&output->transport_gain, safe); atomic_store(&output->transport_target, safe); atomic_store(&output->transport_ramp_frames, 0); } }
+void vgmboy_audio_unit_set_transport_gain(VGMBoyAudioUnit* output, float gain) {
+  if (!output) return;
+  const float safe = clampf(gain, 0, 1);
+  pthread_mutex_lock(&output->envelope_lock);
+  atomic_fetch_add(&output->envelope_revision, 1);
+  atomic_store(&output->envelope_reset_gain, safe);
+  atomic_fetch_add(&output->envelope_reset_revision, 1);
+  atomic_store(&output->envelope_target, safe);
+  atomic_store(&output->envelope_frames, 0);
+  atomic_fetch_add(&output->envelope_revision, 1);
+  pthread_mutex_unlock(&output->envelope_lock);
+}
 void vgmboy_audio_unit_set_transport_active(VGMBoyAudioUnit* output, int active) { if (output) atomic_store_explicit(&output->transport_active, active != 0, memory_order_release); }
-void vgmboy_audio_unit_ramp_transport_gain(VGMBoyAudioUnit* output, float gain, uint32_t frames) { if (output) { atomic_store(&output->transport_target, clampf(gain, 0, 1)); atomic_store(&output->transport_ramp_frames, frames); } }
+void vgmboy_audio_unit_ramp_transport_gain(VGMBoyAudioUnit* output, float gain, uint32_t frames) {
+  if (!output) return;
+  pthread_mutex_lock(&output->envelope_lock);
+  atomic_fetch_add(&output->envelope_revision, 1);
+  atomic_store(&output->envelope_target, clampf(gain, 0, 1));
+  atomic_store(&output->envelope_frames, frames);
+  atomic_fetch_add(&output->envelope_revision, 1);
+  pthread_mutex_unlock(&output->envelope_lock);
+}
 void vgmboy_audio_unit_set_equalizer(VGMBoyAudioUnit* output, int enabled, const float* gains, size_t count) { if (!output) return; pthread_mutex_lock(&output->producer_lock); output->equalizer_enabled = enabled != 0; for (size_t i = 0; i < VGMBOY_BAND_COUNT; i += 1) { configure_biquad(&output->equalizer[i], band_frequencies[i], gains && i < count ? clampf(gains[i], -12, 12) : 0, output->format.mSampleRate); memset(output->equalizer[i].x1, 0, sizeof(output->equalizer[i].x1)); memset(output->equalizer[i].x2, 0, sizeof(output->equalizer[i].x2)); memset(output->equalizer[i].y1, 0, sizeof(output->equalizer[i].y1)); memset(output->equalizer[i].y2, 0, sizeof(output->equalizer[i].y2)); } pthread_mutex_unlock(&output->producer_lock); }
 size_t vgmboy_audio_unit_enqueue_pcm(VGMBoyAudioUnit* output, int16_t* samples, size_t frames) {
   if (!output || !samples) return 0;
