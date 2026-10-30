@@ -44,6 +44,13 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- SB2 stale start error, 2026-10-30: an older failed start could show its error
+  after a newer playback intent began. A renderer check reproduced the stale
+  toast; errors now display only for the current intent, including after an
+  asynchronous gain restore. The focused four-case recovery check and the full
+  50-case renderer run passed. No native or packaged app build was attempted in
+  this disk-constrained pass.
+
 - Slow-archive retry interrupted, 2026-10-30: a concurrent disk-space cleanup
   removed temporary verification and Swift build directories during a retry,
   causing a build-database disk I/O error. The retry and a subsequent dependency
