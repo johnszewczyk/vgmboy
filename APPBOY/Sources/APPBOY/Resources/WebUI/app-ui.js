@@ -712,6 +712,9 @@
     updateTitlebarAndStats();
     syncModeButtons();
     app.playback.renderTransportChrome();
+    requestAnimationFrame(() => {
+      refreshIndicatorPosition();
+    });
   }
 
   app.ui = {

@@ -58,6 +58,10 @@ final class AppViewController: UIViewController {
         }
     }
 
+    func handleDeepLink(_ url: URL) {
+        nativeBridge.emitDeepLink(url: url)
+    }
+
     func flushFrontendState() async {
         guard let webView else { return }
         _ = try? await webView.callAsyncJavaScript(

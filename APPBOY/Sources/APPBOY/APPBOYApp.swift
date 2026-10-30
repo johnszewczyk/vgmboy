@@ -45,6 +45,26 @@ final class AppBoySceneDelegate: UIResponder, UIWindowSceneDelegate {
         hostWindow.makeKeyAndVisible()
         self.rootController = controller
         self.window = hostWindow
+        for context in connectionOptions.urlContexts {
+            controller.handleDeepLink(context.url)
+        }
+        let args = CommandLine.arguments
+        var idx = 1
+        while idx < args.count {
+            if args[idx] == "--url", idx + 1 < args.count, let url = URL(string: args[idx + 1]) {
+                controller.handleDeepLink(url)
+                idx += 2
+            } else {
+                idx += 1
+            }
+        }
+    }
+
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        guard let controller = rootController else { return }
+        for context in URLContexts {
+            controller.handleDeepLink(context.url)
+        }
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
