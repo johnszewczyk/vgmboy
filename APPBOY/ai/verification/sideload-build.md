@@ -16,20 +16,20 @@ iOS package (`com.john.spcboy.appboy`).
   `iPhoneOS27.1.sdk`, `iPhoneSimulator27.1.sdk`, installed iOS 27.0 Simulator
   runtime (`24A434`, `arm64`, `com.apple.CoreSimulator.SimRuntime.iOS-27-0`),
   `sips`, `plutil`, `codesign`, `ditto`, and Node.js (`node --check`).
-- **Fixtures / runtime hardware**: Built-in starter VGM catalog and native 16-bit
-  PCM WAV preview synthesizer (`AppBoyChiptuneSynth`) require no external fixture
-  files; **iPhone 16 Plus** Simulator (`com.apple.CoreSimulator.SimDeviceType.iPhone-16-Plus`,
-  `430 × 932 pt` / `1290 × 2796 @3x`) provides live Simulator UI and audio
-  verification.
+- **Fixtures / runtime hardware**: Built-in starter VGM catalog and native stereo
+  `44.1 kHz` 16-bit PCM WAV loop synthesizer (`AppBoyChiptuneSynth`) require no
+  external fixture files; **iPhone 16 Plus** Simulator
+  (`com.apple.CoreSimulator.SimDeviceType.iPhone-16-Plus`, `430 × 932 pt` /
+  `1290 × 2796 @3x`) provides live Simulator UI and `AVAudioEngine` verification.
 
 ## Current Evidence Index
 
 | Check | Level | Command / Artifact | Result |
 | --- | --- | --- | --- |
 | Bundled WebUI JavaScript syntax | Package | `node --check Sources/APPBOY/Resources/WebUI/*.js` | Passed (`sb-presentation.js`, `app-state.js`, `app-playback.js`, `app-ui.js`, `app.js`). |
-| iOS device compilation & `.ipa` archive | Package | `./build.sh --target device` → `.build/APPBOY.app`, `.build/APPBOY.ipa` | Passed; `vtool` confirms `LC_BUILD_VERSION` `platform IOS`, `minos 17.0`; `plutil -lint` `OK`; `codesign --verify --deep --strict` valid; clean 31-entry `Payload/APPBOY.app` `.ipa` without `__MACOSX` metadata. |
-| iOS Simulator bundle & launch | Packaged UI | `./launch.sh` → `iPhone 16 Plus` (`iOS 27.0` `24A434`, `1290 × 2796 @3x`) | Passed; verified Dynamic Island and home-indicator safe-area geometry, clamped `430pt` CSS Grid shell, animated cyan SB2 mode selector, Library console/album tree, Playlist view with `1px` active row underline, and 2-column square Gallery frames. |
-| Live PCM WAV synthesis, playback & persistence | Live fixture | `xcrun simctl launch ... com.john.spcboy.appboy --url appboy://play/snes-chrono-t1 --url appboy://view/playlist` | Passed; verified `AppBoyChiptuneSynth` generated `snes-chrono-echoes-t01.wav` and `snes-chrono-echoes-t02.wav` under `tmp/APPBOY-Synth/`, `AVPlayer` advanced live elapsed clocks (`PLAYING 0:22 / 0:24` → natural end auto-advance to track `02 Millennial Fairgrounds`), animated 4-bar play glyph active, and `history.json` + `playlist-tabs.json` persisted under `Application Support/APPBOY/`. |
+| iOS device compilation & `.ipa` archive | Package | `./build.sh --target device` → `.build/APPBOY.app`, `.build/APPBOY.ipa` | Passed; `vtool` confirms `LC_BUILD_VERSION` `platform IOS`, `minos 17.0`; `plutil -lint` `OK`; `codesign --verify --deep --strict` valid; clean `Payload/APPBOY.app` `.ipa` without `__MACOSX` metadata. |
+| iOS Simulator UI, equal-width tabs & Options | Packaged UI | `./launch.sh` → `iPhone 16 Plus` (`iOS 27.0` `24A434`, `1290 × 2796 @3x`) | Passed; verified noise-free `SPCBOY` title strip, soundchip-clutter-free Library console tree, equal-width open Playlist tabs (`flex: 1 1 0`), 6 equal-width Options tabs (`Chrome`, `Fonts`, `Gallery`, `Audio`, `Playback`, `Catalog`), 10-band Equalizer UI, and 2-column square Gallery frames. |
+| Live `AVAudioEngine` 10-band EQ, Long Play & Speed | Live fixture | `xcrun simctl launch ... com.john.spcboy.appboy --url appboy://play/snes-chrono-echoes-t01 --url appboy://transport/newTab --url appboy://view/playlist` | Passed; verified `AppBoyChiptuneSynth` generated stereo `44.1 kHz` `snes-chrono-echoes-t01-24s.wav` under `tmp/APPBOY-Synth-v2/`, `AVAudioEngine` (`AVAudioPlayerNode` → `AVAudioUnitTimePitch` at `1.25×` → 10-band `AVAudioUnitEQ` with headroom compensation) looped track `01` seamlessly past its `0:24` natural loop into `PLAYING 1:12 / 3:00 / 15:00` under Long Play, and persisted `preferences.json`, `history.json`, and `playlist-tabs.json`. |
 | DocMan routing & link integrity | Contract | `node scripts/check-doc-links.js && node scripts/check-doc-paradigm.js` | Passed across repository links and routed `project-info.md` files. |
 
 ## Environmental Evidence Gaps

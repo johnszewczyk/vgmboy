@@ -87,12 +87,54 @@ struct AppBoyPreferencesSnapshot: Codable, Equatable, Sendable {
     var galleryGapRem: Double = 0.35
     var galleryRadiusRem: Double = 0.2
     var repeatMode: String = "off"
+    var equalizerEnabled: Bool = false
+    var equalizerBandsDB: [Double] = Array(repeating: 0.0, count: 10)
+    var monoEnabled: Bool = false
+    var fadeOutEnabled: Bool = true
+    var fadeOutSeconds: Double = 5.0
     var longPlayEnabled: Bool = false
     var manualPlayTimeSeconds: Double = 180.0
     var playbackSpeedEnabled: Bool = false
     var playbackSpeedRate: Double = 1.25
     var appVolume: Double = 1.0
     var remoteCatalogURL: String = ""
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = AppBoyPreferencesSnapshot()
+        accentColor = try c.decodeIfPresent(String.self, forKey: .accentColor) ?? d.accentColor
+        uiChromePrimaryColor = try c.decodeIfPresent(String.self, forKey: .uiChromePrimaryColor) ?? d.uiChromePrimaryColor
+        uiChromeSecondaryColor = try c.decodeIfPresent(String.self, forKey: .uiChromeSecondaryColor) ?? d.uiChromeSecondaryColor
+        uiChromePaneColor = try c.decodeIfPresent(String.self, forKey: .uiChromePaneColor) ?? d.uiChromePaneColor
+        sidebarTextColor = try c.decodeIfPresent(String.self, forKey: .sidebarTextColor) ?? d.sidebarTextColor
+        uiChromeFontSizePt = try c.decodeIfPresent(Double.self, forKey: .uiChromeFontSizePt) ?? d.uiChromeFontSizePt
+        contentFontSizePt = try c.decodeIfPresent(Double.self, forKey: .contentFontSizePt) ?? d.contentFontSizePt
+        uiChromeMonospace = try c.decodeIfPresent(Bool.self, forKey: .uiChromeMonospace) ?? d.uiChromeMonospace
+        contentMonospace = try c.decodeIfPresent(Bool.self, forKey: .contentMonospace) ?? d.contentMonospace
+        selectionAnimationEnabled = try c.decodeIfPresent(Bool.self, forKey: .selectionAnimationEnabled) ?? d.selectionAnimationEnabled
+        selectionAnimationMilliseconds = try c.decodeIfPresent(Int.self, forKey: .selectionAnimationMilliseconds) ?? d.selectionAnimationMilliseconds
+        playlistLinkMode = try c.decodeIfPresent(Bool.self, forKey: .playlistLinkMode) ?? d.playlistLinkMode
+        sidebarTrackCounts = try c.decodeIfPresent(Bool.self, forKey: .sidebarTrackCounts) ?? d.sidebarTrackCounts
+        favoriteSortOrder = try c.decodeIfPresent(String.self, forKey: .favoriteSortOrder) ?? d.favoriteSortOrder
+        galleryFitMode = try c.decodeIfPresent(String.self, forKey: .galleryFitMode) ?? d.galleryFitMode
+        galleryFrameScale = try c.decodeIfPresent(Double.self, forKey: .galleryFrameScale) ?? d.galleryFrameScale
+        galleryGapRem = try c.decodeIfPresent(Double.self, forKey: .galleryGapRem) ?? d.galleryGapRem
+        galleryRadiusRem = try c.decodeIfPresent(Double.self, forKey: .galleryRadiusRem) ?? d.galleryRadiusRem
+        repeatMode = try c.decodeIfPresent(String.self, forKey: .repeatMode) ?? d.repeatMode
+        equalizerEnabled = try c.decodeIfPresent(Bool.self, forKey: .equalizerEnabled) ?? d.equalizerEnabled
+        equalizerBandsDB = try c.decodeIfPresent([Double].self, forKey: .equalizerBandsDB) ?? d.equalizerBandsDB
+        monoEnabled = try c.decodeIfPresent(Bool.self, forKey: .monoEnabled) ?? d.monoEnabled
+        fadeOutEnabled = try c.decodeIfPresent(Bool.self, forKey: .fadeOutEnabled) ?? d.fadeOutEnabled
+        fadeOutSeconds = try c.decodeIfPresent(Double.self, forKey: .fadeOutSeconds) ?? d.fadeOutSeconds
+        longPlayEnabled = try c.decodeIfPresent(Bool.self, forKey: .longPlayEnabled) ?? d.longPlayEnabled
+        manualPlayTimeSeconds = try c.decodeIfPresent(Double.self, forKey: .manualPlayTimeSeconds) ?? d.manualPlayTimeSeconds
+        playbackSpeedEnabled = try c.decodeIfPresent(Bool.self, forKey: .playbackSpeedEnabled) ?? d.playbackSpeedEnabled
+        playbackSpeedRate = try c.decodeIfPresent(Double.self, forKey: .playbackSpeedRate) ?? d.playbackSpeedRate
+        appVolume = try c.decodeIfPresent(Double.self, forKey: .appVolume) ?? d.appVolume
+        remoteCatalogURL = try c.decodeIfPresent(String.self, forKey: .remoteCatalogURL) ?? d.remoteCatalogURL
+    }
 
     mutating func normalize() {
         uiChromeFontSizePt = min(max(uiChromeFontSizePt, 9.0), 16.0)
@@ -101,6 +143,17 @@ struct AppBoyPreferencesSnapshot: Codable, Equatable, Sendable {
         galleryFrameScale = min(max(galleryFrameScale, 0.65), 1.6)
         galleryGapRem = min(max(galleryGapRem, 0.0), 1.0)
         galleryRadiusRem = min(max(galleryRadiusRem, 0.0), 1.0)
+        if equalizerBandsDB.count < 10 {
+            equalizerBandsDB.append(contentsOf: Array(repeating: 0.0, count: 10 - equalizerBandsDB.count))
+        } else if equalizerBandsDB.count > 10 {
+            equalizerBandsDB = Array(equalizerBandsDB.prefix(10))
+        }
+        equalizerBandsDB = equalizerBandsDB.map { val in
+            guard val.isFinite else { return 0.0 }
+            let clamped = min(max(val, -12.0), 12.0)
+            return (clamped * 2.0).rounded() / 2.0
+        }
+        fadeOutSeconds = min(max(fadeOutSeconds, 0.0), 30.0)
         manualPlayTimeSeconds = min(max(manualPlayTimeSeconds, 15.0), 3600.0)
         playbackSpeedRate = min(max(playbackSpeedRate, 0.5), 2.0)
         appVolume = (min(max(appVolume, 0.0), 1.0) * 20.0).rounded() / 20.0

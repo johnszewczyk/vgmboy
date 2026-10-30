@@ -52,9 +52,8 @@
       ? "GALLERY"
       : (tab?.consoleName || "LIBRARY").toUpperCase();
     refs.albumLabel.textContent = state.contentMode === "gallery"
-      ? "ARTWORK GRID"
+      ? "ARTWORK"
       : (tab?.title || "NO PLAYLIST");
-    refs.sourceChip.textContent = (c.sourceLabel || "BUILT-IN").toUpperCase();
 
     const sysWord = c.consoleCount === 1 ? "SYSTEM" : "SYSTEMS";
     const albWord = c.albumCount === 1 ? "ALBUM" : "ALBUMS";
@@ -124,7 +123,8 @@
     if (!q) return state.catalog.consoles || [];
     const out = [];
     for (const group of state.catalog.consoles || []) {
-      const consoleMatch = group.name.toLowerCase().includes(q) || group.shortCode.toLowerCase().includes(q);
+      const consoleMatch = group.name.toLowerCase().includes(q)
+        || (group.shortCode || "").toLowerCase().includes(q);
       const matchingAlbums = group.albums.filter((alb) =>
         consoleMatch
         || alb.title.toLowerCase().includes(q)
@@ -139,7 +139,6 @@
   }
 
   function isAlbumAllFavorited(album) {
-    // Check loaded tab tracks if cached, else check matching prefix in favoriteIds
     let matchedCount = 0;
     for (const favId of state.favoriteIds) {
       if (favId.startsWith(`${album.id}-t`)) matchedCount += 1;
@@ -180,10 +179,6 @@
       disc.className = "console-disclosure";
       disc.textContent = expanded ? "▾" : "▸";
 
-      const code = document.createElement("span");
-      code.className = "console-code";
-      code.textContent = group.shortCode;
-
       const name = document.createElement("span");
       name.className = "console-name";
       name.textContent = group.name;
@@ -192,7 +187,7 @@
       count.className = "console-count";
       count.textContent = String(group.albums.length);
 
-      headerBtn.append(disc, code, name, count);
+      headerBtn.append(disc, name, count);
       headerBtn.addEventListener("click", () => {
         if (state.expandedConsoleIds.has(group.id)) {
           state.expandedConsoleIds.delete(group.id);
@@ -315,7 +310,7 @@
       favTab = {
         id: "tab-favorites",
         title: "Favorites",
-        consoleName: "COLLECTION",
+        consoleName: "FAVORITES",
         sourceKind: "favorites",
         sourceId: null,
         selectedTrackId: tracks[0]?.id || null
@@ -343,7 +338,7 @@
       histTab = {
         id: "tab-history",
         title: "Recent",
-        consoleName: "HISTORY",
+        consoleName: "RECENT",
         sourceKind: "history",
         sourceId: null,
         selectedTrackId: tracks[0]?.id || null
@@ -371,7 +366,7 @@
     const newTab = {
       id,
       title: current ? `${current.title}` : "Playlist",
-      consoleName: current?.consoleName || "SNES",
+      consoleName: current?.consoleName || "Super Nintendo",
       sourceKind: current?.sourceKind === "album" ? "album" : "custom",
       sourceId: current?.sourceId || null,
       selectedTrackId: current?.selectedTrackId || currentTracks[0]?.id || null
@@ -384,6 +379,7 @@
     renderPlaylistRows();
     updateTitlebarAndStats();
     syncModeButtons();
+    app.playback.renderTransportChrome();
     app.scheduleWorkspaceSave();
   }
 
@@ -463,7 +459,7 @@
     const dir = state.sortDirection === "desc" ? -1 : 1;
     copy.sort((a, b) => {
       if (state.sortColumn === "time") {
-        return ((a.durationSeconds || 0) - (b.durationSeconds || 0)) * dir;
+        return (app.effectiveTrackDuration(a) - app.effectiveTrackDuration(b)) * dir;
       }
       if (state.sortColumn === "album") {
         return String(a.albumTitle || "").localeCompare(String(b.albumTitle || "")) * dir;
@@ -568,7 +564,7 @@
       title.textContent = track.title;
       const subMobile = document.createElement("span");
       subMobile.className = "track-sub-mobile";
-      subMobile.textContent = `${track.artist} · ${track.albumTitle} [${track.format || track.consoleName}]`;
+      subMobile.textContent = `${track.artist} · ${track.albumTitle}`;
       main.append(title, subMobile);
 
       const albumCell = document.createElement("span");
@@ -577,7 +573,7 @@
 
       const sysCell = document.createElement("span");
       sysCell.className = "track-sys split-only-col";
-      sysCell.textContent = track.format || track.consoleName;
+      sysCell.textContent = track.consoleName;
 
       const isFav = state.favoriteIds.has(track.id) || Boolean(track.isFavorite);
       const favBtn = document.createElement("button");
@@ -593,7 +589,7 @@
 
       const time = document.createElement("span");
       time.className = "track-time";
-      time.textContent = app.formatTime(track.durationSeconds);
+      time.textContent = app.formatTime(app.effectiveTrackDuration(track));
 
       row.append(num, main, albumCell, sysCell, favBtn, time);
 

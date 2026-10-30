@@ -195,20 +195,9 @@ body[data-sb-motion="off"] .sb2-selection-indicator {
   letter-spacing: 0.09em;
 }
 
-.sb-badge {
-  padding: 2px 5px;
-  border: 1px solid color-mix(in srgb, var(--accent) 48%, #29303a);
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--accent) 14%, #11151d);
-  color: var(--accent);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-}
-
 .sb-console {
   color: var(--muted);
-  max-width: 24%;
+  max-width: 38%;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -219,18 +208,6 @@ body[data-sb-motion="off"] .sb2-selection-indicator {
   overflow: hidden;
   color: #e0e1eb;
   text-overflow: ellipsis;
-}
-
-.sb-source-chip {
-  flex: 0 0 auto;
-  padding: 2px 6px;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: #12161e;
-  color: var(--muted);
-  font-size: 0.66rem;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
 }
 
 /* SB2 Buttons */
@@ -438,17 +415,6 @@ body[data-sb-motion="off"] .sb2-selection-indicator {
   text-align: center;
 }
 
-.console-code {
-  flex: 0 0 auto;
-  padding: 2px 5px;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: #12161f;
-  color: var(--accent);
-  font-size: 0.66rem;
-  letter-spacing: 0.06em;
-}
-
 .console-name {
   flex: 1 1 auto;
   min-width: 0;
@@ -592,20 +558,25 @@ body[data-sb-motion="off"] .sb2-selection-indicator {
 }
 
 .playlist-tab {
-  display: inline-flex;
+  display: flex;
+  flex: 1 1 0;
   align-items: center;
-  flex: 0 0 auto;
-  max-width: 220px;
+  min-width: 84px;
   height: 38px;
+  overflow: hidden;
+  border: 1px solid #1e232d;
   border-radius: var(--sb-button-radius);
   background: var(--sb-button-surface);
 }
 
 .playlist-tab.is-active {
+  border-color: color-mix(in srgb, var(--accent) 42%, #1e232d);
   background: var(--sb-button-selected-surface);
 }
 
 .playlist-tab-select {
+  display: block;
+  flex: 1 1 0;
   height: 100%;
   min-width: 0;
   padding: 0 10px;
@@ -614,6 +585,7 @@ body[data-sb-motion="off"] .sb2-selection-indicator {
   color: var(--sb-button-ink);
   font-family: var(--chrome-font-family);
   font-size: var(--sb-control-font-size);
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1031,8 +1003,8 @@ body[data-sb-motion="off"] .sb2-selection-indicator {
 
 .transport-controls-row {
   display: grid;
-  grid-template-columns: repeat(9, minmax(0, 1fr));
-  gap: var(--sb-toolbar-gap);
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 3px;
   align-items: center;
 }
 
@@ -1074,7 +1046,7 @@ body[data-sb-motion="off"] .sb2-selection-indicator {
   .transport-controls-row {
     grid-column: 2;
     grid-row: 1 / span 2;
-    grid-template-columns: repeat(9, 40px);
+    grid-template-columns: repeat(10, 38px);
   }
   .transport-controls-row .tool-button.glyph-button {
     min-height: 38px;
@@ -1302,22 +1274,26 @@ body[data-sb-motion="off"] .sb2-selection-indicator {
 }
 
 .options-nav {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: var(--sb-toolbar-gap);
-  overflow-x: auto;
   padding-bottom: 4px;
-  scrollbar-width: none;
-}
-
-.options-nav::-webkit-scrollbar {
-  display: none;
 }
 
 .options-nav-item {
-  flex: 0 0 auto;
-  min-height: 40px;
-  padding: 0 12px;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 4px 2px;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
   white-space: nowrap;
+}
+
+.options-nav-item .ui-icon {
+  width: 0.92rem;
+  height: 0.92rem;
 }
 
 @media (min-width: 768px) {
@@ -1327,12 +1303,21 @@ body[data-sb-motion="off"] .sb2-selection-indicator {
     gap: 20px;
   }
   .options-nav {
+    display: flex;
     flex-direction: column;
     overflow-x: visible;
   }
   .options-nav-item {
+    flex-direction: row;
     justify-content: flex-start;
+    gap: 8px;
     width: 100%;
+    padding: 0 12px;
+    font-size: var(--sb-control-font-size);
+  }
+  .options-nav-item .ui-icon {
+    width: 1.05rem;
+    height: 1.05rem;
   }
 }
 
@@ -1491,6 +1476,140 @@ input[type="checkbox"]:checked {
 
 input[type="checkbox"]:checked::after {
   opacity: 1;
+}
+
+.options-subpanel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #2c3340;
+}
+
+.options-subpanel-header .options-subpanel-title {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.eq-reset-button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 0.72rem;
+}
+
+/* 10-Band Equalizer & SB2 Range Sliders */
+.equalizer-bands {
+  display: grid;
+  gap: 2px;
+  padding: 4px 0;
+  transition: opacity 120ms linear;
+}
+
+.equalizer-bands.is-bypassed {
+  opacity: 0.55;
+}
+
+.equalizer-band {
+  display: grid;
+  grid-template-columns: 3.7rem minmax(0, 1fr) 4.3rem;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  color: var(--text);
+}
+
+.equalizer-band > span:first-child,
+.equalizer-band output {
+  font-family: var(--mono-font-family);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.equalizer-band output {
+  color: var(--muted);
+  text-align: right;
+}
+
+.equalizer-volume {
+  min-height: 44px;
+  padding-top: 4px;
+}
+
+.range-slider {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 32px;
+  min-width: 0;
+  --range-percent: 50%;
+}
+
+.range-slider > input[type="range"] {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.range-slider-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  z-index: 0;
+  height: 5px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  border: 1px solid #181c24;
+  background: #222834;
+  pointer-events: none;
+}
+
+.range-slider-zero {
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+  background: #555e75;
+}
+
+.range-slider-fill {
+  display: block;
+  width: var(--range-percent);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.range-slider-thumb {
+  position: absolute;
+  left: var(--range-percent);
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #e8ecf8;
+  box-shadow: 0 0 0 2px var(--accent);
+  transform: translate(-50%, -50%);
+}
+
+.speed-preset-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.speed-preset-button {
+  min-height: 38px;
+  padding: 0 4px;
+  font-variant-numeric: tabular-nums;
 }
 
 .options-actions-row {

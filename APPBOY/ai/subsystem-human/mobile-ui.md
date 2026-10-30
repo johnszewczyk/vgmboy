@@ -8,8 +8,8 @@ behavior in APPBOY across iPhone and iPad viewports.
 ## Shell and Chrome
 
 - The top title strip spans the device safe area and displays `SPCBOY`, the
-  active console badge, and the current album or playlist title without desktop
-  window buttons or CPU meters.
+  active console name, and the current album or playlist title without platform
+  badges, desktop window buttons, or CPU meters.
 - The bottom status strip spans the home-indicator safe area and displays
   library system/album totals on the left, playback state (`READY`, `PLAYING`,
   `PAUSED`, `STOPPED`, `ERROR`) with a status dot, and `elapsed / length / total`
@@ -52,12 +52,14 @@ behavior in APPBOY across iPhone and iPad viewports.
 
 ## Playlist and Gallery
 
-- Playlist tabs appear in a horizontally scrollable strip above the track list,
-  supporting tab switching, creating a new tab (`+`), and closing individual
-  tabs when more than one tab is open.
-- Compact track rows display track number, title with subtitle metadata,
-  favorite star toggle, and tabular duration within the phone width; regular
-  viewports add explicit `Album` and `System` columns.
+- Open playlist tabs share the available tab-bar width equally (`flex: 1 1 0`)
+  above the track list, overflowing to horizontal scroll only when many tabs
+  exceed the minimum tab width, and support tab switching, creating a new tab
+  (`+`), and closing individual tabs when more than one tab is open.
+- Compact track rows display track number, title with artist/album subtitle,
+  favorite star toggle, and tabular duration (updating live when Long Play is
+  toggled) within the phone width; regular viewports add explicit `Album` and
+  `System` columns.
 - Active and selected playlist rows render SB2's `1px` bottom accent underline.
   When Link Mode is enabled (default on touch), tapping a track selects and
   starts playback immediately; when Link Mode is off, first tap selects and a
@@ -67,13 +69,22 @@ behavior in APPBOY across iPhone and iPad viewports.
 
 ## Transport and Options
 
-- The docked transport deck displays the active track title and system/album
-  subtitle, a touch-scrubbable progress bar, and buttons for Previous, Stop,
-  Play/Pause (switching to animated 4-bar playback meter while playing), Next,
-  Repeat (`off` / `all` / `one`), Long Play, Speed toggle, and Volume popover.
+- The docked transport deck displays the active track title and artist/album
+  subtitle (plus status pills when Equalizer, Long Play, Playback Speed, or
+  Repeat are active), a touch-scrubbable progress bar, and 10 equal-width
+  controls: Previous, Stop, Play/Pause (switching to animated 4-bar playback
+  meter while playing), Next, Repeat (`off` / `all` / `one`), Equalizer toggle,
+  Long Play toggle, Speed toggle, Volume popover, and Options.
 - Options slides top-down between the persistent title strip and bottom status
-  strip, organized into `Interface`, `Fonts`, `Gallery`, `Source`, and `Audio`
-  sections, and closes via the header `×` button or `Escape`.
+  strip with 6 equal-width section tabs on compact portrait (`Chrome`, `Fonts`,
+  `Gallery`, `Audio`, `Playback`, `Catalog`; vertical left rail on regular
+  viewports) and closes via the header `×` button or `Escape`.
+- `Audio` provides a 10-band peaking Equalizer (`31, 62, 125, 250, 500, 1k, 2k,
+  4k, 8k, 16k` Hz, `-12` to `+12 dB` in `0.5 dB` steps with automatic headroom
+  compensation and `Reset`), `Mono` channel downmix, and app `Volume`.
+- `Playback` provides `Long Play` seamless loop extension with configurable
+  `m:ss` duration, `Fade Out` end-fade toggle and length, and pitch-preserving
+  `Playback Speed` (`0.50×`–`2.00×` plus quick-tap preset pills).
 
 ## Files
 
