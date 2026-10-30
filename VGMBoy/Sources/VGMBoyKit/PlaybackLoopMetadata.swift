@@ -33,6 +33,39 @@ public struct PlaybackLoopMetadata: Codable, Equatable, Sendable {
     public var lengthSamples: Int64 { max(0, endSample - startSample) }
 }
 
+/// Shared sample-boundary reader for live playback and finite offline export.
+enum PlaybackLoopReader {
+    static func bounds(_ loop: PlaybackLoopMetadata, sampleRate: Int, tempo: Double) -> (start: Int64, end: Int64)? {
+        let scale = Double(sampleRate) / Double(loop.sampleRateHz) / tempo
+        let start = (Double(loop.startSample) * scale).rounded()
+        let end = (Double(loop.endSample) * scale).rounded()
+        let maximum = Double(Int32.max) * Double(sampleRate) / 1_000
+        guard start.isFinite, end.isFinite, start >= 0, end <= maximum, end > start else { return nil }
+        return (Int64(start), Int64(end))
+    }
+
+    static func read(decoder: any AudioDecoder, requested: Int, sampleRate: Int, tempo: Double,
+                     loop: inout PlaybackLoopMetadata?, remainingRepeats: inout Int?) throws -> (left: [Float], right: [Float]) {
+        guard requested > 0 else { return ([], []) }
+        guard let current = loop, current.isValid,
+              let bounds = bounds(current, sampleRate: sampleRate, tempo: tempo) else {
+            return try decoder.readFrames(requested)
+        }
+        if decoder.absolutePlayedFrames >= bounds.end {
+            if let remaining = remainingRepeats {
+                guard remaining > 0 else {
+                    loop = nil
+                    return try decoder.readFrames(requested)
+                }
+                remainingRepeats = remaining - 1
+            }
+            decoder.seek(milliseconds: Int((Double(bounds.start) * 1_000 / Double(sampleRate)).rounded()))
+        }
+        let available = max(1, bounds.end - decoder.absolutePlayedFrames)
+        return try decoder.readFrames(min(requested, Int(min(Int64(requested), available))))
+    }
+}
+
 enum PlaybackLoopTagReader {
     static func read(path: String, loadData: (URL) -> Data? = { try? Data(contentsOf: $0, options: .mappedIfSafe) }) -> PlaybackLoopMetadata? {
         let url = URL(fileURLWithPath: path)

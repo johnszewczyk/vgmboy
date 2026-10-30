@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import VGMBoyArchiveCore
+import AVFoundation
 @testable import VGMBoyKit
 
 private final class UACLoopEndRecorder: @unchecked Sendable {
@@ -97,4 +98,36 @@ private func verifyUACPlayback(path: String, expectedSeconds: Double) async thro
     // The loop package adds two 50 ms repeats; the package without metadata
     // plays its one-second member without borrowing the caller's override.
     #expect(abs(status.elapsedSeconds - expectedSeconds) < 0.02)
+}
+
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VGMBOY_UAC_LOOP_FIXTURES"] != nil))
+func uacAACExportUsesLoopAndSharedFade() throws {
+    let directory = try #require(ProcessInfo.processInfo.environment["VGMBOY_UAC_LOOP_FIXTURES"])
+    let root = URL(fileURLWithPath: directory)
+    let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: output) }
+    let controller = PlaybackController()
+    for (name, expected) in [("loop", 48_510), ("none", 44_100), ("endloop", 66_150)] {
+        let result = try controller.exportAAC(.init(sourcePath: root.appendingPathComponent("\(name).uac").path,
+            archiveEntry: "tone.wav", outputDirectory: output, filenameStem: name,
+            playMilliseconds: 2_000, fadeMilliseconds: 0))
+        #expect(abs(result.renderedFrames - Int64(expected)) <= 2, Comment(rawValue: name))
+    }
+    let fade = try controller.exportAAC(.init(sourcePath: root.appendingPathComponent("none.uac").path,
+        archiveEntry: "tone.wav", outputDirectory: output, filenameStem: "fade",
+        playMilliseconds: 500, fadeMilliseconds: 250))
+    #expect(fade.renderedFrames == 33_075)
+    let file = try AVAudioFile(forReading: fade.outputURL)
+    let buffer = try #require(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 40_000))
+    try file.read(into: buffer)
+    let channel = try #require(buffer.floatChannelData?[0])
+    let samples = Array(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength)))
+    #expect(samples.count > 33_000)
+    func meanAmplitude(_ range: Range<Int>) -> Double {
+        range.reduce(0.0) { $0 + Double(abs(samples[$1])) } / Double(range.count)
+    }
+    // ADTS decoder priming shifts the audible window; compare well inside the
+    // fade rather than assuming exact encoded sample alignment.
+    #expect(meanAmplitude(31_000..<32_000) < meanAmplitude(10_000..<11_000) * 0.45)
 }

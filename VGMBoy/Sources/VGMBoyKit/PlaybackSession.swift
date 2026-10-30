@@ -609,43 +609,12 @@ final class PlaybackSession: @unchecked Sendable {
         decoder: any AudioDecoder,
         requested: Int
     ) throws -> (left: [Float], right: [Float]) {
-        guard requested > 0 else { return ([], []) }
-        guard let loop = playbackLoop,
-              loop.isValid,
-              loop.sampleRateHz > 0 else {
-            return try decoder.readFrames(requested)
-        }
-        guard let bounds = loopOutputBounds(loop) else { return try decoder.readFrames(requested) }
-        let startOutput = bounds.start
-        let endOutput = bounds.end
-
-        if decoder.absolutePlayedFrames >= endOutput {
-            if let remaining = remainingLoopRepeats {
-                guard remaining > 0 else {
-                    playbackLoop = nil
-                    return try decoder.readFrames(requested)
-                }
-                remainingLoopRepeats = remaining - 1
-            }
-            decoder.seek(milliseconds: Int((Double(startOutput) * 1_000 / Double(sampleRate)).rounded()))
-        }
-
-        let available = max(1, endOutput - decoder.absolutePlayedFrames)
-        return try decoder.readFrames(min(requested, Int(min(Int64(requested), available))))
+        try PlaybackLoopReader.read(decoder: decoder, requested: requested, sampleRate: sampleRate,
+                                    tempo: currentTempo, loop: &playbackLoop, remainingRepeats: &remainingLoopRepeats)
     }
 
     private func loopOutputBounds(_ loop: PlaybackLoopMetadata, tempo: Double? = nil) -> (start: Int64, end: Int64)? {
-        let scale = Double(sampleRate) / Double(loop.sampleRateHz) / (tempo ?? currentTempo)
-        let scaledStart = (Double(loop.startSample) * scale).rounded()
-        let scaledEnd = (Double(loop.endSample) * scale).rounded()
-        // Native decoders use signed 32-bit millisecond seeks; reject loop
-        // endpoints beyond that range before any floating-point integer cast.
-        let maximumFrames = Double(Int32.max) * Double(sampleRate) / 1_000
-        guard scaledStart.isFinite, scaledEnd.isFinite, scaledStart >= 0,
-              scaledEnd <= maximumFrames, scaledEnd > scaledStart else { return nil }
-        let start = Int64(scaledStart)
-        let end = Int64(scaledEnd)
-        return end > start ? (start, end) : nil
+        PlaybackLoopReader.bounds(loop, sampleRate: sampleRate, tempo: tempo ?? currentTempo)
     }
 
     private func releaseCurrent() {
