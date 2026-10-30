@@ -250,7 +250,7 @@ function currentOutputBasePlaybackSeconds(track) {
   return Math.round(milliseconds * speed.denominator / speed.numerator) / 1000;
 }
 
-async function resolveTimingPlan(track, { force = false, cache = true } = {}) {
+async function resolveTimingPlan(track, { force = false, cache = true, tempo = requestedPlaybackSpeed() } = {}) {
   if (!track) {
     return null;
   }
@@ -265,7 +265,7 @@ async function resolveTimingPlan(track, { force = false, cache = true } = {}) {
     manualPlayMilliseconds: Math.max(0, Math.round(state.manualPlayTimeSeconds * 1000)),
     fadeMilliseconds: Math.max(0, Math.round(currentFadeSeconds(track) * 1000)),
     unknownDurationMilliseconds: Math.max(1, Math.round(state.unknownDurationSeconds * 1000)),
-    tempo: requestedPlaybackSpeed(),
+    tempo,
     longPlayEnabled: state.longPlayEnabled
   });
   if (!plan || !Number.isFinite(Number(plan.pre_fade_seconds))) {
@@ -328,7 +328,8 @@ async function exportTrackAsAAC(track) {
     let directory = state.aacExportDirectory;
     if (!directory) directory = (await window.spcBoySB2.defaultAACExportDirectory?.()) || "";
     if (!directory) return;
-    const plan = await resolveTimingPlan(track, { force: true });
+    const tempo = { ...requestedPlaybackSpeed() };
+    const plan = await resolveTimingPlan(track, { force: true, tempo });
     state.aacExportStatus = `Exporting ${track.title || track.filename || "track"}…`;
     playbackApp.ui.renderAll();
     const result = await window.spcBoySB2.nativeExportAAC({
@@ -339,7 +340,8 @@ async function exportTrackAsAAC(track) {
       outputDirectory: directory,
       filenameStem: track.title || track.filename || "Untitled Track",
       playMilliseconds: Math.max(1, Math.round(plan.pre_fade_seconds * 1000)),
-      fadeMilliseconds: Math.max(0, Math.round(plan.fade_seconds * 1000))
+      fadeMilliseconds: Math.max(0, Math.round(plan.fade_seconds * 1000)),
+      tempo
     });
     state.aacExportStatus = `Exported AAC: ${result?.path || "complete"}`;
   } catch (error) {

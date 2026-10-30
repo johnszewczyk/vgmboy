@@ -56,6 +56,7 @@ public struct PlaybackTransportAACExportRequest: Codable, Equatable, Sendable {
     public let filenameStem: String
     public let playMilliseconds: Int
     public let fadeMilliseconds: Int
+    public let tempo: PlaybackTempo?
 
     public init(
         sourcePath: String,
@@ -65,7 +66,8 @@ public struct PlaybackTransportAACExportRequest: Codable, Equatable, Sendable {
         outputDirectory: String,
         filenameStem: String,
         playMilliseconds: Int,
-        fadeMilliseconds: Int = 0
+        fadeMilliseconds: Int = 0,
+        tempo: PlaybackTempo? = nil
     ) {
         self.sourcePath = sourcePath
         self.archivePath = archivePath
@@ -75,6 +77,7 @@ public struct PlaybackTransportAACExportRequest: Codable, Equatable, Sendable {
         self.filenameStem = filenameStem
         self.playMilliseconds = max(0, playMilliseconds)
         self.fadeMilliseconds = max(0, fadeMilliseconds)
+        self.tempo = tempo
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -86,6 +89,7 @@ public struct PlaybackTransportAACExportRequest: Codable, Equatable, Sendable {
         case filenameStem
         case playMilliseconds
         case fadeMilliseconds
+        case tempo
     }
 
     public func exportRequest() throws -> AACExportRequest {
@@ -104,7 +108,8 @@ public struct PlaybackTransportAACExportRequest: Codable, Equatable, Sendable {
             outputDirectory: URL(fileURLWithPath: outputDirectory),
             filenameStem: filenameStem,
             playMilliseconds: playMilliseconds,
-            fadeMilliseconds: fadeMilliseconds
+            fadeMilliseconds: fadeMilliseconds,
+            tempo: tempo?.multiplier ?? 1
         )
     }
 

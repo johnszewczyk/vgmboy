@@ -30,6 +30,8 @@
   increments from 1/32× through 8×, displays reduced fractions, and uses a
   compact eight-character field. The Speed toolbar toggle enables or disables
   that configured rate while preserving its saved value.
+  AAC export captures the enabled speed when export begins and uses the same
+  format-specific speed limits as playback.
 - Option pages use a readable system font and a 65-character content width.
   Section headings are underlined; setting rows use whitespace without
   divider lines. UI Chrome and UI Fonts are separate SPCBOY pages. UI Fonts

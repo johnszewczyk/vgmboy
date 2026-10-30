@@ -117,6 +117,8 @@ startup contracts shared by the VGMMan player frontends.
   the original archive/member identity; VGMBoy prepares it. A frontend adapter
   may publish UI progress, but it does not extract the source, parse export
   fields, or reconstruct `AACExportRequest`.
+  Its optional tempo defaults to 1x for older requests; a frontend must use the
+  same captured tempo for the timing preview and offline export.
 - `PlaybackTransportSeekRequest` and `PlaybackTransportRampGainRequest` name
   the direct session controls at the bridge boundary. Their shared
   normalization keeps a renderer from relying on scalar argument order. The
