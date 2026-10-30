@@ -54,8 +54,10 @@ remaining live verification and deferred frontend work are not yet bounded.
   tests and SB2 playback renderer checks passed 60. The SPC source is the
   vendored Big Blue fixture previously identified by SHA-256
   `c2e3fbc4ecee60a2f9102acd374387438ac3a9ba5bfaca2f02a12fc6315bee85`.
-  Dependency and isolated test caches occupied approximately 299 MB and 395 MB;
-  about 25 GiB remained available. This is native integration evidence, not a
+  A separate two-job SB2 debug build passed from current source and used about
+  397 MB; macOS 26/27 Homebrew-library linker warnings persist. Dependency and
+  isolated test caches occupied approximately 299 MB and 395 MB, with about
+  25 GiB available. This is native integration evidence, not a
   packaged WebKit race or audible continuity measurement. The optional TXTP
   dependency fixture was unavailable in the vendor tree for this retry.
 
