@@ -44,6 +44,16 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- SB2 queued fade timing, 2026-10-30: the skip timer previously started while
+  its native gain command was still pending, so bridge delay could truncate the
+  fade. Both queued-skip paths now arm the full duration after the ramp reply,
+  with a duration-plus-two-second fallback if the bridge never responds. A
+  canceled, superseded or already-completing request cannot arm a late timer.
+  All 60 SB2 playback checks passed, including simulated delayed and missing
+  replies. The fallback cannot guarantee an audible fade if the bridge is hung;
+  packaged and audible behavior remain unverified. Native builds were not run
+  during disk-space recovery.
+
 - SB2 canceled-fade seek, 2026-10-30: a failed queued-skip gain restore could
   abort a later seek, and an already-replaced session received an unnecessary
   stale restore request. Cancellation now skips obsolete generations and treats
