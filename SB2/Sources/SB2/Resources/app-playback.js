@@ -837,7 +837,7 @@ async function cancelQueuedSkip({ restoreOutput = false } = {}) {
 }
 
 async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
-  let track = playbackPlaylist().find((entry) => entry.id === trackId);
+  let track = (playbackOptions?.pendingQueue || playbackPlaylist()).find((entry) => entry.id === trackId);
   if (!track) {
     return;
   }
@@ -865,39 +865,33 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
   let playbackBaseSeconds = fadeNowSeconds > 0
     ? Math.max(0.001, requestedStartSeconds)
     : normalBaseSeconds;
-  playbackWindow = fadeNowSeconds > 0
+  const nextPlaybackWindow = fadeNowSeconds > 0
     ? { trackId: track.id, totalSeconds: playbackTotalSeconds, fadeSeconds: fadeNowSeconds }
     : null;
-  resetNativePlaybackSnapshot();
-  await stopAllOutput({ keepNativeOutput: true, generation });
-  // A newer intent may have started while this request awaited unload.
-  // Do not publish the old track or send it to native as a fresh request.
-  if (generation !== playbackGeneration) return;
-
-  state.currentTrackId = track.id;
-  state.currentTrackInfo = track;
-  state.totalSeconds = playbackTotalSeconds;
-  state.elapsedSeconds = requestedStartSeconds;
-
-  if (state.totalSeconds > 0 && state.elapsedSeconds >= state.totalSeconds) {
-    state.isPlaying = false;
-    playbackApp.ui.refreshPlaylistPlaybackState();
-    return;
-  }
-
-  playbackApp.ui.refreshPlaylistPlaybackState();
+  const previousTrack = state.currentTrackInfo;
+  const previousGeneration = Number(state.nativePlayback?.generation) || 0;
+  const hadPreviousSession = Boolean(state.currentTrackId && state.nativePlayback?.trackLoaded && previousGeneration > 0);
 
   try {
     await setPlaybackPowerSaveBlocker(true);
     if (generation !== playbackGeneration) return;
-    state.totalSeconds = playbackTotalSeconds;
-    state.elapsedSeconds = requestedStartSeconds;
-    updatePlaybackReadout();
-    if (state.totalSeconds > 0 && state.elapsedSeconds >= state.totalSeconds) {
+    if (playbackTotalSeconds > 0 && requestedStartSeconds >= playbackTotalSeconds) {
+      await stopAllOutput({ keepNativeOutput: true, generation });
+      if (generation !== playbackGeneration) return;
       await setPlaybackPowerSaveBlocker(false);
       if (generation !== playbackGeneration) return;
+      state.currentTrackId = track.id;
+      state.currentTrackInfo = track;
+      if (playbackOptions?.pendingQueue) {
+        state.playingPlaylist = playbackOptions.pendingQueue;
+        state.playbackTabId = playbackOptions.pendingTabId;
+      }
+      state.totalSeconds = playbackTotalSeconds;
+      state.elapsedSeconds = requestedStartSeconds;
+      playbackWindow = nextPlaybackWindow;
       state.isPlaying = false;
       resetNativePlaybackSnapshot();
+      updatePlaybackReadout();
       playbackApp.ui.refreshPlaylistPlaybackState();
       return;
     }
@@ -928,6 +922,16 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
 
     await setPlaybackPowerSaveBlocker(true);
     if (generation !== playbackGeneration) return;
+    state.currentTrackId = track.id;
+    state.currentTrackInfo = track;
+    if (playbackOptions?.pendingQueue) {
+      state.playingPlaylist = playbackOptions.pendingQueue;
+      state.playbackTabId = playbackOptions.pendingTabId;
+    }
+    state.totalSeconds = playbackTotalSeconds;
+    state.elapsedSeconds = requestedStartSeconds;
+    playbackWindow = nextPlaybackWindow;
+    resetNativePlaybackSnapshot();
     applyNativePlaybackSnapshot(track, snapshot, generation, {
       allowNativeGenerationChange: true,
       allowPositionRewind: true
@@ -948,8 +952,27 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
       return;
     }
 
+    let retainedSnapshot = null;
+    if (hadPreviousSession) {
+      try { retainedSnapshot = await window.spcBoySB2.nativePlaybackState(); } catch {}
+      if (generation !== playbackGeneration) return;
+      if (!retainedSnapshot || (retainedSnapshot.track_loaded
+          && Number(retainedSnapshot.generation) === previousGeneration)) {
+        if (retainedSnapshot) applyNativePlaybackSnapshot(previousTrack, retainedSnapshot, generation);
+        playbackApp.ui.refreshPlaylistPlaybackState();
+        throw error;
+      }
+      // A different loaded generation may belong to a newer native intent.
+      // Never close it as cleanup for this failed request.
+      if (retainedSnapshot.track_loaded) throw error;
+    }
     await setPlaybackPowerSaveBlocker(false);
     if (generation !== playbackGeneration) return;
+    state.currentTrackId = track.id;
+    state.currentTrackInfo = track;
+    state.totalSeconds = playbackTotalSeconds;
+    state.elapsedSeconds = requestedStartSeconds;
+    playbackWindow = nextPlaybackWindow;
     state.isPlaying = false;
     resetNativePlaybackSnapshot();
     try { await window.spcBoySB2.nativePlaybackClose(); } catch {}
@@ -970,18 +993,18 @@ function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playba
     clearQueuedSkipTimer();
   }
   const requestedTrackIsInPlayingQueue = state.playingPlaylist?.some((track) => track.id === trackId);
-  if (playbackOptions?.replaceQueue || !state.playingPlaylist?.length || !requestedTrackIsInPlayingQueue) {
-    state.playingPlaylist = [...state.playlist];
-    state.playbackTabId = state.activePlaylistTabId || null;
-  }
+  const needsQueue = playbackOptions?.replaceQueue || !state.playingPlaylist?.length || !requestedTrackIsInPlayingQueue;
+  const requestOptions = playbackOptions?.pendingQueue ? playbackOptions : needsQueue
+    ? { ...playbackOptions, pendingQueue: [...state.playlist], pendingTabId: state.activePlaylistTabId || null }
+    : playbackOptions;
   let request;
   if (!preserveQueuedSkip
       && !replacingQueuedSkip
       && state.currentTrackId
       && state.isPlaying) {
-    request = playTrackWithFadedSkip(trackId, startSeconds, playbackOptions);
+    request = playTrackWithFadedSkip(trackId, startSeconds, requestOptions);
   } else {
-    request = playTrackNow(trackId, startSeconds, playbackOptions);
+    request = playTrackNow(trackId, startSeconds, requestOptions);
   }
   return Promise.resolve(request).catch((error) => {
     showPlaybackError(error);
@@ -990,7 +1013,7 @@ function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playba
 }
 
 async function playTrackWithFadedSkip(trackId, startSeconds = 0, playbackOptions = null) {
-  const track = playbackPlaylist().find((entry) => entry.id === trackId);
+  const track = (playbackOptions?.pendingQueue || playbackPlaylist()).find((entry) => entry.id === trackId);
   if (!track) return;
 
   const generation = ++playbackGeneration;

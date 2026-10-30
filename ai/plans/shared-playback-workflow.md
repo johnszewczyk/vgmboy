@@ -9,19 +9,30 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
-- Open SB2 replacement handoff, 2026-10-29: with Faded Skip disabled, an
+- SB2 immediate replacement handoff, 2026-10-29: SB2 now leaves the current
+  session and identity in place while the shared start prepares a replacement,
+  adopting the new track and staged queue only after an accepted start. It
+  checks native status after failure and keeps an unchanged loaded generation;
+  failure after native retirement follows stopped-session cleanup. Renderer
+  checks cover preserved and retired failures, delayed success, supersession
+  and cross-tab queue staging. The isolated bundle reproduced the earlier
+  missing-ZIP case with the old WAV still playing and its clock advancing from
+  0:13 to 0:20. It also replaced one valid WAV with another, paused and resumed,
+  and advanced through a two-WAV queue to stop. All 28 SB2 playback checks and
+  51 transport checks passed, and SB2 built. The packaged failure check was
+  run before the queue-staging follow-up; audible transitions, forced old-end
+  races during renderer planning and faded-skip failure remain unverified.
+
+- SB2 replacement handoff reproduction, 2026-10-29: with Faded Skip disabled, an
   isolated SB2 bundle based on `4c62c869` played a valid 30-second WAV. A
   double-click on an unavailable ZIP member showed the expected missing-source
   error, but the previous WAV stopped; selecting the valid WAV again restarted
   it. SB2's `playTrackNow` calls `stopAllOutput` and clears the native snapshot
   before submitting the replacement, so the shared controller's pre-load
-  preservation cannot protect that session. This is a confirmed frontend gap.
-  The follow-up must retain the old identity and native session through source
-  preparation, hand off to the new identity only after accepted start, and
-  distinguish preparation failure from a failed replacement after native
-  retirement. Cover stale status/end, newer start/stop, and faded-skip behavior
-  before removing the frontend unload; verify the packaged reproduction and
-  audible transition rather than assuming the shared guard alone fixes it.
+  preservation could not protect that session. The later checkpoint above
+  implements the immediate replacement handoff. Further verification must cover
+  stale status/end, newer start/stop and faded-skip behavior, including audible
+  transitions and old-session completion during preparation.
 
 - Packaged SB2 failure and recovery, 2026-10-29: an isolated SB2 bundle based
   on `4c62c869`, with temporary user data and a two-game test catalog, showed
