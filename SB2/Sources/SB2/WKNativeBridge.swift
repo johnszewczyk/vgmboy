@@ -82,6 +82,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
     private let catalogURL: URL
     private let isOptionsWindow: Bool
     private let catalogSessions = CatalogSessionCoordinator()
+    private let queuedFadeScheduler = PlaybackQueuedFadeScheduler()
     private weak var playbackEventWebView: WKWebView?
 
     var onOpenOptionsWindow: (() -> Void)?
@@ -240,6 +241,9 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             playbackCompletionRetire: (...args) => request("playbackCompletionRetire", args),
             playbackFadeDuration: (...args) => request("playbackFadeDuration", args),
             playbackFadePlan: (...args) => request("playbackFadePlan", args),
+            queuedFadeStart: (...args) => request("queuedFadeStart", args),
+            queuedFadeRampReady: (...args) => request("queuedFadeRampReady", args),
+            queuedFadeCancel: (...args) => request("queuedFadeCancel", args),
             favoritesList: (...args) => request("favoritesList", args),
             favoritesToggle: (...args) => request("favoritesToggle", args),
             favoritesRevision: () => request("favoritesRevision"),
@@ -291,6 +295,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             onLibraryCommand: (listener) => on("libraryCommand", listener),
             onNativePlaybackState: (listener) => on("nativePlaybackState", listener),
             onNativePlaybackEnded: (listener) => on("nativePlaybackEnded", listener),
+            onQueuedFadeReady: (listener) => on("queuedFadeReady", listener),
             onNativeAACExport: (listener) => on("nativeAACExport", listener),
             onAppearanceSettingsChanged: (listener) => on("appearanceSettingsChanged", listener),
             onFrontendSettingsChanged: (listener) => on("frontendSettingsChanged", listener),
@@ -314,6 +319,34 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
               let args = body["args"] as? [Any] else { return }
 
         print("[SPCBOY SB2] request \(method)")
+
+        // These transitions must run in WebKit receipt order, before detached
+        // bridge work can reorder a start, acknowledgement, or cancellation.
+        if ["queuedFadeStart", "queuedFadeRampReady", "queuedFadeCancel"].contains(method) {
+            guard let payload = args.first as? [String: Any], let token = payload["token"] as? String,
+                  !token.isEmpty else {
+                Task { await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": BridgeError.invalidArguments.localizedDescription])) }
+                return
+            }
+            var accepted = true
+            if method == "queuedFadeStart" {
+                if let duration = payload["durationMilliseconds"] as? Int,
+                   let fallback = payload["fallbackMilliseconds"] as? Int {
+                    accepted = queuedFadeScheduler.start(token: token, durationMilliseconds: duration,
+                                                         fallbackMilliseconds: fallback) { [weak self] token in
+                        Task { @MainActor [weak self] in
+                            self?.publishPlaybackEvent(name: "queuedFadeReady", payload: ["token": token])
+                        }
+                    }
+                } else { accepted = false }
+            } else if method == "queuedFadeRampReady" {
+                queuedFadeScheduler.rampReady(token: token)
+            } else {
+                queuedFadeScheduler.cancel(token: token)
+            }
+            Task { await Self.reply(to: message.webView, id: id, success: accepted, valueJSON: accepted ? "true" : Self.json(["message": BridgeError.invalidArguments.localizedDescription])) }
+            return
+        }
 
         if method == "openOptionsWindow" || method == "closeOptionsWindow" || method == "closeMainWindow" {
             let handler: (() -> Void)?

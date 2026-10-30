@@ -45,6 +45,21 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Shared queued-fade scheduling, 2026-10-30: FrontendCore now owns the
+  token-checked native deadline, rearming after the gain reply and rejecting
+  canceled, replaced and completed work. SB2 forwards scheduler transitions in
+  WebKit receipt order and retains a bounded local fallback for lost bridge
+  replies or events. Target selection and handoff remain in SB2. The shared
+  transport suite passed 56 tests, SB2 renderer checks passed 66, and SB2
+  built under the 12 GiB guard. An instrumented isolated SB2 app with the
+  existing temporary WAV fixtures received a native 6,000 ms scheduler event,
+  changed history from one.wav to two.wav, and remained stopped beyond the
+  8,000 ms fallback after another fade was canceled by Stop. This checks the
+  packaged bridge and cancellation, not audible output or forced old-end
+  races. The packaged check preceded a follow-up guard against duplicate ramp
+  acknowledgements; that guard passed the native suite and SB2 rebuilt.
+  The disposable checkout was removed; the isolated app and build remain.
+
 - Shared callback ramp ordering, 2026-10-30: a control-thread ramp could
   arrive during audio rendering and have its remaining-frame count overwritten
   by the older callback. Envelope progress is now callback-owned, with coherent

@@ -561,6 +561,10 @@ if (window.spcBoySB2?.onNativePlaybackEnded) {
   });
 }
 
+if (window.spcBoySB2?.onQueuedFadeReady) {
+  window.spcBoySB2.onQueuedFadeReady((event) => app.playback.handleQueuedFadeReady(event));
+}
+
 if (window.spcBoySB2?.onNativeAACExport) {
   window.spcBoySB2.onNativeAACExport((event) => {
     app.playback.handleAACExportEvent(event);
