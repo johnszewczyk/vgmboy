@@ -44,6 +44,13 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Slow-archive retry interrupted, 2026-10-30: a concurrent disk-space cleanup
+  removed temporary verification and Swift build directories during a retry,
+  causing a build-database disk I/O error. The retry and a subsequent dependency
+  rebuild were stopped; neither is verification evidence. Earlier completed
+  checks remain as recorded. Before further builds, check available disk space,
+  use bounded build output and avoid recreating large caches unnecessarily.
+
 - Ordered SB2 output ramps, 2026-10-30: with fades active, detached native
   workers can reorder fade and restore requests for the same generation. SB2
   now reserves a shared transport ramp revision at message receipt, and the
