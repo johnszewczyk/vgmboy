@@ -44,6 +44,21 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Bounded slow-archive verification, 2026-10-30: after dependency cleanup, a
+  fresh native build at `b204a2b2` used a 12 GiB free-space stop guard, reduced
+  scheduling priority and two Swift build jobs. A temporary 7zz wrapper delayed
+  preparation by one second and signaled extraction. The reconfiguration test
+  passed with playback advancing during preparation and position retained; the
+  superseded-start test passed all six internal routes, including old-session
+  completion during preparation. The complete shared transport suite passed 52
+  tests and SB2 playback renderer checks passed 60. The SPC source is the
+  vendored Big Blue fixture previously identified by SHA-256
+  `c2e3fbc4ecee60a2f9102acd374387438ac3a9ba5bfaca2f02a12fc6315bee85`.
+  Dependency and isolated test caches occupied approximately 299 MB and 395 MB;
+  about 25 GiB remained available. This is native integration evidence, not a
+  packaged WebKit race or audible continuity measurement. The optional TXTP
+  dependency fixture was unavailable in the vendor tree for this retry.
+
 - SB2 queued fade timing, 2026-10-30: the skip timer previously started while
   its native gain command was still pending, so bridge delay could truncate the
   fade. Both queued-skip paths now arm the full duration after the ramp reply,
