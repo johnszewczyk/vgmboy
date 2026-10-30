@@ -84,12 +84,12 @@ function waitForAudioEnvelope(durationMs) {
   return new Promise((resolve) => window.setTimeout(resolve, Math.max(0, Math.ceil(durationMs))));
 }
 
-async function fadeActiveOutput(durationMs = TRANSPORT_DECLICK_MS, { onRampReady = null } = {}) {
+async function fadeActiveOutput(durationMs = TRANSPORT_DECLICK_MS, { onRampReady = null, expectedGeneration = null } = {}) {
   const activeTrack = activeTrackInfo();
-  const expectedGeneration = Number(state.nativePlayback?.generation);
-  if (nativePlaybackInitialized && activeTrack && Number.isSafeInteger(expectedGeneration) && expectedGeneration > 0) {
+  const generation = Number(expectedGeneration ?? state.nativePlayback?.generation);
+  if (nativePlaybackInitialized && activeTrack && Number.isSafeInteger(generation) && generation > 0) {
     try {
-      await window.spcBoySB2.nativePlaybackRampGain?.({ outputGain: 0, rampMilliseconds: durationMs, expectedGeneration });
+      await window.spcBoySB2.nativePlaybackRampGain?.({ outputGain: 0, rampMilliseconds: durationMs, expectedGeneration: generation });
     } catch {
       // The normal stop path still has to complete if a helper exited between
       // the transition request and its short output envelope.
@@ -119,7 +119,8 @@ function scheduleQueuedSkipFade(request, plan, errorContext) {
   // Keep a bounded fallback if the bridge never replies. Normally the reply
   // rearms the timer for the full fade, after the native ramp is accepted.
   arm(plan.fallbackMilliseconds);
-  void fadeActiveOutput(plan.durationMilliseconds, { onRampReady: () => arm(plan.durationMilliseconds) })
+  void fadeActiveOutput(plan.durationMilliseconds, { expectedGeneration: request.nativeGeneration,
+    onRampReady: () => arm(plan.durationMilliseconds) })
     .catch(error => console.error(errorContext, error));
 }
 
@@ -1202,7 +1203,7 @@ async function playAdjacentNow(delta) {
       generation,
       nativeGeneration: previousRequest.nativeGeneration
     };
-    await fadeActiveOutput(TRANSPORT_DECLICK_MS);
+    await fadeActiveOutput(TRANSPORT_DECLICK_MS, { expectedGeneration: previousRequest.nativeGeneration });
     if (generation !== playbackGeneration) return;
     await completeQueuedSkip();
     return;
