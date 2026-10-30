@@ -864,10 +864,17 @@ async function cancelQueuedSkip({ restoreOutput = false } = {}) {
   const request = queuedSkipRequest;
   queuedSkipRequest = null;
   clearQueuedSkipTimer();
-  if (restoreOutput && request && nativePlaybackInitialized && state.nativePlayback.trackLoaded
-      && Number.isSafeInteger(request.nativeGeneration) && request.nativeGeneration > 0) {
-    await window.spcBoySB2.nativePlaybackRampGain({ outputGain: 1, rampMilliseconds: TRANSPORT_DECLICK_MS,
-      expectedGeneration: request.nativeGeneration });
+  if (restoreOutput && request && nativePlaybackInitialized && state.nativePlayback?.trackLoaded
+      && Number.isSafeInteger(request.nativeGeneration) && request.nativeGeneration > 0
+      && Number(state.nativePlayback.generation) === request.nativeGeneration) {
+    try {
+      await window.spcBoySB2.nativePlaybackRampGain({ outputGain: 1, rampMilliseconds: TRANSPORT_DECLICK_MS,
+        expectedGeneration: request.nativeGeneration });
+    } catch (error) {
+      // A stale or unavailable restore must not block the following control;
+      // that control carries its own native-generation guard.
+      console.warn("[SPCBoy] queued-skip gain restoration failed", error);
+    }
   }
 }
 
