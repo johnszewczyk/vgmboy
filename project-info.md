@@ -20,6 +20,10 @@ history live in this repository.
 - SBONLINE is the hosted SPCBOY web-player project, separate from the SB2 macOS
   frontend. Its production site integration and deployment currently live in
   MathBook's `private-admin/` app.
+- APPBOY is the iOS player package under `APPBOY/`, maintaining its own Swift
+  package and sideload release boundary. It translates SB2's pixel-style theme
+  and native WebKit bridge to responsive mobile and tablet viewports without
+  cloning legacy SBONLINE templates or mobile prototypes.
 - LineBoy is a standalone monochrome line-grid player experiment in its own
   family subfolder. It uses CatalogReader for catalog access, FrontendCore for
   favorites and queue policy, and VGMBoy for playback.
@@ -42,6 +46,7 @@ crosses that ownership boundary.
 | AppKit/SwiftUI presentation | [CocoaSpice/AGENTS.md](CocoaSpice/AGENTS.md) |
 | SPCBOY SB2 pixel-style WebKit frontend | [SB2/AGENTS.md](SB2/AGENTS.md) |
 | Hosted SPCBOY web player | [SBONLINE/AGENTS.md](SBONLINE/AGENTS.md) |
+| SPCBOY APPBOY responsive iOS player package | [APPBOY/AGENTS.md](APPBOY/AGENTS.md) |
 | Screen-first Yoga LCD player | [ViewBoy/AGENTS.md](ViewBoy/AGENTS.md) |
 | Monochrome DOS-style line-grid display experiment | [LineBoy/AGENTS.md](LineBoy/AGENTS.md) |
 | Published Markdown library and native documentation viewer | [VGMManDocs/AGENTS.md](VGMManDocs/AGENTS.md) |

@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>SPCBOY APPBOY</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./sb-presentation.css" />
+  </head>
+  <body class="sb2-frontend appboy-mobile" data-mobile-pane="library">
+    <svg class="icon-sprite" aria-hidden="true" focusable="false">
+      <symbol id="icon-xmark" viewBox="0 0 24 24"><path d="M6 6L18 18M18 6L6 18" /></symbol>
+      <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+      <symbol id="icon-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" /></symbol>
+      <symbol id="icon-sidebar-views" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /><path d="M12 8h6" /><path d="M12 12h6" /><path d="M12 16h6" /><path d="M5.5 8h1" /><path d="M5.5 12h1" /><path d="M5.5 16h1" /></symbol>
+      <symbol id="icon-playlist" viewBox="0 0 24 24"><path d="M4 7h11" /><path d="M4 12h11" /><path d="M4 17h7" /><path d="M17 12v7" /><circle cx="15.5" cy="19" r="1.5" /><path d="M17 12l4-1v2l-4 1" /></symbol>
+      <symbol id="icon-gallery" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /><path d="M14 21 9 16" /></symbol>
+      <symbol id="icon-play" viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" /></symbol>
+      <symbol id="icon-pause" viewBox="0 0 24 24"><rect x="14" y="3" width="5" height="18" rx="1" /><rect x="5" y="3" width="5" height="18" rx="1" /></symbol>
+      <symbol id="icon-stop" viewBox="0 0 24 24"><path d="M6 6h12v12H6z" fill="currentColor" stroke="none" /></symbol>
+      <symbol id="icon-skip-back" viewBox="0 0 24 24"><path d="M17.971 4.285A2 2 0 0 1 21 6v12a2 2 0 0 1-3.029 1.715l-9.997-5.998a2 2 0 0 1-.003-3.432z" /><path d="M3 20V4" /></symbol>
+      <symbol id="icon-skip-forward" viewBox="0 0 24 24"><path d="M21 4v16" /><path d="M6.029 4.285A2 2 0 0 0 3 6v12a2 2 0 0 0 3.029 1.715l9.997-5.998a2 2 0 0 0 .003-3.432z" /></symbol>
+      <symbol id="icon-infinity" viewBox="0 0 24 24"><path d="M6 16c5 0 7-8 12-8a4 4 0 0 1 0 8c-5 0-7-8-12-8a4 4 0 1 0 0 8" /></symbol>
+      <symbol id="icon-speed" viewBox="0 0 24 24"><path d="M4.8 18a9 9 0 1 1 14.4 0" /><path d="m12 13 4-4" /><circle cx="12" cy="13" r="1.5" /></symbol>
+      <symbol id="icon-repeat-2" viewBox="0 0 24 24"><path d="m2 9 3-3 3 3" /><path d="M13 18H7a2 2 0 0 1-2-2V6" /><path d="m22 15-3 3-3-3" /><path d="M11 6h6a2 2 0 0 1 2 2v10" /></symbol>
+      <symbol id="icon-list-collapse" viewBox="0 0 24 24"><path d="M4 6h16M4 12h11M4 18h16" /><path d="m18 10 3 3 3-3" /></symbol>
+      <symbol id="icon-list-expand" viewBox="0 0 24 24"><path d="M4 6h16M4 12h11M4 18h16" /><path d="m18 14 3-3 3 3" /></symbol>
+      <symbol id="icon-settings" viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" /><path d="m19.4 15 .1.1a1.8 1.8 0 1 1-2.5 2.5l-.1-.1a1.8 1.8 0 0 0-3 .9v.2a1.8 1.8 0 1 1-3.6 0v-.2a1.8 1.8 0 0 0-3-.9l-.1.1a1.8 1.8 0 1 1-2.5-2.5l.1-.1a1.8 1.8 0 0 0-.9-3H3.8a1.8 1.8 0 1 1 0-3.6H4a1.8 1.8 0 0 0 .9-3l-.1-.1a1.8 1.8 0 1 1 2.5-2.5l.1.1a1.8 1.8 0 0 0 3-.9v-.2a1.8 1.8 0 1 1 3.6 0V4a1.8 1.8 0 0 0 3 .9l.1-.1a1.8 1.8 0 1 1 2.5 2.5l-.1.1a1.8 1.8 0 0 0 .9 3h.2a1.8 1.8 0 1 1 0 3.6H21a1.8 1.8 0 0 0-1.6 1Z" /></symbol>
+      <symbol id="icon-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z" /></symbol>
+      <symbol id="icon-volume" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z" /><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M19 5a10 10 0 0 1 0 14" /></symbol>
+      <symbol id="icon-recent" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l3 2" /></symbol>
+      <symbol id="icon-palette" viewBox="0 0 24 24"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z" /><circle cx="13.5" cy="6.5" r=".5" fill="currentColor" /><circle cx="17.5" cy="10.5" r=".5" fill="currentColor" /><circle cx="6.5" cy="12.5" r=".5" fill="currentColor" /><circle cx="8.5" cy="7.5" r=".5" fill="currentColor" /></symbol>
+      <symbol id="icon-scroll-text" viewBox="0 0 24 24"><path d="M15 12h-5" /><path d="M15 8h-5" /><path d="M19 17V5a2 2 0 0 0-2-2H4" /><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" /></symbol>
+      <symbol id="icon-sliders-horizontal" viewBox="0 0 24 24"><path d="M10 5H3" /><path d="M12 19H3" /><path d="M14 3v4" /><path d="M16 17v4" /><path d="M21 12h-9" /><path d="M21 19h-5" /><path d="M21 5h-7" /><path d="M8 10v4" /><path d="M8 12H3" /></symbol>
+    </svg>
+
+    <div class="app-shell">
+      <div id="sb2-selection-indicator" class="sb2-selection-indicator is-hidden" aria-hidden="true"></div>
+
+      <header class="sb-titlebar" aria-label="SPCBOY APPBOY status">
+        <div class="sb-titlebar-inner">
+          <strong class="sb-brand">SPCBOY</strong>
+          <span class="sb-badge">IOS</span>
+          <span id="sb2-console-label" class="sb-console">—</span>
+          <span id="sb2-album-label" class="sb-album">LOADING</span>
+          <span id="sb2-source-chip" class="sb-source-chip">BUILT-IN</span>
+        </div>
+      </header>
+
+      <nav id="mobile-mode-bar" class="mobile-mode-bar" aria-label="Mobile workspace view">
+        <button id="mode-library-button" class="tool-button mode-button is-selected" type="button" data-mobile-target="library" data-selector-target>
+          <svg class="ui-icon" aria-hidden="true"><use href="#icon-sidebar-views"></use></svg>
+          <span>LIB</span>
+        </button>
+        <button id="mode-playlist-button" class="tool-button mode-button" type="button" data-mobile-target="playlist" data-selector-target>
+          <svg class="ui-icon" aria-hidden="true"><use href="#icon-playlist"></use></svg>
+          <span>LIST</span>
+        </button>
+        <button id="mode-gallery-button" class="tool-button mode-button" type="button" data-mobile-target="gallery" data-selector-target>
+          <svg class="ui-icon" aria-hidden="true"><use href="#icon-gallery"></use></svg>
+          <span>ART</span>
+        </button>
+        <button id="mode-favorites-button" class="tool-button mode-button" type="button" data-mobile-target="favorites" data-selector-target>
+          <svg class="ui-icon" aria-hidden="true"><use href="#icon-star"></use></svg>
+          <span>FAV</span>
+        </button>
+        <button id="mode-recent-button" class="tool-button mode-button" type="button" data-mobile-target="recent" data-selector-target>
+          <svg class="ui-icon" aria-hidden="true"><use href="#icon-recent"></use></svg>
+          <span>HIST</span>
+        </button>
+      </nav>
+
+      <main class="workspace">
+        <aside id="library-pane" class="sidebar" aria-label="Catalog library">
+          <div class="sidebar-search-wrap toolbar">
+            <input id="sidebar-search-input" class="sidebar-search-input" type="search" placeholder="Search consoles or albums…" autocomplete="off" autocapitalize="off" spellcheck="false" />
+            <div class="sidebar-library-actions" role="group" aria-label="Library controls">
+              <button id="split-gallery-button" class="sidebar-mode-button split-only-control" type="button" title="Gallery" aria-label="Gallery" aria-pressed="false" data-selector-target>
+                <svg class="ui-icon" aria-hidden="true"><use href="#icon-gallery"></use></svg>
+              </button>
+              <button id="split-recent-button" class="sidebar-mode-button split-only-control" type="button" title="Recent" aria-label="Recent" aria-pressed="false" data-selector-target>
+                <svg class="ui-icon" aria-hidden="true"><use href="#icon-recent"></use></svg>
+              </button>
+              <button id="split-favorites-button" class="sidebar-mode-button split-only-control" type="button" title="Favorites" aria-label="Favorites" aria-pressed="false" data-selector-target>
+                <svg class="ui-icon" aria-hidden="true"><use href="#icon-star"></use></svg>
+              </button>
+              <button id="sidebar-fold-toggle-button" class="sidebar-mode-button" type="button" title="Collapse all" aria-label="Collapse all" data-selector-target>
+                <svg class="ui-icon" aria-hidden="true"><use id="sidebar-fold-icon-use" href="#icon-list-collapse"></use></svg>
+              </button>
+            </div>
+          </div>
+          <div id="tree-root" class="tree-root sb-scroll-fade" role="tree" aria-label="Consoles and albums"></div>
+        </aside>
+
+        <div class="workspace-divider" aria-hidden="true"></div>
+
+        <section id="content-pane" class="content" aria-label="Active playlist or gallery">
+          <div id="playlist-tabs-toolbar" class="playlist-tabs-toolbar" aria-label="Playlist tabs">
+            <div id="playlist-tabs" class="playlist-tabs" role="tablist" aria-label="Open playlists"></div>
+            <button id="new-tab-button" class="tool-button glyph-button new-tab-button" type="button" title="New playlist tab" aria-label="New playlist tab" data-selector-target>
+              <svg class="ui-icon" aria-hidden="true"><use href="#icon-plus"></use></svg>
+            </button>
+          </div>
+
+          <div class="playlist-wrap">
+            <div id="playlist-view" class="playlist-scroll-wrap">
+              <div class="playlist-header-row" role="row">
+                <span class="col-num">#</span>
+                <button id="sort-title-button" class="col-header-button col-title" type="button">TITLE</button>
+                <button id="sort-album-button" class="col-header-button col-album split-only-col" type="button">ALBUM</button>
+                <span class="col-sys split-only-col">SYS</span>
+                <span class="col-fav" aria-label="Favorite"><svg class="ui-icon" aria-hidden="true"><use href="#icon-star"></use></svg></span>
+                <button id="sort-time-button" class="col-header-button col-time" type="button">TIME</button>
+              </div>
+              <div id="playlist-body-wrap" class="playlist-body-wrap sb-scroll-fade" role="list"></div>
+            </div>
+
+            <section id="gallery-view" class="gallery-view sb-scroll-fade is-hidden" aria-label="Artwork gallery">
+              <div id="gallery-grid" class="gallery-grid"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+
+      <section class="transport-deck" aria-label="Now playing and transport">
+        <div class="now-playing-row">
+          <div class="now-playing-copy">
+            <span id="now-playing-title" class="now-playing-title">Select a track</span>
+            <span id="now-playing-meta" class="now-playing-meta">SPCBOY // READY</span>
+          </div>
+          <span id="speed-readout-badge" class="transport-pill is-hidden">1.25×</span>
+          <span id="repeat-readout-badge" class="transport-pill is-hidden">RPT</span>
+        </div>
+
+        <div class="scrubber-row">
+          <div id="progress-slider-shell" class="progress-slider-shell">
+            <div class="progress-slider-rail" aria-hidden="true">
+              <div id="progress-slider-fill" class="progress-slider-fill"></div>
+              <div id="progress-slider-thumb" class="progress-slider-thumb"></div>
+            </div>
+            <input id="progress-slider" type="range" min="0" max="1" step="0.1" value="0" aria-label="Playback position" />
+          </div>
+        </div>
+
+        <div class="transport-controls-row">
+          <button id="previous-button" class="tool-button glyph-button" type="button" title="Previous" aria-label="Previous" data-selector-target>
+            <svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-back"></use></svg>
+          </button>
+          <button id="stop-button" class="tool-button glyph-button" type="button" title="Stop" aria-label="Stop" data-selector-target>
+            <svg class="ui-icon" aria-hidden="true"><use href="#icon-stop"></use></svg>
+          </button>
+          <button id="play-button" class="tool-button glyph-button is-primary" type="button" title="Play / Pause" aria-label="Play / Pause" data-selector-target>
+            <svg class="ui-icon sb-play-glyph" aria-hidden="true"><use href="#icon-play"></use></svg>
+            <svg class="ui-icon sb-playing-bars" viewBox="0 0 20 20" aria-hidden="true">
+              <rect x="3" y="4" width="2" height="12"/>
+              <rect x="7" y="4" width="2" height="12"/>
+              <rect x="11" y="4" width="2" height="12"/>
+              <rect x="15" y="4" width="2" height="12"/>
+            </svg>
+          </button>
+          <button id="next-button" class="tool-button glyph-button" type="button" title="Next" aria-label="Next" data-selector-target>
+            <svg class="ui-icon" aria-hidden="true"><use href="#icon-skip-forward"></use></svg>
+          </button>
+          <button id="repeat-button" class="tool-button glyph-button" type="button" title="Repeat mode" aria-label="Repeat mode" aria-pressed="false" data-selector-target>
+            <svg class="ui-icon" aria-hidden="true"><use href="#icon-repeat-2"></use></svg>
+          </button>
+          <button id="long-play-button" class="tool-button glyph-button" type="button" title="Toggle Long Play" aria-label="Toggle Long Play" aria-pressed="false" data-selector-target>
+            <svg class="ui-icon" aria-hidden="true"><use href="#icon-infinity"></use></svg>
+          </button>
+          <button id="playback-speed-button" class="tool-button glyph-button" type="button" title="Toggle Playback Speed" aria-label="Toggle Playback Speed" aria-pressed="false" data-selector-target>
+            <svg class="ui-icon" aria-hidden="true"><use href="#icon-speed"></use></svg>
+          </button>
+          <div id="toolbar-volume-control" class="toolbar-volume-control">
+            <button id="toolbar-volume-button" class="tool-button glyph-button" type="button" title="Volume" aria-label="Volume" aria-haspopup="dialog" aria-expanded="false" data-selector-target>
+              <svg class="ui-icon" aria-hidden="true"><use href="#icon-volume"></use></svg>
+            </button>
+            <div id="toolbar-volume-popover" class="toolbar-volume-popover" role="dialog" aria-label="Playback volume" hidden>
+              <input id="toolbar-volume-input" type="range" min="0" max="100" step="5" value="100" aria-label="Playback volume" />
+              <span class="toolbar-volume-ticks" aria-hidden="true"></span>
+              <output id="toolbar-volume-value">100%</output>
+            </div>
+          </div>
+          <button id="options-toolbar-button" class="tool-button glyph-button" type="button" title="Options" aria-label="Options" aria-expanded="false" data-selector-target>
+            <svg class="ui-icon" aria-hidden="true"><use href="#icon-settings"></use></svg>
+          </button>
+        </div>
+      </section>
+
+      <footer class="sb-status" aria-label="Playback and library status">
+        <div class="sb-status-inner">
+          <div class="sb-status-sidebar">
+            <span id="sidebar-stats" class="sb-sidebar-stats" role="status" aria-live="polite">LOADING LIBRARY</span>
+          </div>
+          <div class="sb-status-divider" aria-hidden="true"></div>
+          <div class="sb-status-content">
+            <span id="status-state-wrap" class="sb-status-state" data-state="ready">
+              <i></i>
+              <span id="sb2-app-status-label">READY</span>
+            </span>
+            <div class="sb-times">
+              <span id="elapsed-label" class="time-label">0:00</span>
+              <span class="time-separator">/</span>
+              <span id="song-length-label" class="time-label">0:00</span>
+              <span class="time-separator">/</span>
+              <span id="playlist-total-label" class="time-label">0:00</span>
+            </div>
+          </div>
+        </div>
+      </footer>
+
+      <div id="playback-error-toast" class="playback-error-toast is-hidden" role="alert" aria-live="assertive"></div>
+    </div>
+
+    <div id="options-overlay" class="options-overlay" aria-hidden="true">
+      <div class="options-panel" role="dialog" aria-modal="true" aria-label="Options">
+        <div class="options-header">
+          <span>SPCBOY // OPTIONS</span>
+          <button id="options-close-button" class="tool-button glyph-button" type="button" title="Close Options" aria-label="Close Options">
+            <svg class="ui-icon" aria-hidden="true"><use href="#icon-xmark"></use></svg>
+          </button>
+        </div>
+
+        <div class="options-body">
+          <nav class="options-nav" aria-label="Options sections">
+            <button class="tool-button options-nav-item is-selected" type="button" data-options-tab="interface">
+              <svg class="ui-icon" aria-hidden="true"><use href="#icon-palette"></use></svg>
+              <span>UI Chrome</span>
+            </button>
+            <button class="tool-button options-nav-item" type="button" data-options-tab="fonts">
+              <svg class="ui-icon" aria-hidden="true"><use href="#icon-scroll-text"></use></svg>
+              <span>UI Fonts</span>
+            </button>
+            <button class="tool-button options-nav-item" type="button" data-options-tab="gallery">
+              <svg class="ui-icon" aria-hidden="true"><use href="#icon-gallery"></use></svg>
+              <span>Gallery</span>
+            </button>
+            <button class="tool-button options-nav-item" type="button" data-options-tab="audio">
+              <svg class="ui-icon" aria-hidden="true"><use href="#icon-sliders-horizontal"></use></svg>
+              <span>Audio</span>
+            </button>
+            <button class="tool-button options-nav-item" type="button" data-options-tab="source">
+              <svg class="ui-icon" aria-hidden="true"><use href="#icon-database"></use></svg>
+              <span>Source</span>
+            </button>
+          </nav>
+
+          <div class="options-content sb-scroll-fade">
+            <div class="options-page" data-options-page="interface">
+              <h1 class="options-page-title">APPBOY / UI Chrome</h1>
+
+              <div class="options-subpanel">
+                <h2 class="options-subpanel-title">Palette Presets &amp; Tokens</h2>
+                <div class="preset-strip">
+                  <button class="tool-button preset-button" type="button" data-theme-preset="sb2-cyan">SB2 Cyan</button>
+                  <button class="tool-button preset-button" type="button" data-theme-preset="amber-crt">Amber CRT</button>
+                  <button class="tool-button preset-button" type="button" data-theme-preset="gb-matrix">GB Matrix</button>
+                  <button class="tool-button preset-button" type="button" data-theme-preset="synth-violet">Synth Violet</button>
+                </div>
+                <label class="options-field">
+                  <span class="options-field-copy"><span>Accent Color</span><small>Active selector, progress rail, and playing highlights.</small></span>
+                  <input id="opt-accent-color" class="options-input" type="text" value="#38aaff" autocomplete="off" spellcheck="false" />
+                </label>
+                <label class="options-field">
+                  <span class="options-field-copy"><span>Chrome Surface</span><small>Status bar and toolbar background.</small></span>
+                  <input id="opt-chrome-primary" class="options-input" type="text" value="#111419" autocomplete="off" spellcheck="false" />
+                </label>
+                <label class="options-field">
+                  <span class="options-field-copy"><span>Pane Surface</span><small>Library and playlist obsidian backdrop.</small></span>
+                  <input id="opt-chrome-pane" class="options-input" type="text" value="#090b0f" autocomplete="off" spellcheck="false" />
+                </label>
+              </div>
+
+              <div class="options-subpanel">
+                <h2 class="options-subpanel-title">Motion &amp; Touch Behavior</h2>
+                <label class="options-field options-toggle-field">
+                  <span class="options-field-copy"><span>Selection Motion</span><small>Animate the shared SB2 selector across controls and tabs.</small></span>
+                  <input id="opt-selection-anim-enabled" type="checkbox" checked />
+                </label>
+                <label class="options-field">
+                  <span class="options-field-copy"><span>Motion Duration (ms)</span><small>Transition duration for selector and Options drawer.</small></span>
+                  <input id="opt-selection-anim-ms" class="options-input options-short-input" type="number" min="0" max="600" step="20" value="180" inputmode="numeric" />
+                </label>
+                <label class="options-field options-toggle-field">
+                  <span class="options-field-copy"><span>Link Mode (Single-Tap Play)</span><small>Start playback immediately when tapping a playlist row.</small></span>
+                  <input id="opt-link-mode" type="checkbox" checked />
+                </label>
+                <label class="options-field options-toggle-field">
+                  <span class="options-field-copy"><span>Album Track Counts</span><small>Show track totals beside albums in the Library tree.</small></span>
+                  <input id="opt-sidebar-counts" type="checkbox" checked />
+                </label>
+                <label class="options-field">
+                  <span class="options-field-copy"><span>Favorites Order</span><small>Sort Favorites playlist by date added or title.</small></span>
+                  <select id="opt-fav-sort" class="options-input options-short-input">
+                    <option value="historical">Date Added</option>
+                    <option value="alphabetical">Alphabetical</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div class="options-page is-hidden" data-options-page="fonts">
+              <h1 class="options-page-title">APPBOY / UI Fonts</h1>
+              <div class="options-subpanel">
+                <h2 class="options-subpanel-title">Typography &amp; Scale</h2>
+                <label class="options-field">
+                  <span class="options-field-copy"><span>UI Chrome Scale (pt)</span><small>Scales status readouts, headers, and button labels (9–16).</small></span>
+                  <input id="opt-chrome-font-pt" class="options-input options-short-input" type="number" min="9" max="16" step="0.5" value="11" inputmode="decimal" />
+                </label>
+                <label class="options-field">
+                  <span class="options-field-copy"><span>Library + Playlist Size (pt)</span><small>Scales catalog tree and track titles (9.5–18).</small></span>
+                  <input id="opt-content-font-pt" class="options-input options-short-input" type="number" min="9.5" max="18" step="0.5" value="11.5" inputmode="decimal" />
+                </label>
+                <label class="options-field">
+                  <span class="options-field-copy"><span>Content Ink Color</span><small>Primary text color for library and track rows.</small></span>
+                  <input id="opt-sidebar-text-color" class="options-input" type="text" value="#b6b7dc" autocomplete="off" spellcheck="false" />
+                </label>
+                <label class="options-field options-toggle-field">
+                  <span class="options-field-copy"><span>UI Chrome Monospace</span><small>Use tabular monospace typography across toolbars and chrome.</small></span>
+                  <input id="opt-chrome-mono" type="checkbox" checked />
+                </label>
+                <label class="options-field options-toggle-field">
+                  <span class="options-field-copy"><span>Content Monospace</span><small>Use monospace typography in Library and Playlist rows.</small></span>
+                  <input id="opt-content-mono" type="checkbox" checked />
+                </label>
+              </div>
+            </div>
+
+            <div class="options-page is-hidden" data-options-page="gallery">
+              <h1 class="options-page-title">APPBOY / Gallery</h1>
+              <div class="options-subpanel">
+                <h2 class="options-subpanel-title">Picture Frames</h2>
+                <label class="options-field">
+                  <span class="options-field-copy"><span>Artwork Fit</span><small>Crop fills the square; Pad preserves full aspect.</small></span>
+                  <select id="opt-gallery-fit" class="options-input options-short-input">
+                    <option value="crop">Crop to Square</option>
+                    <option value="pad">Pad to Square</option>
+                  </select>
+                </label>
+                <label class="options-field">
+                  <span class="options-field-copy"><span>Frame Scale (<output id="opt-gallery-scale-out">1.00×</output>)</span><small>Tile minimum width multiplier.</small></span>
+                  <input id="opt-gallery-scale" class="options-range" type="range" min="0.65" max="1.6" step="0.05" value="1.0" />
+                </label>
+                <label class="options-field">
+                  <span class="options-field-copy"><span>Frame Gap (<output id="opt-gallery-gap-out">0.35rem</output>)</span><small>Grid spacing between cards and edges.</small></span>
+                  <input id="opt-gallery-gap" class="options-range" type="range" min="0" max="1" step="0.05" value="0.35" />
+                </label>
+                <label class="options-field">
+                  <span class="options-field-copy"><span>Corner Radius (<output id="opt-gallery-radius-out">0.20rem</output>)</span><small>Card and artwork corner radius.</small></span>
+                  <input id="opt-gallery-radius" class="options-range" type="range" min="0" max="1" step="0.05" value="0.2" />
+                </label>
+              </div>
+            </div>
+
+            <div class="options-page is-hidden" data-options-page="audio">
+              <h1 class="options-page-title">Playback / Audio &amp; Timing</h1>
+              <div class="options-subpanel">
+                <h2 class="options-subpanel-title">Background Session &amp; Rate</h2>
+                <p class="options-help-text">Native iOS <code>AVAudioSession</code> (.playback, .longFormAudio) keeps music active when locked and syncs Lock Screen / Dynamic Island transport controls.</p>
+                <label class="options-field options-toggle-field">
+                  <span class="options-field-copy"><span>Enable Custom Speed</span><small>Apply configured playback rate without altering saved preset when toggled off.</small></span>
+                  <input id="opt-speed-enabled" type="checkbox" />
+                </label>
+                <label class="options-field">
+                  <span class="options-field-copy"><span>Saved Speed Rate</span><small>0.50× to 2.00× time-domain pitch-preserving rate.</small></span>
+                  <input id="opt-speed-rate" class="options-input options-short-input" type="number" min="0.5" max="2.0" step="0.05" value="1.25" inputmode="decimal" />
+                </label>
+                <label class="options-field options-toggle-field">
+                  <span class="options-field-copy"><span>Long Play Override</span><small>Use manual play duration for looping tracks.</small></span>
+                  <input id="opt-long-play-enabled" type="checkbox" />
+                </label>
+                <label class="options-field">
+                  <span class="options-field-copy"><span>Manual Duration (sec)</span><small>Duration used while Long Play is active.</small></span>
+                  <input id="opt-manual-duration" class="options-input options-short-input" type="number" min="15" max="3600" step="5" value="180" inputmode="numeric" />
+                </label>
+              </div>
+            </div>
+
+            <div class="options-page is-hidden" data-options-page="source">
+              <h1 class="options-page-title">APPBOY / Catalog Source</h1>
+              <div class="options-subpanel">
+                <h2 class="options-subpanel-title">Local Files &amp; SBO Stream Adapter</h2>
+                <p class="options-help-text">Active source: <strong id="opt-source-label">Built-in VGM</strong>. Drop audio files (<code>.m4a</code>, <code>.aac</code>, <code>.mp3</code>, <code>.wav</code>, <code>.flac</code>) or <code>catalog.json</code> into <strong>On My iPhone &gt; APPBOY</strong> in the Files app, or configure an SBO JSON catalog endpoint below.</p>
+                <label class="options-field options-stacked-field">
+                  <span class="options-field-copy"><span>Remote Catalog JSON URL (Optional)</span><small>Fetched natively via URLSession while keeping WebKit CSP offline-isolated.</small></span>
+                  <input id="opt-remote-url" class="options-input options-wide-input" type="url" placeholder="https://example.com/api/appboy/catalog.json" autocomplete="off" autocapitalize="off" spellcheck="false" />
+                </label>
+                <div class="options-actions-row">
+                  <button id="opt-reload-catalog-button" class="tool-button action-pill" type="button">Reload Catalog</button>
+                  <span id="opt-source-status" class="options-inline-status"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="./sb-presentation.js"></script>
+    <script src="./app-state.js"></script>
+    <script src="./app-playback.js"></script>
+    <script src="./app-ui.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

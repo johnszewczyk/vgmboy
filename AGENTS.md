@@ -39,6 +39,12 @@ adapter, and deployment currently remain in MathBook's `private-admin/` app.
 Keep SBONLINE separate from the SB2 macOS app, and do not claim production code
 has moved until its source and deployment packaging move together.
 
+APPBOY is the iOS mobile player package under `APPBOY/`, maintaining its own
+Swift package, preference namespace, and sideload release boundary. It adapts
+SB2's pixel-style theme, presentation language, and native WebKit bridge to
+responsive iPhone and iPad viewports rather than cloning SBONLINE templates or
+prototype mobile skins.
+
 For a ViewBoy task, the active application and UI live in `ViewBoy/`; use its
 `README.md` and `AGENTS.md` route and launch with `ViewBoy/launch.sh`.
 `LocalRecovery/ViewBoy/` contains historical archives only. ViewBoy's
