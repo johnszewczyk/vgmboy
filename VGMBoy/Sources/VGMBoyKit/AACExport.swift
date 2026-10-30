@@ -12,6 +12,8 @@ public struct AACExportRequest: Sendable, Equatable {
     public var playMilliseconds: Int
     public var fadeMilliseconds: Int
     public var tempo: Double
+    public var loop: PlaybackLoopMetadata?
+    public var readEmbeddedLoopTags: Bool
 
     public init(
         sourcePath: String,
@@ -21,7 +23,9 @@ public struct AACExportRequest: Sendable, Equatable {
         filenameStem: String,
         playMilliseconds: Int,
         fadeMilliseconds: Int,
-        tempo: Double = 1
+        tempo: Double = 1,
+        loop: PlaybackLoopMetadata? = nil,
+        readEmbeddedLoopTags: Bool = true
     ) {
         self.sourcePath = sourcePath
         self.archiveEntry = archiveEntry
@@ -31,6 +35,8 @@ public struct AACExportRequest: Sendable, Equatable {
         self.playMilliseconds = playMilliseconds
         self.fadeMilliseconds = fadeMilliseconds
         self.tempo = tempo
+        self.loop = loop
+        self.readEmbeddedLoopTags = readEmbeddedLoopTags
     }
 }
 
@@ -146,10 +152,22 @@ public enum AACExporter {
         let decoder = try DecoderFactory.make(path: request.sourcePath, sampleRate: sampleRate)
         defer { decoder.close() }
         try decoder.startTrack(request.trackIndex)
-        decoder.setTempo(FormatRegistry.effectiveTempo(request.tempo, family: family))
-        decoder.configureFade(playMs: request.playMilliseconds, fadeMs: request.fadeMilliseconds)
-
+        let effectiveTempo = FormatRegistry.effectiveTempo(request.tempo, family: family)
+        decoder.setTempo(effectiveTempo)
         let capFrames = Int64(request.playMilliseconds + request.fadeMilliseconds) * Int64(sampleRate) / 1_000
+        let fadeFrames = Int64(request.fadeMilliseconds) * Int64(sampleRate) / 1_000
+        var loop = request.loop ?? (request.readEmbeddedLoopTags ? PlaybackLoopTagReader.read(path: request.sourcePath) : nil)
+        if let loop, (!loop.isValid || PlaybackLoopReader.bounds(loop, sampleRate: sampleRate, tempo: effectiveTempo) == nil) {
+            throw AACExportError.invalidRequest("AAC export loop boundaries are outside the supported frame range.")
+        }
+        if loop != nil && !decoder.appliesFadeInternally {
+            // The shared reader, not a decoder-specific forced loop, owns
+            // authored boundaries and repetition for the exported PCM.
+            decoder.configureNativeEnding(playMs: 0, fadeMs: 0)
+        } else {
+            decoder.configureFade(playMs: request.playMilliseconds, fadeMs: request.fadeMilliseconds)
+        }
+        var remainingRepeats = loop?.repeatCount
         var writerRef: ExtAudioFileRef?
         var fileFormat = AudioStreamBasicDescription(
             mSampleRate: Double(sampleRate), mFormatID: kAudioFormatMPEG4AAC,
@@ -186,16 +204,29 @@ public enum AACExporter {
             progress(AACExportProgress(renderedFrames: renderedFrames, totalFrames: capFrames, sampleRate: sampleRate))
         }
         reportProgress(force: true)
-        while renderedFrames < capFrames && !decoder.trackEnded {
+        while renderedFrames < capFrames {
             if cancellation?.isCancelled == true { throw AACExportError.cancelled }
+            if decoder.trackEnded {
+                guard let current = loop,
+                      let bounds = PlaybackLoopReader.bounds(current, sampleRate: sampleRate, tempo: effectiveTempo),
+                      decoder.absolutePlayedFrames >= bounds.end,
+                      remainingRepeats.map({ $0 > 0 }) ?? true else { break }
+            }
             let wanted = min(chunkFrames, Int(capFrames - renderedFrames))
-            let frames = try decoder.readFrames(wanted)
-            let count = min(wanted, min(frames.left.count, frames.right.count))
+            let frames = try PlaybackLoopReader.read(decoder: decoder, requested: wanted, sampleRate: sampleRate,
+                                                     tempo: effectiveTempo, loop: &loop, remainingRepeats: &remainingRepeats)
+            guard frames.left.count == frames.right.count, frames.left.count <= wanted else {
+                throw AACExportError.invalidRequest("Decoder returned an invalid PCM frame count.")
+            }
+            let count = frames.left.count
             guard count > 0 else { break }
             var interleaved = [Float](repeating: 0, count: count * 2)
             for index in 0..<count {
-                interleaved[index * 2] = frames.left[index]
-                interleaved[index * 2 + 1] = frames.right[index]
+                let gain = !decoder.appliesFadeInternally && fadeFrames > 0
+                    ? PlaybackSession.fadeGain(position: renderedFrames + Int64(index), capFrames: capFrames, fadeFrames: fadeFrames)
+                    : 1
+                interleaved[index * 2] = frames.left[index] * gain
+                interleaved[index * 2 + 1] = frames.right[index] * gain
             }
             try interleaved.withUnsafeMutableBytes { bytes in
                 var bufferList = AudioBufferList(

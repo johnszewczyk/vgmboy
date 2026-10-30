@@ -26,8 +26,8 @@ The remaining work is grouped by the current SB2-first scope:
    reconfiguration while paused or buffered, and representative archive/UAC
    sources including dependencies and authored loop metadata. Distinguish cases
    already covered by injected or native tests from missing packaged coverage.
-   AAC export still does not apply authored loops; establish and implement the
-   intended common offline-render behavior before declaring loop parity.
+   AAC loop and fade behavior has generated-fixture coverage, but representative
+   formats and packaged SB2 export still need verification.
 4. Measure live audio transitions and callback performance around pause, fade,
    seek, loop, speed and mode changes. Controlled offline PCM results do not
    prove live audible continuity or performance; investigate any regression.
@@ -47,6 +47,16 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- AAC loop and fade parity, 2026-10-30: live playback and AAC export now use
+  one sample-boundary loop reader. AAC preparation adopts the selected UAC
+  member's authoritative loop, including an absent loop, and the exporter
+  applies the PCM fade for decoders without their own fade. Generated UAC WAV
+  exports rendered 48,510 frames with two short repeats, 44,100 with no loop,
+  and 66,150 with a repeat ending at EOF. Decoding an actual AAC confirmed a
+  reduced fade-tail amplitude; the comparison allows for encoder priming.
+  All 101 VGMBoy tests passed with generated and SOTN fixtures enabled. Broader
+  decoder-format coverage and packaged SB2 AAC export remain open.
+
 - UAC authored-loop playback, 2026-10-30: VGMBoy now carries the selected
   UAC member's authoritative loop through source preparation into playback;
   an absent UAC loop does not fall back to enclosed tags or a caller override.
@@ -65,7 +75,7 @@ remaining live verification and deferred frontend work are not yet bounded.
   it was read only. Disposable generated fixtures can be reproduced with
   `python3 -B VGMBoy/scripts/make_uac_loop_fixtures.py <new-directory>` and
   the tests enabled with `VGMBOY_UAC_LOOP_FIXTURES` and `VGMBOY_SOTN_XA_UAC`.
-  AAC export loop parity and packaged SB2,
+  Packaged SB2,
   audible, and wider-format validation remain open.
 
 - Producer drain and callback screening, 2026-10-30: an injected decoder

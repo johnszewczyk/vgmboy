@@ -72,14 +72,22 @@ public final class PlaybackController: @unchecked Sendable {
         }
         let materializer = ArchiveMaterializer()
         defer { materializer.release() }
-        let preparedURL = try materializer.materialize(
+        let prepared = try materializer.materializeSource(
             archivePath: request.sourcePath,
             entry: archiveEntry,
             requirement: requirement
         )
         var resolvedRequest = request
-        resolvedRequest.sourcePath = preparedURL.path
+        resolvedRequest.sourcePath = prepared.url.path
         resolvedRequest.archiveEntry = nil
+        if prepared.isUAC {
+            resolvedRequest.readEmbeddedLoopTags = false
+            resolvedRequest.loop = prepared.authoredLoop.map { loop in
+                PlaybackLoopMetadata(startSample: loop.startSamples, endSample: loop.endSamples,
+                                     sampleRateHz: loop.sampleRateHz, repeatCount: loop.repeatCount,
+                                     source: loop.source ?? "uac-manifest")
+            }
+        }
         return try AACExporter.export(resolvedRequest, cancellation: cancellation, progress: progress)
     }
 
