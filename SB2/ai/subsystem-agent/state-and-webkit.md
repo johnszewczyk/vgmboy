@@ -41,8 +41,9 @@ gain. A late failure cannot cancel a newer queued skip.
 A completed queued fade starts its target through the same replacement path as
 an immediate start, keeping the old session during source preparation. A failed
 start requests a generation-guarded gain restore when that intent is still
-current. Natural ends are deferred during this handoff and replayed if the old
-session remains authoritative. Repeated navigation during a queued skip uses
+current. A failed start displays its error only while its playback intent remains
+current, including after an awaited gain restore. Natural ends are deferred
+during this handoff and replayed if the old session remains authoritative. Repeated navigation during a queued skip uses
 a short fade and the same replacement handoff. A direct selection that replaces
 a queued fade also requests guarded gain restoration if that start fails while
 its playback intent remains current, including after timing replanning.

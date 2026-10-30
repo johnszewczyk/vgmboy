@@ -1052,7 +1052,7 @@ function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playba
           expectedGeneration: restoreGeneration });
       } catch {}
     }
-    showPlaybackError(error);
+    if (pendingPlaybackIntent === intent) showPlaybackError(error);
     throw error;
   }).finally(() => finishPlaybackIntent(intent));
 }
