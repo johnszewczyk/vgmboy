@@ -51,7 +51,9 @@
   keep matching gaps. The title and bottom status strips remain continuous
   chrome. These proportions stay
   constant as the font size changes. Rem-based chrome spacing scales with it
-  as well. Playlist and sidebar text sizes remain independent.
+  as well. Playlist and sidebar row typography uses the shared Sidebar +
+  Playlist Font Size setting; Row Gap likewise controls vertical spacing in
+  both panes.
 - Action buttons across the home screen and Options use the same surface,
   corner radius, hover colors, selected colors, and height. Text buttons keep
   natural width except where a grouped action row gives them equal widths.
