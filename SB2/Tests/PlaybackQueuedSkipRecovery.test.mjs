@@ -6,45 +6,75 @@ const source = await readFile(new URL('../Sources/SB2/Resources/app-playback.js'
 const start = source.indexOf('async function completeQueuedSkip()');
 const end = source.indexOf('\nasync function playTrackWithFadedSkip(', start);
 assert.ok(start >= 0 && end > start);
-
-function harness(stateRequest) {
-  const initial = { generation: 7, nativeGeneration: 42 };
-  const events = [];
-  const run = new Function('stateRequest', 'events', `
-    let playbackGeneration = 7, queuedSkipRequest = { generation: 7, nativeGeneration: 42 }, queuedSkipTimer = 1;
-    const window = { spcBoySB2: { nativePlaybackState: stateRequest } };
-    const cancelQueuedSkip = async options => { events.push(['cancel', queuedSkipRequest, options]); queuedSkipRequest = null; };
-    const finalizePlaybackEnded = async () => { events.push(['finalize']); };
+function deferred() { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; }
+function harness({ status = async () => ({ generation: 42 }), navigate = async () => ({ trackId: 'new' }), startTrack = async () => {}, request = {} } = {}) {
+  const events = [], state = { currentTrackId: 'old', selectedTrackId: 'old', nativePlayback: { generation: 42, trackLoaded: true } };
+  const run = new Function('state', 'status', 'navigate', 'startTrack', 'events', 'request', `
+    let playbackGeneration = 7, queuedSkipRequest = { generation: 7, nativeGeneration: 42, ...request }, queuedSkipTimer = 1;
+    const window = { spcBoySB2: { nativePlaybackState: status, playbackQueueAdjacent: navigate,
+      nativePlaybackRampGain: async value => { events.push(['ramp', value]); } } };
+    const TRANSPORT_DECLICK_MS = 10, playbackPlaylist = () => [{ id: 'old' }, { id: 'new' }];
+    const beginPlaybackIntent = id => { events.push(['begin', id]); return {}; };
+    const finishPlaybackIntent = async () => { events.push(['finish']); };
+    const clearQueuedSkipTimer = () => { queuedSkipTimer = 0; };
+    const cancelQueuedSkip = async options => { events.push(['cancel', options]); queuedSkipRequest = null; };
+    const playTrack = (...args) => { playbackGeneration++; events.push(['start', ...args]); return startTrack(); };
     ${source.slice(start, end)}
-    return { completeQueuedSkip, replace: request => { queuedSkipRequest = request; }, getRequest: () => queuedSkipRequest };
-  `)(stateRequest, events);
-  return { ...run, events, initial };
+    return { completeQueuedSkip, replace: value => { queuedSkipRequest = value; },
+      supersede: () => { playbackGeneration++; }, getRequest: () => queuedSkipRequest };
+  `)(state, status, navigate, startTrack, events, request);
+  return { ...run, events, state };
 }
 
-test('status failure cancels the skip and restores the retained session', async () => {
-  const run = harness(async () => { throw new Error('status failed'); });
+test('status failure cancels the skip and requests restore', async () => {
+  const run = harness({ status: async () => { throw new Error('status failed'); } });
   await assert.rejects(run.completeQueuedSkip(), /status failed/);
-  assert.deepEqual(run.events, [['cancel', run.initial, { restoreOutput: true }]]);
-  assert.equal(run.getRequest(), null);
+  assert.deepEqual(run.events, [['begin', null], ['cancel', { restoreOutput: true }], ['finish']]);
 });
 
 test('late status failure does not cancel a newer skip', async () => {
-  let reject;
-  const run = harness(() => new Promise((_, fail) => { reject = fail; }));
-  const pending = run.completeQueuedSkip();
-  const newer = { generation: 8, nativeGeneration: 43 };
-  run.replace(newer);
-  reject(new Error('status failed'));
-  await assert.rejects(pending, /status failed/);
-  assert.deepEqual(run.events, []);
+  const pending = deferred(), run = harness({ status: () => pending.promise });
+  const completion = run.completeQueuedSkip(), newer = { generation: 8, nativeGeneration: 43 };
+  run.replace(newer); run.supersede(); pending.reject(new Error('status failed'));
+  await assert.rejects(completion, /status failed/);
   assert.equal(run.getRequest(), newer);
+  assert.equal(run.events.some(event => event[0] === 'cancel'), false);
 });
 
-test('matching status completes once and mismatched status restores the old generation', async () => {
-  const matching = harness(async () => ({ generation: 42 }));
-  await matching.completeQueuedSkip();
-  assert.deepEqual(matching.events, [['finalize']]);
-  const stale = harness(async () => ({ generation: 43 }));
-  await stale.completeQueuedSkip();
-  assert.deepEqual(stale.events, [['cancel', stale.initial, { restoreOutput: true }]]);
+test('matching status starts the shared replacement without retirement', async () => {
+  const run = harness({ request: { targetTrackId: 'new', startSeconds: 2 } });
+  await run.completeQueuedSkip();
+  assert.deepEqual(run.events, [['begin', 'new'], ['start', 'new', 2, true, null], ['finish']]);
+  assert.equal(run.getRequest(), null);
+});
+
+test('failed replacement restores only the original native generation', async () => {
+  const run = harness({ request: { targetTrackId: 'new' }, startTrack: async () => { throw new Error('missing archive'); } });
+  await assert.rejects(run.completeQueuedSkip(), /missing archive/);
+  assert.deepEqual(run.events.find(event => event[0] === 'ramp'), ['ramp', { outputGain: 1, rampMilliseconds: 10, expectedGeneration: 42 }]);
+});
+
+test('a superseded failed replacement does not restore a newer intent', async () => {
+  const pending = deferred(), run = harness({ request: { targetTrackId: 'new' }, startTrack: () => pending.promise });
+  const completion = run.completeQueuedSkip();
+  await new Promise(resolve => setImmediate(resolve));
+  run.supersede(); pending.reject(new Error('superseded'));
+  await assert.rejects(completion, /superseded/);
+  assert.equal(run.events.some(event => event[0] === 'ramp'), false);
+});
+
+test('duplicate completion cannot start twice and navigation failure restores', async () => {
+  const pending = deferred(), run = harness({ navigate: () => pending.promise, request: { delta: 1 } });
+  const completion = run.completeQueuedSkip();
+  await new Promise(resolve => setImmediate(resolve));
+  await run.completeQueuedSkip();
+  pending.reject(new Error('navigation failed'));
+  await assert.rejects(completion, /navigation failed/);
+  assert.equal(run.events.filter(event => event[0] === 'cancel').length, 1);
+});
+
+test('mismatched native generation cancels with a guarded restore', async () => {
+  const run = harness({ status: async () => ({ generation: 43 }) });
+  await run.completeQueuedSkip();
+  assert.deepEqual(run.events, [['begin', null], ['cancel', { restoreOutput: true }], ['finish']]);
 });

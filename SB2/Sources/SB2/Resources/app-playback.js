@@ -652,7 +652,7 @@ async function handleNativePlaybackEnded(event) {
 
   const applied = applyNativePlaybackSnapshot(activeTrackInfo(), event, generation);
   if (!applied || event?.transport_state !== "ended") return;
-  await finalizePlaybackEnded();
+  await finalizePlaybackEnded(event);
 }
 
 async function setPlaybackPowerSaveBlocker(enabled) {
@@ -766,15 +766,18 @@ function applyNativePlaybackSnapshot(
   return true;
 }
 
-async function finalizePlaybackEnded() {
+async function finalizePlaybackEnded(event = null) {
+  if (queuedSkipRequest) {
+    // Preserve an end that arrived before the skip's replacement intent. If
+    // preparation fails, the normal completion path can still consume it.
+    if (event) deferredNativeEnds.push({ event, trackId: state.currentTrackId,
+      nativeGeneration: Number(event.generation) || 0 });
+    return completeQueuedSkip();
+  }
   const finalizationGeneration = playbackGeneration;
   const completedTrackId = state.currentTrackId;
-  const completedQueuedSkip = queuedSkipRequest;
   const nativeGeneration = Number(state.nativePlayback?.generation) || finalizationGeneration;
-  // The native coordinator owns both the one-shot claim and the queue
-  // decision. Keeping them in one bridge call prevents duplicate end events
-  // from racing between JavaScript promises. A queued skip still uses the
-  // same claim; its adjacent target is calculated only after retirement.
+  // The coordinator owns the one-shot natural-end claim and queue decision.
   const retirementDecision = await window.spcBoySB2.playbackCompletionRetire({
     generation: nativeGeneration,
     state: {
@@ -798,7 +801,6 @@ async function finalizePlaybackEnded() {
   await continueAfterPlaybackRetirement({
     finalizationGeneration,
     completedTrackId,
-    completedQueuedSkip,
     retirementDecision
   });
 }
@@ -806,7 +808,6 @@ async function finalizePlaybackEnded() {
 async function continueAfterPlaybackRetirement({
   finalizationGeneration,
   completedTrackId,
-  completedQueuedSkip,
   retirementDecision
 }) {
   const completionTargetId = retirementDecision?.action === "play"
@@ -829,16 +830,7 @@ async function continueAfterPlaybackRetirement({
     return;
   }
 
-  if (completedQueuedSkip?.targetTrackId) {
-    await playTrack(
-      completedQueuedSkip.targetTrackId,
-      completedQueuedSkip.startSeconds || 0,
-      true,
-      completedQueuedSkip.playbackOptions || null
-    );
-  } else if (completedQueuedSkip) {
-    await advanceToAdjacent(completedQueuedSkip.delta);
-  } else if (completionTargetId) {
+  if (completionTargetId) {
     await playTrack(completionTargetId, 0);
   }
 }
@@ -1058,28 +1050,55 @@ function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playba
 
 async function completeQueuedSkip() {
   const request = queuedSkipRequest;
-  if (!request || request.generation !== playbackGeneration) return;
-  let snapshot;
+  if (!request || request.generation !== playbackGeneration || request.completing) return;
+  request.completing = true;
+  const intent = beginPlaybackIntent(request.targetTrackId || null);
   try {
-    snapshot = await window.spcBoySB2.nativePlaybackState();
+    const snapshot = await window.spcBoySB2.nativePlaybackState();
+    if (request !== queuedSkipRequest || request.generation !== playbackGeneration) return;
+    if (request.nativeGeneration > 0 && Number(snapshot?.generation) !== request.nativeGeneration) {
+      await cancelQueuedSkip({ restoreOutput: true });
+      return;
+    }
+    let target = request.targetTrackId;
+    if (!target) {
+      const navigation = await window.spcBoySB2.playbackQueueAdjacent({
+        state: { currentTrackId: state.currentTrackId, selectedTrackId: state.selectedTrackId, pendingTrackId: null },
+        playlistIds: playbackPlaylist().map(track => track.id),
+        direction: request.delta < 0 ? "previous" : "next",
+        wraps: true
+      });
+      if (request !== queuedSkipRequest || request.generation !== playbackGeneration) return;
+      target = navigation?.trackId;
+    }
+    if (!target) {
+      await cancelQueuedSkip({ restoreOutput: true });
+      return;
+    }
+    queuedSkipRequest = null;
+    clearQueuedSkipTimer();
+    const starting = playTrack(target, request.startSeconds || 0, true, request.playbackOptions || null);
+    const startGeneration = playbackGeneration;
+    try {
+      await starting;
+    } catch (error) {
+      if (startGeneration === playbackGeneration && state.currentTrackId
+          && state.nativePlayback?.trackLoaded && request.nativeGeneration > 0) {
+        try {
+          await window.spcBoySB2.nativePlaybackRampGain({ outputGain: 1, rampMilliseconds: TRANSPORT_DECLICK_MS,
+            expectedGeneration: request.nativeGeneration });
+        } catch {}
+      }
+      throw error;
+    }
   } catch (error) {
-    // A failed status lookup must not strand the retained session at zero gain.
-    // Only cancel the request that initiated the lookup; a newer skip owns its
-    // own envelope and must be left alone.
     if (request === queuedSkipRequest && request.generation === playbackGeneration) {
       await cancelQueuedSkip({ restoreOutput: true });
     }
     throw error;
+  } finally {
+    await finishPlaybackIntent(intent);
   }
-  if (request !== queuedSkipRequest || request.generation !== playbackGeneration) return;
-  if (request.nativeGeneration > 0
-      && Number(snapshot?.generation) !== request.nativeGeneration) {
-    await cancelQueuedSkip({ restoreOutput: true });
-    return;
-  }
-  queuedSkipTimer = 0;
-  // Share the native one-shot completion claim with a simultaneous natural end.
-  await finalizePlaybackEnded();
 }
 
 async function playTrackWithFadedSkip(trackId, startSeconds = 0, playbackOptions = null) {

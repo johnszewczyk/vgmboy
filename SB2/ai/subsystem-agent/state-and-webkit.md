@@ -29,6 +29,12 @@ generation, so a delayed output ramp cannot modify a replacement session.
 Both queued-skip timer paths share a status check; if that check fails, the
 current queued skip is canceled and its originating session is asked to restore
 gain. A late failure cannot cancel a newer queued skip.
+A completed queued fade starts its target through the same replacement path as
+an immediate start, keeping the old session during source preparation. A failed
+start requests a generation-guarded gain restore when that intent is still
+current. Natural ends are deferred during this handoff and replayed if the old
+session remains authoritative. A second navigation during an already queued
+skip still follows the separate stop-and-advance path.
 Start, stop, unload and cache-clear operations reserve playback request
 ownership at WebKit message receipt, before detached workers can reorder them;
 the shared transport rejects a superseded start or stop.
