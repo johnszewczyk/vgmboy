@@ -13,11 +13,18 @@ Simulator bundle verification):
 ./build.sh
 ```
 
+Build and launch directly in iOS Simulator (defaults to **iPhone 16 Plus**, creating the device automatically if needed):
+
+```sh
+./launch.sh
+```
+
 Useful options and environment overrides:
 
 - `./build.sh --target device` — build `APPBOY.app` and `APPBOY.ipa` for `iphoneos` (`arm64`, default).
 - `./build.sh --target simulator` — build `APPBOY-Simulator.app` for `iphonesimulator`.
 - `./build.sh --target all` — build both device (`.app` + `.ipa`) and simulator bundles.
+- `./launch.sh [--device <name-or-udid>] [--skip-build] [--headless]` — build, boot Simulator (`iPhone 16 Plus` by default), install `APPBOY-Simulator.app`, and launch `com.john.spcboy.appboy`.
 - `APPBOY_BUNDLE_IDENTIFIER` — override the default `com.john.spcboy.appboy` bundle identifier.
 - `APPBOY_SIGNING_IDENTITY` — sign with a specific Apple Development identity (falls back to ad-hoc `-` for AltStore, Sideloadly, or TrollStore).
 - `APPBOY_BUILD_DIR` / `APPBOY_IPA_PATH` — relocate build outputs outside `.build/`.

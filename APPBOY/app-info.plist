@@ -81,6 +81,19 @@
       <true/>
     </dict>
   </dict>
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+      <key>CFBundleURLName</key>
+      <string>com.john.spcboy.appboy</string>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>appboy</string>
+      </array>
+    </dict>
+  </array>
   <key>UIApplicationSceneManifest</key>
   <dict>
     <key>UIApplicationSupportsMultipleScenes</key>

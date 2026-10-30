@@ -17,6 +17,16 @@
     app.ui.refreshIndicatorPosition();
   });
 
+  if (typeof ResizeObserver === "function") {
+    const ro = new ResizeObserver(() => {
+      app.ui.refreshIndicatorPosition();
+    });
+    for (const sel of [".app-shell", ".sb-titlebar", "#mobile-mode-bar", ".workspace", ".transport-deck"]) {
+      const el = document.querySelector(sel);
+      if (el) ro.observe(el);
+    }
+  }
+
   // Mobile mode bar
   refs.mobileModeBar.querySelectorAll("[data-mobile-target]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -260,7 +270,35 @@
     void app.flushPendingState();
   });
 
+  function applyDeepLink(payload) {
+    const action = payload?.action;
+    const target = payload?.target;
+    if (action === "view") {
+      if (target === "options") {
+        app.ui.setOptionsOpen(true);
+      } else {
+        app.ui.setOptionsOpen(false);
+        app.ui.setMobilePane(target);
+      }
+    } else if (action === "play") {
+      app.ui.setOptionsOpen(false);
+      if (target) {
+        const track = app.activeTracks().find((t) => t.id === target);
+        if (track) {
+          void app.playback.startTrack(track, app.activeTab()?.id);
+          return;
+        }
+      }
+      void app.playback.togglePlayback();
+    } else if (action === "transport" && target) {
+      app.playback.handleRemoteCommand({ command: target });
+    }
+  }
+
   // Native Bridge Subscriptions
+  const pendingDeepLinks = [];
+  let bootstrapDone = false;
+
   if (window.appBoy) {
     window.appBoy.onNativePlaybackState?.((snap) => {
       app.playback.applyNativeState(snap);
@@ -271,6 +309,13 @@
     });
     window.appBoy.onRemoteCommand?.((payload) => {
       app.playback.handleRemoteCommand(payload);
+    });
+    window.appBoy.onDeepLink?.((payload) => {
+      if (!bootstrapDone) {
+        pendingDeepLinks.push(payload);
+      } else {
+        applyDeepLink(payload);
+      }
     });
   }
 
@@ -312,10 +357,18 @@
           state.selectedAlbumId = active.sourceId;
         }
       }
+      if (Array.isArray(payload?.initialDeepLinks)) {
+        pendingDeepLinks.push(...payload.initialDeepLinks);
+      }
       app.ui.renderAll();
     } catch (err) {
       app.showErrorToast(err?.message || "APPBOY bootstrap failed.");
       app.ui.renderAll();
+    } finally {
+      bootstrapDone = true;
+      while (pendingDeepLinks.length > 0) {
+        applyDeepLink(pendingDeepLinks.shift());
+      }
     }
   }
 

@@ -46,6 +46,10 @@ JavaScript-to-native bridge, and local state persistence.
   `window.APPBOY?.flushPendingState?.()` via `callAsyncJavaScript` inside a
   short `UIApplication` background task so debounced tab or preference edits
   persist before iOS suspends the process.
+- Validate incoming `appboy://` scene URLs against an allowlist of view, play,
+  and transport actions in `AppBoyNativeBridge.emitDeepLink(url:)` and forward
+  structured JSON events (`onDeepLink`) without interpolating raw URL strings
+  into JavaScript.
 
 ## Failure Boundaries
 

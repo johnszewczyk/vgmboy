@@ -22,13 +22,19 @@ behavior in APPBOY across iPhone and iPad viewports.
 
 ## Responsive Layout
 
+- Primary touch proportions are tuned around the **iPhone Plus** canvas
+  (`430 × 932 pt` portrait, `932 × 430 pt` landscape) with `44 × 44 pt` transport
+  controls and 2-column square album frames at `1.00×` gallery scale.
 - On compact viewports (`< 768px`, iPhone portrait), a primary mode bar switches
-  the workspace between `Library`, `Playlist`, `Gallery`, `Favorites`, `Recent`,
-  and `Options` while keeping the docked Now Playing transport deck and status
-  strip visible at the bottom.
-- On regular viewports (`>= 768px`, iPad and wide landscape), the workspace
+  the workspace between `Library`, `Playlist`, `Gallery`, `Favorites`, and `Recent`
+  while keeping the docked Now Playing transport deck (including `Options`) and
+  status strip visible at the bottom.
+- On regular viewports (`>= 768px`, iPhone Plus landscape and iPad), the workspace
   displays SB2's two-pane split layout with the Library sidebar on the left, a
   `1px` vertical divider, and the active Playlist or Gallery pane on the right.
+  On compact-height landscape viewports (`<= 500px` tall, such as iPhone Plus
+  landscape), the transport deck condenses into a horizontal two-zone SB2 toolbar
+  to maximize vertical Library and Playlist row capacity.
 - Rotating the device or resizing iPad Split View switches between compact and
   two-pane layouts while preserving open tabs, search query, selection, and
   playback position.

@@ -7,6 +7,8 @@ final class AppBoyNativeBridge: NSObject, WKScriptMessageHandler {
     private let store: AppBoyStore
     private let playback: AppBoyPlaybackCoordinator
     private weak var webView: WKWebView?
+    private var hasBootstrapped = false
+    private var queuedDeepLinks: [[String: Any]] = []
 
     init(store: AppBoyStore, playback: AppBoyPlaybackCoordinator) {
         self.store = store
@@ -34,6 +36,32 @@ final class AppBoyNativeBridge: NSObject, WKScriptMessageHandler {
 
     func attach(to webView: WKWebView) {
         self.webView = webView
+    }
+
+    func emitDeepLink(url: URL) {
+        guard url.scheme?.lowercased() == "appboy" else { return }
+        let host = (url.host ?? "").lowercased()
+        let pathPart = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let allowedViews: Set<String> = ["library", "playlist", "gallery", "favorites", "recent", "options"]
+        let allowedTransports: Set<String> = ["pause", "stop", "next", "previous", "togglePlayPause"]
+        var eventPayload: [String: Any]?
+        if host == "view", allowedViews.contains(pathPart.lowercased()) {
+            eventPayload = ["action": "view", "target": pathPart.lowercased()]
+        } else if host == "play" {
+            var payload: [String: Any] = ["action": "play"]
+            if !pathPart.isEmpty {
+                payload["target"] = pathPart
+            }
+            eventPayload = payload
+        } else if host == "transport", allowedTransports.contains(pathPart) {
+            eventPayload = ["action": "transport", "target": pathPart]
+        }
+        guard let eventPayload else { return }
+        if hasBootstrapped {
+            publishEvent(name: "deepLink", payload: eventPayload)
+        } else {
+            queuedDeepLinks.append(eventPayload)
+        }
     }
 
     func userScript() -> WKUserScript {
@@ -95,7 +123,8 @@ final class AppBoyNativeBridge: NSObject, WKScriptMessageHandler {
                 onNativePlaybackState: (listener) => on("nativePlaybackState", listener),
                 onNativePlaybackEnded: (listener) => on("nativePlaybackEnded", listener),
                 onRemoteCommand: (listener) => on("remoteCommand", listener),
-                onSettingsChanged: (listener) => on("settingsChanged", listener)
+                onSettingsChanged: (listener) => on("settingsChanged", listener),
+                onDeepLink: (listener) => on("deepLink", listener)
               };
 
               window.appBoy = Object.freeze(api);
@@ -148,12 +177,16 @@ final class AppBoyNativeBridge: NSObject, WKScriptMessageHandler {
                     tabTracks[tab.id] = tracks.map { store.serializeTrack($0) }
                 }
             }
+            hasBootstrapped = true
+            let drainedLinks = queuedDeepLinks
+            queuedDeepLinks.removeAll()
             return [
                 "preferences": prefsValue,
                 "catalog": catalogValue,
                 "workspace": workspaceValue,
                 "favoriteTrackIds": Array(store.allFavoriteIds()),
-                "initialTabTracks": tabTracks
+                "initialTabTracks": tabTracks,
+                "initialDeepLinks": drainedLinks
             ]
 
         case "albumTracks":
