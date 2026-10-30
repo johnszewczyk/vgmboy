@@ -237,7 +237,8 @@ public final class PlaybackController: @unchecked Sendable {
                 outputDirectory: URL(fileURLWithPath: directory),
                 filenameStem: filenameStem,
                 playMilliseconds: playMilliseconds,
-                fadeMilliseconds: fadeMilliseconds
+                fadeMilliseconds: fadeMilliseconds,
+                tempo: request.payload.tempo ?? 1
             ))
             return PlaybackControlEvent(requestID: request.requestID, kind: .response, status: session.status(), message: result.outputURL.path)
         case .status:

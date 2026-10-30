@@ -11,6 +11,7 @@ public struct AACExportRequest: Sendable, Equatable {
     public var filenameStem: String
     public var playMilliseconds: Int
     public var fadeMilliseconds: Int
+    public var tempo: Double
 
     public init(
         sourcePath: String,
@@ -19,7 +20,8 @@ public struct AACExportRequest: Sendable, Equatable {
         outputDirectory: URL,
         filenameStem: String,
         playMilliseconds: Int,
-        fadeMilliseconds: Int
+        fadeMilliseconds: Int,
+        tempo: Double = 1
     ) {
         self.sourcePath = sourcePath
         self.archiveEntry = archiveEntry
@@ -28,6 +30,7 @@ public struct AACExportRequest: Sendable, Equatable {
         self.filenameStem = filenameStem
         self.playMilliseconds = playMilliseconds
         self.fadeMilliseconds = fadeMilliseconds
+        self.tempo = tempo
     }
 }
 
@@ -113,13 +116,16 @@ public enum AACExporter {
         guard request.playMilliseconds > 0, request.fadeMilliseconds >= 0 else {
             throw AACExportError.invalidRequest("AAC export requires a positive play length and a non-negative fade.")
         }
+        guard request.tempo.isFinite, request.tempo > 0 else {
+            throw AACExportError.invalidRequest("AAC export requires a positive finite tempo.")
+        }
         let maximumMilliseconds = Int(Int32.max)
         guard request.playMilliseconds <= maximumMilliseconds,
               request.fadeMilliseconds <= maximumMilliseconds,
               request.playMilliseconds <= maximumMilliseconds - request.fadeMilliseconds else {
             throw AACExportError.invalidRequest("AAC export timing exceeds the supported millisecond range.")
         }
-        guard FormatRegistry.family(for: request.sourcePath) != nil else {
+        guard let family = FormatRegistry.family(for: request.sourcePath) else {
             throw AACExportError.invalidRequest("AAC export requires a supported playable file.")
         }
         let directory = request.outputDirectory.standardizedFileURL
@@ -140,6 +146,7 @@ public enum AACExporter {
         let decoder = try DecoderFactory.make(path: request.sourcePath, sampleRate: sampleRate)
         defer { decoder.close() }
         try decoder.startTrack(request.trackIndex)
+        decoder.setTempo(FormatRegistry.effectiveTempo(request.tempo, family: family))
         decoder.configureFade(playMs: request.playMilliseconds, fadeMs: request.fadeMilliseconds)
 
         let capFrames = Int64(request.playMilliseconds + request.fadeMilliseconds) * Int64(sampleRate) / 1_000

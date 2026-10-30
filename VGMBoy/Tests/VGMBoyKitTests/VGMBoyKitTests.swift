@@ -762,10 +762,40 @@ struct PlaybackControlProtocolTests {
         #expect(result.outputURL.pathExtension == "aac")
         #expect(FileManager.default.fileExists(atPath: result.outputURL.path))
         #expect((try Data(contentsOf: result.outputURL)).count > 0)
+        let unsupportedTempo = try AACExporter.export(.init(
+            sourcePath: source.path, outputDirectory: folder, filenameStem: "WAV-2x",
+            playMilliseconds: 100, fadeMilliseconds: 0, tempo: 2
+        ))
+        #expect(try Data(contentsOf: result.outputURL) == Data(contentsOf: unsupportedTempo.outputURL))
 
         var audioFile: AudioFileID?
         #expect(AudioFileOpenURL(result.outputURL as CFURL, .readPermission, kAudioFileAAC_ADTSType, &audioFile) == noErr)
         if let audioFile { AudioFileClose(audioFile) }
+    }
+
+    @Test("AAC export applies and bounds decoder tempo")
+    func exportAppliesTempo() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = root.appendingPathComponent("vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+        func render(_ tempo: Double) throws -> [Float] {
+            let result = try AACExporter.export(.init(sourcePath: source.path, outputDirectory: folder,
+                filenameStem: "tempo-\(tempo)", playMilliseconds: 3_000, fadeMilliseconds: 0, tempo: tempo))
+            let file = try AVAudioFile(forReading: result.outputURL)
+            let buffer = try #require(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 132_300))
+            try file.read(into: buffer)
+            let channel = try #require(buffer.floatChannelData?[0])
+            return Array(UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength)))
+        }
+        let normal = try render(1), fast = try render(2), capped = try render(4), overLimit = try render(8)
+        #expect(!normal.isEmpty && normal.count == fast.count)
+        let difference = zip(normal, fast).reduce(0.0) { $0 + Double(abs($1.0 - $1.1)) } / Double(max(1, normal.count))
+        #expect(difference > 0.001)
+        #expect(capped.count == overLimit.count)
+        let capDifference = zip(capped, overLimit).reduce(0.0) { $0 + Double(abs($1.0 - $1.1)) } / Double(max(1, capped.count))
+        #expect(capDifference < 0.000001)
     }
 
     @Test("AAC cancellation leaves no incomplete output")

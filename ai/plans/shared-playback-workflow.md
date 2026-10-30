@@ -9,6 +9,15 @@ paths, working-tree changes, and findings before continuing.
 
 ## Implementation checkpoint, 2026-10-28
 
+- AAC export speed, 2026-10-30: SB2 captures one speed for the timing preview
+  and export request, and the shared exporter applies the prepared decoder
+  family's effective tempo. Missing tempo remains 1x for older callers. Native
+  SPC export checks compare decoded samples at 1x and 2x and verify the 4x cap;
+  the renderer check covers a setting change during preview. An isolated SB2
+  bundle exported the same SPC at normal speed and requested 8x (effective 4x):
+  ADTS frame counts correspond to approximately 86 and 26 seconds including
+  fade. This verifies rendered files, not a listening test.
+
 - SB2 completion during replacement, 2026-10-29: renderer completion now waits
   while an explicit start or navigation is pending. It replays an end for the
   retained session after failure, drops an old end after successful replacement,

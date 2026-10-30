@@ -245,7 +245,8 @@ func aacExportBridgeContractRetainsArchiveReferenceAndBuildsTheCoreRequest() thr
         outputDirectory: "/exports",
         filenameStem: "Ending",
         playMilliseconds: 90_000,
-        fadeMilliseconds: 4_000
+        fadeMilliseconds: 4_000,
+        tempo: .init(numerator: 2, denominator: 1)
     )
     let encoded = try JSONEncoder().encode(request)
     let decoded = try JSONDecoder().decode(PlaybackTransportAACExportRequest.self, from: encoded)
@@ -263,6 +264,10 @@ func aacExportBridgeContractRetainsArchiveReferenceAndBuildsTheCoreRequest() thr
     #expect(coreRequest.filenameStem == "Ending")
     #expect(coreRequest.playMilliseconds == 90_000)
     #expect(coreRequest.fadeMilliseconds == 4_000)
+    #expect(coreRequest.tempo == 2)
+    let legacy = Data(#"{"path":"/music/one.spc","trackIndex":0,"outputDirectory":"/exports","filenameStem":"one","playMilliseconds":1000,"fadeMilliseconds":0}"#.utf8)
+    let legacyRequest = try JSONDecoder().decode(PlaybackTransportAACExportRequest.self, from: legacy)
+    #expect(try legacyRequest.exportRequest().tempo == 1)
     #expect(cancellation.id == "export-7")
 }
 

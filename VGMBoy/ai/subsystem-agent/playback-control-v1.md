@@ -103,6 +103,9 @@ same typed endpoint operations.
   frame progress, observes a host cancellation token between decode blocks, renders to a hidden
   partial path, and moves that file to its final name only after the encoder closes successfully. A
   frontend owns its persisted destination preference.
+  Export tempo defaults to 1x for existing callers and is limited using the
+  prepared source decoder family, matching playback. Play and fade durations
+  are already output-time values and must not be scaled a second time.
 - AAC progress is rate-limited to four updates per second. It is a latest-state presentation channel,
   so a realtime decoder cannot monopolize a frontend executor by emitting one UI task per decode block.
 - `PlaybackStructureReader` is the narrow exception for raw disk browsing: it returns only
