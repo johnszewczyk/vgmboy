@@ -1018,7 +1018,7 @@ def pack_from_directives(args: argparse.Namespace) -> tuple[int, int, list[str],
     }
     seen: set[str] = set()
     for pointer, value in args.directive or []:
-        if pointer in seen:
+        if pointer in seen and not pointer.endswith("/-"):
             raise UACError(f"Repeated directive path: {pointer}")
         seen.add(pointer)
         apply_manifest_directive(recipe, pointer, value)
@@ -2818,8 +2818,8 @@ def parser() -> argparse.ArgumentParser:
         default=[],
         metavar="/JSON/POINTER=VALUE",
         help=(
-            "Set one manifest value; repeat for more fields. Plain values are strings, valid JSON values "
-            "retain their JSON type, and /array/- appends an item."
+            "Set one manifest value; repeat for more fields or items. Plain values are strings, valid JSON "
+            "values retain their JSON type, and a final /- appends an array item."
         ),
     )
     direct_pack_parser.add_argument("--variant-id", default="original")

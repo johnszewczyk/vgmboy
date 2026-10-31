@@ -61,7 +61,8 @@ python3 -B Wrapper/python/uacman.py unpack <new-game>.uac <new-output-directory>
 For a new standalone package, `pack-directives` builds the same validated UAC
 without requiring a recipe file. Repeat `--directive` with a JSON Pointer and
 value. Plain unquoted values are strings; valid JSON values retain their JSON
-type. Arrays can be assigned as JSON or extended with the final `-` segment.
+type. Arrays can be assigned as JSON or extended with the final `-` segment;
+repeat the same append directive to add multiple items.
 There is no console-specific tag-name or canonical-identity allowlist; UAC's
 manifest and format validation still applies.
 
