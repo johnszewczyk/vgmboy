@@ -80,6 +80,34 @@ private final class StatusRecorder: @unchecked Sendable {
     #expect(!transport.statusSync().trackLoaded)
 }
 
+@Test func queuedReplacementRequiresItsOriginalNativeGeneration() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.queued-replacement.generation")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    func start(_ id: String, expected: Int? = nil) throws {
+        let request = PlaybackTransportStartRequest(trackID: id, sourcePath: url.path,
+                                                    expectedPreviousGeneration: expected)
+        let decoded = try JSONDecoder().decode(PlaybackTransportStartRequest.self, from: JSONEncoder().encode(request))
+        #expect(decoded == request)
+        try transport.start(decoded.continuationStart(requestID: transport.reservePlaybackRequest()))
+    }
+    try start("old")
+    let oldGeneration = transport.statusSync().generation
+    try start("new")
+    let newGeneration = transport.statusSync().generation
+    #expect(newGeneration != oldGeneration)
+    #expect(throws: CancellationError.self) { try start("stale", expected: oldGeneration) }
+    #expect(throws: CancellationError.self) { try start("invalid", expected: 0) }
+    let retained = transport.statusSync()
+    #expect(retained.currentTrackID == "new")
+    #expect(retained.generation == newGeneration)
+    #expect(retained.isPlaying)
+    try start("accepted", expected: newGeneration)
+    #expect(transport.statusSync().currentTrackID == "accepted")
+}
+
 @Test func invalidFadeDurationsLeavePlaybackIntact() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }

@@ -1003,7 +1003,8 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
       tempo: requestedPlaybackSpeed(),
       longPlayEnabled: timingPlan.is_long_play,
       timedOverride: fadeNowSeconds > 0,
-      unknownDurationMilliseconds: Math.round(state.unknownDurationSeconds * 1000)
+      unknownDurationMilliseconds: Math.round(state.unknownDurationSeconds * 1000),
+      expectedPreviousGeneration: playbackOptions?.expectedPreviousGeneration || null
     });
     if (generation !== playbackGeneration) {
       return;
@@ -1088,14 +1089,17 @@ function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playba
   const requestOptions = playbackOptions?.pendingQueue ? playbackOptions : needsQueue
     ? { ...playbackOptions, pendingQueue: [...state.playlist], pendingTabId: state.activePlaylistTabId || null }
     : playbackOptions;
+  const guardedOptions = preserveQueuedSkip && restoreNativeGeneration > 0
+    ? { ...requestOptions, expectedPreviousGeneration: restoreNativeGeneration }
+    : requestOptions;
   let request;
   if (!preserveQueuedSkip
       && !replacingQueuedSkip
       && state.currentTrackId
       && state.isPlaying) {
-    request = playTrackWithFadedSkip(trackId, startSeconds, requestOptions);
+    request = playTrackWithFadedSkip(trackId, startSeconds, guardedOptions);
   } else {
-    request = playTrackNow(trackId, startSeconds, requestOptions);
+    request = playTrackNow(trackId, startSeconds, guardedOptions);
   }
   const restoreGeneration = Number(replacedQueuedSkip?.nativeGeneration) || restoreNativeGeneration;
   return Promise.resolve(request).catch(async (error) => {

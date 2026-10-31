@@ -47,6 +47,15 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Queued replacement generation guard, 2026-10-30: the shared start contract
+  can require the previous native generation, and SB2 supplies the generation
+  captured by a queued fade. A stale handoff is rejected on the transport
+  queue before it can replace newer playback; callers omitting the field retain
+  their existing behavior. Native integration checks covered stale, invalid,
+  accepted and legacy starts, and renderer checks covered forwarding. All 59
+  shared transport and 68 SB2 playback checks passed, and SB2 built under the
+  disk guard. Packaged race and audible checks remain open.
+
 - Paused UAC reconfiguration, 2026-10-30: shared-transport integration tests
   started a generated looped UAC, paused, sought and reconfigured it, then
   resumed through its expected 1.1-second end exactly once. A separate muted
