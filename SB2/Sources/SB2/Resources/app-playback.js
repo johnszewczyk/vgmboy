@@ -1123,6 +1123,7 @@ async function completeQueuedSkip() {
   try {
     const decision = await window.spcBoySB2.nativePlaybackQueuedSkipDecision({
       expectedGeneration: request.nativeGeneration > 0 ? request.nativeGeneration : null,
+      requestId: request.nativeGeneration > 0 ? request.claimId : undefined,
       targetTrackId: request.targetTrackId || null,
       navigation: request.targetTrackId ? null : {
         state: { currentTrackId: state.currentTrackId, selectedTrackId: state.selectedTrackId, pendingTrackId: null },
@@ -1170,6 +1171,7 @@ async function playTrackWithFadedSkip(trackId, startSeconds = 0, playbackOptions
   if (!fadePlan) return playTrackNow(trackId, startSeconds, playbackOptions);
 
   queuedSkipRequest = {
+    claimId: `${queuedSkipSession}-${++queuedSkipSerial}`,
     targetTrackId: trackId,
     startSeconds,
     playbackOptions,
@@ -1225,6 +1227,7 @@ async function playAdjacentNow(delta) {
     // The newer navigation takes over the short remaining fade, then uses the
     // same replacement-safe handoff as an ordinary queued skip.
     queuedSkipRequest = {
+      claimId: `${queuedSkipSession}-${++queuedSkipSerial}`,
       delta: delta || previousRequest.delta,
       generation,
       nativeGeneration: previousRequest.nativeGeneration
@@ -1253,6 +1256,7 @@ async function playAdjacentNow(delta) {
   }
 
   queuedSkipRequest = {
+    claimId: `${queuedSkipSession}-${++queuedSkipSerial}`,
     delta,
     generation: playbackGeneration,
     nativeGeneration: Number(state.nativePlayback.generation) || 0

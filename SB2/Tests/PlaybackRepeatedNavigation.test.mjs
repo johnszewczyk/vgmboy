@@ -16,6 +16,7 @@ function harness({ fade = async () => {}, start = async () => {}, navigate = asy
   const state = { currentTrackId: 'old', selectedTrackId: 'selected', nativePlayback: { generation: 42, trackLoaded: true } };
   const run = new Function('state', 'events', 'fade', 'start', 'navigate', `
     let playbackGeneration = 7, queuedSkipRequest = { generation: 7, nativeGeneration: 42, delta: 1 };
+    let queuedSkipSerial = 0; const queuedSkipSession = 'test';
     const TRANSPORT_DECLICK_MS = 10;
     const playbackPlaylist = () => [{ id: 'old' }, { id: 'next' }];
     const window = { spcBoySB2: { nativePlaybackQueuedSkipDecision: request => {

@@ -65,6 +65,12 @@ cancellation or failed replacement. Cover repeated navigation, end during
 preparation, failed and successful replacement, and newer stop/start commands
 before removing renderer guards. Queue contents, selection and UI remain in SB2.
 
+Completion-claim pass: SB2 gives each queued request a distinct identity and the
+shared transport claims it once per native generation when resolving its target.
+The existing renderer guard and local fallback remain in place. This does not yet
+move supersession, cancellation, deferred ends or gain restoration into shared
+state, and it does not establish packaged or audible race behavior.
+
 ### Packaged SB2 old-end/failed replacement checkpoint, 2026-10-31
 
 An isolated, instrumented app built from `32bcf646` used a generated four-second
