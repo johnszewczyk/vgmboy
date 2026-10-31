@@ -47,6 +47,14 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Offline producer empty reads, 2026-10-30: AAC export no longer treats a
+  temporary empty decoder read as a successful end. It retries with a bounded
+  delay, fails on persistent stalls or zero-frame output, and keeps incomplete
+  files unpublished. An injected-decoder regression covered recovery after
+  partial and empty reads, repeated stalls, cleanup, and an empty natural end.
+  The VGMBoy suite passed 105 tests with generated and SOTN UAC fixtures,
+  56 shared transport checks passed, and SB2 built under the disk guard.
+
 - Packaged SB2 UAC follow-up, 2026-10-30: the isolated debug app built from
   `bb7d70c5` used temporary state, test-only seek/export controls and a playlist
   containing the generated loop UAC and the read-only SOTN XA package. SOTN

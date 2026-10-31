@@ -144,6 +144,28 @@ private func makeSession(_ decoder: ScriptedProducerDecoder) -> PlaybackSession 
 }
 private let fixturePlan = PlaybackPlan(preFadeMilliseconds: 5_000, fadeMilliseconds: 0, isLongPlay: false, usesNativeEnding: false)
 
+@Test func offlineExportRetriesEmptyReadsAndRejectsStallsWithoutPublishingPartialFiles() throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let request = AACExportRequest(sourcePath: "/fixture.spc", outputDirectory: folder,
+                                   filenameStem: "recovered", playMilliseconds: 100, fadeMilliseconds: 0)
+    let recovering = ScriptedProducerDecoder([.empty, .partial, .empty, .pcm])
+    let result = try AACExporter.export(request, decoderFactory: { _, _ in recovering })
+    #expect(result.renderedFrames == 4_410)
+    #expect(recovering.closed)
+
+    for steps in [Array(repeating: ScriptedProducerDecoder.Step.empty, count: 9), [.end]] {
+        let stalled = ScriptedProducerDecoder(steps)
+        #expect(throws: AACExportError.self) {
+            try AACExporter.export(request, decoderFactory: { _, _ in stalled })
+        }
+        #expect(stalled.closed)
+    }
+    let files = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+    #expect(files == [result.outputURL.lastPathComponent])
+}
+
 @Test func emptyDecoderReadDoesNotAdvanceOrEndAndCanRecover() throws {
     let decoder = ScriptedProducerDecoder([.empty, .pcm])
     let session = makeSession(decoder)
