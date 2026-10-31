@@ -46,6 +46,25 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+### Queued-fade ownership boundary
+
+The shared scheduler owns deadline tokens, fallback timing and ramp-ready
+acknowledgements; the coordinator resolves a target against the captured native
+generation and the guarded start checks it again. SB2 still owns the request,
+the completing flag, renderer generation, local lost-bridge fallback, deferred
+end events and gain restoration. Repeated navigation replaces the request and
+uses a short declick ramp; an end during a queued skip is retained for replay
+if replacement fails. These are linked behaviors, so moving only the timer or
+target lookup does not complete lifecycle extraction.
+
+The next shared lifecycle change must atomically claim completion for a request,
+invalidate superseded tokens, and return enough identity for the host to reject
+late events. Preserve the local fallback until lost bridge replies and events
+have equivalent recovery, and retain generation-guarded gain restoration on
+cancellation or failed replacement. Cover repeated navigation, end during
+preparation, failed and successful replacement, and newer stop/start commands
+before removing renderer guards. Queue contents, selection and UI remain in SB2.
+
 ### Packaged SB2 old-end/failed replacement checkpoint, 2026-10-31
 
 An isolated, instrumented app built from `32bcf646` used a generated four-second
