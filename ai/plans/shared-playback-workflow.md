@@ -77,6 +77,14 @@ gain only to the captured native generation and retains the bridge's ramp
 revision ordering. SB2 still decides when a canceled or failed request needs
 restoration; lifecycle cancellation and deferred ends remain frontend-owned.
 
+Lifecycle pass: shared transport now owns token-scoped begin, supersession,
+claim and cancellation on a lock independent of source preparation. SB2 sends
+ordered lifecycle messages and keeps its renderer guards and fallback; a queued
+start carries the token and rechecks ownership before and after preparation.
+Deterministic tests cover supersession, concurrent claims, canceled starts and
+lost claim replies. Packaged slow-preparation and audible races remain open;
+deferred-end presentation and queue state remain in SB2.
+
 ### Packaged SB2 old-end/failed replacement checkpoint, 2026-10-31
 
 An isolated, instrumented app built from `32bcf646` used a generated four-second

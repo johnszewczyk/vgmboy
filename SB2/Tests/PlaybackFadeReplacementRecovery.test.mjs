@@ -11,6 +11,7 @@ function harness(startTrack, queued = true, ramp = async () => {}) {
   const run = new Function('state', 'startTrack', 'ramps', 'errors', 'queued', 'ramp', `
     let playbackGeneration = 7, pendingPlaybackIntent = null;
     let queuedSkipRequest = queued ? { nativeGeneration: 42 } : null;
+    const invalidateQueuedSkip = () => { queuedSkipRequest = null; };
     const TRANSPORT_DECLICK_MS = 10;
     const window = { spcBoySB2: { nativePlaybackRestoreQueuedSkipGain: async r => { ramps.push(r); await ramp(); } } };
     const beginPlaybackIntent = () => (pendingPlaybackIntent = {});

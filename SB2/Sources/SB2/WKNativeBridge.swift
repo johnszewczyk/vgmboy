@@ -244,6 +244,9 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             queuedFadeStart: (...args) => request("queuedFadeStart", args),
             queuedFadeRampReady: (...args) => request("queuedFadeRampReady", args),
             queuedFadeCancel: (...args) => request("queuedFadeCancel", args),
+            queuedSkipBegin: (...args) => request("queuedSkipBegin", args),
+            queuedSkipClaim: (...args) => request("queuedSkipClaim", args),
+            queuedSkipCancel: (...args) => request("queuedSkipCancel", args),
             favoritesList: (...args) => request("favoritesList", args),
             favoritesToggle: (...args) => request("favoritesToggle", args),
             favoritesRevision: () => request("favoritesRevision"),
@@ -324,6 +327,16 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
 
         // These transitions must run in WebKit receipt order, before detached
         // bridge work can reorder a start, acknowledgement, or cancellation.
+        if ["queuedSkipBegin", "queuedSkipClaim", "queuedSkipCancel"].contains(method) {
+            guard let payload = args.first as? [String: Any], let token = payload["token"] as? String,
+                  !token.isEmpty else {
+                Task { await Self.reply(to: message.webView, id: id, success: false, valueJSON: Self.json(["message": BridgeError.invalidArguments.localizedDescription])) }
+                return
+            }
+            let accepted = WKPlaybackBridge.shared.queuedSkipLifecycle(method, token: token)
+            Task { await Self.reply(to: message.webView, id: id, success: true, valueJSON: accepted ? "true" : "false") }
+            return
+        }
         if ["queuedFadeStart", "queuedFadeRampReady", "queuedFadeCancel"].contains(method) {
             guard let payload = args.first as? [String: Any], let token = payload["token"] as? String,
                   !token.isEmpty else {

@@ -142,6 +142,33 @@ private final class StatusRecorder: @unchecked Sendable {
     #expect(transport.statusSync().trackLoaded)
 }
 
+@Test func queuedSkipStartRequiresCurrentLifecycleToken() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.queued-skip.lifecycle-start")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    func start(_ id: String, token: String? = nil) throws {
+        let request = PlaybackTransportStartRequest(trackID: id, sourcePath: url.path, queuedSkipToken: token)
+        let decoded = try JSONDecoder().decode(PlaybackTransportStartRequest.self, from: JSONEncoder().encode(request))
+        #expect(decoded == request)
+        try transport.start(decoded.continuationStart(requestID: transport.reservePlaybackRequest()))
+    }
+    try start("old")
+    #expect(transport.queuedSkipLifecycle.begin("first"))
+    #expect(transport.queuedSkipLifecycle.claim("first"))
+    #expect(transport.queuedSkipLifecycle.begin("second"))
+    #expect(throws: CancellationError.self) { try start("stale", token: "first") }
+    #expect(transport.statusSync().currentTrackID == "old")
+    #expect(transport.queuedSkipLifecycle.cancel("second"))
+    #expect(throws: CancellationError.self) { try start("canceled", token: "second") }
+    #expect(transport.statusSync().currentTrackID == "old")
+    #expect(transport.queuedSkipLifecycle.begin("third"))
+    #expect(transport.queuedSkipLifecycle.claim("third"))
+    try start("accepted", token: "third")
+    #expect(transport.statusSync().currentTrackID == "accepted")
+}
+
 @Test func invalidFadeDurationsLeavePlaybackIntact() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
