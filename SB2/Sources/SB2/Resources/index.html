@@ -147,6 +147,11 @@
         <div class="sb-status-sidebar"><span id="sidebar-stats" class="sb-sidebar-stats" role="status" aria-live="polite" aria-atomic="true" aria-label="Library statistics">Loading library</span></div><div class="sb-status-divider"></div>
         <div class="sb-status-content">
           <span class="sb-status-state" data-startup-state="ready"><i></i><span id="sb2-app-status-label">READY</span></span>
+          <div id="sb2-current-track-readout" class="sb-current-track-readout" hidden>
+            <a id="sb2-current-album-link" class="sb-current-album-link" href="#playlist"></a>
+            <span class="sb-current-track-separator" aria-hidden="true"> - </span>
+            <span id="sb2-current-track-title" class="sb-current-track-title"></span>
+          </div>
           <div class="sb-times timing-readout toolbar-control">
             <span id="elapsed-label" class="time-label">0:00</span><span class="time-separator">/</span>
             <span id="song-length-label" class="time-label">0:00</span><span class="time-separator">/</span>

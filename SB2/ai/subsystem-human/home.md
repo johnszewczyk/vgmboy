@@ -16,8 +16,10 @@
   is ready. Loading, error, and empty-result messages appear there instead of
   taking over the catalog tree; full details are available in its tooltip.
 - The footer aligns to the sidebar split and shows elapsed time, track length,
-  and playlist length at right. Library totals, playback status, and time values
-  share a centered text baseline.
+  and playlist length at right. Between playback state and the clock, it shows
+  the current album and track; the accent-colored album link opens that album
+  in a playlist tab or returns to its existing tab without interrupting playback.
+  Library totals, playback status, and time values share a centered text baseline.
 - Startup reads the shared CocoaSpice catalog through CatalogReader; ScanSong
   remains its writer.
 - Startup loads Games, Paths, Gallery metadata, and search indexes before
