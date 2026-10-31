@@ -16,6 +16,38 @@ public final class PlaybackController: @unchecked Sendable {
         var loop: PlaybackLoopMetadata?
     }
 
+    /// A prepared source owns its archive lease until it is committed or discarded.
+    public final class PreparedSource: @unchecked Sendable {
+        fileprivate let payload: PlaybackControlPayload
+        fileprivate let sourceData: Data?
+        fileprivate let path: String
+        fileprivate let archiveEntry: String?
+        fileprivate let playablePath: String
+        fileprivate let loop: PlaybackLoopMetadata?
+        private let lock = NSLock()
+        private var materializer: ArchiveMaterializer?
+        private var consumed = false
+
+        fileprivate init(payload: PlaybackControlPayload, sourceData: Data?, path: String,
+                         archiveEntry: String?, playablePath: String, loop: PlaybackLoopMetadata?,
+                         materializer: ArchiveMaterializer?) {
+            self.payload = payload; self.sourceData = sourceData; self.path = path
+            self.archiveEntry = archiveEntry; self.playablePath = playablePath; self.loop = loop
+            self.materializer = materializer
+        }
+
+        fileprivate func takeLease() throws -> ArchiveMaterializer? {
+            lock.lock(); defer { lock.unlock() }
+            guard !consumed else { throw PlaybackControlError.invalidPayload("Prepared source already consumed.") }
+            consumed = true
+            let result = materializer
+            materializer = nil
+            return result
+        }
+
+        deinit { materializer?.release() }
+    }
+
     private let lock = NSLock()
     private let session: PlaybackSession
     private var activeArchiveMaterializer: ArchiveMaterializer?
@@ -262,8 +294,9 @@ public final class PlaybackController: @unchecked Sendable {
         try load(payload, sourceData: nil)
     }
 
-    @discardableResult
-    private func load(_ payload: PlaybackControlPayload, sourceData: Data?, isCurrent: (() -> Bool)? = nil) throws -> PlaybackStatus {
+    /// Prepare archive members and loop metadata without touching the active session.
+    /// Callers may perform this work off their serialized transport queue.
+    public func prepareSource(payload: PlaybackControlPayload, sourceData: Data? = nil) throws -> PreparedSource {
         guard let path = payload.path, !path.isEmpty else {
             throw PlaybackControlError.invalidPayload("Load requires a path.")
         }
@@ -272,7 +305,8 @@ public final class PlaybackController: @unchecked Sendable {
         var uacMember = false
         var uacLoop: PlaybackLoopMetadata?
         var nextArchiveMaterializer: ArchiveMaterializer?
-        defer { nextArchiveMaterializer?.release() }
+        var handedOff = false
+        defer { if !handedOff { nextArchiveMaterializer?.release() } }
         if let archiveEntry, !archiveEntry.isEmpty {
             guard let requirement = FormatRegistry.archiveMaterializationRequirement(for: [archiveEntry]) else {
                 throw PlaybackControlError.invalidPayload("VGMBoy does not admit archive member \(archiveEntry).")
@@ -300,7 +334,7 @@ public final class PlaybackController: @unchecked Sendable {
         guard tempo.isFinite, tempo > 0 else {
             throw PlaybackControlError.invalidPayload("Tempo must be a positive finite value.")
         }
-        guard trackIndex >= 0, let family = FormatRegistry.family(for: playablePath) else {
+        guard trackIndex >= 0, FormatRegistry.family(for: playablePath) != nil else {
             throw PlaybackControlError.invalidPayload("Track index must be non-negative and the file format must be supported.")
         }
         // UAC member metadata is authoritative, including an absent loop.
@@ -309,7 +343,42 @@ public final class PlaybackController: @unchecked Sendable {
         let loop = uacMember ? uacLoop : (payload.loop ?? (sourceData == nil
             ? PlaybackLoopTagReader.read(path: playablePath)
             : PlaybackLoopTagReader.read(data: sourceData ?? Data(), extensionName: URL(fileURLWithPath: playablePath).pathExtension)))
+        let result = PreparedSource(payload: payload, sourceData: sourceData, path: path,
+                                    archiveEntry: archiveEntry, playablePath: playablePath, loop: loop,
+                                    materializer: nextArchiveMaterializer)
+        handedOff = true
+        return result
+    }
+
+    /// Commit a prepared source on the host's serialized transport queue.
+    public func loadPreparedIfCurrent(_ prepared: PreparedSource, isCurrent: @escaping @Sendable () -> Bool) -> PlaybackControlEvent {
+        do {
+            try commitPrepared(prepared, isCurrent: isCurrent)
+            let event = PlaybackControlEvent(kind: .response, status: session.status())
+            emit(event)
+            return event
+        } catch {
+            let event = PlaybackControlEvent(kind: .error, status: session.status(), message: error.localizedDescription)
+            emit(event)
+            return event
+        }
+    }
+
+    @discardableResult
+    private func load(_ payload: PlaybackControlPayload, sourceData: Data?, isCurrent: (() -> Bool)? = nil) throws -> PlaybackStatus {
+        let prepared = try prepareSource(payload: payload, sourceData: sourceData)
+        return try commitPrepared(prepared, isCurrent: isCurrent)
+    }
+
+    @discardableResult
+    private func commitPrepared(_ prepared: PreparedSource, isCurrent: (() -> Bool)? = nil) throws -> PlaybackStatus {
         guard isCurrent?() ?? true else { throw CancellationError() }
+        let payload = prepared.payload, sourceData = prepared.sourceData
+        let path = prepared.path, archiveEntry = prepared.archiveEntry, playablePath = prepared.playablePath
+        let loop = prepared.loop, trackIndex = payload.trackIndex ?? 0, tempo = payload.tempo ?? 1
+        guard let family = FormatRegistry.family(for: playablePath) else { throw PlaybackControlError.invalidPayload("Unsupported prepared source.") }
+        var nextArchiveMaterializer = try prepared.takeLease()
+        defer { nextArchiveMaterializer?.release() }
         if payload.playbackMode != nil || payload.playMilliseconds != nil || payload.fadeMilliseconds != nil || payload.unknownDurationMilliseconds != nil {
             try configurePlaybackMode(payload, reloadCurrent: false)
         }

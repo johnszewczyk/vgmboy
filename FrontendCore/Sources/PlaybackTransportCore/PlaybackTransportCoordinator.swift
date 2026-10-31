@@ -341,6 +341,8 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
 
     private let controller = PlaybackController()
     private let queue: PlaybackSerialExecutor
+    private let prepareSource: @Sendable (PlaybackController, PlaybackContinuationStart) throws -> PlaybackController.PreparedSource
+    private let preparationSlots = DispatchSemaphore(value: 2)
     private let requestLock = NSLock()
     private var latestPlaybackRequest = 0
     private var settingsRevisionCounter = 0
@@ -367,8 +369,15 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     private let continuationCoordinator = PlaybackContinuationCoordinator()
     private let controlSurface: PlaybackControlSurface
 
-    public init(label: String) {
+    public convenience init(label: String) {
+        self.init(label: label) { controller, start in
+            try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+        }
+    }
+
+    init(label: String, prepareSource: @escaping @Sendable (PlaybackController, PlaybackContinuationStart) throws -> PlaybackController.PreparedSource) {
         queue = PlaybackSerialExecutor(label: label, qos: .userInitiated)
+        self.prepareSource = prepareSource
         controlSurface = controller.controlSurface
         _ = controller.subscribe { [weak self] event in
             guard let self, let status = event.status else { return }
@@ -669,8 +678,12 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     /// request retains archive/member identity so VGMBoy prepares the source
     /// before its serialized native load/play operation.
     public func startContinuation(_ start: PlaybackContinuationStart) async throws {
+        try await run { try self.validateStartLocked(start) }
+        let prepared = try await Task.detached(priority: .userInitiated) {
+            try self.prepareOutsideTransport(start)
+        }.value
         try await run {
-            try self.startContinuationLocked(start)
+            try self.startContinuationLocked(start, prepared: prepared)
         }
     }
 
@@ -678,8 +691,10 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     /// the same serialized start sequence as async frontends and preserves the
     /// frontend's stable track ID for status and completion publication.
     public func start(_ start: PlaybackContinuationStart) throws {
+        try queue.sync { try self.validateStartLocked(start) }
+        let prepared = try prepareOutsideTransport(start)
         try queue.sync {
-            try self.startContinuationLocked(start)
+            try self.startContinuationLocked(start, prepared: prepared)
         }
     }
 
@@ -705,15 +720,37 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         }
     }
 
-    private func startContinuationLocked(_ start: PlaybackContinuationStart) throws {
-        let isCurrent: @Sendable () -> Bool = {
-            self.isLatest(start.requestID) && (start.queuedSkipToken.map { self.queuedSkipLifecycle.isCurrent($0) } ?? true)
-        }
-        guard isCurrent() else { throw CancellationError() }
+    private func validateStartLocked(_ start: PlaybackContinuationStart) throws {
+        guard isLatest(start.requestID),
+              start.queuedSkipToken.map({ queuedSkipLifecycle.isCurrent($0) }) ?? true else { throw CancellationError() }
         if let expected = start.expectedPreviousGeneration {
             guard expected > 0, expected == currentPlaybackGeneration else { throw CancellationError() }
         }
-        let event = controller.loadIfCurrent(payload: start.payload, sourceData: start.track.sourceData) {
+    }
+
+    private func prepareOutsideTransport(_ start: PlaybackContinuationStart) throws -> PlaybackController.PreparedSource {
+        preparationSlots.wait()
+        defer { preparationSlots.signal() }
+        let isCurrent = {
+            self.isLatest(start.requestID) && (start.queuedSkipToken.map { self.queuedSkipLifecycle.isCurrent($0) } ?? true)
+        }
+        guard isCurrent() else { throw CancellationError() }
+        do {
+            let prepared = try prepareSource(controller, start)
+            guard isCurrent() else { throw CancellationError() }
+            return prepared
+        } catch {
+            guard isCurrent() else { throw CancellationError() }
+            throw error
+        }
+    }
+
+    private func startContinuationLocked(_ start: PlaybackContinuationStart, prepared: PlaybackController.PreparedSource) throws {
+        let isCurrent: @Sendable () -> Bool = {
+            self.isLatest(start.requestID) && (start.queuedSkipToken.map { self.queuedSkipLifecycle.isCurrent($0) } ?? true)
+        }
+        try validateStartLocked(start)
+        let event = controller.loadPreparedIfCurrent(prepared) {
             isCurrent() && (start.expectedPreviousGeneration == nil
                 || start.expectedPreviousGeneration == self.currentPlaybackGeneration)
         }

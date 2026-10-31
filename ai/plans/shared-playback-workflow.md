@@ -19,8 +19,8 @@ The remaining work is grouped by the current SB2-first scope:
    checks now cover a successful delayed replacement and newer Stop/Previous;
    broader old-end delivery and other start/stop races remain. Check output gain
    and audible behavior as well as track identity, queue, history and clock.
-   A forced slow-preparation check exposed delayed Pause; investigate moving
-   source preparation off the serialized transport queue (checkpoint below).
+   Typed SB2 starts now prepare off the transport queue; the instrumented Pause
+   regression passes. Audit remaining legacy preparation paths (checkpoint below).
 2. Assess what remains duplicated between SB2's renderer and shared transport,
    especially queued-fade lifecycle and cancellation. Move UI-neutral ownership
    to FrontendCore where its contract can preserve the existing queue behavior;
@@ -137,6 +137,19 @@ materializer lease and authoritative UAC metadata until acceptance, rechecking
 request/token/generation immediately before replacement, and releasing failed or
 superseded preparations without retiring the old session. Cover overlapping
 preparations, Stop/Pause/seek and old-end behavior before adopting the change.
+
+Typed-start preparation pass: VGMBoy now prepares source and authoritative loop
+metadata into a single-use lease without touching the current session. The shared
+coordinator prepares outside its transport queue, limits concurrent preparations
+to two and rechecks request, queued token and native generation before commit.
+Focused tests cover Pause, overlapping starts, bounded preparations, one-shot
+prepared sources and superseded failures. The full shared transport suite and
+the read-only SOTN UAC paused-loop check passed. An isolated SB2 build based on
+`f0d5411e` plus the task patch repeated the 15-second injected delay above:
+Pause reported `test-One` paused while preparation was still pending, and the
+same session remained paused after preparation returned. This is UI/status
+evidence, not an audible continuity measurement. Legacy `play`, direct control
+and reconfiguration paths still require audit for the same responsiveness issue.
 
 ### Packaged SB2 old-end/failed replacement checkpoint, 2026-10-31
 
