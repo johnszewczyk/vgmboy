@@ -133,6 +133,12 @@ private final class StatusRecorder: @unchecked Sendable {
     #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
     #expect(transport.queuedSkipDecisionSync(decoded) == nil)
     #expect(transport.queuedSkipDecisionSync(explicit) == nil)
+    #expect(transport.queuedSkipDecisionSync(claimed) == nil)
+    let replacementGeneration = transport.statusSync().generation
+    let replacementClaim = PlaybackQueuedSkipDecisionRequest(expectedGeneration: replacementGeneration,
+                                                              requestID: "skip-1", targetTrackID: "replacement")
+    #expect(transport.queuedSkipDecisionSync(replacementClaim)?.trackID == "replacement")
+    #expect(transport.queuedSkipDecisionSync(replacementClaim) == nil)
     #expect(transport.statusSync().trackLoaded)
 }
 
