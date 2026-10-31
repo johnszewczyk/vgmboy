@@ -82,8 +82,9 @@ claim and cancellation on a lock independent of source preparation. SB2 sends
 ordered lifecycle messages and keeps its renderer guards and fallback; a queued
 start carries the token and rechecks ownership before and after preparation.
 Deterministic tests cover supersession, concurrent claims, canceled starts and
-lost claim replies. Packaged slow-preparation and audible races remain open;
-deferred-end presentation and queue state remain in SB2.
+lost claim replies. The packaged checks below cover two forced slow-preparation
+races; broader packaged and audible races remain open. Deferred-end presentation
+and queue state remain in SB2.
 
 Packaged lifecycle race, 2026-10-31: an isolated instrumented SB2 build from
 `28653980` played generated `one.wav` (SHA-256
