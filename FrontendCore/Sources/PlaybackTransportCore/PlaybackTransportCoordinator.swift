@@ -764,6 +764,8 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         _ = controller.perform(.init(command: .stop))
         currentTrack = nil
         currentPlaybackGeneration = nil
+        queuedSkipClaimGeneration = nil
+        queuedSkipClaims.removeAll()
         currentTrackStartGeneration = nil
         latestSettingsRevision = nil
         naturalEndGate.reset()
@@ -929,6 +931,8 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         case .stop, .shutdown:
             currentTrack = nil
             currentPlaybackGeneration = nil
+            queuedSkipClaimGeneration = nil
+            queuedSkipClaims.removeAll()
             currentTrackStartGeneration = nil
             latestSettingsRevision = nil
             naturalEndGate.reset()
