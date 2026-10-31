@@ -21,6 +21,7 @@ let columnMinimumWidths = new Map();
 let columnMinimumWidthsSignature = null;
 let renderedDatabaseGames = null;
 let databaseVisibleGameIDs = null;
+let databaseGamesByName = new Map();
 let galleryVisibleQuery = null;
 let galleryVisibleGallerySource = null;
 let galleryVisibleDatabaseResults = [];
@@ -556,6 +557,14 @@ function rebuildDatabaseGameSearchIndex(games = state.databaseGames) {
     searchText: String(game.searchText || "")
   }));
   databaseGamesByID = new Map(databaseGameSearchRecords.map(({ game }) => [databaseGameKey(game), game]));
+  databaseGamesByName = new Map();
+  for (const { game } of databaseGameSearchRecords) {
+    const key = normalizeAlbumLookup(game.name);
+    if (!key) continue;
+    const candidates = databaseGamesByName.get(key) || [];
+    candidates.push(game);
+    databaseGamesByName.set(key, candidates);
+  }
   refreshSidebarSearchWorkerIndex("catalog", databaseGameSearchRecords);
 }
 
@@ -5105,7 +5114,90 @@ function updateSB2Titlebar() {
   if (refs.sb2AlbumLabel) {
     refs.sb2AlbumLabel.textContent = String(track?.game || state.playlistTitle || "NO PLAYLIST").toLocaleUpperCase();
   }
+  updateCurrentTrackReadout(uiApp.currentTrack() || state.currentTrackInfo || null);
 }
+
+function normalizeAlbumLookup(value) {
+  return String(value || "").trim().normalize("NFKC").toLocaleLowerCase();
+}
+
+function currentDatabaseGame(track) {
+  const gameName = normalizeAlbumLookup(track?.game);
+  if (!gameName) return null;
+  const candidates = databaseGamesByName.get(gameName) || [];
+  const system = normalizeAlbumLookup(track?.system);
+  let matching = system
+    ? candidates.filter((game) => normalizeAlbumLookup(game.system || "Unknown Console") === system)
+    : candidates;
+  const rootPath = String(track?.rootPath || "");
+  if (rootPath) {
+    const rootMatches = matching.filter((game) => String(game.rootPath || "") === rootPath);
+    if (rootMatches.length === 1) return rootMatches[0];
+    if (rootMatches.length > 1) matching = rootMatches;
+  }
+  return matching.length === 1 ? matching[0] : null;
+}
+
+function updateCurrentTrackReadout(track) {
+  const game = currentDatabaseGame(track);
+  const visible = Boolean(track && game && track.title);
+  if (refs.sb2CurrentTrackReadout) refs.sb2CurrentTrackReadout.hidden = !visible;
+  if (!refs.sb2CurrentAlbumLink || !refs.sb2CurrentTrackTitle) return;
+  if (!visible) {
+    refs.sb2CurrentAlbumLink.textContent = "";
+    refs.sb2CurrentAlbumLink.removeAttribute("aria-label");
+    refs.sb2CurrentTrackTitle.textContent = "";
+    return;
+  }
+  refs.sb2CurrentAlbumLink.textContent = String(track.game || game.name);
+  refs.sb2CurrentAlbumLink.setAttribute("aria-label", "Open album " + game.name);
+  refs.sb2CurrentTrackTitle.textContent = String(track.title);
+}
+
+function playlistContainsAlbumTracks(playlist, albumTrackIDs) {
+  if (!Array.isArray(playlist) || playlist.length !== albumTrackIDs.length) return false;
+  const remaining = new Map();
+  for (const id of albumTrackIDs) remaining.set(id, (remaining.get(id) || 0) + 1);
+  for (const track of playlist) {
+    const count = remaining.get(track?.id) || 0;
+    if (!count) return false;
+    if (count === 1) remaining.delete(track.id);
+    else remaining.set(track.id, count - 1);
+  }
+  return remaining.size === 0;
+}
+
+async function openCurrentAlbumPlaylist() {
+  const track = uiApp.currentTrack() || state.currentTrackInfo || null;
+  if (!track) return false;
+  if (!databaseGamesLoaded) await loadDatabaseGames();
+  const game = currentDatabaseGame(track);
+  if (!game) return false;
+  const response = await window.spcBoySB2.databaseGameTracks([game]);
+  if (response?.stale === true) return false;
+  const albumTracks = databaseRowsToPlaylistTracks(response, { adoptProjection: false });
+  if (!albumTracks.length) return false;
+  const albumTrackIDs = albumTracks.map((entry) => entry.id);
+  const title = String(game.name || track.game || "Album");
+  syncActivePlaylistTab();
+  const existing = state.playlistTabs?.find((tab) =>
+    tab.kind !== "gallery" && playlistContainsAlbumTracks(tab.playlist, albumTrackIDs));
+  if (existing) return existing.id === state.activePlaylistTabId || await activatePlaylistTab(existing.id);
+  const tab = await createPlaylistTab({ duplicateActive: false, title });
+  if (!tab) return false;
+  return loadDatabaseGamesIntoPlaylist([game], {
+    title,
+    targetTabID: tab.id,
+    interactionGeneration: sidebarInteractionGeneration
+  });
+}
+
+refs.sb2CurrentAlbumLink?.addEventListener("click", (event) => {
+  event.preventDefault();
+  void openCurrentAlbumPlaylist().catch((error) => {
+    console.error("[SPCBoy] could not open current album", error);
+  });
+});
 
 async function sampleSB2CPU() {
   if (!refs.sb2CPUValue || !window.spcBoySB2?.processCPUTimeMilliseconds) return;
