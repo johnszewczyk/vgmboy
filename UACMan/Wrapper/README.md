@@ -56,6 +56,35 @@ python3 -B Wrapper/python/uacman.py inspect <new-game>.uac --verify
 python3 -B Wrapper/python/uacman.py unpack <new-game>.uac <new-output-directory>
 ```
 
+### Direct manifest authoring
+
+For a new standalone package, `pack-directives` builds the same validated UAC
+without requiring a recipe file. Repeat `--directive` with a JSON Pointer and
+value. Plain unquoted values are strings; valid JSON values retain their JSON
+type. Arrays can be assigned as JSON or extended with the final `-` segment.
+There is no console-specific tag-name or canonical-identity allowlist; UAC's
+manifest and format validation still applies.
+
+```sh
+python3 -B Wrapper/python/uacman.py pack-directives \
+  <input-directory> <new-game.uac> \
+  --directive /game/id='Mega Man 2' \
+  --directive /game/title='Mega Man 2' \
+  --directive /game/console='Nintendo NES' \
+  --directive /game/canonicalIDs='["No-Intro:<DAT-ID>"]' \
+  --directive '/game/metadata/Region=US' \
+  --directive '/game/metadata/Publisher=Capcom' \
+  --directive '/sources/-={"id":"source-1","collection":"Example","setName":"Example NES","sourceName":"Mega Man 2.zip","observedAt":"2026-10-31T00:00:00Z"}'
+```
+
+The command defaults to one `original` variant. Replace `/variants` with a JSON
+array to customize its declared variant records, then select the matching
+`--variant-id` for the input directory. Use any UAC manifest path for source
+records, transformations, playlists, package metadata, member overrides, or
+extension data. Existing output paths are refused. This command creates only
+a new UAC; it does not index the package in Songbase, assign Museum identity,
+admit it to a managed collection, or write AudioMan operation/set ledgers.
+
 New packages use manifest version 2: a one-variant package stores members at
 their source-relative paths, while packages with multiple variants namespace
 members under `variants/<id>/`. Current readers still open version-1 packages;
