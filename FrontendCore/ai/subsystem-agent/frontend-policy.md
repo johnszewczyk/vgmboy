@@ -65,6 +65,11 @@ startup contracts shared by the VGMMan player frontends.
 - `PlaybackQueueAdjacentRequest` and `PlaybackQueueAdjacentResponse` do the
   same for an explicit user navigation gesture. A renderer supplies IDs,
   direction, and wrapping preference; it does not compute the anchor or target.
+- `PlaybackQueuedSkipDecisionRequest` lets the transport check the captured
+  native generation and resolve either an explicit staged target or shared
+  adjacent navigation in one serialized operation. The later guarded start
+  rechecks generation after source preparation; presentation still owns the
+  queued request, staged queue and error display.
 - `PlaybackTransportStartRequest` carries a stable track ID, original
   source/archive reference, selected member, timing, tempo, and seek offset
   into a typed host boundary. The coordinator preserves that identity and

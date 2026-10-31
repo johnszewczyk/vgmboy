@@ -18,8 +18,8 @@ function harness({ fade = async () => {}, start = async () => {}, navigate = asy
     let playbackGeneration = 7, queuedSkipRequest = { generation: 7, nativeGeneration: 42, delta: 1 };
     const TRANSPORT_DECLICK_MS = 10;
     const playbackPlaylist = () => [{ id: 'old' }, { id: 'next' }];
-    const window = { spcBoySB2: { nativePlaybackState: async () => ({ generation: 42 }),
-      playbackQueueAdjacent: request => { events.push(['navigate', request]); return navigate(request); },
+    const window = { spcBoySB2: { nativePlaybackQueuedSkipDecision: request => {
+      events.push(['navigate', request.navigation]); return navigate(request.navigation); },
       nativePlaybackRampGain: async request => events.push(['ramp', request]) } };
     const clearQueuedSkipTimer = () => events.push(['clear']);
     const fadeActiveOutput = (ms, options) => { events.push(['fade', ms, options]); return fade(); };

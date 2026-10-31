@@ -47,6 +47,18 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Shared queued-skip target decision, 2026-10-30: the transport now checks the
+  captured native generation and resolves an explicit target or shared
+  adjacent-queue decision in one serialized call. SB2 still owns its request,
+  staged queue and presentation; the guarded start rechecks the generation
+  before replacement. All 60 shared transport and 68 SB2 playback checks passed
+  and SB2 built under the disk guard. An isolated app built from `ab31e609`
+  plus this change displayed a test-only decision trace: Previous resolved to
+  `test-Two`, history recorded one.wav then two.wav, and the next Previous
+  resolved to the missing ZIP, displayed its error and kept the second track
+  playing with its clock advancing. This does not prove audible gain behavior
+  or force a newer-session race. The disposable checkout was removed.
+
 - Queued replacement generation guard, 2026-10-30: the shared start contract
   can require the previous native generation, and SB2 supplies the generation
   captured by a queued fade. A stale handoff is rejected on the transport

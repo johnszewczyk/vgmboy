@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import VGMBoyKit
+import PlaybackQueueCore
 @testable import PlaybackTransportCore
 
 private final class EndRecorder: @unchecked Sendable {
@@ -106,6 +107,28 @@ private final class StatusRecorder: @unchecked Sendable {
     #expect(retained.isPlaying)
     try start("accepted", expected: newGeneration)
     #expect(transport.statusSync().currentTrackID == "accepted")
+}
+
+@Test func queuedSkipDecisionUsesCurrentSessionAndSharedQueuePolicy() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.queued-skip.decision")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    let loaded = transport.perform(.init(command: .load, payload: .init(path: url.path)))
+    let generation = try #require(loaded.status?.diagnostics.generation)
+    let navigation = PlaybackQueueAdjacentRequest(
+        state: .init(currentTrackID: "first", selectedTrackID: nil, pendingTrackID: nil),
+        playlistIDs: ["first", "second"], direction: .next, wraps: true)
+    let request = PlaybackQueuedSkipDecisionRequest(expectedGeneration: generation, navigation: navigation)
+    let decoded = try JSONDecoder().decode(PlaybackQueuedSkipDecisionRequest.self, from: JSONEncoder().encode(request))
+    #expect(transport.queuedSkipDecisionSync(decoded)?.trackID == "second")
+    let explicit = PlaybackQueuedSkipDecisionRequest(expectedGeneration: generation, targetTrackID: "staged")
+    #expect(transport.queuedSkipDecisionSync(explicit)?.trackID == "staged")
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    #expect(transport.queuedSkipDecisionSync(decoded) == nil)
+    #expect(transport.queuedSkipDecisionSync(explicit) == nil)
+    #expect(transport.statusSync().trackLoaded)
 }
 
 @Test func invalidFadeDurationsLeavePlaybackIntact() async throws {
