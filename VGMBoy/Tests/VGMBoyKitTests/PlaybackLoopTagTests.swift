@@ -42,3 +42,15 @@ private func taggedFLAC(_ comments: [String]) -> Data {
     let data = taggedFLAC(["LOOP_START=9223372036854775800", "LOOP_LENGTH=100"])
     #expect(PlaybackLoopTagReader.read(data: data, extensionName: "flac") == nil)
 }
+
+@Test func decodedLoopValuesRejectNegativeFieldsAndSaturateLength() throws {
+    let extreme = Data("""
+        {"startSample":-9223372036854775808,"endSample":9223372036854775807,
+         "sampleRateHz":44100,"mode":"forward","repeatCount":1}
+        """.utf8)
+    let value = try JSONDecoder().decode(PlaybackLoopMetadata.self, from: extreme)
+    #expect(!value.isValid)
+    #expect(value.lengthSamples == Int64.max)
+    let negativeRepeats = PlaybackLoopMetadata(startSample: 0, endSample: 1, sampleRateHz: 44_100, repeatCount: -1)
+    #expect(!negativeRepeats.isValid)
+}

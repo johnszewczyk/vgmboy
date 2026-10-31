@@ -27,10 +27,15 @@ public struct PlaybackLoopMetadata: Codable, Equatable, Sendable {
     }
 
     public var isValid: Bool {
-        endSample > startSample && sampleRateHz > 0 && mode.lowercased() == "forward"
+        startSample >= 0 && endSample > startSample && sampleRateHz > 0
+            && (repeatCount.map { $0 >= 0 } ?? true) && mode.lowercased() == "forward"
     }
 
-    public var lengthSamples: Int64 { max(0, endSample - startSample) }
+    public var lengthSamples: Int64 {
+        guard endSample > startSample else { return 0 }
+        let result = endSample.subtractingReportingOverflow(startSample)
+        return result.overflow ? Int64.max : result.partialValue
+    }
 }
 
 /// Shared sample-boundary reader for live playback and finite offline export.

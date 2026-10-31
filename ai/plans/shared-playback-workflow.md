@@ -47,6 +47,24 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Packaged SB2 UAC follow-up, 2026-10-30: the isolated debug app built from
+  `bb7d70c5` used temporary state, test-only seek/export controls and a playlist
+  containing the generated loop UAC and the read-only SOTN XA package. SOTN
+  playback continued from 2:20 to 2:26 after a 140.1-second seek across the
+  authored loop boundary, with the same selected/current track and native
+  playing state. The generated loop UAC exported through the SB2 bridge to an
+  isolated AAC file; ffprobe reported 1.161183 seconds and its SHA-256 was
+  `68c527b47e776ef74ede5ebf42860c7b09c261b360163944cec34249175aab1e`.
+  This supersedes the earlier inconclusive attempt below. The controls and
+  state trace were test-only, the app predated the exact-EOF follow-up, and
+  neither result proves audible continuity or every frontend interaction.
+
+- Loop value validation, 2026-10-30: decoded loop values with negative start
+  or repeat count are invalid, and computing a length from extreme decoded
+  values saturates instead of trapping. The VGMBoy suite passed 104 tests with
+  generated and SOTN UAC fixtures; 56 shared transport checks passed and SB2
+  built under the disk guard.
+
 - Exact EOF loop boundary, 2026-10-30: an injected decoder that marks itself
   ended while returning the final frame exposed a missing repeat at an authored
   loop boundary. Playback and export now share the decision to rewind an ended

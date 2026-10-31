@@ -9,6 +9,8 @@ it. This does not by itself map a position across a tempo change.
 When a decoder reports end on the exact authored loop boundary, playback and
 export rewind if a repetition remains. An end before that boundary is a real
 end and must not fabricate a loop.
+Loop validity requires a nonnegative start and repeat count; computed sample
+lengths saturate if malformed decoded values exceed the integer range.
 
 ## Scope
 
