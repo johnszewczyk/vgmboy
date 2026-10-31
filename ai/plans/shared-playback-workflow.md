@@ -138,7 +138,7 @@ request/token/generation immediately before replacement, and releasing failed or
 superseded preparations without retiring the old session. Cover overlapping
 preparations, Stop/Pause/seek and old-end behavior before adopting the change.
 
-Typed-start preparation pass: VGMBoy now prepares source and authoritative loop
+Shared-start preparation pass: VGMBoy now prepares source and authoritative loop
 metadata into a single-use lease without touching the current session. The shared
 coordinator prepares outside its transport queue, limits concurrent preparations
 to two and rechecks request, queued token and native generation before commit.
@@ -148,8 +148,20 @@ the read-only SOTN UAC paused-loop check passed. An isolated SB2 build based on
 `f0d5411e` plus the task patch repeated the 15-second injected delay above:
 Pause reported `test-One` paused while preparation was still pending, and the
 same session remained paused after preparation returned. This is UI/status
-evidence, not an audible continuity measurement. Legacy `play`, direct control
-and reconfiguration paths still require audit for the same responsiveness issue.
+evidence, not an audible continuity measurement. The legacy `play` entry now uses
+the same continuation transaction; controlled Pause and slow-archive supersession
+checks exercise it. Direct control and reconfiguration paths still require audit
+for the same responsiveness issue.
+
+Legacy `play` pass: the duplicate serialized load sequence was removed, and its
+timing plan is now committed with the shared continuation. A held-preparation
+test confirms Pause can finish before the old preparation is released; the
+slow-archive supersession fixture exercises both typed and legacy entry points.
+The transport suite passed with SOTN enabled (71 discovered, four skipped), and
+SB2 built with the existing linker/WebKit warnings. Under concurrent full-suite
+load, the prior two-second Pause test deadline failed intermittently; its
+scheduling allowance was widened to six seconds while holding preparation for up
+to 20 seconds. The final suite passed, but this is not a live audio latency bound.
 
 ### Packaged SB2 old-end/failed replacement checkpoint, 2026-10-31
 

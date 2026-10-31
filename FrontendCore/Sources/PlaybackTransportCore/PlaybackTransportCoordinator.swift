@@ -451,10 +451,21 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         tempo: PlaybackTempo,
         requestID: Int
     ) async throws {
-        try await run {
-            guard self.isLatest(requestID) else { throw CancellationError() }
-            try self.load(track: track, plan: plan, tempo: tempo, resumeAt: 0, autoplay: true, requestID: requestID)
-        }
+        guard isLatest(requestID) else { throw CancellationError() }
+        let timing = try PlaybackTimingRequest.standard(
+            path: track.archiveEntry ?? track.path,
+            longPlayEnabled: plan.isLongPlay,
+            manualPlayMilliseconds: try timingMilliseconds(plan.preFadeSeconds),
+            fadeMilliseconds: try timingMilliseconds(plan.fadeSeconds),
+            unknownDurationMilliseconds: try timingMilliseconds(plan.unknownDurationSeconds)
+        )
+        let payload = PlaybackControlPayload(
+            path: track.archivePath ?? track.path, archiveEntry: track.archiveEntry,
+            trackIndex: track.trackIndex, tempo: tempo.multiplier, playbackMode: timing.playbackMode,
+            playMilliseconds: timing.playMilliseconds, fadeMilliseconds: timing.fadeMilliseconds,
+            unknownDurationMilliseconds: timing.unknownDurationMilliseconds, loop: track.loop
+        )
+        try await startContinuation(.init(track: track, payload: payload, requestID: requestID), playbackPlan: plan)
     }
 
     public func reconfigureCurrentTrack(plan: PlaybackTimingPlan, tempo: PlaybackTempo) async throws {
@@ -678,12 +689,17 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     /// request retains archive/member identity so VGMBoy prepares the source
     /// before its serialized native load/play operation.
     public func startContinuation(_ start: PlaybackContinuationStart) async throws {
+        try await startContinuation(start, playbackPlan: nil)
+    }
+
+    private func startContinuation(_ start: PlaybackContinuationStart, playbackPlan: PlaybackTimingPlan?) async throws {
         try await run { try self.validateStartLocked(start) }
         let prepared = try await Task.detached(priority: .userInitiated) {
             try self.prepareOutsideTransport(start)
         }.value
         try await run {
             try self.startContinuationLocked(start, prepared: prepared)
+            if let playbackPlan { self.currentPlaybackPlan = playbackPlan }
         }
     }
 
@@ -1009,63 +1025,6 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             throw PlaybackControlError.invalidPayload("Playback timing exceeds the supported millisecond range.")
         }
         return seconds * 1_000
-    }
-
-    private func load(
-        track: PlaybackTransportTrack,
-        plan: PlaybackTimingPlan,
-        tempo: PlaybackTempo,
-        resumeAt: TimeInterval,
-        autoplay: Bool,
-        requestID: Int
-    ) throws {
-        let timing = try PlaybackTimingRequest.standard(
-            path: track.archiveEntry ?? track.path,
-            longPlayEnabled: plan.isLongPlay,
-            manualPlayMilliseconds: try timingMilliseconds(plan.preFadeSeconds),
-            fadeMilliseconds: try timingMilliseconds(plan.fadeSeconds),
-            unknownDurationMilliseconds: try timingMilliseconds(plan.unknownDurationSeconds)
-        )
-        let payload = PlaybackControlPayload(
-            path: track.archivePath ?? track.path,
-            archiveEntry: track.archiveEntry,
-            trackIndex: track.trackIndex,
-            tempo: tempo.multiplier,
-            playbackMode: timing.playbackMode,
-            playMilliseconds: timing.playMilliseconds,
-            fadeMilliseconds: timing.fadeMilliseconds,
-            unknownDurationMilliseconds: timing.unknownDurationMilliseconds,
-            loop: track.loop
-        )
-        let event = controller.loadIfCurrent(payload: payload, sourceData: track.sourceData) {
-            self.isLatest(requestID)
-        }
-        let previousGeneration = currentPlaybackGeneration
-        do {
-            guard isLatest(requestID) else { throw CancellationError() }
-            try requireSuccess(event)
-            naturalEndGate.reset()
-            continuationCoordinator.reset()
-            currentPlaybackGeneration = event.status?.diagnostics.generation
-            if resumeAt > 0 {
-                try requireSuccess(controller.perform(.init(
-                    command: .seek,
-                    payload: .init(positionMilliseconds: Int(resumeAt * 1_000))
-                )))
-            }
-            guard isLatest(requestID) else { throw CancellationError() }
-            if autoplay { try requireSuccess(controller.perform(.init(command: .play))) }
-            guard isLatest(requestID) else { throw CancellationError() }
-        } catch {
-            if event.kind != .error || event.status?.diagnostics.generation != previousGeneration {
-                retirePlaybackLocked()
-            }
-            throw error
-        }
-        currentTrack = track
-        currentPlaybackPlan = plan
-        currentTrackStartGeneration = currentPlaybackGeneration
-        latestSettingsRevision = nil
     }
 
     private func performOutputControl(_ command: PlaybackControlCommand, payload: PlaybackControlPayload) {
