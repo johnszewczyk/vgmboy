@@ -85,6 +85,22 @@ Deterministic tests cover supersession, concurrent claims, canceled starts and
 lost claim replies. Packaged slow-preparation and audible races remain open;
 deferred-end presentation and queue state remain in SB2.
 
+Packaged lifecycle race, 2026-10-31: an isolated instrumented SB2 build from
+`28653980` played generated `one.wav` (SHA-256
+`41c1781c2374272f7b823e0e404d753ebc751cd12bd6d7aba990dd3a29c9d113`).
+A test-only button started a queued replacement from generated `slow-race.zip`
+(SHA-256 `76a53e9d4b541205ac588b0208be65eb0d4033e7a5bb93a7af92687d0515c479`);
+test-only instrumentation marked entry into preparation and delayed it for 15
+seconds. Stop issued during that delay cleared the active token while the old
+track was still playing; after the delay the player was stopped and the delayed
+target was not current. In a second run, Previous issued during the delay
+cleared the token; afterward `test-Two` was playing with no pending request.
+Its generated `two.wav` SHA-256 was
+`78ade8e4a4dd506509179004c76bb2f7cfac2e600f614479864ecff7b75ae255`.
+The isolated checkout and data paths were separate from the user's library;
+the worktree was removed afterward. These instrumented UI/status observations
+do not establish audible continuity, naturally slow sources, or every race.
+
 ### Packaged SB2 old-end/failed replacement checkpoint, 2026-10-31
 
 An isolated, instrumented app built from `32bcf646` used a generated four-second
