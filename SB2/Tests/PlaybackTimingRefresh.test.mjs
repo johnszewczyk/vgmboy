@@ -90,7 +90,8 @@ test('fade requests retain their origin and skip stale restoration', async () =>
   const cancelEnd = source.indexOf('\nasync function playTrackNow(', cancelStart);
   assert.ok(fadeStart >= 0 && fadeEnd > fadeStart && cancelStart >= 0 && cancelEnd > cancelStart);
   const requests = [];
-  const window = { spcBoySB2: { nativePlaybackRampGain: async request => requests.push(request) } };
+  const window = { spcBoySB2: { nativePlaybackRampGain: async request => requests.push(request),
+    nativePlaybackRestoreQueuedSkipGain: async request => requests.push(request) } };
   const run = new Function('window', `
     const state = { nativePlayback: { generation: 42, trackLoaded: true } };
     let queuedSkipRequest = { nativeGeneration: 42 }, nativePlaybackInitialized = true;

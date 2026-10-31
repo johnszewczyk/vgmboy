@@ -169,6 +169,11 @@ private final class StatusRecorder: @unchecked Sendable {
     let currentGeneration = try #require(replacement.status?.diagnostics.generation)
     #expect(oldGeneration != currentGeneration)
     #expect(throws: CancellationError.self) {
+        try transport.restoreQueuedSkipGainSync(.init(expectedGeneration: oldGeneration, rampMilliseconds: 10))
+    }
+    let restored = try transport.restoreQueuedSkipGainSync(.init(expectedGeneration: currentGeneration, rampMilliseconds: 10))
+    #expect(restored.generation == currentGeneration)
+    #expect(throws: CancellationError.self) {
         try transport.rampOutputGainSync(.init(outputGain: 0, rampMilliseconds: 10,
                                                expectedGeneration: oldGeneration))
     }
@@ -188,8 +193,8 @@ private final class StatusRecorder: @unchecked Sendable {
     let loaded = transport.perform(.init(command: .load, payload: .init(path: url.path)))
     let generation = try #require(loaded.status?.diagnostics.generation)
     let oldFade = transport.reserveRampRevision(), restore = transport.reserveRampRevision()
-    _ = try transport.rampOutputGainSync(.init(outputGain: 1, rampMilliseconds: 10,
-                                               expectedGeneration: generation, rampRevision: restore))
+    _ = try transport.restoreQueuedSkipGainSync(.init(expectedGeneration: generation, rampMilliseconds: 10,
+                                                     rampRevision: restore))
     #expect(throws: CancellationError.self) {
         try transport.rampOutputGainSync(.init(outputGain: 0, rampMilliseconds: 5000,
                                                expectedGeneration: generation, rampRevision: oldFade))

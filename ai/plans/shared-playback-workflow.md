@@ -71,6 +71,12 @@ The existing renderer guard and local fallback remain in place. This does not ye
 move supersession, cancellation, deferred ends or gain restoration into shared
 state, and it does not establish packaged or audible race behavior.
 
+Gain-restoration pass: SB2 now requests a shared queued-skip restoration
+instead of choosing the restore gain itself. The shared transport applies full
+gain only to the captured native generation and retains the bridge's ramp
+revision ordering. SB2 still decides when a canceled or failed request needs
+restoration; lifecycle cancellation and deferred ends remain frontend-owned.
+
 ### Packaged SB2 old-end/failed replacement checkpoint, 2026-10-31
 
 An isolated, instrumented app built from `32bcf646` used a generated four-second

@@ -915,7 +915,7 @@ async function cancelQueuedSkip({ restoreOutput = false } = {}) {
       && Number.isSafeInteger(request.nativeGeneration) && request.nativeGeneration > 0
       && Number(state.nativePlayback.generation) === request.nativeGeneration) {
     try {
-      await window.spcBoySB2.nativePlaybackRampGain({ outputGain: 1, rampMilliseconds: TRANSPORT_DECLICK_MS,
+      await window.spcBoySB2.nativePlaybackRestoreQueuedSkipGain({ rampMilliseconds: TRANSPORT_DECLICK_MS,
         expectedGeneration: request.nativeGeneration });
     } catch (error) {
       // A stale or unavailable restore must not block the following control;
@@ -1106,7 +1106,7 @@ function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playba
     if (pendingPlaybackIntent === intent && state.currentTrackId
         && state.nativePlayback?.trackLoaded && restoreGeneration > 0) {
       try {
-        await window.spcBoySB2.nativePlaybackRampGain({ outputGain: 1, rampMilliseconds: TRANSPORT_DECLICK_MS,
+        await window.spcBoySB2.nativePlaybackRestoreQueuedSkipGain({ rampMilliseconds: TRANSPORT_DECLICK_MS,
           expectedGeneration: restoreGeneration });
       } catch {}
     }

@@ -286,6 +286,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
             nativePlaybackSetTempo: (...args) => request("nativePlaybackSetTempo", args),
             nativePlaybackState: (...args) => request("nativePlaybackState", args),
             nativePlaybackRampGain: (...args) => request("nativePlaybackRampGain", args),
+            nativePlaybackRestoreQueuedSkipGain: (...args) => request("nativePlaybackRestoreQueuedSkipGain", args),
             nativePlaybackQueuedSkipDecision: (...args) => request("nativePlaybackQueuedSkipDecision", args),
             setNowPlayingInfo: (...args) => request("setNowPlayingInfo", args),
             nativeExportAAC: (...args) => request("nativeExportAAC", args),
@@ -488,7 +489,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
                   seek["expectedGeneration"] is Int {
             seek["seekRevision"] = WKPlaybackBridge.shared.reserveSeekRevision()
             detachedArguments[0] = seek
-        } else if method == "nativePlaybackRampGain",
+        } else if ["nativePlaybackRampGain", "nativePlaybackRestoreQueuedSkipGain"].contains(method),
                   var ramp = args.first as? [String: Any],
                   ramp["expectedGeneration"] is Int {
             ramp["rampRevision"] = WKPlaybackBridge.shared.reserveRampRevision()
@@ -762,7 +763,7 @@ final class WKNativeBridge: NSObject, WKScriptMessageHandler {
         case "nativePlaybackInit", "nativePlaybackAudioConfig", "nativePlaybackSetEqualizer", "nativePlaybackSetVolume", "nativePlaybackSetMono", "nativePlaybackTiming", "nativePlaybackReconfigure", "nativePlaybackSetTempo", "nativePlaybackStart",
              "nativePlaybackResume", "nativePlaybackPause", "nativePlaybackStop",
              "nativePlaybackClose", "nativePlaybackUnload", "nativePlaybackSeek",
-             "nativePlaybackState", "nativePlaybackRampGain", "nativePlaybackQueuedSkipDecision",
+             "nativePlaybackState", "nativePlaybackRampGain", "nativePlaybackRestoreQueuedSkipGain", "nativePlaybackQueuedSkipDecision",
              "nativeExportAAC", "nativeExportAACCancel":
             return try WKPlaybackBridge.shared.handle(method: method, args: args, requestID: playbackRequestID)
         default:

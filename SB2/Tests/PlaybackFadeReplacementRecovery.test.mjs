@@ -12,7 +12,7 @@ function harness(startTrack, queued = true, ramp = async () => {}) {
     let playbackGeneration = 7, pendingPlaybackIntent = null;
     let queuedSkipRequest = queued ? { nativeGeneration: 42 } : null;
     const TRANSPORT_DECLICK_MS = 10;
-    const window = { spcBoySB2: { nativePlaybackRampGain: async r => { ramps.push(r); await ramp(); } } };
+    const window = { spcBoySB2: { nativePlaybackRestoreQueuedSkipGain: async r => { ramps.push(r); await ramp(); } } };
     const beginPlaybackIntent = () => (pendingPlaybackIntent = {});
     const finishPlaybackIntent = async intent => { if (pendingPlaybackIntent === intent) pendingPlaybackIntent = null; };
     const clearPlaybackError = () => {}, clearQueuedSkipTimer = () => {}, showPlaybackError = error => errors.push(error.message);
@@ -27,7 +27,7 @@ function harness(startTrack, queued = true, ramp = async () => {}) {
 test('selection replacing a queued fade restores the retained session on failure', async () => {
   const run = harness(async () => { throw new Error('missing source'); });
   await assert.rejects(run.playTrack('new'), /missing source/);
-  assert.deepEqual(run.ramps, [{ outputGain: 1, rampMilliseconds: 10, expectedGeneration: 42 }]);
+  assert.deepEqual(run.ramps, [{ rampMilliseconds: 10, expectedGeneration: 42 }]);
   assert.deepEqual(run.errors, ['missing source']);
 });
 
