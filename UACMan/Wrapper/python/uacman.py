@@ -903,11 +903,8 @@ def apply_contained_container_versions(root: Path, recipe: dict) -> None:
                 raise UACError(f"Recipe {key} disagrees with detected container header: {path}")
             metadata[key] = value
 
-def load_recipe(path: Path) -> dict:
-    try:
-        recipe = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as error:
-        raise UACError(f"Cannot read UAC metadata recipe {path}: {error}") from error
+def normalize_recipe_document(recipe: object) -> dict:
+    """Validate a recipe object supplied by a file or direct manifest directives."""
     if not isinstance(recipe, dict):
         raise UACError("Metadata recipe must be a JSON object.")
     required = ("game", "variants")
@@ -929,6 +926,104 @@ def load_recipe(path: Path) -> dict:
     if not isinstance(recipe["memberOverrides"], dict):
         raise UACError("Recipe memberOverrides must be an object keyed by input-relative path.")
     return normalize_recipe(recipe)
+
+
+def load_recipe(path: Path) -> dict:
+    try:
+        recipe = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise UACError(f"Cannot read UAC metadata recipe {path}: {error}") from error
+    return normalize_recipe_document(recipe)
+
+
+def parse_manifest_directive(value: str) -> tuple[str, object]:
+    """Parse JSON-Pointer=VALUE; plain unquoted values remain strings."""
+    pointer, separator, raw_value = value.partition("=")
+    if not separator or not pointer.startswith("/"):
+        raise argparse.ArgumentTypeError("expected /JSON/Pointer=VALUE")
+    if re.search(r"~(?![01])", pointer):
+        raise argparse.ArgumentTypeError("JSON Pointer escapes must use ~0 or ~1")
+    try:
+        decoded = json.loads(raw_value)
+    except json.JSONDecodeError:
+        decoded = raw_value
+    return pointer, decoded
+
+
+def _pointer_container(next_segment: str) -> object:
+    return [] if next_segment == "-" or next_segment.isdecimal() else {}
+
+
+def apply_manifest_directive(document: dict, pointer: str, value: object) -> None:
+    """Apply one unrestricted JSON Pointer assignment to a recipe document."""
+    segments = [segment.replace("~1", "/").replace("~0", "~") for segment in pointer[1:].split("/")]
+    if not segments or any(segment == "" for segment in segments):
+        raise UACError(f"Directive has an empty JSON Pointer segment: {pointer}")
+    current: object = document
+    for index, segment in enumerate(segments):
+        final = index == len(segments) - 1
+        next_segment = None if final else segments[index + 1]
+        if isinstance(current, dict):
+            if final:
+                current[segment] = value
+                return
+            if segment not in current:
+                current[segment] = [] if next_segment == "-" else {}
+            child = current[segment]
+            if not isinstance(child, (dict, list)):
+                raise UACError(f"Directive crosses a scalar at {pointer}")
+            current = child
+            continue
+        if isinstance(current, list):
+            if segment == "-":
+                if final:
+                    current.append(value)
+                    return
+                child = _pointer_container(next_segment or "")
+                current.append(child)
+                current = child
+                continue
+            if not re.fullmatch(r"0|[1-9][0-9]*", segment):
+                raise UACError(f"Directive has an invalid array index at {pointer}")
+            array_index = int(segment)
+            if array_index > len(current):
+                raise UACError(f"Directive array index is out of range at {pointer}")
+            if final:
+                if array_index == len(current):
+                    current.append(value)
+                else:
+                    current[array_index] = value
+                return
+            if array_index == len(current):
+                current.append(_pointer_container(next_segment or ""))
+            child = current[array_index]
+            if not isinstance(child, (dict, list)):
+                raise UACError(f"Directive crosses a scalar at {pointer}")
+            current = child
+            continue
+        raise UACError(f"Directive crosses a scalar at {pointer}")
+    raise UACError(f"Directive did not set a value: {pointer}")
+
+
+def pack_from_directives(args: argparse.Namespace) -> tuple[int, int, list[str], list[tuple[str, int, int]]]:
+    """Build a new UAC from free-form UAC manifest directives."""
+    recipe: dict = {
+        "game": {},
+        "variants": [{"id": "original", "label": "Original", "kind": "original"}],
+        "sources": [],
+        "transformations": [],
+        "playlists": [],
+        "extensions": {},
+        "memberOverrides": {},
+    }
+    seen: set[str] = set()
+    for pointer, value in args.directive or []:
+        if pointer in seen:
+            raise UACError(f"Repeated directive path: {pointer}")
+        seen.add(pointer)
+        apply_manifest_directive(recipe, pointer, value)
+    args.recipe = normalize_recipe_document(recipe)
+    return pack(args)
 
 
 def harvest_spc_metadata(
@@ -2685,7 +2780,7 @@ def parser() -> argparse.ArgumentParser:
     pack_parser.add_argument("recipe", help="JSON file with game, variants, source, and optional playlist metadata.")
     pack_parser.add_argument("output", help="New .uac path; existing files are never overwritten.")
     pack_parser.add_argument("--variant-id", default="original")
-    pack_parser.add_argument("--level", type=int, default=3, help="Zstandard level 0-22 (default: 3; 20-22 use --ultra).")
+    pack_parser.add_argument("--level", type=int, default=3, help="Zstandard level 0-22 (default: 3; 20-22 enable ultra mode).")
     pack_parser.add_argument("--frame-size", type=int, default=4194304, help="Maximum seek frame size in bytes (default: 4 MiB; limit: 64 MiB).")
     pack_parser.add_argument("--include-macos-sidecars", action="store_true", help="Include .DS_Store and AppleDouble files intentionally.")
     pack_parser.add_argument(
@@ -2705,6 +2800,57 @@ def parser() -> argparse.ArgumentParser:
         ),
     )
     pack_parser.set_defaults(run=pack)
+
+    direct_pack_parser = commands.add_parser(
+        "pack-directives",
+        help="Pack a new UAC from unrestricted manifest directives without a recipe file.",
+        description=(
+            "Set any UAC manifest field with a JSON Pointer directive. Tag names and values are not "
+            "restricted by console-specific allowlists; the UAC manifest and format validators still apply."
+        ),
+    )
+    direct_pack_parser.add_argument("input_dir", help="Directory containing one variant's original members.")
+    direct_pack_parser.add_argument("output", help="New .uac path; existing files are never overwritten.")
+    direct_pack_parser.add_argument(
+        "--directive",
+        action="append",
+        type=parse_manifest_directive,
+        default=[],
+        metavar="/JSON/POINTER=VALUE",
+        help=(
+            "Set one manifest value; repeat for more fields. Plain values are strings, valid JSON values "
+            "retain their JSON type, and /array/- appends an item."
+        ),
+    )
+    direct_pack_parser.add_argument("--variant-id", default="original")
+    direct_pack_parser.add_argument(
+        "--level", type=int, default=3,
+        help="Zstandard level 0-22 (default: 3; 20-22 enable ultra mode).",
+    )
+    direct_pack_parser.add_argument(
+        "--frame-size", type=int, default=4194304,
+        help="Maximum seek frame size in bytes (default: 4 MiB; limit: 64 MiB).",
+    )
+    direct_pack_parser.add_argument(
+        "--include-macos-sidecars", action="store_true",
+        help="Include .DS_Store and AppleDouble files intentionally.",
+    )
+    direct_pack_parser.add_argument(
+        "--harvest-spc-metadata",
+        metavar="UACMAN_METADATA_CLI",
+        help="Required for .spc input; project source tags and source-timed Play Length (ms) through MetaManCore.",
+    )
+    direct_pack_parser.add_argument(
+        "--harvest-format-metadata",
+        action="append",
+        nargs=2,
+        metavar=("EXTENSION", "UACMAN_METADATA_CLI"),
+        help=(
+            "Read a MetaMan-supported format before writing the manifest; track-aware results become ordered "
+            "subsong playlist entries; may be repeated for different extensions."
+        ),
+    )
+    direct_pack_parser.set_defaults(run=pack_from_directives)
 
     inspect_parser = commands.add_parser("inspect", help="Read UAC metadata and optionally verify its full payload.")
     inspect_parser.add_argument("container")
