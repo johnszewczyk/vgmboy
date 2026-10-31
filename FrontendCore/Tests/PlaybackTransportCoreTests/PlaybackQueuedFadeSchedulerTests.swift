@@ -50,3 +50,16 @@ private final class FadeClock: @unchecked Sendable {
     scheduler.cancel(token: "cancel"); scheduler.rampReady(token: "cancel"); clock.run(2)
     #expect(clock.finished == ["new"])
 }
+
+@Test func queuedFadeSchedulerHandlesDeadlineFiringDuringRegistration() {
+    let clock = FadeClock()
+    let scheduler = PlaybackQueuedFadeScheduler { _, work in
+        work()
+        return {}
+    }
+    #expect(scheduler.start(token: "immediate", durationMilliseconds: 1, fallbackMilliseconds: 2,
+                            completion: clock.complete))
+    scheduler.rampReady(token: "immediate")
+    scheduler.cancel(token: "immediate")
+    #expect(clock.finished == ["immediate"])
+}
