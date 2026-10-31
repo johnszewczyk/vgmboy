@@ -1235,19 +1235,31 @@ function sidebarSelectionTarget() {
   return null;
 }
 
-function syncSidebarSelectionRowClass(target = sidebarSelectionTarget()) {
-  for (const previous of [selectedBrowserButton, selectedDatabaseSidebarButton]) {
+function syncSidebarSelectionRowClass(target = sidebarSelectionTarget(), { forceInteraction = false } = {}) {
+  const previousTargets = [selectedBrowserButton, selectedDatabaseSidebarButton].filter(Boolean);
+  for (const previous of previousTargets) {
     if (!previous || previous === target) continue;
     previous.classList.remove("is-selected");
     if (previous.hasAttribute("aria-selected")) previous.setAttribute("aria-selected", "false");
+    previous.removeAttribute("aria-current");
   }
   target?.classList.add("is-selected");
+  if (target) target.setAttribute("aria-current", target.classList.contains("tree-node") ? "location" : "true");
   selectedBrowserButton = target?.classList.contains("tree-node") ? target : null;
   selectedDatabaseSidebarButton = target?.classList.contains("database-game-row")
     || target?.classList.contains("database-console-row") ? target : null;
   if (isAvailableInteractionTarget(target)) {
-    selectedInteractionTarget = target;
-    positionInteractionIndicator(currentInteractionTarget());
+    const interactionTargetIsSidebar = selectedInteractionTarget instanceof Element
+      && selectedInteractionTarget.matches(".tree-node, .database-game-row, .database-console-row");
+    if (forceInteraction || !isAvailableInteractionTarget(selectedInteractionTarget) || interactionTargetIsSidebar) {
+      selectedInteractionTarget = target;
+      positionInteractionIndicator(currentInteractionTarget());
+    }
+  } else if (previousTargets.includes(selectedInteractionTarget)
+      || (selectedInteractionTarget instanceof Element
+        && selectedInteractionTarget.matches(".tree-node, .database-game-row, .database-console-row"))) {
+    selectedInteractionTarget = null;
+    syncInteractionSelectionTarget();
   } else if (!isAvailableInteractionTarget(selectedInteractionTarget)) {
     syncInteractionSelectionTarget();
   }
@@ -1941,7 +1953,7 @@ function selectDatabaseSidebarRow(button, { focus = true, preview = false } = {}
     }
   }
 
-  syncSidebarSelectionRowClass(button);
+  syncSidebarSelectionRowClass(button, { forceInteraction: true });
   if (focus) button.focus();
   persistSettings();
 
@@ -3265,13 +3277,7 @@ function syncAnimatedRanges() {
 }
 
 function syncTreeSelection() {
-  if (selectedBrowserButton?.dataset.browserPath !== state.selectedBrowserPath) {
-    selectedBrowserButton?.classList.remove("is-selected");
-    selectedBrowserButton = state.selectedBrowserPath
-      ? refs.treeRoot.querySelector(`[data-browser-path="${CSS.escape(state.selectedBrowserPath)}"]`)
-      : null;
-    selectedBrowserButton?.classList.add("is-selected");
-  }
+  syncSidebarSelectionRowClass();
   scrollSelectedBrowserItemIntoView();
 }
 
@@ -3947,7 +3953,10 @@ function playlistSelectedIDs() {
 function updatePlaylistRowState(row, trackId) {
   if (!row) return;
   row.classList.toggle("is-selected", playlistSelectedIDs().has(trackId));
-  row.classList.toggle("is-current", state.activePlaylistTabId === state.playbackTabId && state.currentTrackId === trackId);
+  const isCurrent = state.activePlaylistTabId === state.playbackTabId && state.currentTrackId === trackId;
+  row.classList.toggle("is-current", isCurrent);
+  if (isCurrent) row.setAttribute("aria-current", "true");
+  else row.removeAttribute("aria-current");
 }
 
 function selectPlaylistTrack(trackId, { focus = false, extend = false, range = false } = {}) {
@@ -4100,6 +4109,7 @@ function createPlaylistRow(track, rowIndex) {
   row.setAttribute("aria-label", `${track.title || track.filename || "Track"}`);
   const isCurrent = state.activePlaylistTabId === state.playbackTabId && state.currentTrackId === track.id;
   row.className = `playlist-row${playlistSelectedIDs().has(track.id) ? " is-selected" : ""}${isCurrent ? " is-current" : ""}`;
+  if (isCurrent) row.setAttribute("aria-current", "true");
 
   for (const column of orderedColumns()) {
     row.appendChild(renderPlaylistCell(track, column, rowIndex));

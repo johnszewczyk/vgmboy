@@ -2123,6 +2123,16 @@ body.sb2-frontend .database-console-label { font-family: var(--mono-font-family)
 body.sb2-frontend .tree-node:hover,
 body.sb2-frontend .database-game-row:hover,
 body.sb2-frontend .database-console-row:hover { background: #141820; color: #e0e1eb; }
+body.sb2-frontend .tree-node.is-selected,
+body.sb2-frontend .database-game-row.is-selected,
+body.sb2-frontend .database-console-row.is-selected {
+  color: var(--accent);
+  box-shadow: inset 0 -1px rgb(103 199 255 / 50%);
+}
+body.sb2-frontend .playlist-row.is-current > td {
+  color: var(--accent);
+  box-shadow: inset 0 -1px rgb(103 199 255 / 50%);
+}
 body.sb2-frontend .database-game-row {
   gap: 0;
   padding-left: calc(var(--sb-space-050) + 1rem + 2ch);
