@@ -15,9 +15,10 @@ The remaining work is grouped by the current SB2-first scope:
 1. Extend packaged SB2 faded-handoff verification: instrumented builds have
    exercised a queued fade, repeated Next, missing and valid targets, and Stop,
    including the shared-plan bridge. A forced slow failure now covers one
-   old-session end during preparation (see checkpoint below); still exercise a
-   successful replacement and newer start/stop races. Check output gain and audible behavior
-   as well as track identity, queue, history and clock.
+   old-session end during preparation (see checkpoints below). Instrumented
+   checks now cover a successful delayed replacement and newer Stop/Previous;
+   broader old-end delivery and other start/stop races remain. Check output gain
+   and audible behavior as well as track identity, queue, history and clock.
 2. Assess what remains duplicated between SB2's renderer and shared transport,
    especially queued-fade lifecycle and cancellation. Move UI-neutral ownership
    to FrontendCore where its contract can preserve the existing queue behavior;
@@ -101,6 +102,20 @@ Its generated `two.wav` SHA-256 was
 The isolated checkout and data paths were separate from the user's library;
 the worktree was removed afterward. These instrumented UI/status observations
 do not establish audible continuity, naturally slow sources, or every race.
+
+Successful delayed replacement, 2026-10-31: the same isolated build played the
+generated four-second `race-old.wav` (SHA-256
+`ae87c511f9bf31bc9c11c662bf02e5185ff7861ce2f733a0167f1b46ac1815e4`).
+A test-only queued replacement used a 15-second preparation delay and a ZIP
+containing generated 30-second WAV data (ZIP SHA-256
+`5a94c778a3a9b4af4f2ff77a208a31537a7ff3f39789cbcbba07ec6677817168`).
+The UI showed the old track playing when the replacement was pending; after
+the delay it showed `race-slow` playing, no active token or pending intent,
+and continued playing on a later check. The isolated playback history recorded
+the replacement. The test button copied old track display metadata into its
+fixture, so the displayed duration is not valid timing evidence. No native end
+event appeared in the bridge trace in this run; it does not demonstrate delivery
+or handling of an old-session end event, nor audible continuity.
 
 ### Packaged SB2 old-end/failed replacement checkpoint, 2026-10-31
 
