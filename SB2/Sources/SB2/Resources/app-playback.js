@@ -1121,23 +1121,18 @@ async function completeQueuedSkip() {
   request.completing = true;
   const intent = beginPlaybackIntent(request.targetTrackId || null);
   try {
-    const snapshot = await window.spcBoySB2.nativePlaybackState();
-    if (request !== queuedSkipRequest || request.generation !== playbackGeneration) return;
-    if (request.nativeGeneration > 0 && Number(snapshot?.generation) !== request.nativeGeneration) {
-      await cancelQueuedSkip({ restoreOutput: true });
-      return;
-    }
-    let target = request.targetTrackId;
-    if (!target) {
-      const navigation = await window.spcBoySB2.playbackQueueAdjacent({
+    const decision = await window.spcBoySB2.nativePlaybackQueuedSkipDecision({
+      expectedGeneration: request.nativeGeneration > 0 ? request.nativeGeneration : null,
+      targetTrackId: request.targetTrackId || null,
+      navigation: request.targetTrackId ? null : {
         state: { currentTrackId: state.currentTrackId, selectedTrackId: state.selectedTrackId, pendingTrackId: null },
         playlistIds: playbackPlaylist().map(track => track.id),
         direction: request.delta < 0 ? "previous" : "next",
         wraps: true
-      });
-      if (request !== queuedSkipRequest || request.generation !== playbackGeneration) return;
-      target = navigation?.trackId;
-    }
+      }
+    });
+    if (request !== queuedSkipRequest || request.generation !== playbackGeneration) return;
+    const target = decision?.trackId;
     if (!target) {
       await cancelQueuedSkip({ restoreOutput: true });
       return;

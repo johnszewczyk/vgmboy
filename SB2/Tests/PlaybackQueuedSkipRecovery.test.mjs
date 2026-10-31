@@ -11,7 +11,11 @@ function harness({ status = async () => ({ generation: 42 }), navigate = async (
   const events = [], state = { currentTrackId: 'old', selectedTrackId: 'old', nativePlayback: { generation: 42, trackLoaded: true } };
   const run = new Function('state', 'status', 'navigate', 'startTrack', 'events', 'request', `
     let playbackGeneration = 7, queuedSkipRequest = { generation: 7, nativeGeneration: 42, ...request }, queuedSkipTimer = 1;
-    const window = { spcBoySB2: { nativePlaybackState: status, playbackQueueAdjacent: navigate,
+    const window = { spcBoySB2: { nativePlaybackQueuedSkipDecision: async value => {
+      const snapshot = await status();
+      if (value.expectedGeneration && snapshot.generation !== value.expectedGeneration) return null;
+      return value.targetTrackId ? { trackId: value.targetTrackId } : navigate(value.navigation);
+    },
       nativePlaybackRampGain: async value => { events.push(['ramp', value]); } } };
     const TRANSPORT_DECLICK_MS = 10, playbackPlaylist = () => [{ id: 'old' }, { id: 'new' }];
     const beginPlaybackIntent = id => { events.push(['begin', id]); return {}; };

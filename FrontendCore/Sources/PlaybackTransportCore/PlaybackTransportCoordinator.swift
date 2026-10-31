@@ -662,6 +662,20 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         }
     }
 
+    /// Resolve the target only while the captured native session still owns
+    /// playback. The later guarded start rechecks ownership after preparation.
+    public func queuedSkipDecisionSync(_ request: PlaybackQueuedSkipDecisionRequest) -> PlaybackQueueAdjacentResponse? {
+        queue.sync {
+            if let expected = request.expectedGeneration {
+                guard expected > 0, expected == self.currentPlaybackGeneration else { return nil }
+            }
+            if let target = request.targetTrackID, !target.isEmpty {
+                return PlaybackQueueAdjacentResponse(trackID: target)
+            }
+            return request.navigation?.response
+        }
+    }
+
     private func startContinuationLocked(_ start: PlaybackContinuationStart) throws {
         guard isLatest(start.requestID) else { throw CancellationError() }
         if let expected = start.expectedPreviousGeneration {

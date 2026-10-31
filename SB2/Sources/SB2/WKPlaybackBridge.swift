@@ -179,6 +179,12 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 errorMessage: "Playback output ramp requires gain and duration."
             )
             return statusResponse(try transport.rampOutputGainSync(request))
+        case "nativePlaybackQueuedSkipDecision":
+            let request: PlaybackQueuedSkipDecisionRequest = try bridgeRequest(
+                args, errorMessage: "Queued skip requires a valid session and target request."
+            )
+            guard let response = transport.queuedSkipDecisionSync(request) else { return NSNull() }
+            return try bridgeResponse(response)
         case "nativeExportAAC":
             let request: PlaybackTransportAACExportRequest = try bridgeRequest(
                 args,
