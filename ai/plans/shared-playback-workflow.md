@@ -14,8 +14,9 @@ The remaining work is grouped by the current SB2-first scope:
 
 1. Extend packaged SB2 faded-handoff verification: instrumented builds have
    exercised a queued fade, repeated Next, missing and valid targets, and Stop,
-   including the shared-plan bridge. Still exercise old-session end during
-   preparation and newer start/stop races. Check output gain and audible behavior
+   including the shared-plan bridge. A forced slow failure now covers one
+   old-session end during preparation (see checkpoint below); still exercise a
+   successful replacement and newer start/stop races. Check output gain and audible behavior
    as well as track identity, queue, history and clock.
 2. Assess what remains duplicated between SB2's renderer and shared transport,
    especially queued-fade lifecycle and cancellation. Move UI-neutral ownership
@@ -44,6 +45,22 @@ The remaining work is grouped by the current SB2-first scope:
 
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
+
+### Packaged SB2 old-end/failed replacement checkpoint, 2026-10-31
+
+An isolated, instrumented app built from `32bcf646` used a generated four-second
+WAV (`race-old.wav`, SHA-256 `ae87c511f9bf31bc9c11c662bf02e5185ff7861ce2f733a0167f1b46ac1815e4`)
+and an isolated ZIP (`slow-race.zip`, SHA-256
+`76a53e9d4b541205ac588b0208be65eb0d4033e7a5bb93a7af92687d0515c479`).
+Test-only instrumentation delayed the ZIP replacement for five seconds and
+forced preparation to fail. The UI trace first showed the old track playing
+with replacement pending; after the old track ended and the failure returned,
+it showed one native end event, stopped playback, no pending request and the
+original queue intact. The displayed error was the injected failure. The
+temporary worktree was removed; the test did not alter the music collection.
+This is evidence for that forced-failure ordering only, not audible continuity,
+an uninstrumented app, a naturally slow archive, or successful replacement and
+newer-command races.
 
 ## Implementation checkpoint, 2026-10-28
 
