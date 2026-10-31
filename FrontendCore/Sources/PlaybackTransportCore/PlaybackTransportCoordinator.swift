@@ -347,6 +347,8 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     private var statusHandler: StatusHandler?
     private var naturalEndHandler: NaturalEndHandler?
     private var currentPlaybackGeneration: Int?
+    private var queuedSkipClaimGeneration: Int?
+    private var queuedSkipClaims = Set<String>()
     private var currentTrackStartGeneration: Int?
     private var latestSettingsRevision: Int?
     private var latestSeekRevision: Int?
@@ -668,6 +670,14 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         queue.sync {
             if let expected = request.expectedGeneration {
                 guard expected > 0, expected == self.currentPlaybackGeneration else { return nil }
+            }
+            if let requestID = request.requestID {
+                guard !requestID.isEmpty, let generation = request.expectedGeneration else { return nil }
+                if self.queuedSkipClaimGeneration != generation {
+                    self.queuedSkipClaimGeneration = generation
+                    self.queuedSkipClaims.removeAll()
+                }
+                guard self.queuedSkipClaims.insert(requestID).inserted else { return nil }
             }
             if let target = request.targetTrackID, !target.isEmpty {
                 return PlaybackQueueAdjacentResponse(trackID: target)

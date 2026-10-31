@@ -15,6 +15,7 @@ function harness(plan) {
     nativePlayback: { generation: 42 } }, requests = [], scheduled = [], immediate = [];
   const run = new Function('state', 'plan', 'requests', 'scheduled', 'immediate', `
     let playbackGeneration = 0, queuedSkipRequest = null;
+    let queuedSkipSerial = 0; const queuedSkipSession = 'test';
     const TRANSPORT_DECLICK_MS = 10, playbackPlaylist = () => [{ id: 'one' }, { id: 'two' }];
     const currentTrack = () => ({ id: 'one' }), currentOutputBasePlaybackSeconds = () => 30;
     const currentFadeSeconds = () => 6, currentTotalSeconds = () => 36;
