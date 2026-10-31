@@ -39,6 +39,10 @@ startup contracts shared by the VGMMan player frontends.
   and playback start. A superseded preparation preserves the previous session;
   after native replacement begins, cancellation retires its own replacement
   before a newer queued request can begin.
+- A start may carry an expected previous native generation. The coordinator
+  checks it on the serialized transport queue before and after preparation;
+  a queued fade cannot replace a newer session if its captured generation is
+  stale. Omitting the field preserves the existing start contract.
 - Queued status for a retired generation is not published as the current track.
   Snapshot reads are non-emitting so a callback may safely refresh the current
   state without recursively producing another status event.

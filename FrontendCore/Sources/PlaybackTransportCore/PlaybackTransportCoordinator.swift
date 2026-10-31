@@ -42,17 +42,20 @@ public struct PlaybackContinuationStart: Equatable, Sendable {
     public let payload: PlaybackControlPayload
     public let requestID: Int
     public let startMilliseconds: Int
+    public let expectedPreviousGeneration: Int?
 
     public init(
         track: PlaybackTransportTrack,
         payload: PlaybackControlPayload,
         requestID: Int,
-        startMilliseconds: Int = 0
+        startMilliseconds: Int = 0,
+        expectedPreviousGeneration: Int? = nil
     ) {
         self.track = track
         self.payload = payload
         self.requestID = requestID
         self.startMilliseconds = max(0, startMilliseconds)
+        self.expectedPreviousGeneration = expectedPreviousGeneration
     }
 }
 
@@ -73,6 +76,7 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
     public let timedOverride: Bool
     public let unknownDurationMilliseconds: Int
     public let loop: PlaybackLoopMetadata?
+    public let expectedPreviousGeneration: Int?
 
     public init(
         trackID: String,
@@ -87,7 +91,8 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
         longPlayEnabled: Bool = false,
         timedOverride: Bool = false,
         unknownDurationMilliseconds: Int = PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000,
-        loop: PlaybackLoopMetadata? = nil
+        loop: PlaybackLoopMetadata? = nil,
+        expectedPreviousGeneration: Int? = nil
     ) {
         self.trackID = trackID
         self.sourcePath = sourcePath
@@ -102,6 +107,7 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
         self.timedOverride = timedOverride
         self.unknownDurationMilliseconds = max(1_000, unknownDurationMilliseconds)
         self.loop = loop
+        self.expectedPreviousGeneration = expectedPreviousGeneration
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -118,6 +124,7 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
         case timedOverride
         case unknownDurationMilliseconds
         case loop
+        case expectedPreviousGeneration
     }
 
     /// Builds the common transport input while preserving archive/member
@@ -171,7 +178,8 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
                 loop: loop
             ),
             requestID: requestID,
-            startMilliseconds: startMilliseconds
+            startMilliseconds: startMilliseconds,
+            expectedPreviousGeneration: expectedPreviousGeneration
         )
     }
 }
@@ -656,8 +664,12 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
 
     private func startContinuationLocked(_ start: PlaybackContinuationStart) throws {
         guard isLatest(start.requestID) else { throw CancellationError() }
+        if let expected = start.expectedPreviousGeneration {
+            guard expected > 0, expected == currentPlaybackGeneration else { throw CancellationError() }
+        }
         let event = controller.loadIfCurrent(payload: start.payload, sourceData: start.track.sourceData) {
-            self.isLatest(start.requestID)
+            self.isLatest(start.requestID) && (start.expectedPreviousGeneration == nil
+                || start.expectedPreviousGeneration == self.currentPlaybackGeneration)
         }
         do {
             guard isLatest(start.requestID) else { throw CancellationError() }

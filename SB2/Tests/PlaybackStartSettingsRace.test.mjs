@@ -195,3 +195,26 @@ test('a cross-tab start stages the new queue until the handoff', async () => {
   assert.deepEqual(options.pendingQueue, newQueue);
   assert.equal(options.pendingTabId, 'new-tab');
 });
+
+test('queued handoff passes its original native generation through start options', async () => {
+  const wrapperStart = source.indexOf('function playTrack(');
+  const wrapperEnd = source.indexOf('\nasync function completeQueuedSkip()', wrapperStart);
+  const state = { playingPlaylist: [{ id: 'new' }], playlist: [{ id: 'new' }], currentTrackId: 'old', isPlaying: true };
+  let options;
+  const run = new Function('state', 'receive', `
+    let queuedSkipRequest = null, pendingPlaybackIntent = null;
+    const beginPlaybackIntent = () => (pendingPlaybackIntent = {}), finishPlaybackIntent = async () => {};
+    const clearPlaybackError = () => {}, clearQueuedSkipTimer = () => {}, showPlaybackError = () => {};
+    const playTrackNow = async (_, __, value) => receive(value), playTrackWithFadedSkip = playTrackNow;
+    ${source.slice(wrapperStart, wrapperEnd)}
+    return playTrack;
+  `)(state, value => { options = value; });
+  await run('new', 0, true, null, 42);
+  assert.equal(options.expectedPreviousGeneration, 42);
+});
+
+test('queued handoff sends the captured native generation to the bridge', async () => {
+  const run = harness();
+  await run.playTrackNow('one', 0, { expectedPreviousGeneration: 42 });
+  assert.equal(run.calls[0].expectedPreviousGeneration, 42);
+});
