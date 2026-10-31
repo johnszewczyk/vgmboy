@@ -43,19 +43,22 @@ public struct PlaybackContinuationStart: Equatable, Sendable {
     public let requestID: Int
     public let startMilliseconds: Int
     public let expectedPreviousGeneration: Int?
+    public let queuedSkipToken: String?
 
     public init(
         track: PlaybackTransportTrack,
         payload: PlaybackControlPayload,
         requestID: Int,
         startMilliseconds: Int = 0,
-        expectedPreviousGeneration: Int? = nil
+        expectedPreviousGeneration: Int? = nil,
+        queuedSkipToken: String? = nil
     ) {
         self.track = track
         self.payload = payload
         self.requestID = requestID
         self.startMilliseconds = max(0, startMilliseconds)
         self.expectedPreviousGeneration = expectedPreviousGeneration
+        self.queuedSkipToken = queuedSkipToken
     }
 }
 
@@ -77,6 +80,7 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
     public let unknownDurationMilliseconds: Int
     public let loop: PlaybackLoopMetadata?
     public let expectedPreviousGeneration: Int?
+    public let queuedSkipToken: String?
 
     public init(
         trackID: String,
@@ -92,7 +96,8 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
         timedOverride: Bool = false,
         unknownDurationMilliseconds: Int = PlaybackTimingPreferences.defaultUnknownDurationSeconds * 1_000,
         loop: PlaybackLoopMetadata? = nil,
-        expectedPreviousGeneration: Int? = nil
+        expectedPreviousGeneration: Int? = nil,
+        queuedSkipToken: String? = nil
     ) {
         self.trackID = trackID
         self.sourcePath = sourcePath
@@ -108,6 +113,7 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
         self.unknownDurationMilliseconds = max(1_000, unknownDurationMilliseconds)
         self.loop = loop
         self.expectedPreviousGeneration = expectedPreviousGeneration
+        self.queuedSkipToken = queuedSkipToken
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -125,6 +131,7 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
         case unknownDurationMilliseconds
         case loop
         case expectedPreviousGeneration
+        case queuedSkipToken
     }
 
     /// Builds the common transport input while preserving archive/member
@@ -179,7 +186,8 @@ public struct PlaybackTransportStartRequest: Codable, Equatable, Sendable {
             ),
             requestID: requestID,
             startMilliseconds: startMilliseconds,
-            expectedPreviousGeneration: expectedPreviousGeneration
+            expectedPreviousGeneration: expectedPreviousGeneration,
+            queuedSkipToken: queuedSkipToken
         )
     }
 }
@@ -327,6 +335,7 @@ public struct PlaybackNaturalEndGate: Sendable {
 /// presentation stay outside this boundary; shared queue policy is consulted
 /// only for generation-checked completion retirement.
 public final class PlaybackTransportCoordinator: @unchecked Sendable {
+    public let queuedSkipLifecycle = PlaybackQueuedSkipLifecycle()
     public typealias StatusHandler = @Sendable (PlaybackTransportStatus) -> Void
     public typealias NaturalEndHandler = @Sendable (PlaybackTransportStatus) -> Void
 
@@ -697,16 +706,19 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     }
 
     private func startContinuationLocked(_ start: PlaybackContinuationStart) throws {
-        guard isLatest(start.requestID) else { throw CancellationError() }
+        let isCurrent: @Sendable () -> Bool = {
+            self.isLatest(start.requestID) && (start.queuedSkipToken.map { self.queuedSkipLifecycle.isCurrent($0) } ?? true)
+        }
+        guard isCurrent() else { throw CancellationError() }
         if let expected = start.expectedPreviousGeneration {
             guard expected > 0, expected == currentPlaybackGeneration else { throw CancellationError() }
         }
         let event = controller.loadIfCurrent(payload: start.payload, sourceData: start.track.sourceData) {
-            self.isLatest(start.requestID) && (start.expectedPreviousGeneration == nil
+            isCurrent() && (start.expectedPreviousGeneration == nil
                 || start.expectedPreviousGeneration == self.currentPlaybackGeneration)
         }
         do {
-            guard isLatest(start.requestID) else { throw CancellationError() }
+            guard isCurrent() else { throw CancellationError() }
             try requireSuccess(event)
             naturalEndGate.reset()
             continuationCoordinator.reset()
@@ -716,9 +728,9 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
                     payload: .init(positionMilliseconds: start.startMilliseconds)
                 )))
             }
-            guard isLatest(start.requestID) else { throw CancellationError() }
+            guard isCurrent() else { throw CancellationError() }
             try requireSuccess(controller.perform(.init(command: .play)))
-            guard isLatest(start.requestID) else { throw CancellationError() }
+            guard isCurrent() else { throw CancellationError() }
         } catch {
             if event.kind != .error || event.status?.diagnostics.generation != currentPlaybackGeneration {
                 retirePlaybackLocked()

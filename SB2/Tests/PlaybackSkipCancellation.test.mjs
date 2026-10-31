@@ -16,6 +16,7 @@ function harness({ skipGeneration = 42, currentGeneration = 42, restore = async 
   const ramps = [], seeks = [];
   const run = new Function('state', 'restore', 'ramps', 'seeks', `
     let queuedSkipRequest = { nativeGeneration: ${skipGeneration} }, playbackGeneration = 0;
+    const invalidateQueuedSkip = () => { queuedSkipRequest = null; };
     let nativePlaybackInitialized = true;
     const TRANSPORT_DECLICK_MS = 10, activeTrackInfo = () => ({ id: 'one' });
     const clearQueuedSkipTimer = () => {}, updatePlaybackReadout = () => {}, updateNativeDiagnostics = () => {};

@@ -70,6 +70,13 @@ startup contracts shared by the VGMMan player frontends.
   adjacent navigation in one serialized operation. The later guarded start
   rechecks generation after source preparation; presentation still owns the
   queued request, staged queue and error display.
+- `PlaybackQueuedSkipLifecycle` serializes one current queued transition on a
+  separate lock from the transport queue. Unique tokens support supersession,
+  one-shot claims and token-scoped cancellation even while source preparation
+  occupies the transport queue. A queued start may carry the token; the
+  coordinator checks it before and during preparation and before playback.
+  Hosts must deliver begin, claim and cancel in request order and use unique
+  tokens. Staged queues, fallback presentation and errors remain host-owned.
 - `PlaybackTransportStartRequest` carries a stable track ID, original
   source/archive reference, selected member, timing, tempo, and seek offset
   into a typed host boundary. The coordinator preserves that identity and

@@ -17,9 +17,12 @@ function harness({ fade = async () => {}, start = async () => {}, navigate = asy
   const run = new Function('state', 'events', 'fade', 'start', 'navigate', `
     let playbackGeneration = 7, queuedSkipRequest = { generation: 7, nativeGeneration: 42, delta: 1 };
     let queuedSkipSerial = 0; const queuedSkipSession = 'test';
+    let queuedSkipActiveToken = null;
+    const beginQueuedSkip = request => { queuedSkipRequest = request; queuedSkipActiveToken = request.claimId; };
+    const invalidateQueuedSkip = () => { queuedSkipRequest = null; queuedSkipActiveToken = null; };
     const TRANSPORT_DECLICK_MS = 10;
     const playbackPlaylist = () => [{ id: 'old' }, { id: 'next' }];
-    const window = { spcBoySB2: { nativePlaybackQueuedSkipDecision: request => {
+    const window = { spcBoySB2: { queuedSkipClaim: async () => true, nativePlaybackQueuedSkipDecision: request => {
       events.push(['navigate', request.navigation]); return navigate(request.navigation); },
       nativePlaybackRampGain: async request => events.push(['ramp', request]) } };
     const clearQueuedSkipTimer = () => events.push(['clear']);
@@ -42,14 +45,14 @@ test('repeated navigation keeps the session and uses the shared queue decision',
   const navigation = run.events.find(event => event[0] === 'navigate')[1];
   assert.equal(navigation.direction, 'previous');
   assert.equal(navigation.state.currentTrackId, 'old');
-  assert.deepEqual(run.events.find(event => event[0] === 'start'), ['start', 'next', 0, true, null, 42]);
+  assert.deepEqual(run.events.find(event => event[0] === 'start'), ['start', 'next', 0, true, { queuedSkipToken: 'test-1' }, 42]);
   assert.equal(run.events.some(event => event[0].startsWith('unexpected')), false);
 });
 
 test('a failed replacement receives the original generation for recovery', async () => {
   const run = harness({ start: async () => { throw new Error('missing source'); } });
   await assert.rejects(run.playAdjacentNow(1), /missing source/);
-  assert.deepEqual(run.events.find(event => event[0] === 'start'), ['start', 'next', 0, true, null, 42]);
+  assert.deepEqual(run.events.find(event => event[0] === 'start'), ['start', 'next', 0, true, { queuedSkipToken: 'test-1' }, 42]);
   assert.equal(run.state.currentTrackId, 'old');
 });
 

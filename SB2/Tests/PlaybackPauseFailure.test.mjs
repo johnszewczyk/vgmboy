@@ -12,6 +12,7 @@ function harness(pause, ramp = async () => {}) {
   const requests = [];
   const run = new Function('state', 'pause', 'ramp', 'requests', `
     let playbackGeneration = 0, queuedSkipRequest = null, nativePlaybackInitialized = true;
+    let queuedSkipActiveToken = null; const invalidateQueuedSkip = () => {};
     const TRANSPORT_DECLICK_MS = 10, activeTrackInfo = () => ({ id: 'one' });
     const currentNativeGeneration = () => 42, fadeActiveOutput = async () => {};
     const clearQueuedSkipTimer = () => {}, setPlaybackPowerSaveBlocker = async () => {};

@@ -68,6 +68,7 @@ test('stopping shows the selected track timing rather than the manual default', 
   const state = { currentTrackId: 'one', currentTrackInfo: {}, isPlaying: true, elapsedSeconds: 12 };
   const run = new Function('state', `
     let queuedSkipRequest = {}, playbackGeneration = 0, playbackWindow = {};
+    const invalidateQueuedSkip = () => { queuedSkipRequest = null; };
     const cancelPlaybackIntent = () => {};
     const clearQueuedSkipTimer = () => {}, stopAllOutput = async () => {};
     const setPlaybackPowerSaveBlocker = async () => {};
@@ -95,6 +96,7 @@ test('fade requests retain their origin and skip stale restoration', async () =>
   const run = new Function('window', `
     const state = { nativePlayback: { generation: 42, trackLoaded: true } };
     let queuedSkipRequest = { nativeGeneration: 42 }, nativePlaybackInitialized = true;
+    const invalidateQueuedSkip = () => { queuedSkipRequest = null; };
     const TRANSPORT_DECLICK_MS = 10, activeTrackInfo = () => ({});
     const clearQueuedSkipTimer = () => {}, waitForAudioEnvelope = async () => {};
     ${source.slice(fadeStart, fadeEnd)}
@@ -123,6 +125,7 @@ test('pause, resume and seek carry their observed native session', async () => {
     nativePlayback: { generation: 42, trackLoaded: true, transportState: 'playing' } };
   const run = new Function('state', 'window', `
     let playbackGeneration = 0, queuedSkipRequest = null, nativePlaybackInitialized = true;
+    let queuedSkipActiveToken = null; const invalidateQueuedSkip = () => {};
     const TRANSPORT_DECLICK_MS = 10, activeTrackInfo = () => ({ id: 'one' });
     const fadeActiveOutput = async () => {}, clearQueuedSkipTimer = () => {};
     const setPlaybackPowerSaveBlocker = async () => {}, cancelQueuedSkip = async () => {};

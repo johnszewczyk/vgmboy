@@ -19,7 +19,22 @@ let queuedSkipRequest = null;
 let queuedSkipTimer = 0;
 let queuedSkipToken = null;
 let queuedSkipSerial = 0;
+let queuedSkipActiveToken = null;
 const queuedSkipSession = `${Date.now()}-${Math.random()}`;
+
+function beginQueuedSkip(request) {
+  queuedSkipRequest = request;
+  queuedSkipActiveToken = request.claimId;
+  request.lifecycleReady = window.spcBoySB2.queuedSkipBegin({ token: request.claimId });
+  request.lifecycleReady.catch(() => {});
+}
+
+function invalidateQueuedSkip() {
+  queuedSkipRequest = null;
+  const token = queuedSkipActiveToken;
+  queuedSkipActiveToken = null;
+  if (token) void window.spcBoySB2.queuedSkipCancel({ token }).catch(() => {});
+}
 let playbackErrorTimer = 0;
 let playbackWindow = null;
 let playbackClockHandle = 0;
@@ -865,7 +880,7 @@ async function continueAfterPlaybackRetirement({
   updatePlaybackReadout();
   updateNativeDiagnostics();
 
-  queuedSkipRequest = null;
+  invalidateQueuedSkip();
   clearQueuedSkipTimer();
   await stopPlaybackState({ declick: false, nativeAlreadyRetired: true });
 
@@ -884,7 +899,7 @@ async function continueAfterPlaybackRetirement({
 
 async function stopPlaybackState({ declick = true, keepNativeOutput = false, nativeAlreadyRetired = false } = {}) {
   cancelPlaybackIntent();
-  queuedSkipRequest = null;
+  invalidateQueuedSkip();
   clearQueuedSkipTimer();
   const generation = ++playbackGeneration;
   if (!nativeAlreadyRetired) {
@@ -909,7 +924,7 @@ async function stopPlaybackState({ declick = true, keepNativeOutput = false, nat
 
 async function cancelQueuedSkip({ restoreOutput = false } = {}) {
   const request = queuedSkipRequest;
-  queuedSkipRequest = null;
+  invalidateQueuedSkip();
   clearQueuedSkipTimer();
   if (restoreOutput && request && nativePlaybackInitialized && state.nativePlayback?.trackLoaded
       && Number.isSafeInteger(request.nativeGeneration) && request.nativeGeneration > 0
@@ -1004,6 +1019,7 @@ async function playTrackNow(trackId, startSeconds = 0, playbackOptions = null) {
       longPlayEnabled: timingPlan.is_long_play,
       timedOverride: fadeNowSeconds > 0,
       unknownDurationMilliseconds: Math.round(state.unknownDurationSeconds * 1000),
+      queuedSkipToken: playbackOptions?.queuedSkipToken || null,
       expectedPreviousGeneration: playbackOptions?.expectedPreviousGeneration || null
     });
     if (generation !== playbackGeneration) {
@@ -1081,7 +1097,7 @@ function playTrack(trackId, startSeconds = 0, preserveQueuedSkip = false, playba
   const replacedQueuedSkip = !preserveQueuedSkip ? queuedSkipRequest : null;
   const replacingQueuedSkip = Boolean(replacedQueuedSkip);
   if (!preserveQueuedSkip) {
-    queuedSkipRequest = null;
+    invalidateQueuedSkip();
     clearQueuedSkipTimer();
   }
   const requestedTrackIsInPlayingQueue = state.playingPlaylist?.some((track) => track.id === trackId);
@@ -1121,6 +1137,17 @@ async function completeQueuedSkip() {
   request.completing = true;
   const intent = beginPlaybackIntent(request.targetTrackId || null);
   try {
+    // The bridge receives begin and claim in order. If a reply is lost, the
+    // guarded native start still checks this token before replacing playback.
+    let claimTimeout;
+    const claimed = await Promise.race([
+      window.spcBoySB2.queuedSkipClaim({ token: request.claimId }),
+      new Promise(resolve => { claimTimeout = setTimeout(() => resolve(null), 1000); })
+    ]).finally(() => clearTimeout(claimTimeout));
+    if (claimed === false) {
+      throw new Error("Queued skip was superseded.");
+    }
+    if (request !== queuedSkipRequest || request.generation !== playbackGeneration) return;
     const decision = await window.spcBoySB2.nativePlaybackQueuedSkipDecision({
       expectedGeneration: request.nativeGeneration > 0 ? request.nativeGeneration : null,
       requestId: request.nativeGeneration > 0 ? request.claimId : undefined,
@@ -1140,14 +1167,15 @@ async function completeQueuedSkip() {
     }
     queuedSkipRequest = null;
     clearQueuedSkipTimer();
-    await playTrack(target, request.startSeconds || 0, true, request.playbackOptions || null,
-      request.nativeGeneration);
+    await playTrack(target, request.startSeconds || 0, true,
+      { ...request.playbackOptions, queuedSkipToken: request.claimId }, request.nativeGeneration);
   } catch (error) {
     if (request === queuedSkipRequest && request.generation === playbackGeneration) {
       await cancelQueuedSkip({ restoreOutput: true });
     }
     throw error;
   } finally {
+    if (queuedSkipActiveToken === request.claimId) invalidateQueuedSkip();
     await finishPlaybackIntent(intent);
   }
 }
@@ -1170,14 +1198,14 @@ async function playTrackWithFadedSkip(trackId, startSeconds = 0, playbackOptions
   if (generation !== playbackGeneration) return;
   if (!fadePlan) return playTrackNow(trackId, startSeconds, playbackOptions);
 
-  queuedSkipRequest = {
+  beginQueuedSkip({
     claimId: `${queuedSkipSession}-${++queuedSkipSerial}`,
     targetTrackId: trackId,
     startSeconds,
     playbackOptions,
     generation,
     nativeGeneration: Number(state.nativePlayback.generation) || 0
-  };
+  });
   scheduleQueuedSkipFade(queuedSkipRequest, fadePlan, "[SPCBoy] faded playlist activation failed");
 }
 
@@ -1216,6 +1244,7 @@ function playAdjacent(delta) {
 
 async function playAdjacentNow(delta) {
   const generation = ++playbackGeneration;
+  if (!queuedSkipRequest && queuedSkipActiveToken) invalidateQueuedSkip();
   if (!state.currentTrackId) {
     await advanceToAdjacent(delta, generation);
     return;
@@ -1226,12 +1255,12 @@ async function playAdjacentNow(delta) {
     clearQueuedSkipTimer();
     // The newer navigation takes over the short remaining fade, then uses the
     // same replacement-safe handoff as an ordinary queued skip.
-    queuedSkipRequest = {
+    beginQueuedSkip({
       claimId: `${queuedSkipSession}-${++queuedSkipSerial}`,
       delta: delta || previousRequest.delta,
       generation,
       nativeGeneration: previousRequest.nativeGeneration
-    };
+    });
     await fadeActiveOutput(TRANSPORT_DECLICK_MS, { expectedGeneration: previousRequest.nativeGeneration });
     if (generation !== playbackGeneration) return;
     await completeQueuedSkip();
@@ -1255,12 +1284,12 @@ async function playAdjacentNow(delta) {
     return;
   }
 
-  queuedSkipRequest = {
+  beginQueuedSkip({
     claimId: `${queuedSkipSession}-${++queuedSkipSerial}`,
     delta,
     generation: playbackGeneration,
     nativeGeneration: Number(state.nativePlayback.generation) || 0
-  };
+  });
   scheduleQueuedSkipFade(queuedSkipRequest, fadePlan, "[SPCBoy] faded skip failed");
 }
 
@@ -1276,8 +1305,8 @@ async function togglePlayback() {
   // against a session that is already running; that can restart the selected
   // item instead of pausing the active one.
   if (state.isPlaying || nativeSessionIsPlaying) {
-    if (queuedSkipRequest) {
-      queuedSkipRequest = null;
+    if (queuedSkipRequest || queuedSkipActiveToken) {
+      invalidateQueuedSkip();
       clearQueuedSkipTimer();
     }
     const generation = ++playbackGeneration;

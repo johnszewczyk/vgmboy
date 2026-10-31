@@ -60,6 +60,15 @@ final class WKPlaybackBridge: @unchecked Sendable {
         transport.reserveRampRevision()
     }
 
+    func queuedSkipLifecycle(_ operation: String, token: String) -> Bool {
+        switch operation {
+        case "queuedSkipBegin": return transport.queuedSkipLifecycle.begin(token)
+        case "queuedSkipClaim": return transport.queuedSkipLifecycle.claim(token)
+        case "queuedSkipCancel": return transport.queuedSkipLifecycle.cancel(token)
+        default: return false
+        }
+    }
+
     func setStatusHandler(_ handler: (@Sendable (PlaybackTransportStatus) -> Void)?) {
         handlerLock.lock()
         defer { handlerLock.unlock() }
