@@ -29,6 +29,10 @@ private final class StatusRecorder: @unchecked Sendable {
     func snapshot() -> [PlaybackTransportStatus] { lock.lock(); defer { lock.unlock() }; return values }
 }
 
+private func waitForSignal(_ semaphore: DispatchSemaphore, seconds: Int) -> Bool {
+    semaphore.wait(timeout: .now() + .seconds(seconds)) == .success
+}
+
 @Test func statusSnapshotReadsDoNotPublishEvents() async {
     let transport = PlaybackTransportCoordinator(label: "test.status.nonemitting")
     let recorded = StatusRecorder()
@@ -167,6 +171,143 @@ private final class StatusRecorder: @unchecked Sendable {
     #expect(transport.queuedSkipLifecycle.claim("third"))
     try start("accepted", token: "third")
     #expect(transport.statusSync().currentTrackID == "accepted")
+}
+
+@Test func pauseRemainsResponsiveWhileQueuedSourcePrepares() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 30).write(to: url)
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+    let transport = PlaybackTransportCoordinator(label: "test.queued-skip.nonblocking") { controller, start in
+        if start.track.id == "replacement" {
+            entered.signal()
+            _ = release.wait(timeout: .now() + 10)
+        }
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let generation = transport.statusSync().generation
+    #expect(transport.queuedSkipLifecycle.begin("queued"))
+    let start = PlaybackContinuationStart(track: .init(id: "replacement", path: url.path),
+        payload: .init(path: url.path), requestID: transport.reservePlaybackRequest(),
+        expectedPreviousGeneration: generation, queuedSkipToken: "queued")
+    let starting = Task.detached { try transport.start(start) }
+    #expect(waitForSignal(entered, seconds: 3))
+    let paused = DispatchSemaphore(value: 0)
+    let pausing = Task.detached {
+        defer { paused.signal() }
+        return try transport.performSessionControlSync(.pause, expectedGeneration: generation)
+    }
+    let pauseCompletedBeforePreparation = waitForSignal(paused, seconds: 2)
+    #expect(transport.queuedSkipLifecycle.cancel("queued"))
+    release.signal()
+    let pauseStatus = try await pausing.value
+    do { try await starting.value; Issue.record("Canceled queued replacement unexpectedly started") }
+    catch is CancellationError {} catch { Issue.record("Unexpected start error: \(error)") }
+    #expect(pauseCompletedBeforePreparation)
+    #expect(!pauseStatus.isPlaying)
+    #expect(transport.statusSync().generation == generation)
+    #expect(transport.statusSync().currentTrackID == url.path)
+}
+
+@Test func newerStartCanCommitWhileOlderSourcePrepares() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 30).write(to: url)
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+    let transport = PlaybackTransportCoordinator(label: "test.concurrent.preparations") { controller, start in
+        if start.track.id == "slow" { entered.signal(); _ = release.wait(timeout: .now() + 10) }
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { release.signal(); _ = transport.perform(.init(command: .stop)) }
+    func start(_ id: String) -> PlaybackContinuationStart {
+        .init(track: .init(id: id, path: url.path), payload: .init(path: url.path),
+              requestID: transport.reservePlaybackRequest())
+    }
+    let slow = start("slow")
+    let starting = Task.detached { try transport.start(slow) }
+    #expect(waitForSignal(entered, seconds: 3))
+    let fast = start("newer")
+    let finished = DispatchSemaphore(value: 0)
+    let newer = Task.detached { defer { finished.signal() }; try transport.start(fast) }
+    let newerCommittedBeforeRelease = waitForSignal(finished, seconds: 3)
+    release.signal()
+    try await newer.value
+    do { try await starting.value; Issue.record("Superseded start unexpectedly succeeded") }
+    catch is CancellationError {} catch { Issue.record("Unexpected start error: \(error)") }
+    #expect(newerCommittedBeforeRelease)
+    #expect(transport.statusSync().currentTrackID == "newer")
+    #expect(transport.statusSync().isPlaying)
+}
+
+@Test func overlappingPreparationsAreBounded() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 5).write(to: url)
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+    let transport = PlaybackTransportCoordinator(label: "test.bounded.preparations") { controller, start in
+        entered.signal()
+        _ = release.wait(timeout: .now() + 10)
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { for _ in 0..<3 { release.signal() }; _ = transport.perform(.init(command: .stop)) }
+    func start(_ id: String) -> PlaybackContinuationStart {
+        .init(track: .init(id: id, path: url.path), payload: .init(path: url.path),
+              requestID: transport.reservePlaybackRequest())
+    }
+    let firstRequest = start("first")
+    let first = Task.detached { try transport.start(firstRequest) }
+    #expect(waitForSignal(entered, seconds: 3))
+    let secondRequest = start("second")
+    let second = Task.detached { try transport.start(secondRequest) }
+    #expect(waitForSignal(entered, seconds: 3))
+    let thirdRequest = start("third")
+    let third = Task.detached { try transport.start(thirdRequest) }
+    let enteredBeforeRelease = waitForSignal(entered, seconds: 1)
+    release.signal()
+    let enteredAfterRelease = waitForSignal(entered, seconds: 3)
+    release.signal(); release.signal()
+    _ = try? await first.value
+    _ = try? await second.value
+    try await third.value
+    #expect(!enteredBeforeRelease)
+    #expect(enteredAfterRelease)
+    #expect(transport.statusSync().currentTrackID == "third")
+}
+
+@Test func preparedSourceCanOnlyBeCommittedOnce() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 2).write(to: url)
+    let controller = PlaybackController()
+    defer { _ = controller.perform(.init(command: .stop)) }
+    let prepared = try controller.prepareSource(payload: .init(path: url.path))
+    let accepted = controller.loadPreparedIfCurrent(prepared) { true }
+    #expect(accepted.kind != .error)
+    let generation = try #require(accepted.status?.diagnostics.generation)
+    let repeated = controller.loadPreparedIfCurrent(prepared) { true }
+    #expect(repeated.kind == .error)
+    #expect(controller.status().diagnostics.generation == generation)
+}
+
+@Test func supersededPreparationFailureReportsCancellation() async throws {
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+    let transport = PlaybackTransportCoordinator(label: "test.superseded.preparation.failure") { _, _ in
+        entered.signal()
+        _ = release.wait(timeout: .now() + 10)
+        throw PlaybackControlError.invalidPayload("preparation failed")
+    }
+    defer { release.signal() }
+    let start = PlaybackContinuationStart(track: .init(id: "old", path: "/missing.wav"),
+        payload: .init(path: "/missing.wav"), requestID: transport.reservePlaybackRequest())
+    let pending = Task.detached { try transport.start(start) }
+    #expect(waitForSignal(entered, seconds: 3))
+    transport.invalidatePlaybackRequests()
+    release.signal()
+    do { try await pending.value; Issue.record("Superseded preparation unexpectedly succeeded") }
+    catch is CancellationError {} catch { Issue.record("Expected cancellation, got: \(error)") }
 }
 
 @Test func invalidFadeDurationsLeavePlaybackIntact() async throws {

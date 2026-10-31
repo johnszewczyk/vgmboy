@@ -26,6 +26,11 @@ finite AAC export; it has no catalog, queue, or UI policy.
 - Playback and AAC source preparation also return the selected UAC member's
   validated authored loop, if present. An absent UAC loop remains absent; member
   FLAC or APE tags do not fill it.
+- `PlaybackController.prepareSource` prepares the selected source without
+  changing the live session. Its single-use result owns the archive lease and
+  resolved loop metadata until a guarded commit transfers that lease to the
+  controller, or discarding the result releases it. Direct controller load
+  commands still prepare synchronously.
 - UAC manifest, seek-table, and member-range validation remain in
   `UACWrapperCore`; `UACZstandardCLIFrameCodec` supplies bounded Zstandard
   frame decoding. Seekable UAC selected-member reads use only frames that
