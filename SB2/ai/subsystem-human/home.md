@@ -72,9 +72,12 @@
   and the pointer cursor indicates Link Mode is active.
 - Playlist row selection uses one animated, one-pixel underline at the row
   bottom. The previous solid-versus-outline selection option is retired.
-- Sidebar selection remains available to navigation and activation. Hover,
-  focus, and current selection use the transient shared selector rather than a
-  pinned selected-row fill. Folder and console disclosure updates immediately.
+- Sidebar selection remains available to navigation and activation. The
+  selected path, console, or game keeps a one-pixel accent underline; hover and
+  focus still use the transient shared selector. The playing playlist row also
+  keeps a one-pixel accent underline. Sidebar selection and the playing row
+  expose their current states to accessibility. Folder and console disclosure
+  updates immediately.
 - In Path View, a single click on a playable file loads its playlist preview
   without starting playback. Enter or double-click activates it; folder clicks
   continue to expand or collapse the folder.

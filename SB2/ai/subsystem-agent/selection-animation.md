@@ -31,6 +31,12 @@ SB2's shared animated selector and custom range-control motion.
 - Preserve the playlist's separate one-pixel selected-row underline. The
   shared selector is a surface treatment and does not replace track selection
   state or change playback behavior.
+- Keep the selected sidebar path, console, or game visibly marked with a
+  one-pixel accent underline and `aria-current` state, including after restored
+  tree rows are rendered.
+  The current playing playlist row has its own one-pixel accent underline and
+  `aria-current` state; these marks remain visible while the shared selector
+  follows another hovered or focused target.
 - Honor the UI setting that disables selection motion and the system reduced
   motion preference for the selector and range sliders.
 - The main Options overlay uses the same configured motion duration for its
