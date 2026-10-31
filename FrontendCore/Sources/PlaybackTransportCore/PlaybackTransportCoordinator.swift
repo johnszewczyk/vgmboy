@@ -545,6 +545,16 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         }
     }
 
+    /// A failed or canceled queued skip may restore only the session it faded.
+    public func restoreQueuedSkipGainSync(_ request: PlaybackQueuedSkipRestoreRequest) throws -> PlaybackTransportStatus {
+        guard request.expectedGeneration > 0, request.rampMilliseconds > 0 else {
+            throw PlaybackControlError.invalidPayload("Invalid queued skip restoration.")
+        }
+        return try rampOutputGainSync(.init(outputGain: 1, rampMilliseconds: request.rampMilliseconds,
+                                            expectedGeneration: request.expectedGeneration,
+                                            rampRevision: request.rampRevision))
+    }
+
     public func performSessionControlSync(
         _ command: PlaybackControlCommand,
         payload: PlaybackControlPayload = .init(),

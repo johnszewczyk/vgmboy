@@ -190,6 +190,19 @@ public struct PlaybackTransportRampGainRequest: Codable, Equatable, Sendable {
     }
 }
 
+/// Restore the captured session after a queued transition is canceled.
+public struct PlaybackQueuedSkipRestoreRequest: Codable, Equatable, Sendable {
+    public let expectedGeneration: Int
+    public let rampMilliseconds: Int
+    public let rampRevision: Int?
+
+    public init(expectedGeneration: Int, rampMilliseconds: Int, rampRevision: Int? = nil) {
+        self.expectedGeneration = expectedGeneration
+        self.rampMilliseconds = rampMilliseconds
+        self.rampRevision = rampRevision
+    }
+}
+
 /// Typed renderer request for the timing preview displayed before a track is
 /// loaded. The frontend supplies catalog facts and user intent; VGMBoyKit owns
 /// format admission and the resulting duration policy.

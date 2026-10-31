@@ -185,6 +185,11 @@ final class WKPlaybackBridge: @unchecked Sendable {
             )
             guard let response = transport.queuedSkipDecisionSync(request) else { return NSNull() }
             return try bridgeResponse(response)
+        case "nativePlaybackRestoreQueuedSkipGain":
+            let request: PlaybackQueuedSkipRestoreRequest = try bridgeRequest(
+                args, errorMessage: "Queued skip restoration requires a session and duration."
+            )
+            return statusResponse(try transport.restoreQueuedSkipGainSync(request))
         case "nativeExportAAC":
             let request: PlaybackTransportAACExportRequest = try bridgeRequest(
                 args,

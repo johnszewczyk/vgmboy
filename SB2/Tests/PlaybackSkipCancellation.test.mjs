@@ -20,7 +20,7 @@ function harness({ skipGeneration = 42, currentGeneration = 42, restore = async 
     const TRANSPORT_DECLICK_MS = 10, activeTrackInfo = () => ({ id: 'one' });
     const clearQueuedSkipTimer = () => {}, updatePlaybackReadout = () => {}, updateNativeDiagnostics = () => {};
     const applyNativePlaybackSnapshot = () => {}, currentNativeGeneration = () => state.nativePlayback.generation;
-    const window = { spcBoySB2: { nativePlaybackRampGain: async value => { ramps.push(value); await restore(); },
+    const window = { spcBoySB2: { nativePlaybackRestoreQueuedSkipGain: async value => { ramps.push(value); await restore(); },
       nativePlaybackSeek: async value => { seeks.push(value); return {}; } } };
     ${cancel}
     ${seek}
