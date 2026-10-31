@@ -116,6 +116,18 @@ public enum AACExporter {
         cancellation: AACExportCancellation? = nil,
         progress: (@Sendable (AACExportProgress) -> Void)? = nil
     ) throws -> AACExportResult {
+        try export(request, cancellation: cancellation, progress: progress,
+                   decoderFactory: { path, rate in try DecoderFactory.make(path: path, sampleRate: rate) })
+    }
+
+    // Injected decoders exercise offline producer behavior without changing the
+    // public export contract or opening a live audio device.
+    static func export(
+        _ request: AACExportRequest,
+        cancellation: AACExportCancellation? = nil,
+        progress: (@Sendable (AACExportProgress) -> Void)? = nil,
+        decoderFactory: (String, Int) throws -> any AudioDecoder
+    ) throws -> AACExportResult {
         guard request.trackIndex >= 0 else {
             throw AACExportError.invalidRequest("AAC export requires a non-negative track index.")
         }
@@ -149,7 +161,7 @@ public enum AACExporter {
             }
         }
         if cancellation?.isCancelled == true { throw AACExportError.cancelled }
-        let decoder = try DecoderFactory.make(path: request.sourcePath, sampleRate: sampleRate)
+        let decoder = try decoderFactory(request.sourcePath, sampleRate)
         defer { decoder.close() }
         try decoder.startTrack(request.trackIndex)
         let effectiveTempo = FormatRegistry.effectiveTempo(request.tempo, family: family)
@@ -195,6 +207,7 @@ public enum AACExporter {
         ))
 
         var renderedFrames: Int64 = 0
+        var consecutiveEmptyReads = 0
         var lastProgressUptime: TimeInterval = 0
         func reportProgress(force: Bool = false) {
             guard let progress else { return }
@@ -217,7 +230,18 @@ public enum AACExporter {
                 throw AACExportError.invalidRequest("Decoder returned an invalid PCM frame count.")
             }
             let count = frames.left.count
-            guard count > 0 else { break }
+            if count == 0 {
+                if decoder.trackEnded { break }
+                consecutiveEmptyReads += 1
+                guard consecutiveEmptyReads <= 8 else {
+                    throw AACExportError.invalidRequest("Decoder repeatedly returned no audio before reaching the end.")
+                }
+                // Offline rendering is not time-critical. Give a decoder with
+                // transient empty reads a bounded opportunity to make progress.
+                Thread.sleep(forTimeInterval: 0.01)
+                continue
+            }
+            consecutiveEmptyReads = 0
             var interleaved = [Float](repeating: 0, count: count * 2)
             for index in 0..<count {
                 let gain = !decoder.appliesFadeInternally && fadeFrames > 0
@@ -237,6 +261,7 @@ public enum AACExporter {
             reportProgress()
         }
         if cancellation?.isCancelled == true { throw AACExportError.cancelled }
+        guard renderedFrames > 0 else { throw AACExportError.invalidRequest("Decoder produced no audio.") }
         reportProgress(force: true)
         let closeStatus = ExtAudioFileDispose(writer)
         writerRef = nil

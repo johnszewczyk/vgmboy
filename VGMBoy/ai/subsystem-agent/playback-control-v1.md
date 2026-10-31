@@ -112,6 +112,9 @@ same typed endpoint operations.
   Playback and export use the same authored sample-loop boundary reader;
   export applies the PCM fade for decoders that do not fade internally. UAC
   member loop metadata remains authoritative for export as well as playback.
+  Offline export retries transient empty decoder reads with a bounded delay;
+  persistent stalls and zero-frame outputs fail without publishing a partial
+  AAC file. A genuine end after decoded audio can still finish before the cap.
 - AAC progress is rate-limited to four updates per second. It is a latest-state presentation channel,
   so a realtime decoder cannot monopolize a frontend executor by emitting one UI task per decode block.
 - `PlaybackStructureReader` is the narrow exception for raw disk browsing: it returns only
