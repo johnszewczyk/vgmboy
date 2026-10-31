@@ -29,13 +29,13 @@ startup contracts shared by the VGMMan player frontends.
 - `PlaybackTransportCore` owns serialized native commands, invalidation, timing
   reconfiguration, monotonic status ordering, completion retirement, and the
   shared faded-track-change eligibility and duration policy.
-- Typed continuation starts prepare sources outside the serialized transport
+- Typed continuation starts and `play` prepare sources outside the serialized transport
   queue, with at most two concurrent preparations per coordinator. They check
   request identity before preparation and recheck request, queued token and
   expected native generation on serialized commit. A rejected preparation
   releases its lease; an accepted commit transfers it to the controller.
-  Legacy `play` and direct controller operations still prepare on their existing
-  execution paths.
+  Direct controller operations and reconfiguration still prepare on their
+  existing execution paths.
 - A successful low-level mode change can reload the native session. The
   coordinator adopts its returned generation and resets completion claims;
   stale natural-end events are discarded before status or end delivery.

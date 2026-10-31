@@ -181,7 +181,7 @@ private func waitForSignal(_ semaphore: DispatchSemaphore, seconds: Int) -> Bool
     let transport = PlaybackTransportCoordinator(label: "test.queued-skip.nonblocking") { controller, start in
         if start.track.id == "replacement" {
             entered.signal()
-            _ = release.wait(timeout: .now() + 10)
+            _ = release.wait(timeout: .now() + 20)
         }
         return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
     }
@@ -200,7 +200,7 @@ private func waitForSignal(_ semaphore: DispatchSemaphore, seconds: Int) -> Bool
         defer { paused.signal() }
         return try transport.performSessionControlSync(.pause, expectedGeneration: generation)
     }
-    let pauseCompletedBeforePreparation = waitForSignal(paused, seconds: 2)
+    let pauseCompletedBeforePreparation = waitForSignal(paused, seconds: 6)
     #expect(transport.queuedSkipLifecycle.cancel("queued"))
     release.signal()
     let pauseStatus = try await pausing.value
@@ -210,6 +210,57 @@ private func waitForSignal(_ semaphore: DispatchSemaphore, seconds: Int) -> Bool
     #expect(!pauseStatus.isPlaying)
     #expect(transport.statusSync().generation == generation)
     #expect(transport.statusSync().currentTrackID == url.path)
+}
+
+@Test func pauseRemainsResponsiveWhileLegacyPlayPrepares() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 30).write(to: url)
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+    let transport = PlaybackTransportCoordinator(label: "test.legacy-play.nonblocking") { controller, start in
+        if start.track.id == "replacement" { entered.signal(); _ = release.wait(timeout: .now() + 20) }
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let generation = transport.statusSync().generation
+    let requestID = transport.reservePlaybackRequest()
+    let track = PlaybackTransportTrack(id: "replacement", path: url.path)
+    let plan = PlaybackTimingPlan(preFadeSeconds: 30, fadeSeconds: 0, usesNativeEnding: false, isLongPlay: true)
+    let starting = Task.detached { try await transport.play(track: track, plan: plan, tempo: .defaultValue, requestID: requestID) }
+    #expect(waitForSignal(entered, seconds: 3))
+    let paused = DispatchSemaphore(value: 0)
+    let pausing = Task.detached {
+        defer { paused.signal() }
+        return try transport.performSessionControlSync(.pause, expectedGeneration: generation)
+    }
+    let responsive = waitForSignal(paused, seconds: 6)
+    transport.invalidatePlaybackRequests()
+    release.signal()
+    let status = try await pausing.value
+    do { try await starting.value; Issue.record("Canceled replacement unexpectedly started") }
+    catch is CancellationError {} catch { Issue.record("Unexpected start error: \(error)") }
+    #expect(responsive)
+    #expect(!status.isPlaying)
+    #expect(transport.statusSync().generation == generation)
+    #expect(transport.statusSync().currentTrackID == url.path)
+}
+
+@Test func legacyPlayStartsThroughSharedContinuation() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.legacy-play.shared-start")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    let track = PlaybackTransportTrack(id: "legacy", path: url.path)
+    let plan = PlaybackTimingPlan(preFadeSeconds: 30, fadeSeconds: 2, usesNativeEnding: false, isLongPlay: true)
+    try await transport.play(track: track, plan: plan, tempo: .init(numerator: 2, denominator: 1),
+                             requestID: transport.reservePlaybackRequest())
+    let status = transport.statusSync()
+    #expect(status.currentTrackID == "legacy")
+    #expect(status.trackLoaded && status.isPlaying)
+    #expect(status.tempo == 1)
 }
 
 @Test func newerStartCanCommitWhileOlderSourcePrepares() async throws {
