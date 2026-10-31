@@ -906,6 +906,70 @@ func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
     _ = transport.perform(.init(command: .stop))
 }
 
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VGMBOY_UAC_LOOP_FIXTURES"] != nil))
+func uacManifestLoopSurvivesPausedSeekAndSharedReconfiguration() async throws {
+    let directory = try #require(ProcessInfo.processInfo.environment["VGMBOY_UAC_LOOP_FIXTURES"])
+    let path = URL(fileURLWithPath: directory).appendingPathComponent("loop.uac").path
+    let transport = PlaybackTransportCoordinator(label: "test.uac.paused.loop.reconfiguration")
+    let ends = EndRecorder()
+    transport.setNaturalEndHandler { ends.record($0.generation) }
+    defer { _ = transport.perform(.init(command: .stop)) }
+    let request = PlaybackTransportStartRequest(trackID: "uac-loop", sourcePath: path,
+        archivePath: path, archiveEntry: "tone.wav", fadeMilliseconds: 0)
+    try transport.start(request.continuationStart(requestID: transport.reservePlaybackRequest()))
+    let initial = transport.statusSync()
+    #expect(initial.isPlaying)
+    let paused = try transport.performSessionControlSync(.pause, expectedGeneration: initial.generation)
+    #expect(!paused.isPlaying)
+    let sought = try transport.performSessionControlSync(.seek, payload: .init(positionMilliseconds: 700),
+                                                         expectedGeneration: initial.generation)
+    #expect(abs(sought.elapsedSeconds - 0.7) < 0.05)
+    let configured = try transport.reconfigureSync(.init(longPlayEnabled: false, fadeMilliseconds: 200,
+        expectedGeneration: initial.generation, settingsRevision: transport.reserveSettingsRevision()))
+    #expect(configured.currentTrackID == "uac-loop")
+    #expect(configured.generation != initial.generation)
+    #expect(!configured.isPlaying)
+    #expect(abs(configured.elapsedSeconds - 0.7) < 0.05)
+    _ = try transport.performSessionControlSync(.play, expectedGeneration: configured.generation)
+    for _ in 0..<100 where ends.snapshot().isEmpty { try await Task.sleep(for: .milliseconds(20)) }
+    #expect(ends.snapshot() == [configured.generation])
+    let finished = transport.statusSync()
+    #expect(finished.reachedEnd)
+    #expect(finished.bufferedFrames == 0)
+    // One-second source plus the two 50 ms manifest repeats.
+    #expect((1.08...1.12).contains(finished.elapsedSeconds))
+}
+
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VGMBOY_SOTN_XA_UAC"] != nil))
+func sotnLoopSurvivesPausedSharedReconfiguration() async throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBOY_SOTN_XA_UAC"])
+    let entry = "audio/SD-XA_STR1/file00-channel00.xa"
+    let transport = PlaybackTransportCoordinator(label: "test.sotn.paused.loop.reconfiguration")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    _ = try transport.configureAudio(.init(outputVolume: 0, equalizerEnabled: false,
+                                          equalizerBandGains: Array(repeating: 0, count: 10), monoEnabled: false))
+    let request = PlaybackTransportStartRequest(trackID: "sotn-xa", sourcePath: path,
+        archivePath: path, archiveEntry: entry, fadeMilliseconds: 0)
+    try transport.start(request.continuationStart(requestID: transport.reservePlaybackRequest()))
+    let initial = transport.statusSync()
+    _ = try transport.performSessionControlSync(.pause, expectedGeneration: initial.generation)
+    _ = try transport.performSessionControlSync(.seek, payload: .init(positionMilliseconds: 140_100),
+                                                expectedGeneration: initial.generation)
+    let configured = try transport.reconfigureSync(.init(longPlayEnabled: false, fadeMilliseconds: 200,
+        expectedGeneration: initial.generation, settingsRevision: transport.reserveSettingsRevision()))
+    #expect(configured.currentTrackID == "sotn-xa")
+    #expect(!configured.isPlaying)
+    #expect(abs(configured.elapsedSeconds - 140.1) < 0.1)
+    _ = try transport.performSessionControlSync(.play, expectedGeneration: configured.generation)
+    try await Task.sleep(for: .milliseconds(1_000))
+    let status = transport.statusSync()
+    #expect(status.currentTrackID == "sotn-xa")
+    #expect(status.generation == configured.generation)
+    #expect(status.isPlaying)
+    #expect(status.elapsedSeconds > 140.5)
+    #expect(status.errorMessage == nil)
+}
+
 @Test func seekingInsideRepeatedLoopPreservesLogicalTimeline() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }

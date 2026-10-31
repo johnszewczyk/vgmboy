@@ -47,6 +47,15 @@ remaining live verification and deferred frontend work are not yet bounded.
 
 ## Implementation checkpoint, 2026-10-28
 
+- Paused UAC reconfiguration, 2026-10-30: shared-transport integration tests
+  started a generated looped UAC, paused, sought and reconfigured it, then
+  resumed through its expected 1.1-second end exactly once. A separate muted
+  test used the read-only SOTN XA member, sought to 140.1 seconds while paused,
+  reconfigured, and continued playing beyond 140.5 seconds with the same
+  track and new native generation. Both used the optional fixture environment
+  paths recorded below; all 58 shared transport tests passed with the disk
+  guard. These checks do not prove audible output or packaged UI behavior.
+
 - Offline producer empty reads, 2026-10-30: AAC export no longer treats a
   temporary empty decoder read as a successful end. It retries with a bounded
   delay, fails on persistent stalls or zero-frame output, and keeps incomplete
