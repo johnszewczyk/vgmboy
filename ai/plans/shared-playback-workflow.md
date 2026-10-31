@@ -19,6 +19,8 @@ The remaining work is grouped by the current SB2-first scope:
    checks now cover a successful delayed replacement and newer Stop/Previous;
    broader old-end delivery and other start/stop races remain. Check output gain
    and audible behavior as well as track identity, queue, history and clock.
+   A forced slow-preparation check exposed delayed Pause; investigate moving
+   source preparation off the serialized transport queue (checkpoint below).
 2. Assess what remains duplicated between SB2's renderer and shared transport,
    especially queued-fade lifecycle and cancellation. Move UI-neutral ownership
    to FrontendCore where its contract can preserve the existing queue behavior;
@@ -116,6 +118,25 @@ the replacement. The test button copied old track display metadata into its
 fixture, so the displayed duration is not valid timing evidence. No native end
 event appeared in the bridge trace in this run; it does not demonstrate delivery
 or handling of an old-session end event, nor audible continuity.
+
+Pause during preparation, 2026-10-31: in the instrumented `28653980` SB2 build,
+generated `one.wav` (SHA-256
+`41c1781c2374272f7b823e0e404d753ebc751cd12bd6d7aba990dd3a29c9d113`)
+was playing when a queued replacement entered a test-only 15-second preparation
+delay. The replacement ZIP SHA-256 was
+`5a94c778a3a9b4af4f2ff77a208a31537a7ff3f39789cbcbba07ec6677817168`.
+Pause cleared the queued token while preparation was still blocked, but the UI
+continued to report the old session playing until the delay completed. It then
+reported the original track paused at approximately 0:16, with no pending request;
+Resume returned it to playing. This demonstrates a responsiveness limitation
+under the injected delay, not an audible measurement or a timing bound for real
+archives. The coordinator's serialized start currently invokes archive source
+materialization on the same transport queue used by output ramps and pause.
+Investigate separating preparation from the serialized commit, retaining its
+materializer lease and authoritative UAC metadata until acceptance, rechecking
+request/token/generation immediately before replacement, and releasing failed or
+superseded preparations without retiring the old session. Cover overlapping
+preparations, Stop/Pause/seek and old-end behavior before adopting the change.
 
 ### Packaged SB2 old-end/failed replacement checkpoint, 2026-10-31
 
