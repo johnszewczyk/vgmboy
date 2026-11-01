@@ -59,6 +59,11 @@ title, and track window. Supported options:
 - Nintendo DS (2sf2wav): `.2sf`, `.mini2sf` — mini2SF needs its companion library files beside it
 - Nintendo DS legacy WAV payloads: `SWAV` payloads and recognized headerless `_NN.wav` signed PCM
 - PlayStation / PlayStation 2 (Play!): `.psf`, `.minipsf`, `.psf2`, `.minipsf2`
+- Experimental SNES native state (ares): `.snesstate` (`UACNSNES` v1), one
+  state per playlist entry. These entries have no natural duration, tempo
+  control, or authored cue-loop metadata. Long Play with duration `0` lets the
+  captured native SNES program continue without a player time cap; this does
+  not assert that the cue itself repeats.
 
 Long play, fade, and seek work across all families. Tempo is available only where the decoder
 supports it.
@@ -91,3 +96,4 @@ number rather than overwriting an existing file.
 - [VGMBoyCommand.swift](../../Sources/vgmboy/VGMBoyCommand.swift)
 - [PlayerViewModel.swift](../../Sources/VGMBoyApp/PlayerViewModel.swift)
 - [ContentView.swift](../../Sources/VGMBoyApp/ContentView.swift)
+- [AresSNESDecoder.swift](../../Sources/VGMBoyKit/AresSNESDecoder.swift)
