@@ -12,6 +12,8 @@ history live in this repository.
   native metadata interpretation.
 - ScanSong writes the catalog; CatalogReader and FrontendCore provide shared
   read and frontend policy boundaries.
+- SharedWebUI owns portable DOM control primitives used by WebKit clients;
+  each frontend keeps its page structure and theme.
 - UACMan owns its package format and editor. CocoaSpice, SPCBOY SB2, and ViewBoy
   are active separate player apps; SB2 is the current SPCBOY frontend under
   development. SPCBoyWK source is retired from the active tree and retained in
@@ -45,6 +47,7 @@ crosses that ownership boundary.
 | Shared archive-cache, preferences, queue, and transport policy | [FrontendCore/AGENTS.md](FrontendCore/AGENTS.md) |
 | AppKit/SwiftUI presentation | [CocoaSpice/AGENTS.md](CocoaSpice/AGENTS.md) |
 | SPCBOY SB2 pixel-style WebKit frontend | [SB2/AGENTS.md](SB2/AGENTS.md) |
+| Portable WebKit control primitives | [SharedWebUI/AGENTS.md](SharedWebUI/AGENTS.md) |
 | Hosted SPCBOY web player | [SBONLINE/AGENTS.md](SBONLINE/AGENTS.md) |
 | SPCBOY APPBOY responsive iOS player package | [APPBOY/AGENTS.md](APPBOY/AGENTS.md) |
 | Screen-first Yoga LCD player | [ViewBoy/AGENTS.md](ViewBoy/AGENTS.md) |
@@ -83,6 +86,8 @@ component task:
 - Shared frontend policy belongs in CatalogReader or FrontendCore. VGMBoy owns
   playback/export preparation of archive and compressed-file sources. Keep
   AppKit, SwiftUI, WebKit, and renderer-specific behavior in each app.
+- Portable DOM control mechanics shared by WebKit clients belong in
+  `SharedWebUI`; keep each app's layout, theme, and native renderer controls local.
 - UAC is a reversible wrapper around original format members. Native SPC
   conversion was closed; do not add capture or repackaging work.
 - Generated builds, app bundles, local archives, and fixture payloads are

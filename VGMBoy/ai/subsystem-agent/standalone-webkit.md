@@ -3,6 +3,8 @@
 `Sources/VGMBoyApp` owns the standalone local player presentation. SwiftUI hosts
 one WKWebView; its nonpersistent store loads `Resources/index.html` from the
 SwiftPM resource bundle. `build-app.sh` copies that bundle into the packaged app.
+The test-bench range slider uses the shared DOM control in `../../../SharedWebUI/`
+and its synced app-resource files. Keep EQ commands and app layout local.
 No remote assets, server or second audio graph are involved.
 
 The coordinator accepts main-frame messages only from the exact bundled page.

@@ -26,14 +26,7 @@
     const next = String(value ?? '');
     if (node && node.textContent !== next) node.textContent = next;
   };
-  const setRangeFill = input => {
-    const minimum = Number(input.min || 0);
-    const maximum = Number(input.max || 1);
-    const current = Number(input.value || 0);
-    const percent = maximum > minimum ? (current - minimum) * 100 / (maximum - minimum) : 0;
-    const visual = input.closest('.range-slider') || input;
-    visual.style.setProperty('--range-percent', Math.max(0, Math.min(100, percent)) + '%');
-  };
+  const setRangeFill = input => window.VGMRangeControls?.sync(input);
   const setControl = (id, next) => {
     const input = $(id);
     if (!input || input === document.activeElement) return;
@@ -163,40 +156,32 @@
   };
 
   const renderBands = frequencies => {
-    $('equalizer').replaceChildren(...frequencies.map((frequency, band) => {
+    const container = $('equalizer');
+    container.replaceChildren(...frequencies.map((frequency, band) => {
       const row = document.createElement('div');
       row.className = 'equalizer-band';
       const labelControl = document.createElement('label');
       const labelText = frequency >= 1000 ? (frequency / 1000) + ' kHz' : frequency + ' Hz';
       labelControl.htmlFor = 'band-' + band;
       labelControl.textContent = labelText;
-      const range = document.createElement('span');
-      range.className = 'range-slider';
       const slider = document.createElement('input');
       slider.id = 'band-' + band;
       slider.className = 'animated-range';
+      slider.setAttribute('data-vgm-range-slider', '');
       slider.type = 'range';
       slider.min = '-12';
       slider.max = '12';
       slider.step = '0.5';
       slider.dataset.band = String(band);
       slider.setAttribute('aria-label', labelText + ' equalizer gain');
-      const track = document.createElement('span');
-      track.className = 'range-slider-track';
-      track.setAttribute('aria-hidden', 'true');
-      const fill = document.createElement('span');
-      fill.className = 'range-slider-fill';
-      const thumb = document.createElement('span');
-      thumb.className = 'range-slider-thumb';
-      track.append(fill, thumb);
-      range.append(slider, track);
       const output = document.createElement('output');
       output.id = 'band-value-' + band;
       slider.setAttribute('aria-describedby', output.id);
       output.textContent = '+0.0 dB';
-      row.append(labelControl, range, output);
+      row.append(labelControl, slider, output);
       return row;
     }));
+    window.VGMRangeControls?.enhance(container);
   };
 
   const renderTracks = count => {

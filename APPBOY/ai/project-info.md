@@ -15,7 +15,8 @@ app with native background audio and lock-screen media controls.
   `AVPlayer` / `MediaPlayer` playback coordinator.
 - [`../Sources/APPBOY/Resources/WebUI/`](../Sources/APPBOY/Resources/WebUI/)
   owns the responsive mobile/tablet WebKit presentation derived from SB2's
-  visual tokens and portable `sb-presentation.{css,js}` primitives.
+  visual tokens and portable `sb-presentation.{css,js}` primitives. Shared DOM
+  range controls come from `../../SharedWebUI/` and are synced into this bundle.
 - [`../build.sh`](../build.sh), [`../app-info.plist`](../app-info.plist), and
   [`../app-icon.png`](../app-icon.png) own iOS device/simulator compilation,
   ad-hoc or identity signing, and sideload `.ipa` packaging.

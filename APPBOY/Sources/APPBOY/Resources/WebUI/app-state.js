@@ -234,11 +234,7 @@
   }
 
   function setRangeSliderPercent(inputEl, pct) {
-    const shell = inputEl?.closest(".range-slider");
-    if (shell) {
-      const clamped = Math.min(100, Math.max(0, Number(pct) || 0));
-      shell.style.setProperty("--range-percent", `${clamped.toFixed(2)}%`);
-    }
+    window.VGMRangeControls?.setPercent(inputEl, pct);
   }
 
   function showErrorToast(message) {
