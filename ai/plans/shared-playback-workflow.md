@@ -163,6 +163,25 @@ load, the prior two-second Pause test deadline failed intermittently; its
 scheduling allowance was widened to six seconds while holding preparation for up
 to 20 seconds. The final suite passed, but this is not a live audio latency bound.
 
+Old-end preparation tests: with source preparation held by an injected gate,
+shared transport delivers the old generation's single natural-end event before
+the gate opens. A successful queued replacement then becomes current; an
+injected preparation failure instead retains the ended old generation and track
+identity. These generated-WAV coordinator tests do not establish packaged SB2
+bridge delivery, audible continuity, or real archive extraction timing. The
+focused tests passed, and the transport suite passed with SOTN enabled using
+`--experimental-maximum-parallelization-width 2` (73 discovered, four skipped).
+An unrestricted run and a `--num-workers 1` run produced timing failures across
+existing short-audio and preparation-gate tests under concurrent load; the latter
+flag alone did not bound Swift Testing's execution in this environment.
+
+Reconfiguration audit: an archive-backed mode or tempo reload currently
+re-extracts the member on the serialized transport queue. The existing contract
+reports an error and preserves the active decoder if the original archive is
+unavailable. Reusing its live extracted member would change that behavior; any
+off-queue preparation must retain the failure boundary, capture position after
+preparation, and recheck settings revision and session identity before commit.
+
 ### Packaged SB2 old-end/failed replacement checkpoint, 2026-10-31
 
 An isolated, instrumented app built from `32bcf646` used a generated four-second
