@@ -32,7 +32,10 @@ as `1/64` and `5/4`. UAC session rows use manifest track titles and show artist
 and album; Track Tags presents the selected member's common title, artist,
 album, composer, track number, year, region and selector tags. The position
 slider uses a seek window, not a claimed metadata-derived total duration. Audio
-provides output volume, mono and ten-band EQ. Diagnostics shows actual native
+provides output volume, mono and ten-band EQ. EQ bands use focusable custom
+range sliders with live gain updates and a dB readout; keyboard focus stays on
+the slider for repeated adjustments, and gains remain editable while EQ is
+bypassed. Reset returns all bands to zero. Diagnostics shows actual native
 output/buffer/frame counters; Decoder formats uses VGMBoyKit's authoritative
 capability registry.
 
