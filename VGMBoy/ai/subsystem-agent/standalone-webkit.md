@@ -33,6 +33,11 @@ paused state. The seek window is a
 frontend bound, not authoritative metadata duration. Native output diagnostics
 remain read-only. Observation publishes changed snapshots without replacing
 focused controls; playback/status events stay on the main actor at the UI edge.
+Timing edits that may reload a decoder run on the dedicated serial timing queue,
+with a revision gate so superseded settings cannot take ownership at commit.
+Do not synchronously prepare or replace a decoder from the WebKit message
+handler. UAC session listings retain scalar member tags for presentation; the
+player displays these without changing package or catalog metadata.
 
 The packaged app is a regular Dock app with a native menu bar. Keep standard
 window actions in native command groups so keyboard shortcuts reach AppKit and

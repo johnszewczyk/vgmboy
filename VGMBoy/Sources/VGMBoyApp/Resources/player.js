@@ -11,8 +11,8 @@
       : String(minutes) + ':' + remainder;
   };
   const tempoLabel = step => {
-    let numerator = Math.max(1, Math.min(256, Math.round(Number(step) || 32)));
-    let denominator = 32;
+    let numerator = Math.max(1, Math.min(512, Math.round(Number(step) || 64)));
+    let denominator = 64;
     let left = numerator;
     let right = denominator;
     while (right !== 0) [left, right] = [right, left % right];
@@ -43,6 +43,7 @@
   const tabs = Array.from(document.querySelectorAll('[data-page]'));
   const pages = Array.from(document.querySelectorAll('[data-page-panel]'));
   let filesKey = '';
+  let tagsKey = '';
   let trackCountKey = '';
   let frequenciesKey = '';
   let formatsKey = '';
@@ -71,7 +72,9 @@
     if (input.dataset.control === 'seek') {
       setText('clock', formatTime(input.value) + ' / ' + formatTime(input.max));
     }
-    if (input.dataset.control === 'tempo') setText('tempo-label', tempoLabel(input.value));
+    if (input.dataset.control === 'tempo' && $('tempo-input') !== document.activeElement) {
+      $('tempo-input').value = tempoLabel(input.value).replace(/×$/, '');
+    }
     if (input.dataset.band !== undefined) {
       const gain = Number(input.value);
       input.nextElementSibling.textContent = (gain > 0 ? '+' : '') + gain.toFixed(1) + ' dB';
@@ -88,7 +91,11 @@
       return;
     }
     if (control === 'tempo') {
-      send('tempo', Number(input.value) / 32);
+      send('tempo', Number(input.value) / 64);
+      return;
+    }
+    if (control === 'tempo-input') {
+      send('tempo', input.value);
       input.blur();
       return;
     }
@@ -126,10 +133,19 @@
       const index = document.createElement('span');
       index.className = 'file-index';
       index.textContent = String(file.index + 1).padStart(2, '0');
+      const copy = document.createElement('span');
+      copy.className = 'file-copy';
       const name = document.createElement('span');
       name.className = 'file-name';
-      name.textContent = file.name;
-      button.append(index, name);
+      name.textContent = file.title || file.name;
+      copy.append(name);
+      if (file.subtitle || file.title !== file.name) {
+        const subtitle = document.createElement('span');
+        subtitle.className = 'file-subtitle';
+        subtitle.textContent = file.subtitle || file.name;
+        copy.append(subtitle);
+      }
+      button.append(index, copy);
       return button;
     });
     if (!items.length) {
@@ -188,6 +204,35 @@
     $('track').replaceChildren(...options);
   };
 
+  const renderTags = tags => {
+    const nextKey = JSON.stringify(tags || {});
+    if (nextKey === tagsKey) return;
+    tagsKey = nextKey;
+    const values = new Map(Object.entries(tags || {}).map(([key, value]) => [key.toLowerCase(), String(value)]));
+    const fields = [
+      ['Title', 'Title'], ['Game Title', 'Game'], ['Artist', 'Artist'],
+      ['Album Artist', 'Album artist'], ['Album', 'Album'], ['Composer', 'Composer'],
+      ['Track Number', 'Track'], ['Year', 'Year'], ['Region', 'Region'],
+      ['BGM Selector ID', 'Selector']
+    ];
+    const rows = fields.flatMap(([key, label]) => {
+      const value = values.get(key.toLowerCase());
+      if (!value) return [];
+      const term = document.createElement('dt');
+      term.textContent = label;
+      const description = document.createElement('dd');
+      description.textContent = value;
+      return [term, description];
+    });
+    if (!rows.length) {
+      const empty = document.createElement('div');
+      empty.className = 'tag-empty';
+      empty.textContent = 'No embedded track tags for this source.';
+      rows.push(empty);
+    }
+    $('track-tags').replaceChildren(...rows);
+  };
+
   const renderFormats = formats => {
     $('format-list').replaceChildren(...formats.map(format => {
       const row = document.createElement('div');
@@ -208,7 +253,7 @@
 
   window.vgm = Object.freeze({
     render(state) {
-      setText('title-file', state.loaded ? state.file : 'No file open');
+      setText('title-file', state.loaded ? (state.title || state.file) : 'No file open');
       setText('family-tag', state.loaded ? state.family : 'LOCAL');
       setText('filename', state.file);
       setText('path', state.path);
@@ -235,9 +280,10 @@
       setControl('longPlay', state.longPlay);
       setControl('length', state.length);
       setControl('fade', state.fade);
-      const tempoStep = Math.max(1, Math.min(256, Math.round((Number(state.tempo) || 1) * 32)));
+      const tempoStep = Math.max(1, Math.min(512, Math.round((Number(state.tempo) || 1) * 64)));
       setControl('tempo', tempoStep);
-      if (document.activeElement !== $('tempo')) setText('tempo-label', tempoLabel(tempoStep));
+      setControl('tempo-input', tempoLabel(tempoStep).replace(/×$/, ''));
+      renderTags(state.trackMetadata);
       setControl('mono', state.mono);
       setControl('volume', state.volume);
       setControl('eqEnabled', state.eqEnabled);
@@ -254,7 +300,7 @@
       previous.disabled = !state.loaded || selectedIndex <= 0;
       next.disabled = !state.loaded || selectedIndex < 0 || selectedIndex >= state.files.length - 1;
 
-      const nextFilesKey = JSON.stringify(state.files.map(file => [file.index, file.name, file.selected]));
+      const nextFilesKey = JSON.stringify(state.files.map(file => [file.index, file.name, file.title, file.subtitle, file.selected]));
       if (nextFilesKey !== filesKey) {
         filesKey = nextFilesKey;
         renderFiles(state.files);

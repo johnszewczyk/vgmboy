@@ -132,8 +132,8 @@ button:disabled, input:disabled, select:disabled { opacity: .38; cursor: default
   align-items: center;
   gap: 5px;
   width: 100%;
-  min-height: 31px;
-  padding: 0 6px;
+  min-height: 42px;
+  padding: 4px 6px;
   border: 0;
   border-radius: 4px;
   background: transparent;
@@ -144,8 +144,11 @@ button:disabled, input:disabled, select:disabled { opacity: .38; cursor: default
 }
 .file-row:hover { background: var(--control); color: #d4d8e8; }
 .file-row[aria-current="true"] { background: var(--active); color: var(--cyan); }
-.file-index { color: var(--dim); font-size: 10px; text-align: right; }
-.file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-index { grid-row: span 2; color: var(--dim); font-size: 10px; text-align: right; }
+.file-copy { display: grid; gap: 3px; min-width: 0; }
+.file-name, .file-subtitle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-name { color: inherit; }
+.file-subtitle { color: var(--dim); font-size: 9px; }
 kbd { padding: 1px 4px; border: 1px solid var(--line); border-radius: 3px; color: var(--text); font: inherit; font-size: 10px; }
 .sidebar-status {
   display: flex;
@@ -247,8 +250,15 @@ kbd { padding: 1px 4px; border: 1px solid var(--line); border-radius: 3px; color
 }
 .field:focus-visible { border-color: var(--cyan); }
 select.field { text-align: left; }
-.tempo-control { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.tempo-control output { min-width: 4.5rem; color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+.tempo-control { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tempo-control .range { flex: 1 1 auto; min-width: 40px; }
+.tempo-input { flex: 0 0 5.2rem; font-variant-numeric: tabular-nums; }
+.metadata-group { margin-top: 18px; }
+.tag-grid { display: grid; grid-template-columns: minmax(90px, 150px) minmax(0, 1fr); margin: 0; }
+.tag-grid dt, .tag-grid dd { min-width: 0; margin: 0; padding: 7px 8px; border-bottom: 1px solid var(--line-soft); }
+.tag-grid dt { color: var(--muted); }
+.tag-grid dd { overflow-wrap: anywhere; color: var(--text); }
+.tag-empty { grid-column: 1 / -1; padding: 12px 8px; color: var(--muted); font-size: 11px; }
 .switch { position: relative; display: flex; justify-content: flex-end; align-items: center; gap: 8px; cursor: pointer; }
 .switch input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .switch-track { position: relative; display: block; width: 30px; height: 17px; border-radius: 10px; background: #343b47; transition: background 160ms cubic-bezier(.2,0,0,1); }
