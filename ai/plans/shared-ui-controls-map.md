@@ -15,6 +15,8 @@ widget toolkit.
 | Views | `CatalogReader/CatalogBrowserCore` defines catalog modes/state, temporary search view, content/result source, projections, and sidebar row intent. `FrontendCommandCore` shares command and shortcut identifiers. | Each active app owns its navigation surface, view composition, focus, geometry, and transitions. | Share view semantics and commands; keep view widgets and layout with each renderer. Favorites remains a playlist projection rather than a catalog view. |
 | Search | `CatalogBrowserCore` provides canonical game/file search indexes, console groups, row identities, and browser state. | Apps own input controls, focus/clear behavior, result rendering, and adapters. ViewBoy requests matching IDs from the shared indexes and maps them onto Canvas rows. | ViewBoy no longer rebuilds console grouping or game/path matching in JavaScript. Search controls and rendering remain skin-owned. |
 | Options | `FrontendCore/FrontendPreferencesCore` owns common preference values/store behavior, animation bounds, window roles, and `FrontendOptionsManifest`. The manifest currently describes Database, Interface, and Windows sections. | Each app owns its option schema, settings commands, page/dialog structure, and native/WebKit/Canvas/WebGL controls. | Shared preferences and categories are data contracts, not shared controls or a common option renderer. |
+| Equalizer model | `VGMBoyKit.EqualizerConfiguration` owns band frequencies, gain bounds, and the playback configuration contract. | Each frontend owns its EQ panel, labels, outputs, persistence adapter, and renderer-specific interaction. | DSP settings are shared; presentation is adapted to each renderer. |
+| WebKit range controls | `SharedWebUI/range-controls.{css,js}` owns native range enhancement, slider structure, and value-to-fill/zero-position math for WebKit apps. | Each app owns row layout, labels, commands, sizing, and palette variables; SwiftUI and Canvas frontends keep native controls. | Reuse the DOM control among WebKit clients without forcing one widget across renderer technologies. |
 
 ## Existing library map
 
@@ -27,15 +29,20 @@ widget toolkit.
   format, persistence location, payload adapter, and renderer.
 - **FrontendCommandCore** owns renderer-neutral command and shortcut IDs.
 - **VGMBoy** owns playback admission, decoding, timing, and audio output.
+- **SharedWebUI** owns the canonical DOM range-control implementation. Its CSS
+  and JavaScript are copied into the SB2, APPBOY, and VGMBoy SwiftPM bundles by
+  `SharedWebUI/sync-range-controls.py`.
 - **App targets** own their visual and interaction adapters: AppKit/SwiftUI in
   CocoaSpice, DOM/WebKit in SB2, and Yoga/Canvas in ViewBoy.
 
-This keeps the common libraries focused on data, state transitions, and
-policy. A shared widget library would have to erase real differences between
-SwiftUI, DOM, and Canvas, so it is not the right first extraction.
+This keeps shared data and policy separate from renderer-specific presentation.
+WebKit apps can share DOM controls through `SharedWebUI`; SwiftUI and Canvas
+clients keep native controls and consume the common playback settings contract.
 
-The active app set is CocoaSpice, SB2, and ViewBoy. SPCBoyWK is retired and is
-not a parity target for new shared UI work.
+The shared range control targets the SB2, APPBOY, and standalone VGMBoy WebKit
+pages. CocoaSpice SwiftUI and ViewBoy Canvas use the common EQ settings model
+but keep renderer-native controls. SPCBoyWK is retired and is not a parity
+target for new shared UI work.
 
 ## Recommended shared contracts
 
@@ -67,8 +74,9 @@ not a parity target for new shared UI work.
 3. Inventory shared option values separately from app-specific settings, then
    add schema fields to `FrontendOptionsManifest` only for genuinely common
    controls.
-4. Keep the visual control systems app-owned and verify each host after any
-   shared-contract change.
+4. Keep each app's visual layout and renderer-specific controls app-owned.
+   Share a control only across clients with the same rendering technology, and
+   verify each host after any shared-contract change.
 
 ## Source anchors
 
@@ -76,6 +84,9 @@ not a parity target for new shared UI work.
 - `CatalogReader/Sources/FrontendCommandCore/FrontendCommandCore.swift`
 - `CatalogReader/Sources/CatalogPlaylistPresentationCore/CatalogPlaylistPresentationCore.swift`
 - `FrontendCore/Sources/FrontendPreferencesCore/FrontendPreferencesCore.swift`
+- `VGMBoy/Sources/VGMBoyKit/PlaybackControlProtocol.swift`
+- `SharedWebUI/range-controls.css`
+- `SharedWebUI/range-controls.js`
 - `FrontendCore/Sources/PlaylistIdentityCore/PlaylistIdentityCore.swift`
 - `FrontendCore/Sources/PlaylistTabsPersistenceCore/PlaylistTabsPersistenceCore.swift`
 - `CocoaSpice/Sources/CocoaSpice/App/PlaylistTabs.swift`

@@ -92,6 +92,8 @@ behavior in APPBOY across iPhone and iPad viewports.
 - `Sources/APPBOY/Resources/WebUI/styles.css`
 - `Sources/APPBOY/Resources/WebUI/sb-presentation.css`
 - `Sources/APPBOY/Resources/WebUI/sb-presentation.js`
+- `Sources/APPBOY/Resources/WebUI/range-controls.css`
+- `Sources/APPBOY/Resources/WebUI/range-controls.js`
 - `Sources/APPBOY/Resources/WebUI/app-state.js`
 - `Sources/APPBOY/Resources/WebUI/app-ui.js`
 - `Sources/APPBOY/Resources/WebUI/app-playback.js`

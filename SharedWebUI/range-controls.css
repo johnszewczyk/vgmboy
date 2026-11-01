@@ -1,0 +1,77 @@
+/* Shared WebKit range control structure. Apps own the theme variables. */
+.range-slider {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: var(--range-height, 1rem);
+  min-width: 0;
+  --range-percent: 50%;
+}
+
+.range-slider > input[type="range"] {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.range-slider-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  z-index: 0;
+  height: var(--range-track-height, 5px);
+  transform: translateY(-50%);
+  border: var(--range-track-border, 0);
+  border-radius: 999px;
+  background: var(--range-track-background, #282828);
+  box-shadow: var(--range-track-shadow, none);
+  pointer-events: none;
+}
+
+.range-slider-zero {
+  position: absolute;
+  left: var(--range-zero-percent, 50%);
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+  background: var(--range-zero-color, currentColor);
+}
+
+.range-slider-fill {
+  display: block;
+  width: var(--range-percent);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--range-fill-color, currentColor);
+  transition: var(--range-fill-transition, none);
+}
+
+.range-slider-thumb {
+  position: absolute;
+  left: var(--range-percent);
+  top: 50%;
+  width: var(--range-thumb-size, 13px);
+  height: var(--range-thumb-size, 13px);
+  border-radius: 50%;
+  background: var(--range-thumb-background, currentColor);
+  box-shadow: var(--range-thumb-shadow, none);
+  transform: translate(-50%, -50%);
+  transition: var(--range-thumb-transition, none);
+}
+
+.range-slider:focus-within .range-slider-thumb {
+  box-shadow: var(--range-focus-shadow, var(--range-thumb-shadow, none));
+}
+
+.range-slider > input[type="range"]:active + .range-slider-track .range-slider-fill,
+.range-slider > input[type="range"]:active + .range-slider-track .range-slider-thumb,
+.range-slider:focus-within .range-slider-fill,
+.range-slider:focus-within .range-slider-thumb {
+  transition: none;
+}

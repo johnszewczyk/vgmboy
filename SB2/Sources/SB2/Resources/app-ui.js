@@ -3275,13 +3275,7 @@ function updateSidebarStats(message = "", { error = false, title = "" } = {}) {
 
 function syncAnimatedRanges() {
   document.querySelectorAll(".animated-range").forEach((input) => {
-    const minimum = Number(input.min || 0);
-    const maximum = Number(input.max || 100);
-    const value = Number(input.value || 0);
-    const percent = maximum > minimum
-      ? ((value - minimum) / (maximum - minimum)) * 100
-      : 0;
-    input.parentElement?.style.setProperty("--range-percent", `${Math.max(0, Math.min(100, percent))}%`);
+    window.VGMRangeControls?.sync(input);
   });
 }
 

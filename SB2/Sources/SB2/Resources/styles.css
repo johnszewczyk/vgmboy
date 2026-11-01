@@ -1305,68 +1305,20 @@ body[data-playlist-link-mode="on"] .playlist-row > td * {
 .equalizer-band output, #app-volume-value { min-width: 4.5rem; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
 .equalizer-bands .equalizer-band > span:first-child,
 .equalizer-bands .equalizer-band output { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.options-inline-trailing input[type="range"] { width: 12rem; }
+.options-inline-trailing .range-slider { width: 12rem; }
 
 .range-slider {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 1rem;
-  min-width: 0;
-  --range-percent: 0%;
-}
-
-.range-slider > input[type="range"] {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.range-slider-track {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  z-index: 0;
-  height: 0.35rem;
-  transform: translateY(-50%);
-  border-radius: 999px;
-  border: 1px solid rgb(20 20 20);
-  background: rgb(40 40 40);
-  box-shadow: inset 0 0 0 1px rgb(50 50 50);
-  pointer-events: none;
-}
-
-.range-slider-fill {
-  display: block;
-  width: var(--range-percent);
-  height: 100%;
-  border-radius: inherit;
-  background: var(--accent);
-  transition: width var(--selection-animation-duration) var(--selection-animation-easing);
-}
-
-.range-slider-thumb {
-  position: absolute;
-  left: var(--range-percent);
-  top: 50%;
-  width: 0.8rem;
-  height: 0.8rem;
-  border-radius: 50%;
-  background: var(--accent);
-  transform: translate(-50%, -50%);
-  transition:
-    left var(--selection-animation-duration) var(--selection-animation-easing),
-    box-shadow var(--selection-animation-duration) var(--selection-animation-easing);
-}
-
-.range-slider:focus-within .range-slider-thumb {
-  box-shadow: 0 0 0 2px var(--bg-subpanel), 0 0 0 3px var(--accent);
+  --range-height: 1rem;
+  --range-track-height: 0.35rem;
+  --range-track-border: 1px solid rgb(20 20 20);
+  --range-track-background: rgb(40 40 40);
+  --range-track-shadow: inset 0 0 0 1px rgb(50 50 50);
+  --range-fill-color: var(--accent);
+  --range-thumb-size: 0.8rem;
+  --range-thumb-background: var(--accent);
+  --range-fill-transition: width var(--selection-animation-duration) var(--selection-animation-easing);
+  --range-thumb-transition: left var(--selection-animation-duration) var(--selection-animation-easing), box-shadow var(--selection-animation-duration) var(--selection-animation-easing);
+  --range-focus-shadow: 0 0 0 2px var(--bg-subpanel), 0 0 0 3px var(--accent);
 }
 
 .options-library-toolbar {
