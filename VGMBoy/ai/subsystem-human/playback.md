@@ -20,6 +20,9 @@ The subsong field uses a one-based source index. Show in Finder locates the
 selected source.
 
 Player exposes Long Play, pre-fade seconds, fade and decoder-supported tempo.
+Set the Long Play duration to zero for unbounded playback; the player shows an
+infinity duration and applies no time cap or end fade. With Long Play off, the
+request uses a decoder-provided duration or the shared unknown-duration default.
 Changing timing preserves pause intent and position. The position slider uses a
 seek window, not a claimed metadata-derived total duration. Audio provides output
 volume, mono and ten-band EQ. Diagnostics shows actual native output/buffer/frame

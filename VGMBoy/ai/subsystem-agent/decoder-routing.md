@@ -19,6 +19,15 @@ deliberately exclusive to one family.
 
 - A file must resolve to exactly one family. Unsupported input throws
   `DecoderFactoryError.unsupportedFamily` — never an invented track.
+- Experimental `.snesstate` playback routes to `ares-snes`. `AresSNESDecoder`
+  starts the separately built `ares-agent-host` with no ROM and streams stereo
+  PCM16 from the restored SMP/DSP state. The ares runtime is staged beside the
+  app at `Contents/Resources/ares-snes/` by the app build scripts; without it,
+  playback returns an explicit runtime-unavailable error. This experimental
+  route has no natural end, tempo control, authored sample loop, or certified
+  source loop boundary. File-default playback uses the unknown-duration
+  fallback; Long Play accepts a finite user-selected window or zero for
+  unbounded execution of the state’s native SNES program.
 - Frontends must project `FormatRegistry.playbackDescriptors` rather than rebuilding extension
   unions, backend IDs, Long Play support, tempo support, or natural-ending flags.
 - GameCube admission is fixture-backed and limited to primary playable DSP,
@@ -128,4 +137,5 @@ deliberately exclusive to one family.
 - [VgmstreamDecoder.swift](../../Sources/VGMBoyKit/VgmstreamDecoder.swift)
 - [LazyUSFDecoder.swift](../../Sources/VGMBoyKit/LazyUSFDecoder.swift)
 - [PlayPSFDecoder.swift](../../Sources/VGMBoyKit/PlayPSFDecoder.swift)
+- [AresSNESDecoder.swift](../../Sources/VGMBoyKit/AresSNESDecoder.swift)
 - [QSFDecoder.swift](../../Sources/VGMBoyKit/QSFDecoder.swift)

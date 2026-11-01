@@ -37,6 +37,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$EXECUTABLE" "$APP/Contents/MacOS/LineBoy"
 cp "$ROOT/app-info.plist" "$APP/Contents/Info.plist"
 ditto "$RESOURCE_BUNDLE" "$APP/Contents/Resources/$RESOURCE_BUNDLE_NAME"
+"$ROOT/../VGMBoy/scripts/copy-ares-snes-runtime.sh" "$APP/Contents/Resources"
 chmod +x "$APP/Contents/MacOS/LineBoy"
 codesign --force --deep --sign - --identifier com.john.lineboy "$APP"
 

@@ -65,8 +65,8 @@
                 <label class="switch"><input id="longPlay" type="checkbox" data-control="longPlay"><span class="switch-track" aria-hidden="true"></span><span class="sr-only">Long Play</span></label>
               </div>
               <div class="setting-row">
-                <label for="length">Play length<small>Seconds · used with Long Play</small></label>
-                <input class="field" id="length" type="number" min="5" max="86400" step="5" value="60" data-control="length">
+                <label for="length">Play length<small>Seconds · 0 means unbounded</small></label>
+                <input class="field" id="length" type="number" min="0" max="86400" step="5" value="60" data-control="length">
               </div>
               <div class="setting-row">
                 <label for="fade">Fade out<small>Seconds</small></label>

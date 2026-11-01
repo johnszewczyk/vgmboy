@@ -43,6 +43,7 @@ cp "$EXECUTABLE" "$APP_DIR/Contents/MacOS/SB2"
 cp "$ROOT_DIR/app-info.plist" "$APP_DIR/Contents/Info.plist"
 cp "$ROOT_DIR/app-icon.png" "$APP_DIR/Contents/Resources/app-icon.png"
 ditto "$RESOURCE_BUNDLE" "$APP_DIR/Contents/Resources/SB2_SB2.bundle"
+"$VGMBoy_DIR/scripts/copy-ares-snes-runtime.sh" "$APP_DIR/Contents/Resources"
 chmod +x "$APP_DIR/Contents/MacOS/SB2"
 SIGNING_IDENTITY="-"
 if security find-identity -v -p codesigning 2>/dev/null | grep -Fq "$DEVELOPMENT_SIGNING_IDENTITY"; then

@@ -158,7 +158,9 @@ public final class ArchiveMaterializer: @unchecked Sendable {
                 from: archiveURL,
                 decompressManifestFrame: decompressUACManifestFrame ?? uacZstandardCodec.manifestDecoder
             )
-            entries = container.manifest.members.map(\.path)
+            entries = container.manifest.members
+                .filter { $0.role == "playable" || $0.role == "track" }
+                .map(\.path)
         case .tar:
             let output = try runListingTool("tar", arguments: ["-tf", archiveURL.path])
             entries = try ArchiveListingParser.parseTarListing(output).entries
