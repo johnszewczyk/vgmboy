@@ -104,14 +104,16 @@
             </div>
           </section>
           <section class="group" aria-labelledby="equalizer-heading">
-            <h2 id="equalizer-heading">EQUALIZER
-              <span class="eq-actions">
-                <label class="switch" title="Enable equalizer"><input id="eqEnabled" type="checkbox" data-control="eqEnabled" checked><span class="switch-track" aria-hidden="true"></span><span class="sr-only">Enable equalizer</span></label>
-                <button class="flat-button" type="button" data-command="resetEQ">FLAT</button>
-              </span>
-            </h2>
-            <div id="equalizer" class="equalizer-bands" aria-label="Ten-band equalizer"></div>
-            <p class="hint">Ten bands · 0.5 dB steps · −12 to +12 dB</p>
+            <h2 id="equalizer-heading">EQUALIZER</h2>
+            <div class="setting-row">
+              <div><span class="setting-label">Enable equalizer</span><small>Gains remain set while bypassed</small></div>
+              <label class="switch" title="Enable equalizer"><input id="eqEnabled" type="checkbox" data-control="eqEnabled" checked><span class="switch-track" aria-hidden="true"></span><span class="sr-only">Enable equalizer</span></label>
+            </div>
+            <div id="equalizer" class="equalizer-bands" role="group" aria-label="Ten-band equalizer"></div>
+            <div class="eq-reset-row">
+              <p class="hint">Ten bands · 0.5 dB steps · −12 to +12 dB</p>
+              <button class="flat-button" type="button" data-command="resetEQ">Reset</button>
+            </div>
           </section>
         </section>
 

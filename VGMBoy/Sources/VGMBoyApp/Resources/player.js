@@ -31,7 +31,8 @@
     const maximum = Number(input.max || 1);
     const current = Number(input.value || 0);
     const percent = maximum > minimum ? (current - minimum) * 100 / (maximum - minimum) : 0;
-    input.style.setProperty('--range-percent', Math.max(0, Math.min(100, percent)) + '%');
+    const visual = input.closest('.range-slider') || input;
+    visual.style.setProperty('--range-percent', Math.max(0, Math.min(100, percent)) + '%');
   };
   const setControl = (id, next) => {
     const input = $(id);
@@ -77,7 +78,9 @@
     }
     if (input.dataset.band !== undefined) {
       const gain = Number(input.value);
-      input.nextElementSibling.textContent = (gain > 0 ? '+' : '') + gain.toFixed(1) + ' dB';
+      const output = input.closest('.equalizer-band')?.querySelector('output');
+      if (output) output.textContent = (gain >= 0 ? '+' : '') + gain.toFixed(1) + ' dB';
+      send('eq', {band: Number(input.dataset.band), gain});
     }
   });
 
@@ -106,10 +109,7 @@
         : Number(input.value);
       send(control, next);
     }
-    if (input.dataset.band !== undefined) {
-      send('eq', {band: Number(input.dataset.band), gain: Number(input.value)});
-    }
-    if (input.type === 'range' || input.type === 'number') input.blur();
+    if (input.type === 'number') input.blur();
   });
 
   document.addEventListener('keydown', event => {
@@ -165,22 +165,36 @@
   const renderBands = frequencies => {
     $('equalizer').replaceChildren(...frequencies.map((frequency, band) => {
       const row = document.createElement('div');
-      row.className = 'eq-row';
-      const label = document.createElement('label');
-      label.htmlFor = 'band-' + band;
-      label.textContent = frequency >= 1000 ? (frequency / 1000) + ' kHz' : frequency + ' Hz';
+      row.className = 'equalizer-band';
+      const labelControl = document.createElement('label');
+      const labelText = frequency >= 1000 ? (frequency / 1000) + ' kHz' : frequency + ' Hz';
+      labelControl.htmlFor = 'band-' + band;
+      labelControl.textContent = labelText;
+      const range = document.createElement('span');
+      range.className = 'range-slider';
       const slider = document.createElement('input');
       slider.id = 'band-' + band;
-      slider.className = 'range';
+      slider.className = 'animated-range';
       slider.type = 'range';
       slider.min = '-12';
       slider.max = '12';
       slider.step = '0.5';
       slider.dataset.band = String(band);
-      slider.setAttribute('aria-label', frequency + ' Hz gain');
+      slider.setAttribute('aria-label', labelText + ' equalizer gain');
+      const track = document.createElement('span');
+      track.className = 'range-slider-track';
+      track.setAttribute('aria-hidden', 'true');
+      const fill = document.createElement('span');
+      fill.className = 'range-slider-fill';
+      const thumb = document.createElement('span');
+      thumb.className = 'range-slider-thumb';
+      track.append(fill, thumb);
+      range.append(slider, track);
       const output = document.createElement('output');
-      output.textContent = '0.0 dB';
-      row.append(label, slider, output);
+      output.id = 'band-value-' + band;
+      slider.setAttribute('aria-describedby', output.id);
+      output.textContent = '+0.0 dB';
+      row.append(labelControl, range, output);
       return row;
     }));
   };
@@ -315,10 +329,10 @@
         const slider = $('band-' + band);
         if (!slider) return;
         setControl(slider.id, gain);
-        slider.disabled = !state.eqEnabled;
-        const display = (gain > 0 ? '+' : '') + Number(gain).toFixed(1) + ' dB';
-        if (slider !== document.activeElement && slider.nextElementSibling.textContent !== display) {
-          slider.nextElementSibling.textContent = display;
+        const output = slider.closest('.equalizer-band')?.querySelector('output');
+        const display = (gain >= 0 ? '+' : '') + Number(gain).toFixed(1) + ' dB';
+        if (slider !== document.activeElement && output && output.textContent !== display) {
+          output.textContent = display;
         }
       });
 
