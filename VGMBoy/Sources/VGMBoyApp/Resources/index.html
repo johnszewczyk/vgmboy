@@ -13,7 +13,7 @@
     <strong class="brand">VGMBOY</strong>
     <span class="tag" id="family-tag">LOCAL</span>
     <span class="current-file" id="title-file">No file open</span>
-    <span class="core-badge">IN-PROCESS CORE</span>
+    <span class="core-badge">TEST BENCH</span>
   </header>
 
   <div class="workspace">
@@ -30,7 +30,6 @@
       </div>
       <div class="file-heading"><span>SESSION FILES</span><span id="file-count">00</span></div>
       <div id="files" class="file-list" role="list" aria-label="Files in this session"></div>
-      <div class="sidebar-status"><span class="status-dot"></span>LOCAL SESSION</div>
     </aside>
 
     <main class="main-panel">
@@ -96,6 +95,13 @@
               <div><span class="setting-label">Mono output</span><small>Optional channel fold-down</small></div>
               <label class="switch"><input id="mono" type="checkbox" data-control="mono"><span class="switch-track" aria-hidden="true"></span><span class="sr-only">Mono output</span></label>
             </div>
+            <div class="setting-row">
+              <div><span class="setting-label">Output volume</span><small>VGMBoy app output level</small></div>
+              <label class="volume-control" for="volume">
+                <input id="volume" class="range" type="range" min="0" max="1" step="0.01" value="1" data-control="volume" aria-label="Output volume">
+                <output id="volume-label" for="volume">100%</output>
+              </label>
+            </div>
           </section>
           <section class="group" aria-labelledby="equalizer-heading">
             <h2 id="equalizer-heading">EQUALIZER
@@ -135,10 +141,13 @@
   </div>
 
   <footer class="statusbar" aria-label="Playback status">
-    <div class="playback-state"><span class="status-dot"></span><span id="play-state">READY</span><span class="status-separator">·</span><span>NATIVE OUTPUT</span></div>
-    <output id="clock" class="clock">0:00 / 0:00</output>
-    <input id="position" class="range position-range" type="range" min="0" max="150" step="0.1" value="0" data-control="seek" data-loaded aria-label="Playback position">
-    <label class="volume-control"><span>VOL</span><input id="volume" class="range" type="range" min="0" max="1" step="0.01" value="1" data-control="volume" aria-label="Output volume"><output id="volume-label">100%</output></label>
+    <div class="statusbar-sidebar"><span class="status-dot"></span><span>LOCAL SESSION</span></div>
+    <div class="statusbar-divider" aria-hidden="true"></div>
+    <div class="statusbar-content">
+      <div class="playback-state"><span class="status-dot"></span><span id="play-state">READY</span></div>
+      <input id="position" class="range position-range" type="range" min="0" max="150" step="0.1" value="0" data-control="seek" data-loaded aria-label="Playback position">
+      <output id="clock" class="clock">0:00 / 0:00</output>
+    </div>
   </footer>
 </body>
 </html>

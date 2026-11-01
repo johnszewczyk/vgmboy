@@ -2,9 +2,12 @@
 
 VGMBoy's command line (`vgmboy-cli`) and standalone WebKit application (`VGMBoy`)
 play original game-music files through one native audio core. The app uses a
-charcoal/cyan two-pane interface: session files and compact transport controls on
-the left, with Player, Audio, Diagnostics and Formats pages on the right. Its
-bottom status bar keeps playback time, seek and volume visible across pages.
+charcoal/cyan two-pane test bench: local session files and compact transport
+controls on the left, with Player, Audio, Diagnostics and Formats pages on the
+right. Its compact title and status bars use SB2's chrome and sidebar/content
+split; the status bar keeps local session state, playback state, seek and
+playback time visible across pages. Output volume is controlled on the Audio
+page alongside mono output and EQ.
 Command-O adds local audio files or archives to the current session; dropping
 files onto the window replaces that session. Both routes accept the formats
 listed below, including NSF, GBS, PSF, SPC, and GSF, and expand archives only
