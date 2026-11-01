@@ -18,6 +18,18 @@ public struct MaterializedArchiveSource: Sendable {
     public let authoredLoop: ArchiveAuthoredLoop?
 }
 
+/// A playable archive entry and its scalar UAC tags, when the source is UAC.
+/// Other archive types provide the member path with an empty metadata map.
+public struct ArchiveEntryDescriptor: Sendable, Equatable {
+    public let path: String
+    public let metadata: [String: String]
+
+    public init(path: String, metadata: [String: String] = [:]) {
+        self.path = path
+        self.metadata = metadata
+    }
+}
+
 /// A shared native materializer for a catalog-selected archive entry.
 ///
 /// CatalogReader remains responsible for archive identity and membership. The
@@ -141,6 +153,12 @@ public final class ArchiveMaterializer: @unchecked Sendable {
     /// playback preparation. Single-file Zstandard input has one implicit
     /// member whose name is the source filename without its compression suffix.
     public func listEntries(archivePath: String) throws -> [String] {
+        try listEntriesWithMetadata(archivePath: archivePath).map(\.path)
+    }
+
+    /// Lists playable archive entries and retains scalar UAC member tags for
+    /// frontends that want to present track titles instead of member paths.
+    public func listEntriesWithMetadata(archivePath: String) throws -> [ArchiveEntryDescriptor] {
         let archiveURL = URL(fileURLWithPath: archivePath).standardizedFileURL
         guard FileManager.default.fileExists(atPath: archiveURL.path) else {
             throw ArchiveMaterializationError.missingSource(archiveURL.path)
@@ -149,10 +167,10 @@ public final class ArchiveMaterializer: @unchecked Sendable {
             throw ArchiveMaterializationError.toolUnavailable("supported archive format")
         }
 
-        let entries: [String]
+        let entries: [ArchiveEntryDescriptor]
         switch kind {
         case .singleFileZstandard:
-            entries = [archiveURL.deletingPathExtension().lastPathComponent]
+            entries = [ArchiveEntryDescriptor(path: archiveURL.deletingPathExtension().lastPathComponent)]
         case .uac:
             let container = try UACContainerReader.read(
                 from: archiveURL,
@@ -160,25 +178,25 @@ public final class ArchiveMaterializer: @unchecked Sendable {
             )
             entries = container.manifest.members
                 .filter { $0.role == "playable" || $0.role == "track" }
-                .map(\.path)
+                .map { ArchiveEntryDescriptor(path: $0.path, metadata: Self.displayMetadata($0.metadata)) }
         case .tar:
             let output = try runListingTool("tar", arguments: ["-tf", archiveURL.path])
-            entries = try ArchiveListingParser.parseTarListing(output).entries
+            entries = try ArchiveListingParser.parseTarListing(output).entries.map { ArchiveEntryDescriptor(path: $0) }
         case .zip, .sevenZip, .lha:
             let output = try runListingTool("7zz", arguments: ["l", "-slt", archiveURL.path])
-            entries = try ArchiveListingParser.parseSevenZipReport(output).entries
+            entries = try ArchiveListingParser.parseSevenZipReport(output).entries.map { ArchiveEntryDescriptor(path: $0) }
         case .rsn:
             let output = try runListingTool("lsar", arguments: ["-json", archiveURL.path])
-            entries = try ArchiveListingParser.parseRSNListing(output).entries
+            entries = try ArchiveListingParser.parseRSNListing(output).entries.map { ArchiveEntryDescriptor(path: $0) }
         }
 
         var seen = Set<String>()
         return entries.compactMap { entry in
-            let normalized = ArchiveEntryPath.normalized(entry)
+            let normalized = ArchiveEntryPath.normalized(entry.path)
             guard !normalized.isEmpty,
                   ArchiveEntryPath.isSafe(normalized),
                   seen.insert(normalized).inserted else { return nil }
-            return normalized
+            return ArchiveEntryDescriptor(path: normalized, metadata: entry.metadata)
         }
     }
 
@@ -264,6 +282,20 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         if case .string(let value)? = loop["source"] { source = value } else { source = nil }
         return ArchiveAuthoredLoop(startSamples: start, endSamples: end, sampleRateHz: sampleRate,
                                    repeatCount: repeatCount, source: source)
+    }
+
+    private static func displayMetadata(_ metadata: [String: UACJSONValue]) -> [String: String] {
+        metadata.compactMapValues { value in
+            switch value {
+            case .string(let text):
+                let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? nil : trimmed
+            case .integer(let number): return String(number)
+            case .number(let number): return number.isFinite ? String(number) : nil
+            case .bool(let flag): return flag ? "true" : "false"
+            case .null, .array, .object: return nil
+            }
+        }
     }
 
     private func extractArchiveEntryOnce(archiveURL: URL, entry: String, output: URL) throws {

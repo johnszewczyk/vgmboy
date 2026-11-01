@@ -23,10 +23,15 @@ Player exposes Long Play, pre-fade seconds, fade and decoder-supported tempo.
 Set the Long Play duration to zero for unbounded playback; the player shows an
 infinity duration and applies no time cap or end fade. With Long Play off, the
 request uses a decoder-provided duration or the shared unknown-duration default.
-Changing timing preserves pause intent and position. The position slider uses a
-seek window, not a claimed metadata-derived total duration. Audio provides output
-volume, mono and ten-band EQ. Diagnostics shows actual native output/buffer/frame
-counters; Decoder formats uses VGMBoyKit's authoritative capability registry.
+Changing timing preserves pause intent and position without blocking the player
+controls. The speed slider uses 1/64 increments and also accepts fractions such
+as `1/64` and `5/4`. UAC session rows use manifest track titles and show artist
+and album; Track Tags presents the selected member's common title, artist,
+album, composer, track number, year, region and selector tags. The position
+slider uses a seek window, not a claimed metadata-derived total duration. Audio
+provides output volume, mono and ten-band EQ. Diagnostics shows actual native
+output/buffer/frame counters; Decoder formats uses VGMBoyKit's authoritative
+capability registry.
 
 The app has no catalog or persistent playlist database. WebKit presents bundled
 local controls; VGMBoyKit retains decoding, DSP, timing and the audio device.

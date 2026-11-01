@@ -6,11 +6,47 @@ import VGMBoyKit
 private struct SessionFile: Hashable {
     let sourceURL: URL
     let archiveEntry: String?
+    let metadata: [String: String]
 
     var name: String { archiveEntry ?? sourceURL.lastPathComponent }
+    var title: String { tag("Title") ?? name }
+    var subtitle: String {
+        [tag("Artist"), tag("Album")].compactMap { $0 }.joined(separator: " · ")
+    }
     var location: String {
         guard let archiveEntry else { return sourceURL.path }
         return "\(sourceURL.path) :: \(archiveEntry)"
+    }
+
+    func tag(_ name: String) -> String? {
+        metadata.first { $0.key.caseInsensitiveCompare(name) == .orderedSame }?.value
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.sourceURL == rhs.sourceURL && lhs.archiveEntry == rhs.archiveEntry
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(sourceURL)
+        hasher.combine(archiveEntry)
+    }
+}
+
+private final class TimingUpdateGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var revision: UInt64 = 0
+
+    func advance() -> UInt64 {
+        lock.lock()
+        defer { lock.unlock() }
+        revision &+= 1
+        return revision
+    }
+
+    func isCurrent(_ candidate: UInt64) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return revision == candidate
     }
 }
 
@@ -43,6 +79,8 @@ final class PlayerViewModel {
     var equalizerBandGains = Array(repeating: Float.zero, count: EqualizerConfiguration.bandCount)
 
     private let controller = PlaybackController()
+    private let timingUpdateGate = TimingUpdateGate()
+    private let timingUpdateQueue = DispatchQueue(label: "VGMBoy.app.timing-reconfiguration", qos: .userInitiated)
 
     var displayDuration: Double {
         guard filePath != nil else { return 0 }
@@ -100,7 +138,7 @@ final class PlayerViewModel {
                 continue
             }
             if FormatRegistry.family(for: url.path) != nil {
-                incoming.append(SessionFile(sourceURL: url, archiveEntry: nil))
+                incoming.append(SessionFile(sourceURL: url, archiveEntry: nil, metadata: [:]))
                 continue
             }
             guard ArchiveContainerKind(archiveURL: url) != nil else {
@@ -108,14 +146,14 @@ final class PlayerViewModel {
                 continue
             }
             do {
-                let playableEntries = try materializer.listEntries(archivePath: url.path).filter {
-                    FormatRegistry.archiveMaterializationRequirement(for: [$0]) != nil
+                let playableEntries = try materializer.listEntriesWithMetadata(archivePath: url.path).filter {
+                    FormatRegistry.archiveMaterializationRequirement(for: [$0.path]) != nil
                 }
                 if playableEntries.isEmpty {
                     listingError = "No supported audio tracks were found in \(url.lastPathComponent)."
                 } else {
                     incoming.append(contentsOf: playableEntries.map {
-                        SessionFile(sourceURL: url, archiveEntry: $0)
+                        SessionFile(sourceURL: url, archiveEntry: $0.path, metadata: $0.metadata)
                     })
                 }
             } catch {
@@ -150,6 +188,7 @@ final class PlayerViewModel {
     }
 
     private func load(source: SessionFile) {
+        _ = timingUpdateGate.advance()
         currentSource = source
         archiveEntry = source.archiveEntry
         filePath = source.sourceURL.path
@@ -162,11 +201,13 @@ final class PlayerViewModel {
 
     func selectTrack(_ index: Int) {
         guard (0 ..< trackCount).contains(index), index != selectedTrack else { return }
+        _ = timingUpdateGate.advance()
         selectedTrack = index
         loadSelectedTrack(autoplay: isPlaying)
     }
 
     func togglePlay() {
+        _ = timingUpdateGate.advance()
         do {
             if isPlaying {
                 apply(controller.perform(.init(command: .pause)).status)
@@ -183,11 +224,13 @@ final class PlayerViewModel {
     }
 
     func stop() {
+        _ = timingUpdateGate.advance()
         apply(controller.perform(.init(command: .stop)).status)
         hasPlaybackLoaded = false
     }
 
     func seek(to seconds: Double) {
+        _ = timingUpdateGate.advance()
         if !hasPlaybackLoaded {
             loadSelectedTrack(resumeAt: seconds, autoplay: false)
             return
@@ -202,9 +245,78 @@ final class PlayerViewModel {
     }
 
     func applyTimingChange() {
-        guard filePath != nil else { return }
-        let resumeAt = elapsedSeconds
-        loadSelectedTrack(resumeAt: resumeAt, autoplay: isPlaying)
+        guard let filePath, hasPlaybackLoaded else { return }
+        let mode: PlaybackMode = longPlayEnabled && currentFamily?.supportsLongPlay == true ? .longPlay : .fileDefault
+        let payload = PlaybackControlPayload(
+            path: filePath,
+            archiveEntry: archiveEntry,
+            trackIndex: selectedTrack,
+            tempo: tempo,
+            playbackMode: mode,
+            playMilliseconds: mode == .longPlay ? manualSeconds * 1_000 : nil,
+            fadeMilliseconds: fadeSeconds * 1_000
+        )
+        let effectiveTempo = FormatRegistry.effectiveTempo(tempo, family: currentFamily)
+        let resumeAt = elapsedSeconds * (statistics.tempo > 0 ? statistics.tempo : 1) / max(effectiveTempo, 0.000_001)
+        let shouldResume = isPlaying
+        let controller = self.controller
+        let gate = timingUpdateGate
+        let revision = gate.advance()
+
+        timingUpdateQueue.async { [weak self] in
+            guard gate.isCurrent(revision) else { return }
+            do {
+                let prepared = try controller.prepareSource(payload: payload)
+                guard gate.isCurrent(revision) else { return }
+                let loaded = controller.loadPreparedIfCurrent(prepared) {
+                    gate.isCurrent(revision)
+                }
+                guard gate.isCurrent(revision) else { return }
+                guard loaded.kind != .error else {
+                    DispatchQueue.main.async {
+                        guard gate.isCurrent(revision) else { return }
+                        self?.errorMessage = loaded.message ?? "Playback timing could not be applied."
+                    }
+                    return
+                }
+                if resumeAt > 0 {
+                    let seeked = controller.perform(.init(
+                        command: .seek,
+                        payload: .init(positionMilliseconds: Int(min(resumeAt * 1_000, Double(Int32.max))))
+                    ))
+                    guard gate.isCurrent(revision) else { return }
+                    if seeked.kind == .error {
+                        DispatchQueue.main.async {
+                            guard gate.isCurrent(revision) else { return }
+                            self?.errorMessage = seeked.message ?? "Playback position could not be restored."
+                        }
+                        return
+                    }
+                }
+                if shouldResume {
+                    let started = controller.perform(.init(command: .play))
+                    guard gate.isCurrent(revision) else { return }
+                    if started.kind == .error {
+                        DispatchQueue.main.async {
+                            guard gate.isCurrent(revision) else { return }
+                            self?.errorMessage = started.message ?? "Playback could not resume."
+                        }
+                        return
+                    }
+                }
+                let status = controller.status()
+                DispatchQueue.main.async {
+                    guard gate.isCurrent(revision) else { return }
+                    self?.apply(status)
+                }
+            } catch {
+                let message = error.localizedDescription
+                DispatchQueue.main.async {
+                    guard gate.isCurrent(revision) else { return }
+                    self?.errorMessage = message
+                }
+            }
+        }
     }
 
     func setEqualizerEnabled(_ enabled: Bool) {
@@ -276,6 +388,8 @@ final class PlayerViewModel {
     var webSnapshot: [String: Any] {
         [
             "file": currentSource?.name ?? "Open a music file",
+            "title": currentSource?.title ?? "Open a music file",
+            "trackMetadata": currentSource?.metadata ?? [:],
             "path": currentSource?.location ?? "Local playback · original formats · native audio output",
             "loaded": filePath != nil, "playing": isPlaying, "ended": reachedEnd,
             "elapsed": elapsedSeconds, "window": max(displayDuration, elapsedSeconds + 1),
@@ -292,7 +406,8 @@ final class PlayerViewModel {
                  "tempo": descriptor.supportsTempo, "longPlay": descriptor.supportsLongPlay] as [String: Any]
             },
             "files": sessionFiles.enumerated().map { index, source in
-                ["index": index, "name": source.name, "selected": source == currentSource] as [String: Any]
+                ["index": index, "name": source.name, "title": source.title,
+                 "subtitle": source.subtitle, "selected": source == currentSource] as [String: Any]
             },
             "diagnostics": ["buffered": diagnostics.bufferedFrames, "capacity": diagnostics.capacityFrames,
                 "underruns": diagnostics.underrunCount, "requested": diagnostics.framesRequested,
@@ -328,10 +443,11 @@ final class PlayerViewModel {
         case "length": if let number = finite { manualSeconds = Int(min(86400, max(0, number))); applyTimingChange() }
         case "fade": if let number = finite { fadeSeconds = Int(min(60, max(0, number))); applyTimingChange() }
         case "tempo":
-            if let number = finite {
-                let steps = min(256, max(1, Int((number * 32).rounded())))
-                tempo = Double(steps) / 32
+            if let nextTempo = Self.parseTempo(value) {
+                tempo = nextTempo
                 applyTimingChange()
+            } else {
+                errorMessage = "Enter a playback speed from 1/64× to 8×, such as 1/64 or 5/4."
             }
         case "volume":
             if let number = finite { volume = min(1, max(0, number)); perform(.setOutputVolume, .init(outputVolume: Float(volume))) }
@@ -360,6 +476,33 @@ final class PlayerViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private static func parseTempo(_ value: Any?) -> Double? {
+        let text: String
+        if let string = value as? String {
+            text = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        } else if let number = value as? NSNumber {
+            text = number.stringValue
+        } else {
+            return nil
+        }
+        guard !text.isEmpty else { return nil }
+
+        let parsed: Double
+        if let slash = text.firstIndex(of: "/") {
+            guard text.firstIndex(of: "/") == text.lastIndex(of: "/"),
+                  let numerator = Double(text[..<slash].trimmingCharacters(in: .whitespaces)),
+                  let denominator = Double(text[text.index(after: slash)...].trimmingCharacters(in: .whitespaces)),
+                  numerator.isFinite, denominator.isFinite, numerator > 0, denominator > 0 else { return nil }
+            parsed = numerator / denominator
+        } else {
+            guard let number = Double(text) else { return nil }
+            parsed = number
+        }
+        guard parsed.isFinite, (1.0 / 64.0 ... 8.0).contains(parsed) else { return nil }
+        let steps = min(512, max(1, Int((parsed * 64).rounded())))
+        return Double(steps) / 64
     }
 }
 

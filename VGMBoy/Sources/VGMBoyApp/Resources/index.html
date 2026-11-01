@@ -73,14 +73,18 @@
                 <input class="field" id="fade" type="number" min="0" max="60" value="6" data-control="fade">
               </div>
               <div class="setting-row">
-                <label for="tempo">Playback speed<small>1/32 steps · 1/32× to 8×</small></label>
+                <label for="tempo">Playback speed<small>1/64 steps · enter a fraction such as 1/64</small></label>
                 <div class="tempo-control">
-                  <input class="range" id="tempo" type="range" min="1" max="256" step="1" value="32" data-control="tempo" aria-label="Playback speed">
-                  <output id="tempo-label" for="tempo">1×</output>
+                  <input class="range" id="tempo" type="range" min="1" max="512" step="1" value="64" data-control="tempo" aria-label="Playback speed">
+                  <input class="field tempo-input" id="tempo-input" type="text" inputmode="decimal" autocomplete="off" maxlength="16" value="1" data-control="tempo-input" aria-label="Playback speed fraction">
                 </div>
               </div>
             </section>
           </div>
+          <section class="group metadata-group" aria-labelledby="metadata-heading">
+            <h2 id="metadata-heading">TRACK TAGS</h2>
+            <dl id="track-tags" class="tag-grid" aria-live="polite"></dl>
+          </section>
           <p class="hint">Timing changes preserve the current position and play state. Speed depends on decoder support.</p>
         </section>
 
