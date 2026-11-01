@@ -141,6 +141,13 @@ public enum FormatRegistry {
         supportsTempo: false
     )
 
+    public static let aresSNESFamily = DecoderFamily(
+        id: "ares-snes",
+        supportsLongPlay: true,
+        supportsTempo: false,
+        hasNaturalEnding: false
+    )
+
     public static let qsfFamily = DecoderFamily(
         id: "qsf",
         supportsLongPlay: true,
@@ -209,6 +216,9 @@ public enum FormatRegistry {
         "psf", "minipsf", "psf2", "minipsf2"
     ]
 
+    /// UAC-native SNES state members restored by the ares headless runtime.
+    public static let aresSNESExtensions: Set<String> = ["snesstate"]
+
     public static let qsfExtensions: Set<String> = ["qsf", "miniqsf"]
 
     public static let sidplayfpExtensions: Set<String> = ["sid"]
@@ -237,6 +247,7 @@ public enum FormatRegistry {
         PlaybackFormatDescriptor(id: "vgmstream", family: vgmstreamFamily, extensions: vgmstreamExtensions),
         PlaybackFormatDescriptor(id: "lazyusf", family: lazyusfFamily, extensions: lazyusfExtensions),
         PlaybackFormatDescriptor(id: "playpsf", family: playpsfFamily, extensions: playpsfExtensions),
+        PlaybackFormatDescriptor(id: "ares-snes", family: aresSNESFamily, extensions: aresSNESExtensions),
         PlaybackFormatDescriptor(id: "qsf", family: qsfFamily, extensions: qsfExtensions),
         PlaybackFormatDescriptor(id: "sidplayfp", family: sidplayfpFamily, extensions: sidplayfpExtensions),
         PlaybackFormatDescriptor(id: "openmpt", family: openMPTFamily, extensions: openMPTExtensions),
@@ -302,6 +313,9 @@ public enum FormatRegistry {
         }
         if playpsfExtensions.contains(ext) {
             return playpsfFamily
+        }
+        if aresSNESExtensions.contains(ext) {
+            return aresSNESFamily
         }
         if qsfExtensions.contains(ext) {
             return qsfFamily

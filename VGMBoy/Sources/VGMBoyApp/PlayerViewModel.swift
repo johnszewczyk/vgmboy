@@ -47,6 +47,7 @@ final class PlayerViewModel {
     var displayDuration: Double {
         guard filePath != nil else { return 0 }
         if longPlayEnabled, let family = currentFamily, family.supportsLongPlay {
+            guard manualSeconds > 0 else { return 0 }
             return Double(manualSeconds + fadeSeconds)
         }
         return 150 + Double(fadeSeconds)
@@ -231,7 +232,8 @@ final class PlayerViewModel {
             let mode: PlaybackMode = longPlayEnabled && currentFamily?.supportsLongPlay == true ? .longPlay : .fileDefault
             let loaded = controller.perform(.init(command: .load, payload: .init(
                 path: filePath, archiveEntry: archiveEntry, trackIndex: selectedTrack, tempo: tempo, playbackMode: mode,
-                playMilliseconds: manualSeconds * 1_000, fadeMilliseconds: fadeSeconds * 1_000
+                playMilliseconds: mode == .longPlay ? manualSeconds * 1_000 : nil,
+                fadeMilliseconds: fadeSeconds * 1_000
             )))
             if loaded.kind == .error { throw PlayerControlError.rejected(loaded.message) }
             hasPlaybackLoaded = true
@@ -323,7 +325,7 @@ final class PlayerViewModel {
             }
         case "seek": if let number = finite { seek(to: min(max(0, number), max(displayDuration, elapsedSeconds))) }
         case "longPlay": if let enabled = value as? Bool { longPlayEnabled = enabled; applyTimingChange() }
-        case "length": if let number = finite { manualSeconds = Int(min(86400, max(5, number))); applyTimingChange() }
+        case "length": if let number = finite { manualSeconds = Int(min(86400, max(0, number))); applyTimingChange() }
         case "fade": if let number = finite { fadeSeconds = Int(min(60, max(0, number))); applyTimingChange() }
         case "tempo":
             if let number = finite {

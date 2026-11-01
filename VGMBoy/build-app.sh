@@ -24,6 +24,8 @@ install -m 755 "$BIN_DIR/VGMBoy" "$APP_DIR/Contents/MacOS/VGMBoy"
 cp -R "$BIN_DIR/VGMBoy_VGMBoyApp.bundle" "$APP_DIR/Contents/Resources/"
 install -m 644 "$SCRIPT_DIR/Resources/Info.plist" "$APP_DIR/Contents/Info.plist"
 
+"$SCRIPT_DIR/scripts/copy-ares-snes-runtime.sh" "$APP_DIR/Contents/Resources"
+
 ICON_SOURCE=""
 for candidate in "$SCRIPT_DIR/app-icon.png" "$SCRIPT_DIR/app-icon.jpg"; do
     if [[ -f "$candidate" ]]; then

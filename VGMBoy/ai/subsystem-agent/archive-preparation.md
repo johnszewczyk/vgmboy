@@ -15,10 +15,12 @@ finite AAC export; it has no catalog, queue, or UI policy.
   selected entry needs extraction alone, a complete archive set, or a complete
   set with lazyUSF aliases.
 - `ArchiveMaterializer.listEntries` owns bounded archive member discovery for
-  local file-open workflows. UAC entries come from the validated manifest;
-  other containers use the configured listing tools and shared parsers. A
-  frontend filters those entries through `FormatRegistry` and retains the
-  original source/member pair for playback.
+  local file-open workflows. UAC entries come from the validated manifest and
+  only `playable`/`track` roles are offered; assets such as dump-info, artwork,
+  or unresolved capture states are never imported as tracks. Other containers
+  use the configured listing tools and shared parsers. A frontend then filters
+  those entries through `FormatRegistry` and retains the original
+  source/member pair for playback.
 - `VGMBoyArchiveCore.ArchiveMaterializer` validates the source and member,
   routes the required archive operation, prepares format dependencies, and
   holds the temporary result for the active playback session. AAC export uses

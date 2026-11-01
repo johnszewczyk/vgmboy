@@ -80,6 +80,7 @@ STAGING_EXECUTABLE="$STAGING_CONTENTS/MacOS/$APP_NAME"
 STAGING_FRAMEWORKS_DIR="$STAGING_CONTENTS/Frameworks"
 
 mkdir -p "$STAGING_CONTENTS/MacOS" "$STAGING_FRAMEWORKS_DIR" "$STAGING_CONTENTS/Resources"
+"$VGMBoy_DIR/scripts/copy-ares-snes-runtime.sh" "$STAGING_CONTENTS/Resources"
 
 cp -X "$ROOT_DIR/Resources/Info.plist" "$STAGING_CONTENTS/Info.plist"
 if [[ -f "$ROOT_DIR/app-icon.png" ]]; then

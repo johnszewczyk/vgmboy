@@ -222,7 +222,8 @@
       const duration = state.loaded ? Math.max(0, Number(state.window) || 0) : 0;
       $('position').max = String(Math.max(1, duration));
       setControl('position', state.elapsed);
-      setText('clock', formatTime(state.elapsed) + ' / ' + formatTime(duration));
+      const unbounded = state.loaded && state.longPlay && state.supportsLongPlay && Number(state.length) === 0;
+      setText('clock', formatTime(state.elapsed) + ' / ' + (unbounded ? '∞' : formatTime(duration)));
 
       document.querySelectorAll('[data-loaded]').forEach(control => { control.disabled = !state.loaded; });
       renderTracks(state.trackCount);

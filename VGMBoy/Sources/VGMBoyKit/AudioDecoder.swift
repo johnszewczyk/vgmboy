@@ -75,6 +75,8 @@ enum DecoderFactory {
             return try LazyUSFDecoder(path: path, sampleRate: sampleRate)
         case "playpsf":
             return try PlayPSFDecoder(path: path, sampleRate: sampleRate)
+        case "ares-snes":
+            return try AresSNESDecoder(path: path, sampleRate: sampleRate)
         case "qsf":
             return try QSFDecoder(path: path, sampleRate: sampleRate)
         default:

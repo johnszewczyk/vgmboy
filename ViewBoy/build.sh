@@ -37,6 +37,7 @@ cp "$ROOT_DIR/app-info.plist" "$APP_DIR/Contents/Info.plist"
 cp "$ROOT_DIR/app-icon.png" "$APP_DIR/Contents/Resources/app-icon.png"
 xattr -c "$APP_DIR/Contents/Resources/app-icon.png"
 ditto "$RESOURCE_BUNDLE" "$APP_DIR/Contents/Resources/ViewBoy_ViewBoy.bundle"
+"$VGMBoy_DIR/scripts/copy-ares-snes-runtime.sh" "$APP_DIR/Contents/Resources"
 chmod +x "$APP_DIR/Contents/MacOS/ViewBoy"
 SIGNING_IDENTITY="-"
 if security find-identity -v -p codesigning 2>/dev/null | grep -Fq "$DEVELOPMENT_SIGNING_IDENTITY"; then

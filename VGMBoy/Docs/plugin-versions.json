@@ -115,6 +115,16 @@
       "formats": ["QSF", "miniQSF"]
     },
     {
+      "id": "ares-snes-state",
+      "name": "ares SNES native-state runtime",
+      "kind": "snapshot",
+      "current": "0aafd85789215e84e1e43415c07d4c88461b7899",
+      "sourceIdentity": "ares v148 tag; separately built in the Game Rips Super Castlevania IV study, not vendored in VGMBoy",
+      "upstream": "https://github.com/ares-emulator/ares",
+      "milestoneCheck": "manual",
+      "formats": ["UACNSNES v1 (.snesstate)"]
+    },
+    {
       "id": "mgba",
       "name": "mGBA / Highly Complete",
       "kind": "snapshot",

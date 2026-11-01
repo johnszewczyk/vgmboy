@@ -30,6 +30,13 @@ for ScanSong's external inspection executables.
   includes source contents and the patch so edits cannot hide behind a stale
   built product.
 - Compiled archives and scanner-plugin outputs belong under VGMBoy's `.build`.
+- The experimental SNES state decoder consumes a separately built
+  `ares-agent-host`; use `scripts/stage-ares-snes-host.sh <host>` to place it
+  under `.build/dependencies/ares-snes`, then each macOS app builder calls
+  `scripts/copy-ares-snes-runtime.sh <app>/Contents/Resources` to include the
+  helper and pinned SFC database. The host is intentionally separate from
+  `build-dependencies.sh` because its source/build belongs to the Game Rips
+  workshop, not VGMBoy's ordinary decoder dependency garden.
 - The decoder-library and scanner-plugin builders target macOS 26.0, matching
   the Swift packages. The dependency input stamps include the selected SDK and
   deployment target, so changing either rebuilds native archives rather than
