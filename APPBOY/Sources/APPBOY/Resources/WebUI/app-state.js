@@ -26,6 +26,52 @@
     }
   };
 
+  function gcd(a, b) {
+    let x = Math.abs(Math.trunc(a));
+    let y = Math.abs(Math.trunc(b));
+    while (y !== 0) {
+      const r = x % y;
+      x = y;
+      y = r;
+    }
+    return x || 1;
+  }
+
+  function quantizeSpeedRate(rawRate) {
+    const clamped = Math.min(2.0, Math.max(0.5, Number.isFinite(rawRate) ? rawRate : 1.25));
+    const steps32 = Math.min(64, Math.max(16, Math.round(clamped * 32)));
+    const divisor = gcd(steps32, 32);
+    return {
+      numerator: steps32 / divisor,
+      denominator: 32 / divisor,
+      rate: steps32 / 32
+    };
+  }
+
+  function parseSpeedInput(rawText, fallbackRate = 1.25) {
+    const cleaned = String(rawText ?? "").trim().replace(/[×xX]$/u, "").trim();
+    if (!cleaned) return quantizeSpeedRate(fallbackRate).rate;
+    if (cleaned.includes("/")) {
+      const parts = cleaned.split("/");
+      if (parts.length === 2) {
+        const num = Number(parts[0].trim());
+        const den = Number(parts[1].trim());
+        if (Number.isFinite(num) && Number.isFinite(den) && den > 0) {
+          return quantizeSpeedRate(num / den).rate;
+        }
+      }
+      return quantizeSpeedRate(fallbackRate).rate;
+    }
+    const parsed = Number(cleaned);
+    if (!Number.isFinite(parsed)) return quantizeSpeedRate(fallbackRate).rate;
+    return quantizeSpeedRate(parsed).rate;
+  }
+
+  function formatSpeedRatio(rate) {
+    const q = quantizeSpeedRate(Number(rate) || 1.0);
+    return `${q.numerator}/${q.denominator}`;
+  }
+
   const state = {
     mobilePane: "library",
     contentMode: "playlist",
@@ -36,9 +82,12 @@
     expandedConsoleIds: new Set(),
     catalog: {
       sourceLabel: "Starter Catalog",
+      databasePath: "",
+      schemaVersion: 0,
       consoleCount: 0,
       albumCount: 0,
       trackCount: 0,
+      artworkCount: 0,
       consoles: []
     },
     favoriteIds: new Set(),
@@ -48,6 +97,7 @@
     sortColumn: null,
     sortDirection: "asc",
     selectedAlbumId: null,
+    diagnostics: null,
     preferences: {
       accentColor: "#38aaff",
       uiChromePrimaryColor: "#111419",
@@ -88,8 +138,7 @@
       transportState: "stopped",
       elapsedSeconds: 0,
       durationSeconds: 0,
-      playbackRate: 1.0,
-      scrubbing: false
+      playbackRate: 1.0
     }
   };
 
@@ -97,14 +146,16 @@
     indicator: document.getElementById("sb2-selection-indicator"),
     consoleLabel: document.getElementById("sb2-console-label"),
     albumLabel: document.getElementById("sb2-album-label"),
-    mobileModeBar: document.getElementById("mobile-mode-bar"),
     searchInput: document.getElementById("sidebar-search-input"),
-    splitGalleryBtn: document.getElementById("split-gallery-button"),
-    splitRecentBtn: document.getElementById("split-recent-button"),
-    splitFavoritesBtn: document.getElementById("split-favorites-button"),
+    viewToggleBtn: document.getElementById("sidebar-view-toggle-button"),
+    galleryBtn: document.getElementById("sidebar-gallery-button"),
+    recentBtn: document.getElementById("sidebar-history-button"),
+    favoritesBtn: document.getElementById("sidebar-favorites-button"),
     foldToggleBtn: document.getElementById("sidebar-fold-toggle-button"),
     foldIconUse: document.getElementById("sidebar-fold-icon-use"),
     treeRoot: document.getElementById("tree-root"),
+    contentPane: document.getElementById("content-pane"),
+    tabsToolbar: document.getElementById("playlist-tabs-toolbar"),
     tabsContainer: document.getElementById("playlist-tabs"),
     newTabBtn: document.getElementById("new-tab-button"),
     playlistView: document.getElementById("playlist-view"),
@@ -114,14 +165,6 @@
     sortTimeBtn: document.getElementById("sort-time-button"),
     galleryView: document.getElementById("gallery-view"),
     galleryGrid: document.getElementById("gallery-grid"),
-    nowPlayingTitle: document.getElementById("now-playing-title"),
-    nowPlayingMeta: document.getElementById("now-playing-meta"),
-    eqBadge: document.getElementById("eq-readout-badge"),
-    longPlayBadge: document.getElementById("long-play-readout-badge"),
-    speedBadge: document.getElementById("speed-readout-badge"),
-    repeatBadge: document.getElementById("repeat-readout-badge"),
-    progressSlider: document.getElementById("progress-slider"),
-    progressShell: document.getElementById("progress-slider-shell"),
     prevBtn: document.getElementById("previous-button"),
     stopBtn: document.getElementById("stop-button"),
     playBtn: document.getElementById("play-button"),
@@ -139,6 +182,7 @@
     sidebarStats: document.getElementById("sidebar-stats"),
     statusStateWrap: document.getElementById("status-state-wrap"),
     statusLabel: document.getElementById("sb2-app-status-label"),
+    currentTrackTitle: document.getElementById("sb2-current-track-title"),
     elapsedLabel: document.getElementById("elapsed-label"),
     songLengthLabel: document.getElementById("song-length-label"),
     playlistTotalLabel: document.getElementById("playlist-total-label"),
@@ -178,9 +222,20 @@
     optFadeEnabled: document.getElementById("opt-fade-enabled"),
     optFadeDuration: document.getElementById("opt-fade-duration"),
     optSourceLabel: document.getElementById("opt-source-label"),
+    optDbSummary: document.getElementById("opt-db-summary"),
     optRemoteURL: document.getElementById("opt-remote-url"),
     optReloadCatalogBtn: document.getElementById("opt-reload-catalog-button"),
-    optSourceStatus: document.getElementById("opt-source-status")
+    optSourceStatus: document.getElementById("opt-source-status"),
+    diagRefreshBtn: document.getElementById("diag-refresh-button"),
+    diagBackend: document.getElementById("diag-backend"),
+    diagTransport: document.getElementById("diag-transport"),
+    diagSampleRate: document.getElementById("diag-sample-rate"),
+    diagBuffers: document.getElementById("diag-buffers"),
+    diagFrames: document.getElementById("diag-frames"),
+    diagTempo: document.getElementById("diag-tempo"),
+    diagEq: document.getElementById("diag-eq"),
+    diagContainer: document.getElementById("diag-container"),
+    diagPosition: document.getElementById("diag-position")
   };
 
   let pendingSettingsPatch = {};
@@ -276,6 +331,7 @@
 
   function syncOptionsInputsFromState() {
     const p = state.preferences;
+    const c = state.catalog;
     if (refs.optAccentColor && document.activeElement !== refs.optAccentColor) refs.optAccentColor.value = p.accentColor;
     if (refs.optChromePrimary && document.activeElement !== refs.optChromePrimary) refs.optChromePrimary.value = p.uiChromePrimaryColor;
     if (refs.optChromePane && document.activeElement !== refs.optChromePane) refs.optChromePane.value = p.uiChromePaneColor;
@@ -322,7 +378,7 @@
     }
     if (refs.optAppVolumeValue) refs.optAppVolumeValue.textContent = `${Math.round(vol * 100)}%`;
 
-    // Playback: Long Play + Fade Out + Speed
+    // Playback: Long Play + Fade Out + 1/32 Speed
     if (refs.optLongPlayEnabled) refs.optLongPlayEnabled.checked = Boolean(p.longPlayEnabled);
     if (refs.optManualDuration && document.activeElement !== refs.optManualDuration) {
       refs.optManualDuration.value = formatTime(p.manualPlayTimeSeconds);
@@ -334,7 +390,7 @@
 
     if (refs.optSpeedEnabled) refs.optSpeedEnabled.checked = Boolean(p.playbackSpeedEnabled);
     if (refs.optSpeedRate && document.activeElement !== refs.optSpeedRate) {
-      refs.optSpeedRate.value = Number(p.playbackSpeedRate || 1.25).toFixed(2);
+      refs.optSpeedRate.value = formatSpeedRatio(p.playbackSpeedRate || 1.25);
     }
     document.querySelectorAll("[data-speed-preset]").forEach((btn) => {
       const presetVal = Number(btn.dataset.speedPreset);
@@ -342,9 +398,55 @@
       btn.classList.toggle("is-selected", active);
     });
 
-    if (refs.optSourceLabel) refs.optSourceLabel.textContent = state.catalog.sourceLabel || "Starter Catalog";
+    if (refs.optSourceLabel) refs.optSourceLabel.textContent = c.sourceLabel || "Starter Catalog";
+    if (refs.optDbSummary) {
+      refs.optDbSummary.textContent = `${c.albumCount || 0} games · ${c.consoleCount || 0} systems · ${c.trackCount || 0} tracks`;
+    }
     if (refs.optRemoteURL && document.activeElement !== refs.optRemoteURL) {
       refs.optRemoteURL.value = p.remoteCatalogURL || "";
+    }
+  }
+
+  function renderDiagnostics(diag) {
+    if (diag && typeof diag === "object") {
+      state.diagnostics = diag;
+    }
+    const d = state.diagnostics;
+    if (!d) return;
+    if (refs.diagBackend) refs.diagBackend.textContent = d.backendName || "Idle";
+    if (refs.diagTransport) refs.diagTransport.textContent = String(d.transportState || "stopped").toUpperCase();
+    if (refs.diagSampleRate) {
+      refs.diagSampleRate.textContent = d.sampleRateHz ? `${d.sampleRateHz} Hz` : "—";
+    }
+    if (refs.diagBuffers) {
+      refs.diagBuffers.textContent = d.targetBuffers
+        ? `${d.queuedBuffers ?? 0} / ${d.targetBuffers} queued`
+        : "—";
+    }
+    if (refs.diagFrames) {
+      refs.diagFrames.textContent = Number.isFinite(d.framesScheduled)
+        ? Number(d.framesScheduled).toLocaleString()
+        : "0";
+    }
+    if (refs.diagTempo) refs.diagTempo.textContent = d.tempoDisplay || "1/1 (1.00×)";
+    if (refs.diagEq) {
+      refs.diagEq.textContent = d.equalizerEnabled
+        ? `Enabled (${Number(d.headroomCompensationDB || 0).toFixed(1)} dB headroom)`
+        : "Bypassed";
+    }
+    if (refs.diagContainer) refs.diagContainer.textContent = d.containerSummary || "—";
+    if (refs.diagPosition) {
+      refs.diagPosition.textContent = `${formatTime(d.positionSeconds || 0)} / ${formatTime(d.durationSeconds || 0)}`;
+    }
+  }
+
+  async function refreshDiagnostics() {
+    if (!window.appBoy?.audioDiagnostics) return;
+    try {
+      const diag = await window.appBoy.audioDiagnostics();
+      renderDiagnostics(diag);
+    } catch {
+      // Ignore transient bridge errors
     }
   }
 
@@ -435,12 +537,16 @@
     refs,
     formatTime,
     parseDurationInput,
+    parseSpeedInput,
+    formatSpeedRatio,
     effectiveTrackDuration,
     formatGainDB,
     setRangeSliderPercent,
     showErrorToast,
     applyPreferencesToDOM,
     syncOptionsInputsFromState,
+    renderDiagnostics,
+    refreshDiagnostics,
     queueSettingsPatch,
     flushSettings,
     scheduleWorkspaceSave,

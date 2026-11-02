@@ -1,12 +1,11 @@
 import AVFoundation
 import Foundation
 import MediaPlayer
+import VGMBoyEmbeddedCore
 
 @MainActor
 final class AppBoyPlaybackCoordinator {
-    static let equalizerFrequencies: [Float] = [
-        31, 62, 125, 250, 500, 1_000, 2_000, 4_000, 8_000, 16_000
-    ]
+    static let equalizerFrequencies: [Float] = EmbeddedEqualizerConfiguration.bandFrequencies
 
     var onStateChanged: ((AppBoyPlaybackStateSnapshot) -> Void)?
     var onNaturalEnd: ((Int, String) -> Void)?
@@ -14,29 +13,44 @@ final class AppBoyPlaybackCoordinator {
 
     private enum BackendMode {
         case none
+        case embeddedGME
         case engine
         case streamPlayer
+
+        var isEngineBacked: Bool {
+            self == .embeddedGME || self == .engine
+        }
     }
 
-    // Primary local / synthesized audio graph (10-band EQ + Mono + Long Play + Speed)
+    // Primary in-process audio graph (VGMBoyEmbeddedCore + AVAudioFile -> 10-band EQ + Headroom)
     private let engine = AVAudioEngine()
     private let playerNode = AVAudioPlayerNode()
     private let timePitchNode = AVAudioUnitTimePitch()
-    private let eqNode = AVAudioUnitEQ(numberOfBands: 10)
+    private let eqNode = AVAudioUnitEQ(numberOfBands: EmbeddedEqualizerConfiguration.bandCount)
     private var engineGraphAttached = false
     private var engineSampleRate: Double = 0.0
     private var engineProcessingFormat: AVAudioFormat?
     private let chunkFrameCount: AVAudioFrameCount = 4_096
     private let targetQueuedBuffers: Int = 6
 
+    // VGMBoyEmbeddedCore cycle-accurate decoder state
+    private var gmeDecoder: EmbeddedGMEDecoder?
+    private var gmeScratchInt16: [Int16] = Array(repeating: 0, count: 4_096 * 2)
+    private var activeContainerSummary: String = "—"
+
+    // Local AVAudioFile state
     private var audioFile: AVAudioFile?
     private var fileLengthFrames: AVAudioFramePosition = 0
     private var fileSampleRate: Double = 44_100.0
     private var naturalFileDurationSeconds: Double = 0.0
+
     private var scheduleToken: Int = 0
     private var queuedBufferCount: Int = 0
+    private var totalScheduledFrames: Int64 = 0
     private var nextVirtualFrameToSchedule: AVAudioFramePosition = 0
     private var playbackAnchorFrame: AVAudioFramePosition = 0
+    private var playbackAnchorSongSeconds: Double = 0.0
+    private var nextSongSecondsToSchedule: Double = 0.0
     private var pausedElapsedSeconds: Double = 0.0
     private var didScheduleFinalFrame = false
     private var engineTickTask: Task<Void, Never>?
@@ -57,7 +71,7 @@ final class AppBoyPlaybackCoordinator {
     private var configuredRate: Double = 1.0
     private var configuredVolume: Float = 1.0
     private var equalizerEnabled: Bool = false
-    private var equalizerBandsDB: [Double] = Array(repeating: 0.0, count: 10)
+    private var equalizerBandsDB: [Double] = Array(repeating: 0.0, count: EmbeddedEqualizerConfiguration.bandCount)
     private var monoEnabled: Bool = false
     private var longPlayEnabled: Bool = false
     private var manualPlayTimeSeconds: Double = 180.0
@@ -87,7 +101,8 @@ final class AppBoyPlaybackCoordinator {
 
     func applyPreferences(_ prefs: AppBoyPreferencesSnapshot) {
         configuredVolume = Float(min(max(prefs.appVolume, 0.0), 1.0))
-        let desiredRate = prefs.playbackSpeedEnabled ? min(max(prefs.playbackSpeedRate, 0.5), 2.0) : 1.0
+        let snappedTempo = EmbeddedPlaybackTempo.snapped(multiplier: prefs.playbackSpeedRate)
+        let desiredRate = prefs.playbackSpeedEnabled ? snappedTempo.multiplier : 1.0
         let rateChanged = abs(desiredRate - configuredRate) > 0.0005
         configuredRate = desiredRate
 
@@ -113,12 +128,14 @@ final class AppBoyPlaybackCoordinator {
             streamPlayer.rate = Float(configuredRate)
         }
 
-        if backendMode == .engine, currentTrack != nil {
+        if backendMode.isEngineBacked, currentTrack != nil {
             let newTarget = longPlayEnabled ? manualPlayTimeSeconds : naturalFileDurationSeconds
             let durationChanged = abs(newTarget - targetDurationSeconds) > 0.01
-            if durationChanged || monoChanged || fadeChanged {
+            let gmeRateChanged = (backendMode == .embeddedGME && rateChanged)
+            if durationChanged || monoChanged || fadeChanged || gmeRateChanged {
                 let currentPos = currentEngineElapsedSeconds()
                 targetDurationSeconds = newTarget
+                gmeDecoder?.setIgnoreSilence(longPlayEnabled)
                 if transportState == "playing" && currentPos >= newTarget {
                     completeNaturalEnd(forGeneration: generation)
                     return
@@ -147,7 +164,8 @@ final class AppBoyPlaybackCoordinator {
 
         currentTrack = track
         configuredVolume = Float(min(max(prefs.appVolume, 0.0), 1.0))
-        configuredRate = prefs.playbackSpeedEnabled ? min(max(prefs.playbackSpeedRate, 0.5), 2.0) : 1.0
+        let snappedTempo = EmbeddedPlaybackTempo.snapped(multiplier: prefs.playbackSpeedRate)
+        configuredRate = prefs.playbackSpeedEnabled ? snappedTempo.multiplier : 1.0
         equalizerEnabled = prefs.equalizerEnabled
         equalizerBandsDB = Self.sanitizedBands(prefs.equalizerBandsDB)
         monoEnabled = prefs.monoEnabled
@@ -159,16 +177,34 @@ final class AppBoyPlaybackCoordinator {
         teardownActiveBackends()
 
         do {
-            let resolvedURL = try AppBoyChiptuneSynth.resolvePlayableURL(
-                for: track.streamURI,
-                trackId: track.id,
-                naturalDurationSeconds: track.durationSeconds
-            )
-
-            if resolvedURL.isFileURL {
-                try startEnginePlayback(fileURL: resolvedURL, fallbackDuration: track.durationSeconds)
+            if let containerPath = track.uacContainerPath,
+               let memberPath = track.uacMemberPath {
+                try startEmbeddedUACPlayback(
+                    containerPath: containerPath,
+                    memberPath: memberPath,
+                    subsongIndex: track.subsongIndex,
+                    fallbackDuration: track.durationSeconds
+                )
             } else {
-                startStreamPlayback(url: resolvedURL, generation: activeGen, track: track)
+                let resolvedURL = try AppBoyChiptuneSynth.resolvePlayableURL(
+                    for: track.streamURI,
+                    trackId: track.id,
+                    naturalDurationSeconds: track.durationSeconds
+                )
+                if resolvedURL.isFileURL {
+                    let ext = resolvedURL.pathExtension.lowercased()
+                    if EmbeddedGMEDecoder.supports(pathExtension: ext) {
+                        try startEmbeddedLooseFilePlayback(
+                            fileURL: resolvedURL,
+                            subsongIndex: track.subsongIndex,
+                            fallbackDuration: track.durationSeconds
+                        )
+                    } else {
+                        try startEnginePlayback(fileURL: resolvedURL, fallbackDuration: track.durationSeconds)
+                    }
+                } else {
+                    startStreamPlayback(url: resolvedURL, generation: activeGen, track: track)
+                }
             }
 
             let snap = currentSnapshot(errorMessage: nil)
@@ -191,7 +227,7 @@ final class AppBoyPlaybackCoordinator {
         }
         guard currentTrack != nil else { return currentSnapshot(errorMessage: nil) }
         switch backendMode {
-        case .engine:
+        case .embeddedGME, .engine:
             pausedElapsedSeconds = currentEngineElapsedSeconds()
             playerNode.pause()
         case .streamPlayer:
@@ -214,7 +250,7 @@ final class AppBoyPlaybackCoordinator {
         configureAudioSession()
 
         switch backendMode {
-        case .engine:
+        case .embeddedGME, .engine:
             do {
                 if !engine.isRunning {
                     try engine.start()
@@ -252,13 +288,16 @@ final class AppBoyPlaybackCoordinator {
         }
         scheduleToken += 1
         switch backendMode {
-        case .engine:
+        case .embeddedGME, .engine:
             playerNode.stop()
             queuedBufferCount = 0
             playbackAnchorFrame = 0
             nextVirtualFrameToSchedule = 0
+            playbackAnchorSongSeconds = 0.0
+            nextSongSecondsToSchedule = 0.0
             pausedElapsedSeconds = 0.0
             didScheduleFinalFrame = false
+            try? gmeDecoder?.seek(toMilliseconds: 0)
         case .streamPlayer:
             streamPlayer.pause()
             streamPlayer.seek(to: .zero)
@@ -288,7 +327,7 @@ final class AppBoyPlaybackCoordinator {
         let clamped = max(0.0, min(seconds, max(targetDurationSeconds - 0.02, 0.0)))
 
         switch backendMode {
-        case .engine:
+        case .embeddedGME, .engine:
             reanchorEngine(at: clamped)
         case .streamPlayer:
             let time = CMTime(seconds: clamped, preferredTimescale: 600)
@@ -304,9 +343,15 @@ final class AppBoyPlaybackCoordinator {
     }
 
     func setRate(_ rate: Double) -> AppBoyPlaybackStateSnapshot {
-        configuredRate = min(max(rate, 0.5), 2.0)
+        let tempo = EmbeddedPlaybackTempo.snapped(multiplier: rate)
+        let prevRate = configuredRate
+        configuredRate = tempo.multiplier
+        let currentPos = backendMode.isEngineBacked ? currentEngineElapsedSeconds() : 0.0
         syncEngineParameters()
-        if backendMode == .streamPlayer && transportState == "playing" {
+        if backendMode == .embeddedGME, abs(prevRate - configuredRate) > 0.0005,
+           (transportState == "playing" || transportState == "paused") {
+            reanchorEngine(at: currentPos)
+        } else if backendMode == .streamPlayer && transportState == "playing" {
             streamPlayer.rate = Float(configuredRate)
         }
         let snap = currentSnapshot(errorMessage: nil)
@@ -329,12 +374,56 @@ final class AppBoyPlaybackCoordinator {
         return currentSnapshot(errorMessage: nil)
     }
 
+    func diagnosticsSnapshot() -> AppBoyAudioDiagnostics {
+        let eqConfig = EmbeddedEqualizerConfiguration(
+            enabled: equalizerEnabled,
+            gainsDecibels: equalizerBandsDB.map(Float.init)
+        )
+        let tempo = EmbeddedPlaybackTempo.snapped(multiplier: configuredRate)
+        let tempoString: String
+        if tempo.denominator == 1 {
+            tempoString = "\(tempo.numerator)×"
+        } else {
+            tempoString = "\(tempo.numerator)/\(tempo.denominator)× (\(String(format: "%.2f", tempo.multiplier))×)"
+        }
+        let decoderLabel: String
+        switch backendMode {
+        case .embeddedGME:
+            let sys = gmeDecoder?.timing.systemName ?? ""
+            decoderLabel = sys.isEmpty
+                ? "VGMBoyEmbeddedCore · libgme"
+                : "VGMBoyEmbeddedCore · \(sys)"
+        case .engine:
+            decoderLabel = "AVAudioEngine · Local PCM"
+        case .streamPlayer:
+            decoderLabel = "AVPlayer · Remote Stream"
+        case .none:
+            decoderLabel = "Idle"
+        }
+        let snap = currentSnapshot(errorMessage: nil)
+        return AppBoyAudioDiagnostics(
+            backendName: decoderLabel,
+            transportState: transportState.capitalized,
+            sampleRateHz: backendMode.isEngineBacked ? Int(fileSampleRate.rounded()) : 44_100,
+            queuedBuffers: queuedBufferCount,
+            targetBuffers: targetQueuedBuffers,
+            framesScheduled: totalScheduledFrames,
+            equalizerEnabled: equalizerEnabled,
+            headroomCompensationDB: Double(eqConfig.headroomCompensationDecibels),
+            tempoDisplay: tempoString,
+            trackTitle: currentTrack?.title ?? "Not loaded",
+            containerSummary: activeContainerSummary,
+            positionSeconds: snap.elapsedSeconds,
+            durationSeconds: snap.durationSeconds
+        )
+    }
+
     func currentSnapshot(errorMessage: String?) -> AppBoyPlaybackStateSnapshot {
         let elapsed: Double
         var duration = targetDurationSeconds
 
         switch backendMode {
-        case .engine:
+        case .embeddedGME, .engine:
             elapsed = currentEngineElapsedSeconds()
         case .streamPlayer:
             let rawSeconds = streamPlayer.currentTime().seconds
@@ -357,7 +446,7 @@ final class AppBoyPlaybackCoordinator {
         )
     }
 
-    // MARK: - AVAudioEngine Local & Synthesized Pipeline
+    // MARK: - VGMBoyEmbeddedCore + AVAudioEngine Pipeline
 
     private func configureEqualizerBandsMetadata() {
         for (index, freq) in Self.equalizerFrequencies.enumerated() where index < eqNode.bands.count {
@@ -408,29 +497,113 @@ final class AppBoyPlaybackCoordinator {
     }
 
     private func syncEngineParameters() {
-        timePitchNode.rate = Float(configuredRate)
-        timePitchNode.pitch = 0.0
-        timePitchNode.bypass = abs(configuredRate - 1.0) < 0.001
+        if backendMode == .embeddedGME {
+            // Hardware timer tempo scaling inside EmbeddedGMEDecoder avoids time-stretch artifacts.
+            timePitchNode.rate = 1.0
+            timePitchNode.pitch = 0.0
+            timePitchNode.bypass = true
+            gmeDecoder?.setTempo(configuredRate)
+        } else {
+            timePitchNode.rate = Float(configuredRate)
+            timePitchNode.pitch = 0.0
+            timePitchNode.bypass = abs(configuredRate - 1.0) < 0.001
+        }
 
+        let eqConfig = EmbeddedEqualizerConfiguration(
+            enabled: equalizerEnabled,
+            gainsDecibels: equalizerBandsDB.map(Float.init)
+        )
         eqNode.bypass = !equalizerEnabled
-        var maxPositiveBoostDB = 0.0
-        for index in 0..<min(eqNode.bands.count, equalizerBandsDB.count) {
-            let gainDB = equalizerBandsDB[index]
-            if equalizerEnabled && gainDB > maxPositiveBoostDB {
-                maxPositiveBoostDB = gainDB
-            }
+        for index in 0..<min(eqNode.bands.count, eqConfig.gainsDecibels.count) {
+            let gainDB = eqConfig.gainsDecibels[index]
             let band = eqNode.bands[index]
-            band.gain = Float(gainDB)
+            band.gain = gainDB
             band.bypass = !equalizerEnabled || abs(gainDB) < 0.01
         }
 
-        // Non-clipping headroom compensation matching SB2's audio rule.
-        let headroomLinear = equalizerEnabled && maxPositiveBoostDB > 0.0
-            ? Float(pow(10.0, -maxPositiveBoostDB / 20.0))
+        let headroomDB = eqConfig.headroomCompensationDecibels
+        let headroomLinear = headroomDB < 0
+            ? Float(pow(10.0, Double(headroomDB) / 20.0))
             : 1.0
         if engineGraphAttached {
             engine.mainMixerNode.outputVolume = configuredVolume * headroomLinear
         }
+    }
+
+    private func startEmbeddedUACPlayback(
+        containerPath: String,
+        memberPath: String,
+        subsongIndex: Int,
+        fallbackDuration: Double
+    ) throws {
+        let containerURL = URL(fileURLWithPath: containerPath)
+        let chipData = try UACEmbeddedArchiveReader.readMemberData(
+            containerURL: containerURL,
+            memberPath: memberPath
+        )
+        activeContainerSummary = "\(containerURL.lastPathComponent) · \(memberPath)"
+        try startEmbeddedDecoder(
+            chipData: chipData,
+            subsongIndex: subsongIndex,
+            fallbackDuration: fallbackDuration
+        )
+    }
+
+    private func startEmbeddedLooseFilePlayback(
+        fileURL: URL,
+        subsongIndex: Int,
+        fallbackDuration: Double
+    ) throws {
+        let chipData = try Data(contentsOf: fileURL, options: .mappedIfSafe)
+        activeContainerSummary = fileURL.lastPathComponent
+        try startEmbeddedDecoder(
+            chipData: chipData,
+            subsongIndex: subsongIndex,
+            fallbackDuration: fallbackDuration
+        )
+    }
+
+    private func startEmbeddedDecoder(
+        chipData: Data,
+        subsongIndex: Int,
+        fallbackDuration: Double
+    ) throws {
+        let sr = 44_100
+        let decoder = try EmbeddedGMEDecoder(
+            data: chipData,
+            sampleRate: sr,
+            subsongIndex: subsongIndex,
+            enableAccuracy: true
+        )
+        decoder.configureFade(startSeconds: nil, fadeDurationSeconds: 0)
+        decoder.setIgnoreSilence(longPlayEnabled)
+        decoder.setTempo(configuredRate)
+
+        backendMode = .embeddedGME
+        gmeDecoder = decoder
+        fileSampleRate = Double(sr)
+
+        let natural = fallbackDuration > 0.5
+            ? fallbackDuration
+            : (decoder.timing.resolvedDurationSeconds ?? 150.0)
+        naturalFileDurationSeconds = max(1.0, natural)
+        targetDurationSeconds = longPlayEnabled ? manualPlayTimeSeconds : naturalFileDurationSeconds
+
+        try ensureEngineGraph(sampleRate: Double(sr))
+
+        scheduleToken += 1
+        playbackAnchorFrame = 0
+        nextVirtualFrameToSchedule = 0
+        playbackAnchorSongSeconds = 0.0
+        nextSongSecondsToSchedule = 0.0
+        pausedElapsedSeconds = 0.0
+        queuedBufferCount = 0
+        totalScheduledFrames = 0
+        didScheduleFinalFrame = false
+
+        refillEngineBuffers(token: scheduleToken)
+        playerNode.play()
+        transportState = "playing"
     }
 
     private func startEnginePlayback(fileURL: URL, fallbackDuration: Double) throws {
@@ -442,21 +615,25 @@ final class AppBoyPlaybackCoordinator {
             ])
         }
 
-        try ensureEngineGraph(sampleRate: sr)
-
         backendMode = .engine
         audioFile = file
+        activeContainerSummary = fileURL.lastPathComponent
         fileLengthFrames = file.length
         fileSampleRate = sr
         let computedNatural = Double(file.length) / sr
         naturalFileDurationSeconds = computedNatural > 0.1 ? computedNatural : max(1.0, fallbackDuration)
         targetDurationSeconds = longPlayEnabled ? manualPlayTimeSeconds : naturalFileDurationSeconds
 
+        try ensureEngineGraph(sampleRate: sr)
+
         scheduleToken += 1
         playbackAnchorFrame = 0
         nextVirtualFrameToSchedule = 0
+        playbackAnchorSongSeconds = 0.0
+        nextSongSecondsToSchedule = 0.0
         pausedElapsedSeconds = 0.0
         queuedBufferCount = 0
+        totalScheduledFrames = 0
         didScheduleFinalFrame = false
 
         refillEngineBuffers(token: scheduleToken)
@@ -465,18 +642,26 @@ final class AppBoyPlaybackCoordinator {
     }
 
     private func reanchorEngine(at seconds: Double) {
-        guard backendMode == .engine, audioFile != nil, fileSampleRate > 0 else { return }
+        guard backendMode.isEngineBacked, fileSampleRate > 0 else { return }
         let wasPlaying = (transportState == "playing")
         scheduleToken += 1
         let activeToken = scheduleToken
 
         playerNode.stop()
-        let startFrame = max(0, AVAudioFramePosition((seconds * fileSampleRate).rounded()))
-        playbackAnchorFrame = startFrame
-        nextVirtualFrameToSchedule = startFrame
         pausedElapsedSeconds = seconds
         queuedBufferCount = 0
         didScheduleFinalFrame = false
+
+        if backendMode == .embeddedGME, let decoder = gmeDecoder {
+            try? decoder.seek(toMilliseconds: Int((seconds * 1_000.0).rounded()))
+            decoder.setTempo(configuredRate)
+            playbackAnchorSongSeconds = seconds
+            nextSongSecondsToSchedule = seconds
+        } else {
+            let startFrame = max(0, AVAudioFramePosition((seconds * fileSampleRate).rounded()))
+            playbackAnchorFrame = startFrame
+            nextVirtualFrameToSchedule = startFrame
+        }
 
         refillEngineBuffers(token: activeToken)
         if wasPlaying {
@@ -489,15 +674,22 @@ final class AppBoyPlaybackCoordinator {
 
     private func refillEngineBuffers(token: Int) {
         guard token == scheduleToken,
-              backendMode == .engine,
+              backendMode.isEngineBacked,
               !didScheduleFinalFrame else { return }
 
         while queuedBufferCount < targetQueuedBuffers && !didScheduleFinalFrame {
-            guard let buffer = readNextStereoChunk() else {
+            let nextChunk: AVAudioPCMBuffer?
+            if backendMode == .embeddedGME {
+                nextChunk = readNextEmbeddedGMEChunk()
+            } else {
+                nextChunk = readNextStereoChunk()
+            }
+            guard let buffer = nextChunk else {
                 didScheduleFinalFrame = true
                 break
             }
             queuedBufferCount += 1
+            totalScheduledFrames += Int64(buffer.frameLength)
             let capturedToken = token
             playerNode.scheduleBuffer(buffer, completionCallbackType: .dataPlayedBack) { [weak self] _ in
                 Task { @MainActor [weak self] in
@@ -508,13 +700,83 @@ final class AppBoyPlaybackCoordinator {
     }
 
     private func handleBufferPlayedBack(token: Int) {
-        guard token == scheduleToken, backendMode == .engine else { return }
+        guard token == scheduleToken, backendMode.isEngineBacked else { return }
         queuedBufferCount = max(0, queuedBufferCount - 1)
         if !didScheduleFinalFrame {
             refillEngineBuffers(token: token)
         } else if queuedBufferCount == 0 && transportState == "playing" {
             completeNaturalEnd(forGeneration: generation)
         }
+    }
+
+    private func readNextEmbeddedGMEChunk() -> AVAudioPCMBuffer? {
+        guard let decoder = gmeDecoder,
+              let stereoFormat = engineProcessingFormat,
+              fileSampleRate > 0 else { return nil }
+
+        let tempo = max(EmbeddedPlaybackTempo.minMultiplier, configuredRate)
+        let remainingSongSeconds = targetDurationSeconds - nextSongSecondsToSchedule
+        if remainingSongSeconds <= 0.0005 || (!longPlayEnabled && decoder.isTrackEnded) {
+            didScheduleFinalFrame = true
+            return nil
+        }
+
+        let remainingOutputFrames = max(
+            AVAudioFramePosition(1),
+            AVAudioFramePosition(((remainingSongSeconds / tempo) * fileSampleRate).rounded())
+        )
+        let framesToProduce = AVAudioFrameCount(min(AVAudioFramePosition(chunkFrameCount), remainingOutputFrames))
+        guard framesToProduce > 0,
+              let outBuffer = AVAudioPCMBuffer(pcmFormat: stereoFormat, frameCapacity: framesToProduce),
+              let dstChannels = outBuffer.floatChannelData else {
+            return nil
+        }
+        outBuffer.frameLength = framesToProduce
+        let dstL = dstChannels[0]
+        let dstR = dstChannels[1]
+        let count = Int(framesToProduce)
+
+        do {
+            _ = try decoder.renderStereoFloatFrames(
+                frameCount: count,
+                scratchInt16: &gmeScratchInt16,
+                leftChannel: dstL,
+                rightChannel: dstR
+            )
+        } catch {
+            didScheduleFinalFrame = true
+            return nil
+        }
+
+        if monoEnabled {
+            for i in 0..<count {
+                let m = 0.5 * (dstL[i] + dstR[i])
+                dstL[i] = m
+                dstR[i] = m
+            }
+        }
+
+        let totalWallDuration = targetDurationSeconds / tempo
+        let effectiveFadeWallSeconds = min(fadeOutSeconds, totalWallDuration * 0.35)
+        let fadeSongSpan = effectiveFadeWallSeconds * tempo
+        if fadeOutEnabled && fadeSongSpan > 0.05 {
+            let fadeStartSongSeconds = targetDurationSeconds - fadeSongSpan
+            let songStepPerFrame = tempo / fileSampleRate
+            for i in 0..<count {
+                let songT = nextSongSecondsToSchedule + Double(i) * songStepPerFrame
+                if songT >= fadeStartSongSeconds {
+                    let gain = Float(max(0.0, (targetDurationSeconds - songT) / fadeSongSpan))
+                    dstL[i] *= gain
+                    dstR[i] *= gain
+                }
+            }
+        }
+
+        nextSongSecondsToSchedule += (Double(count) / fileSampleRate) * tempo
+        if nextSongSecondsToSchedule >= targetDurationSeconds - 0.0005 || (!longPlayEnabled && decoder.isTrackEnded) {
+            didScheduleFinalFrame = true
+        }
+        return outBuffer
     }
 
     private func readNextStereoChunk() -> AVAudioPCMBuffer? {
@@ -561,7 +823,6 @@ final class AppBoyPlaybackCoordinator {
             } else if virtualCursor < fileLengthFrames {
                 fileOffset = virtualCursor
             } else {
-                // Past single-shot file length: zero remaining frames and finish.
                 let zeroCount = Int(framesToProduce - filled)
                 let startIdx = Int(filled)
                 for i in 0..<zeroCount {
@@ -646,14 +907,21 @@ final class AppBoyPlaybackCoordinator {
     }
 
     private func currentEngineElapsedSeconds() -> Double {
-        guard backendMode == .engine, fileSampleRate > 0 else { return 0.0 }
+        guard backendMode.isEngineBacked, fileSampleRate > 0 else { return 0.0 }
         if transportState == "stopped" { return 0.0 }
         if transportState == "paused" { return pausedElapsedSeconds }
         if let nodeTime = playerNode.lastRenderTime,
            nodeTime.isSampleTimeValid,
            let playerTime = playerNode.playerTime(forNodeTime: nodeTime) {
-            let currentFrame = playbackAnchorFrame + max(0, playerTime.sampleTime)
-            let secs = Double(currentFrame) / fileSampleRate
+            let playedFrames = max(0, playerTime.sampleTime)
+            let secs: Double
+            if backendMode == .embeddedGME {
+                let tempo = max(EmbeddedPlaybackTempo.minMultiplier, configuredRate)
+                secs = playbackAnchorSongSeconds + (Double(playedFrames) / fileSampleRate) * tempo
+            } else {
+                let currentFrame = playbackAnchorFrame + playedFrames
+                secs = Double(currentFrame) / fileSampleRate
+            }
             pausedElapsedSeconds = min(targetDurationSeconds, max(0.0, secs))
             return pausedElapsedSeconds
         }
@@ -666,7 +934,7 @@ final class AppBoyPlaybackCoordinator {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 200_000_000)
                 guard let self,
-                      self.backendMode == .engine,
+                      self.backendMode.isEngineBacked,
                       self.currentTrack != nil,
                       self.transportState == "playing" else {
                     continue
@@ -688,7 +956,7 @@ final class AppBoyPlaybackCoordinator {
     private func completeNaturalEnd(forGeneration completedGen: Int) {
         guard completedGen == generation, let trackId = currentTrack?.id else { return }
         scheduleToken += 1
-        if backendMode == .engine {
+        if backendMode.isEngineBacked {
             playerNode.stop()
             queuedBufferCount = 0
             pausedElapsedSeconds = 0.0
@@ -707,10 +975,15 @@ final class AppBoyPlaybackCoordinator {
         if engineGraphAttached {
             playerNode.stop()
         }
+        gmeDecoder = nil
         audioFile = nil
+        activeContainerSummary = "—"
         queuedBufferCount = 0
+        totalScheduledFrames = 0
         didScheduleFinalFrame = false
         pausedElapsedSeconds = 0.0
+        playbackAnchorSongSeconds = 0.0
+        nextSongSecondsToSchedule = 0.0
 
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         if let failedObserver { NotificationCenter.default.removeObserver(failedObserver) }
@@ -725,6 +998,7 @@ final class AppBoyPlaybackCoordinator {
 
     private func startStreamPlayback(url: URL, generation itemGen: Int, track: AppBoyTrack) {
         backendMode = .streamPlayer
+        activeContainerSummary = url.host ?? url.absoluteString
         naturalFileDurationSeconds = track.durationSeconds
         targetDurationSeconds = longPlayEnabled ? manualPlayTimeSeconds : track.durationSeconds
 
@@ -843,7 +1117,7 @@ final class AppBoyPlaybackCoordinator {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                guard let self, self.backendMode == .engine, self.transportState == "playing" else { return }
+                guard let self, self.backendMode.isEngineBacked, self.transportState == "playing" else { return }
                 let pos = self.pausedElapsedSeconds
                 try? self.ensureEngineGraph(sampleRate: self.fileSampleRate)
                 self.reanchorEngine(at: pos)
@@ -900,9 +1174,10 @@ final class AppBoyPlaybackCoordinator {
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             return
         }
+        let artistLine = track.artist.isEmpty ? track.consoleName : track.artist
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: track.title,
-            MPMediaItemPropertyArtist: track.artist,
+            MPMediaItemPropertyArtist: artistLine,
             MPMediaItemPropertyAlbumTitle: "\(track.albumTitle) · \(track.consoleName)",
             MPNowPlayingInfoPropertyElapsedPlaybackTime: snapshot.elapsedSeconds,
             MPNowPlayingInfoPropertyPlaybackRate: snapshot.transportState == "playing" ? snapshot.playbackRate : 0.0
@@ -914,16 +1189,6 @@ final class AppBoyPlaybackCoordinator {
     }
 
     private static func sanitizedBands(_ raw: [Double]) -> [Double] {
-        var bands = raw
-        if bands.count < 10 {
-            bands.append(contentsOf: Array(repeating: 0.0, count: 10 - bands.count))
-        } else if bands.count > 10 {
-            bands = Array(bands.prefix(10))
-        }
-        return bands.map { val in
-            guard val.isFinite else { return 0.0 }
-            let clamped = min(max(val, -12.0), 12.0)
-            return (clamped * 2.0).rounded() / 2.0
-        }
+        EmbeddedEqualizerConfiguration.normalizedBands(raw.map(Float.init)).map(Double.init)
     }
 }

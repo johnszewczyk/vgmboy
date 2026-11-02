@@ -24,16 +24,21 @@ let qsfBuildDirectory = "\(dependencyRoot)/qsf"
 let psgPlayVendorDirectory = "\(sharedVendorRoot)/psgplay"
 let psgPlayBuildDirectory = "\(dependencyRoot)/psgplay"
 let asapVendorDirectory = "\(sharedVendorRoot)/zxtune/3rdparty/asap"
+let gmeVendorRootDirectory = "\(sharedVendorRoot)/zxtune/3rdparty/gme"
+let gmeVendorDirectory = "\(gmeVendorRootDirectory)/gme"
+let zstdVendorDirectory = "\(sharedVendorRoot)/play/deps/libchdr/deps/zstd-1.5.6/lib"
 let mdxMiniVendorDirectory = "\(sharedVendorRoot)/mdxmini/src"
 let uadeIncludeDirectory = "/opt/homebrew/opt/uade/include"
 let uadeLibraryDirectory = "/opt/homebrew/opt/uade/lib"
+let embeddedGMETypeList = "gme_spc_type,gme_sfm_type,gme_nsf_type,gme_nsfe_type,gme_gbs_type,gme_hes_type,gme_gym_type,gme_kss_type,gme_ay_type,gme_sap_type,gme_sgc_type"
 
 let package = Package(
     name: "VGMBoy",
-    platforms: [.macOS("26.0")],
+    platforms: [.macOS("26.0"), .iOS(.v17)],
     products: [
         .library(name: "VGMBoyFormatCore", targets: ["VGMBoyFormatCore"]),
         .library(name: "VGMBoyArchiveCore", targets: ["VGMBoyArchiveCore"]),
+        .library(name: "VGMBoyEmbeddedCore", targets: ["VGMBoyEmbeddedCore"]),
         .library(name: "VGMBoySNDH", targets: ["VGMBoySNDH"]),
         .library(name: "VGMBoyKit", targets: ["VGMBoyKit"]),
         // Exposes libVGM only to downstream parity-test targets. Production
@@ -58,6 +63,55 @@ let package = Package(
                 "VGMBoyFormatCore"
             ],
             path: "Sources/VGMBoyArchiveCore"
+        ),
+        .target(
+            name: "VGMBoyCZstdDecompress",
+            path: "Sources/CZstdDecompress",
+            publicHeadersPath: "include",
+            cSettings: [
+                .define("ZSTD_DISABLE_ASM", to: "1"),
+                .define("ZSTD_STATIC_LINKING_ONLY", to: "1"),
+                .define("FSE_STATIC_LINKING_ONLY", to: "1"),
+                .define("HUF_STATIC_LINKING_ONLY", to: "1"),
+                .unsafeFlags([
+                    "-I\(zstdVendorDirectory)",
+                    "-I\(zstdVendorDirectory)/common",
+                    "-w"
+                ])
+            ]
+        ),
+        .target(
+            name: "VGMBoyCEmbeddedGME",
+            path: "Sources/CEmbeddedGME",
+            publicHeadersPath: "include",
+            cSettings: [
+                .define("HAVE_STDINT_H"),
+                .unsafeFlags([
+                    "-I\(gmeVendorDirectory)",
+                    "-I\(gmeVendorRootDirectory)",
+                    "-w"
+                ])
+            ],
+            cxxSettings: [
+                .define("HAVE_STDINT_H"),
+                .define("BLARGG_NAMESPACE", to: "vgmboy_embedded_gme"),
+                .define("GME_TYPE_LIST", to: embeddedGMETypeList),
+                .unsafeFlags([
+                    "-I\(gmeVendorDirectory)",
+                    "-I\(gmeVendorRootDirectory)",
+                    "-w"
+                ])
+            ]
+        ),
+        .target(
+            name: "VGMBoyEmbeddedCore",
+            dependencies: [
+                .product(name: "UACWrapperCore", package: "UACWrapper"),
+                "VGMBoyFormatCore",
+                "VGMBoyCZstdDecompress",
+                "VGMBoyCEmbeddedGME"
+            ],
+            path: "Sources/VGMBoyEmbeddedCore"
         ),
         .target(name: "VGMBoyEndpointCore", path: "Sources/VGMBoyEndpointCore"),
         .target(

@@ -3,6 +3,8 @@
   const { state, refs } = app;
 
   let activeIndicatorTarget = null;
+  let galleryObserver = null;
+  const loadedTitleSnaps = new Map();
 
   function isCompactViewport() {
     return window.matchMedia("(max-width: 767px)").matches;
@@ -23,11 +25,7 @@
       return;
     }
     activeIndicatorTarget = target;
-    if (instant) {
-      el.style.transition = "none";
-    } else {
-      el.style.transition = "";
-    }
+    el.style.transition = instant ? "none" : "";
     el.classList.remove("is-hidden");
     el.style.width = `${rect.width}px`;
     el.style.height = `${rect.height}px`;
@@ -48,46 +46,87 @@
   function updateTitlebarAndStats() {
     const tab = app.activeTab();
     const c = state.catalog;
-    refs.consoleLabel.textContent = state.contentMode === "gallery"
+    const showingGallery = state.contentMode === "gallery"
+      && (!isCompactViewport() || state.mobilePane !== "library");
+
+    refs.consoleLabel.textContent = showingGallery
       ? "GALLERY"
       : (tab?.consoleName || "LIBRARY").toUpperCase();
-    refs.albumLabel.textContent = state.contentMode === "gallery"
+    refs.albumLabel.textContent = showingGallery
       ? "ARTWORK"
       : (tab?.title || "NO PLAYLIST");
 
+    const gameWord = c.albumCount === 1 ? "GAME" : "GAMES";
     const sysWord = c.consoleCount === 1 ? "SYSTEM" : "SYSTEMS";
-    const albWord = c.albumCount === 1 ? "ALBUM" : "ALBUMS";
-    refs.sidebarStats.textContent = `${c.consoleCount} ${sysWord} · ${c.albumCount} ${albWord} · ${c.trackCount} TRK`;
+    refs.sidebarStats.textContent = `${c.albumCount || 0} ${gameWord} · ${c.consoleCount || 0} ${sysWord}`;
   }
 
   function syncModeButtons() {
     document.body.dataset.mobilePane = state.mobilePane;
-    const modeButtons = refs.mobileModeBar.querySelectorAll("[data-mobile-target]");
-    let selectedBtn = null;
-    modeButtons.forEach((btn) => {
-      const active = btn.dataset.mobileTarget === state.mobilePane;
-      btn.classList.toggle("is-selected", active);
-      if (active) selectedBtn = btn;
-    });
 
+    const compact = isCompactViewport();
+    const inContentPane = !compact || state.mobilePane !== "library";
     const isGallery = state.contentMode === "gallery";
+
     refs.playlistView.classList.toggle("is-hidden", isGallery);
     refs.galleryView.classList.toggle("is-hidden", !isGallery);
+    refs.tabsToolbar?.classList.toggle("is-hidden", isGallery);
+    refs.contentPane?.classList.toggle("is-gallery-mode", isGallery);
 
     const tab = app.activeTab();
-    refs.splitGalleryBtn?.setAttribute("aria-pressed", isGallery ? "true" : "false");
-    refs.splitFavoritesBtn?.setAttribute(
-      "aria-pressed",
-      !isGallery && tab?.sourceKind === "favorites" ? "true" : "false"
-    );
-    refs.splitRecentBtn?.setAttribute(
-      "aria-pressed",
-      !isGallery && tab?.sourceKind === "history" ? "true" : "false"
+    const viewTogglePressed = compact
+      ? state.mobilePane !== "library" && !isGallery
+      : !isGallery;
+    refs.viewToggleBtn?.setAttribute("aria-pressed", viewTogglePressed ? "true" : "false");
+    refs.viewToggleBtn?.setAttribute(
+      "title",
+      compact
+        ? (state.mobilePane === "library" ? "Show Playlist" : "Show Library")
+        : "Playlist view"
     );
 
-    if (isCompactViewport() && selectedBtn) {
-      moveSelectionIndicator(selectedBtn);
+    refs.galleryBtn?.setAttribute("aria-pressed", inContentPane && isGallery ? "true" : "false");
+    refs.favoritesBtn?.setAttribute(
+      "aria-pressed",
+      inContentPane && !isGallery && tab?.sourceKind === "favorites" ? "true" : "false"
+    );
+    refs.recentBtn?.setAttribute(
+      "aria-pressed",
+      inContentPane && !isGallery && tab?.sourceKind === "history" ? "true" : "false"
+    );
+  }
+
+  function toggleViewPane() {
+    if (isCompactViewport()) {
+      if (state.mobilePane === "library") {
+        state.contentMode = "playlist";
+        state.mobilePane = "content";
+      } else {
+        state.mobilePane = "library";
+      }
+    } else {
+      state.contentMode = "playlist";
     }
+    updateTitlebarAndStats();
+    syncModeButtons();
+  }
+
+  function toggleGalleryPane() {
+    if (isCompactViewport()) {
+      if (state.mobilePane !== "library" && state.contentMode === "gallery") {
+        state.contentMode = "playlist";
+        state.mobilePane = "library";
+      } else {
+        state.contentMode = "gallery";
+        state.mobilePane = "content";
+        renderGallery();
+      }
+    } else {
+      state.contentMode = state.contentMode === "gallery" ? "playlist" : "gallery";
+      if (state.contentMode === "gallery") renderGallery();
+    }
+    updateTitlebarAndStats();
+    syncModeButtons();
   }
 
   function setMobilePane(targetPane) {
@@ -101,20 +140,21 @@
     }
     if (targetPane === "gallery") {
       state.contentMode = "gallery";
-      state.mobilePane = "gallery";
+      state.mobilePane = "content";
       renderGallery();
       updateTitlebarAndStats();
       syncModeButtons();
       return;
     }
-    if (targetPane === "playlist") {
+    if (targetPane === "playlist" || targetPane === "content") {
       state.contentMode = "playlist";
-      state.mobilePane = "playlist";
+      state.mobilePane = "content";
       updateTitlebarAndStats();
       syncModeButtons();
       return;
     }
     state.mobilePane = "library";
+    updateTitlebarAndStats();
     syncModeButtons();
   }
 
@@ -139,9 +179,22 @@
   }
 
   function isAlbumAllFavorited(album) {
+    let albumTracks = null;
+    for (const tracks of state.tabTracks.values()) {
+      const matching = tracks.filter((t) => t.albumId === album.id);
+      if (matching.length >= album.trackCount && album.trackCount > 0) {
+        albumTracks = matching;
+        break;
+      }
+    }
+    if (albumTracks) {
+      return albumTracks.every((t) => state.favoriteIds.has(t.id));
+    }
     let matchedCount = 0;
     for (const favId of state.favoriteIds) {
-      if (favId.startsWith(`${album.id}-t`)) matchedCount += 1;
+      if (favId.includes(`/${album.id}/`) || favId.startsWith(`${album.id}-t`)) {
+        matchedCount += 1;
+      }
     }
     return album.trackCount > 0 && matchedCount >= album.trackCount;
   }
@@ -159,7 +212,7 @@
     if (!groups.length) {
       const empty = document.createElement("div");
       empty.className = "empty-state";
-      empty.textContent = searching ? "No matching consoles or albums." : "No catalog albums available.";
+      empty.textContent = searching ? "No matching consoles or games." : "No catalog games available.";
       refs.treeRoot.replaceChildren(empty);
       return;
     }
@@ -215,10 +268,15 @@
           const title = document.createElement("span");
           title.className = "album-title";
           title.textContent = album.title;
-          const sub = document.createElement("span");
-          sub.className = "album-sub";
-          sub.textContent = `${album.artist} · ${album.year}`;
-          copy.append(title, sub);
+          copy.appendChild(title);
+
+          const subtitleParts = [album.artist, album.year].filter(Boolean);
+          if (subtitleParts.length > 0) {
+            const sub = document.createElement("span");
+            sub.className = "album-sub";
+            sub.textContent = subtitleParts.join(" · ");
+            copy.appendChild(sub);
+          }
           rowBtn.appendChild(copy);
 
           if (showCounts) {
@@ -235,9 +293,8 @@
           const favBtn = document.createElement("button");
           favBtn.type = "button";
           favBtn.className = "album-fav-button";
-          const allFav = isAlbumAllFavorited(album);
-          if (allFav) favBtn.classList.add("is-favorite");
-          favBtn.setAttribute("aria-label", `Favorite album ${album.title}`);
+          if (isAlbumAllFavorited(album)) favBtn.classList.add("is-favorite");
+          favBtn.setAttribute("aria-label", `Favorite ${album.title}`);
           favBtn.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="#icon-star"></use></svg>';
           favBtn.addEventListener("click", async (ev) => {
             ev.stopPropagation();
@@ -287,7 +344,7 @@
 
     state.contentMode = "playlist";
     if (isCompactViewport()) {
-      state.mobilePane = "playlist";
+      state.mobilePane = "content";
     }
 
     renderLibraryTree();
@@ -322,7 +379,9 @@
     if (!favTab.selectedTrackId && tracks[0]) favTab.selectedTrackId = tracks[0].id;
 
     state.contentMode = "playlist";
-    state.mobilePane = isCompactViewport() ? "favorites" : state.mobilePane;
+    if (isCompactViewport()) {
+      state.mobilePane = "content";
+    }
     renderTabs();
     renderPlaylistRows();
     updateTitlebarAndStats();
@@ -350,7 +409,9 @@
     if (!histTab.selectedTrackId && tracks[0]) histTab.selectedTrackId = tracks[0].id;
 
     state.contentMode = "playlist";
-    state.mobilePane = isCompactViewport() ? "recent" : state.mobilePane;
+    if (isCompactViewport()) {
+      state.mobilePane = "content";
+    }
     renderTabs();
     renderPlaylistRows();
     updateTitlebarAndStats();
@@ -420,11 +481,7 @@
         state.activeTabId = tab.id;
         state.contentMode = "playlist";
         if (isCompactViewport()) {
-          state.mobilePane = tab.sourceKind === "favorites"
-            ? "favorites"
-            : tab.sourceKind === "history"
-              ? "recent"
-              : "playlist";
+          state.mobilePane = "content";
         }
         renderTabs();
         renderPlaylistRows();
@@ -538,7 +595,7 @@
         ? "No favorite tracks yet. Tap a star to add tracks."
         : tab?.sourceKind === "history"
           ? "No recently played tracks yet."
-          : "Select an album in Library to load tracks.";
+          : "Select a game in Library to load tracks.";
       refs.playlistBody.replaceChildren(empty);
       return;
     }
@@ -562,10 +619,15 @@
       const title = document.createElement("span");
       title.className = "track-title";
       title.textContent = track.title;
-      const subMobile = document.createElement("span");
-      subMobile.className = "track-sub-mobile";
-      subMobile.textContent = `${track.artist} · ${track.albumTitle}`;
-      main.append(title, subMobile);
+      main.appendChild(title);
+
+      const mobileSubParts = [track.artist, track.albumTitle].filter(Boolean);
+      if (mobileSubParts.length > 0) {
+        const subMobile = document.createElement("span");
+        subMobile.className = "track-sub-mobile";
+        subMobile.textContent = mobileSubParts.join(" · ");
+        main.appendChild(subMobile);
+      }
 
       const albumCell = document.createElement("span");
       albumCell.className = "track-album split-only-col";
@@ -612,18 +674,49 @@
     refs.playlistBody.replaceChildren(fragment);
   }
 
+  function ensureGalleryObserver() {
+    if (galleryObserver || typeof IntersectionObserver !== "function" || !window.appBoy?.galleryArtworkRead) {
+      return galleryObserver;
+    }
+    galleryObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const img = entry.target;
+        galleryObserver.unobserve(img);
+        const albumId = img.dataset.albumId;
+        if (!albumId) continue;
+        if (loadedTitleSnaps.has(albumId)) {
+          img.src = loadedTitleSnaps.get(albumId);
+          continue;
+        }
+        window.appBoy.galleryArtworkRead(albumId).then((res) => {
+          if (res?.dataURL) {
+            loadedTitleSnaps.set(albumId, res.dataURL);
+            img.src = res.dataURL;
+          }
+        }).catch(() => {});
+      }
+    }, { root: refs.galleryView, rootMargin: "160px" });
+    return galleryObserver;
+  }
+
   function renderGallery() {
     const groups = filteredConsoles();
     const albums = groups.flatMap((g) => g.albums);
 
+    if (galleryObserver) {
+      galleryObserver.disconnect();
+    }
+
     if (!albums.length) {
       const empty = document.createElement("div");
       empty.className = "empty-state";
-      empty.textContent = "No album artwork matches the current filter.";
+      empty.textContent = "No game artwork matches the current filter.";
       refs.galleryGrid.replaceChildren(empty);
       return;
     }
 
+    const observer = ensureGalleryObserver();
     const fragment = document.createDocumentFragment();
     for (const album of albums) {
       const cardBtn = document.createElement("button");
@@ -636,7 +729,11 @@
       const img = document.createElement("img");
       img.className = "gallery-artwork-image";
       img.alt = `${album.title} artwork`;
-      img.src = album.artworkDataURL;
+      img.src = loadedTitleSnaps.get(album.id) || album.artworkDataURL;
+      if (album.hasTitleSnap && !loadedTitleSnaps.has(album.id) && observer) {
+        img.dataset.albumId = album.id;
+        observer.observe(img);
+      }
       frame.appendChild(img);
 
       const copy = document.createElement("span");
@@ -645,7 +742,7 @@
       title.textContent = album.title;
       const meta = document.createElement("span");
       meta.className = "gallery-card-meta";
-      meta.textContent = `${album.consoleName} · ${album.year}`;
+      meta.textContent = [album.consoleName, album.year].filter(Boolean).join(" · ");
       copy.append(title, meta);
 
       cardBtn.append(frame, copy);
@@ -677,19 +774,26 @@
     if (state.optionsOpen) {
       setVolumePopoverOpen(false);
       refs.indicator?.classList.add("is-hidden");
+      if (state.optionsTab === "diagnostics") {
+        void app.refreshDiagnostics();
+      }
     } else {
       syncModeButtons();
     }
   }
 
   function setOptionsSection(sectionId) {
-    state.optionsTab = sectionId;
+    const normalized = sectionId === "source" ? "database" : sectionId;
+    state.optionsTab = normalized;
     document.querySelectorAll("[data-options-tab]").forEach((btn) => {
-      btn.classList.toggle("is-selected", btn.dataset.optionsTab === sectionId);
+      btn.classList.toggle("is-selected", btn.dataset.optionsTab === normalized);
     });
     document.querySelectorAll("[data-options-page]").forEach((page) => {
-      page.classList.toggle("is-hidden", page.dataset.optionsPage !== sectionId);
+      page.classList.toggle("is-hidden", page.dataset.optionsPage !== normalized);
     });
+    if (normalized === "diagnostics") {
+      void app.refreshDiagnostics();
+    }
   }
 
   function setVolumePopoverOpen(open) {
@@ -701,6 +805,7 @@
   function renderAll() {
     app.applyPreferencesToDOM();
     app.syncOptionsInputsFromState();
+    app.renderDiagnostics();
     renderLibraryTree();
     renderTabs();
     renderPlaylistRows();
@@ -717,6 +822,10 @@
     isCompactViewport,
     moveSelectionIndicator,
     refreshIndicatorPosition,
+    updateTitlebarAndStats,
+    syncModeButtons,
+    toggleViewPane,
+    toggleGalleryPane,
     setMobilePane,
     renderLibraryTree,
     openAlbumInPlaylist,

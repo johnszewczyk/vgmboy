@@ -67,13 +67,17 @@ public struct UACTransformation: Codable, Equatable, Sendable {
     public let reason: String?
     public let details: [String: UACJSONValue]
 
+    private enum CodingKeys: String, CodingKey {
+        case id, operation, inputs, outputs, tool, toolVersion, appliedAt, reason, details
+    }
+
     public init(
         id: String,
         operation: String,
         inputs: [UACTransformationInput],
         outputs: [UACTransformationOutput] = [],
         tool: String,
-        toolVersion: String,
+        toolVersion: String = "",
         appliedAt: String,
         reason: String? = nil,
         details: [String: UACJSONValue] = [:]
@@ -88,6 +92,19 @@ public struct UACTransformation: Codable, Equatable, Sendable {
         self.reason = reason
         self.details = details
     }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(String.self, forKey: .id)
+        operation = try values.decode(String.self, forKey: .operation)
+        inputs = try values.decodeIfPresent([UACTransformationInput].self, forKey: .inputs) ?? []
+        outputs = try values.decodeIfPresent([UACTransformationOutput].self, forKey: .outputs) ?? []
+        tool = try values.decode(String.self, forKey: .tool)
+        toolVersion = try values.decodeIfPresent(String.self, forKey: .toolVersion) ?? ""
+        appliedAt = try values.decode(String.self, forKey: .appliedAt)
+        reason = try values.decodeIfPresent(String.self, forKey: .reason)
+        details = try values.decodeIfPresent([String: UACJSONValue].self, forKey: .details) ?? [:]
+    }
 }
 
 public struct UACTransformationInput: Codable, Equatable, Sendable {
@@ -96,11 +113,35 @@ public struct UACTransformationInput: Codable, Equatable, Sendable {
     public let blake3: String
     public let streamBlake3: String?
 
-    public init(sourceID: String, sourcePath: String, blake3: String, streamBlake3: String? = nil) {
+    private enum CodingKeys: String, CodingKey {
+        case sourceID, sourcePath, blake3, packageBlake3, streamBlake3
+    }
+
+    public init(sourceID: String = "", sourcePath: String = "", blake3: String, streamBlake3: String? = nil) {
         self.sourceID = sourceID
         self.sourcePath = sourcePath
         self.blake3 = blake3
         self.streamBlake3 = streamBlake3
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        sourceID = try values.decodeIfPresent(String.self, forKey: .sourceID) ?? ""
+        sourcePath = try values.decodeIfPresent(String.self, forKey: .sourcePath) ?? ""
+        if let direct = try values.decodeIfPresent(String.self, forKey: .blake3) {
+            blake3 = direct
+        } else {
+            blake3 = try values.decodeIfPresent(String.self, forKey: .packageBlake3) ?? ""
+        }
+        streamBlake3 = try values.decodeIfPresent(String.self, forKey: .streamBlake3)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(sourceID, forKey: .sourceID)
+        try container.encode(sourcePath, forKey: .sourcePath)
+        try container.encode(blake3, forKey: .blake3)
+        try container.encodeIfPresent(streamBlake3, forKey: .streamBlake3)
     }
 }
 
@@ -108,9 +149,19 @@ public struct UACTransformationOutput: Codable, Equatable, Sendable {
     public let memberPath: String
     public let blake3: String
 
-    public init(memberPath: String, blake3: String) {
+    private enum CodingKeys: String, CodingKey {
+        case memberPath, blake3
+    }
+
+    public init(memberPath: String = "", blake3: String = "") {
         self.memberPath = memberPath
         self.blake3 = blake3
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        memberPath = try values.decodeIfPresent(String.self, forKey: .memberPath) ?? ""
+        blake3 = try values.decodeIfPresent(String.self, forKey: .blake3) ?? ""
     }
 }
 
@@ -295,7 +346,7 @@ public struct UACSource: Codable, Equatable, Sendable {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(String.self, forKey: .id)
         collection = try values.decode(String.self, forKey: .collection)
-        setName = try values.decode(String.self, forKey: .setName)
+        setName = try values.decodeIfPresent(String.self, forKey: .setName) ?? ""
         sourceName = try values.decode(String.self, forKey: .sourceName)
         sourceURL = try values.decodeIfPresent(String.self, forKey: .sourceURL)
         packageBlake3 = try values.decodeIfPresent(String.self, forKey: .packageBlake3)

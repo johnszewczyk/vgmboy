@@ -1,4 +1,6 @@
 import Foundation
+import FrontendPreferencesCore
+import VGMBoyEmbeddedCore
 
 struct AppBoyTrack: Codable, Equatable, Sendable {
     let id: String
@@ -10,9 +12,89 @@ struct AppBoyTrack: Codable, Equatable, Sendable {
     let title: String
     let artist: String
     let year: String
+    let dumper: String
     let format: String
     let durationSeconds: Double
     let streamURI: String
+    let canonicalSourcePath: String?
+    let uacContainerPath: String?
+    let uacMemberPath: String?
+    let subsongIndex: Int
+    let subsongCount: Int
+    let introSeconds: Double
+    let loopSeconds: Double
+    let fadeSeconds: Double
+
+    init(
+        id: String,
+        albumId: String,
+        consoleId: String,
+        consoleName: String,
+        albumTitle: String,
+        trackNumber: Int,
+        title: String,
+        artist: String,
+        year: String,
+        dumper: String = "",
+        format: String,
+        durationSeconds: Double,
+        streamURI: String,
+        canonicalSourcePath: String? = nil,
+        uacContainerPath: String? = nil,
+        uacMemberPath: String? = nil,
+        subsongIndex: Int = 0,
+        subsongCount: Int = 1,
+        introSeconds: Double = 0.0,
+        loopSeconds: Double = 0.0,
+        fadeSeconds: Double = 0.0
+    ) {
+        self.id = id
+        self.albumId = albumId
+        self.consoleId = consoleId
+        self.consoleName = consoleName
+        self.albumTitle = albumTitle
+        self.trackNumber = trackNumber
+        self.title = title
+        self.artist = artist
+        self.year = year
+        self.dumper = dumper
+        self.format = format
+        self.durationSeconds = durationSeconds
+        self.streamURI = streamURI
+        self.canonicalSourcePath = canonicalSourcePath
+        self.uacContainerPath = uacContainerPath
+        self.uacMemberPath = uacMemberPath
+        self.subsongIndex = max(0, subsongIndex)
+        self.subsongCount = max(1, subsongCount)
+        self.introSeconds = max(0.0, introSeconds)
+        self.loopSeconds = max(0.0, loopSeconds)
+        self.fadeSeconds = max(0.0, fadeSeconds)
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        albumId = try c.decode(String.self, forKey: .albumId)
+        consoleId = try c.decode(String.self, forKey: .consoleId)
+        consoleName = try c.decode(String.self, forKey: .consoleName)
+        albumTitle = try c.decode(String.self, forKey: .albumTitle)
+        trackNumber = try c.decodeIfPresent(Int.self, forKey: .trackNumber) ?? 1
+        title = try c.decode(String.self, forKey: .title)
+        artist = try c.decodeIfPresent(String.self, forKey: .artist) ?? ""
+        year = try c.decodeIfPresent(String.self, forKey: .year) ?? ""
+        dumper = try c.decodeIfPresent(String.self, forKey: .dumper) ?? ""
+        format = try c.decodeIfPresent(String.self, forKey: .format) ?? ""
+        durationSeconds = try c.decodeIfPresent(Double.self, forKey: .durationSeconds) ?? 0.0
+        streamURI = try c.decodeIfPresent(String.self, forKey: .streamURI) ?? ""
+        canonicalSourcePath = try c.decodeIfPresent(String.self, forKey: .canonicalSourcePath)
+        uacContainerPath = try c.decodeIfPresent(String.self, forKey: .uacContainerPath)
+        uacMemberPath = try c.decodeIfPresent(String.self, forKey: .uacMemberPath)
+        subsongIndex = max(0, try c.decodeIfPresent(Int.self, forKey: .subsongIndex) ?? 0)
+        subsongCount = max(1, try c.decodeIfPresent(Int.self, forKey: .subsongCount) ?? 1)
+        introSeconds = max(0.0, try c.decodeIfPresent(Double.self, forKey: .introSeconds) ?? 0.0)
+        loopSeconds = max(0.0, try c.decodeIfPresent(Double.self, forKey: .loopSeconds) ?? 0.0)
+        fadeSeconds = max(0.0, try c.decodeIfPresent(Double.self, forKey: .fadeSeconds) ?? 0.0)
+    }
 }
 
 struct AppBoyAlbum: Codable, Equatable, Sendable {
@@ -25,6 +107,53 @@ struct AppBoyAlbum: Codable, Equatable, Sendable {
     let trackCount: Int
     let totalDurationSeconds: Double
     let artworkDataURL: String
+    let hasTitleSnap: Bool
+    let titleSnapContainerPath: String?
+    let titleSnapMemberPath: String?
+
+    init(
+        id: String,
+        consoleId: String,
+        consoleName: String,
+        title: String,
+        artist: String,
+        year: String,
+        trackCount: Int,
+        totalDurationSeconds: Double,
+        artworkDataURL: String,
+        hasTitleSnap: Bool = false,
+        titleSnapContainerPath: String? = nil,
+        titleSnapMemberPath: String? = nil
+    ) {
+        self.id = id
+        self.consoleId = consoleId
+        self.consoleName = consoleName
+        self.title = title
+        self.artist = artist
+        self.year = year
+        self.trackCount = trackCount
+        self.totalDurationSeconds = totalDurationSeconds
+        self.artworkDataURL = artworkDataURL
+        self.hasTitleSnap = hasTitleSnap
+        self.titleSnapContainerPath = titleSnapContainerPath
+        self.titleSnapMemberPath = titleSnapMemberPath
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        consoleId = try c.decode(String.self, forKey: .consoleId)
+        consoleName = try c.decode(String.self, forKey: .consoleName)
+        title = try c.decode(String.self, forKey: .title)
+        artist = try c.decodeIfPresent(String.self, forKey: .artist) ?? ""
+        year = try c.decodeIfPresent(String.self, forKey: .year) ?? ""
+        trackCount = try c.decodeIfPresent(Int.self, forKey: .trackCount) ?? 0
+        totalDurationSeconds = try c.decodeIfPresent(Double.self, forKey: .totalDurationSeconds) ?? 0.0
+        artworkDataURL = try c.decodeIfPresent(String.self, forKey: .artworkDataURL) ?? ""
+        hasTitleSnap = try c.decodeIfPresent(Bool.self, forKey: .hasTitleSnap) ?? false
+        titleSnapContainerPath = try c.decodeIfPresent(String.self, forKey: .titleSnapContainerPath)
+        titleSnapMemberPath = try c.decodeIfPresent(String.self, forKey: .titleSnapMemberPath)
+    }
 }
 
 struct AppBoyConsoleGroup: Codable, Equatable, Sendable {
@@ -36,9 +165,12 @@ struct AppBoyConsoleGroup: Codable, Equatable, Sendable {
 
 struct AppBoyCatalogSnapshot: Codable, Equatable, Sendable {
     let sourceLabel: String
+    let databasePath: String
+    let schemaVersion: Int
     let consoleCount: Int
     let albumCount: Int
     let trackCount: Int
+    let artworkCount: Int
     let consoles: [AppBoyConsoleGroup]
 }
 
@@ -55,16 +187,6 @@ struct AppBoyPlaylistTab: Codable, Equatable, Sendable {
 struct AppBoyWorkspaceSnapshot: Codable, Equatable, Sendable {
     var activeTabId: String
     var tabs: [AppBoyPlaylistTab]
-}
-
-struct AppBoyFavoriteEntry: Codable, Equatable, Sendable {
-    let trackId: String
-    let addedAtISO8601: String
-}
-
-struct AppBoyHistoryEntry: Codable, Equatable, Sendable {
-    let trackId: String
-    let playedAtISO8601: String
 }
 
 struct AppBoyPreferencesSnapshot: Codable, Equatable, Sendable {
@@ -88,7 +210,7 @@ struct AppBoyPreferencesSnapshot: Codable, Equatable, Sendable {
     var galleryRadiusRem: Double = 0.2
     var repeatMode: String = "off"
     var equalizerEnabled: Bool = false
-    var equalizerBandsDB: [Double] = Array(repeating: 0.0, count: 10)
+    var equalizerBandsDB: [Double] = Array(repeating: 0.0, count: EmbeddedEqualizerConfiguration.bandCount)
     var monoEnabled: Bool = false
     var fadeOutEnabled: Bool = true
     var fadeOutSeconds: Double = 5.0
@@ -96,6 +218,8 @@ struct AppBoyPreferencesSnapshot: Codable, Equatable, Sendable {
     var manualPlayTimeSeconds: Double = 180.0
     var playbackSpeedEnabled: Bool = false
     var playbackSpeedRate: Double = 1.25
+    var playbackSpeedNumerator: Int = 5
+    var playbackSpeedDenominator: Int = 4
     var appVolume: Double = 1.0
     var remoteCatalogURL: String = ""
 
@@ -132,6 +256,8 @@ struct AppBoyPreferencesSnapshot: Codable, Equatable, Sendable {
         manualPlayTimeSeconds = try c.decodeIfPresent(Double.self, forKey: .manualPlayTimeSeconds) ?? d.manualPlayTimeSeconds
         playbackSpeedEnabled = try c.decodeIfPresent(Bool.self, forKey: .playbackSpeedEnabled) ?? d.playbackSpeedEnabled
         playbackSpeedRate = try c.decodeIfPresent(Double.self, forKey: .playbackSpeedRate) ?? d.playbackSpeedRate
+        playbackSpeedNumerator = try c.decodeIfPresent(Int.self, forKey: .playbackSpeedNumerator) ?? d.playbackSpeedNumerator
+        playbackSpeedDenominator = try c.decodeIfPresent(Int.self, forKey: .playbackSpeedDenominator) ?? d.playbackSpeedDenominator
         appVolume = try c.decodeIfPresent(Double.self, forKey: .appVolume) ?? d.appVolume
         remoteCatalogURL = try c.decodeIfPresent(String.self, forKey: .remoteCatalogURL) ?? d.remoteCatalogURL
     }
@@ -139,24 +265,23 @@ struct AppBoyPreferencesSnapshot: Codable, Equatable, Sendable {
     mutating func normalize() {
         uiChromeFontSizePt = min(max(uiChromeFontSizePt, 9.0), 16.0)
         contentFontSizePt = min(max(contentFontSizePt, 9.5), 18.0)
-        selectionAnimationMilliseconds = min(max(selectionAnimationMilliseconds, 0), 600)
+        selectionAnimationMilliseconds = min(FrontendAnimationTimings.clamp(selectionAnimationMilliseconds), 600)
         galleryFrameScale = min(max(galleryFrameScale, 0.65), 1.6)
         galleryGapRem = min(max(galleryGapRem, 0.0), 1.0)
         galleryRadiusRem = min(max(galleryRadiusRem, 0.0), 1.0)
-        if equalizerBandsDB.count < 10 {
-            equalizerBandsDB.append(contentsOf: Array(repeating: 0.0, count: 10 - equalizerBandsDB.count))
-        } else if equalizerBandsDB.count > 10 {
-            equalizerBandsDB = Array(equalizerBandsDB.prefix(10))
-        }
-        equalizerBandsDB = equalizerBandsDB.map { val in
-            guard val.isFinite else { return 0.0 }
-            let clamped = min(max(val, -12.0), 12.0)
-            return (clamped * 2.0).rounded() / 2.0
-        }
+
+        let floatBands = EmbeddedEqualizerConfiguration.normalizedBands(equalizerBandsDB.map(Float.init))
+        equalizerBandsDB = floatBands.map(Double.init)
+
         fadeOutSeconds = min(max(fadeOutSeconds, 0.0), 30.0)
         manualPlayTimeSeconds = min(max(manualPlayTimeSeconds, 15.0), 3600.0)
-        playbackSpeedRate = min(max(playbackSpeedRate, 0.5), 2.0)
-        appVolume = (min(max(appVolume, 0.0), 1.0) * 20.0).rounded() / 20.0
+
+        let tempo = EmbeddedPlaybackTempo.snapped(multiplier: playbackSpeedRate)
+        playbackSpeedRate = tempo.multiplier
+        playbackSpeedNumerator = tempo.numerator
+        playbackSpeedDenominator = tempo.denominator
+
+        appVolume = FrontendPlaybackVolumeScale.normalized(appVolume)
         if !["historical", "alphabetical"].contains(favoriteSortOrder) {
             favoriteSortOrder = "historical"
         }
@@ -191,4 +316,20 @@ struct AppBoyPlaybackStateSnapshot: Codable, Equatable, Sendable {
     let durationSeconds: Double
     let playbackRate: Double
     let errorMessage: String?
+}
+
+struct AppBoyAudioDiagnostics: Codable, Equatable, Sendable {
+    let backendName: String
+    let transportState: String
+    let sampleRateHz: Int
+    let queuedBuffers: Int
+    let targetBuffers: Int
+    let framesScheduled: Int64
+    let equalizerEnabled: Bool
+    let headroomCompensationDB: Double
+    let tempoDisplay: String
+    let trackTitle: String
+    let containerSummary: String
+    let positionSeconds: Double
+    let durationSeconds: Double
 }

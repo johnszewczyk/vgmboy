@@ -83,17 +83,19 @@ enum UACManifestValidator {
                 }
             }
             if member.variantID == nil,
-               !(member.path.hasPrefix("assets/") || member.path.hasPrefix("shared/")) {
-                throw UACContainerError.invalidManifest("Shared member must live under assets/ or shared/: \(member.path)")
+               !(member.path.hasPrefix("assets/") || member.path.hasPrefix("shared/") || member.path.hasPrefix("art/")) {
+                throw UACContainerError.invalidManifest("Shared member must live under assets/, shared/, or art/: \(member.path)")
             }
         }
 
         let membersByPath = Dictionary(uniqueKeysWithValues: manifest.members.map { ($0.path, $0) })
+        let memberBlake3s = Set(manifest.members.map(\.blake3))
         try validateTransformations(
             manifest.transformations,
             sourcesByID: Dictionary(uniqueKeysWithValues: manifest.sources.map { ($0.id, $0) }),
             sourceIDs: sourceIDSet,
-            membersByPath: membersByPath
+            membersByPath: membersByPath,
+            memberBlake3s: memberBlake3s
         )
         try validatePlaylists(manifest.playlists, variantIDs: variantIDs, membersByPath: membersByPath)
         try validatePathCollisions(paths)
@@ -103,12 +105,12 @@ enum UACManifestValidator {
         _ transformations: [UACTransformation],
         sourcesByID: [String: UACSource],
         sourceIDs: Set<String>,
-        membersByPath: [String: UACMember]
+        membersByPath: [String: UACMember],
+        memberBlake3s: Set<String>
     ) throws {
         for transformation in transformations {
             guard !transformation.operation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   !transformation.tool.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                  !transformation.toolVersion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   !transformation.appliedAt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw UACContainerError.invalidManifest("Transformation records require an operation, tool, and timestamp.")
             }
@@ -126,17 +128,25 @@ enum UACManifestValidator {
                 }
             }
             for input in transformation.inputs {
-                guard sourceIDs.contains(input.sourceID),
-                      isSafeRelativePath(input.sourcePath),
+                guard (input.sourceID.isEmpty || sourceIDs.contains(input.sourceID)),
+                      (input.sourcePath.isEmpty || isSafeRelativePath(input.sourcePath)),
                       isBLAKE3(input.blake3),
                       input.streamBlake3.map(isBLAKE3) ?? true else {
                     throw UACContainerError.invalidManifest("Transformation input has invalid source provenance or hashes.")
                 }
             }
             for output in transformation.outputs {
-                guard let member = membersByPath[output.memberPath],
-                      member.blake3 == output.blake3 else {
-                    throw UACContainerError.invalidManifest("Transformation output must reference a member with the same BLAKE3.")
+                if !output.memberPath.isEmpty || !output.blake3.isEmpty {
+                    if let member = membersByPath[output.memberPath] {
+                        guard member.blake3 == output.blake3 else {
+                            throw UACContainerError.invalidManifest("Transformation output must reference a member with the same BLAKE3.")
+                        }
+                    } else {
+                        guard isSafeRelativePath(output.memberPath),
+                              memberBlake3s.contains(output.blake3) else {
+                            throw UACContainerError.invalidManifest("Transformation output must reference a member with the same BLAKE3.")
+                        }
+                    }
                 }
             }
         }

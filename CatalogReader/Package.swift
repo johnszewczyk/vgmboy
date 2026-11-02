@@ -4,7 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "CatalogReader",
-    platforms: [.macOS("26.0")],
+    platforms: [.macOS("26.0"), .iOS(.v17)],
     products: [
         .library(name: "CatalogReader", targets: ["CatalogReader"]),
         .library(name: "CatalogPlaylistCore", targets: ["CatalogPlaylistCore"]),

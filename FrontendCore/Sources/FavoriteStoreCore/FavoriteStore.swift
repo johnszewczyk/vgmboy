@@ -172,7 +172,8 @@ public final class FavoriteStore: @unchecked Sendable {
             in: .userDomainMask,
             appropriateFor: nil,
             create: false
-        )) ?? fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support", isDirectory: true)
+        )) ?? URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+            .appendingPathComponent("Library/Application Support", isDirectory: true)
         return base
             .appendingPathComponent("VGMMan", isDirectory: true)
             .appendingPathComponent("UserData.sqlite", isDirectory: false)

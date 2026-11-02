@@ -24,10 +24,6 @@
     const pct = duration > 0 ? Math.min(100, (elapsed / duration) * 100) : 0;
 
     document.documentElement.style.setProperty("--progress-percent", `${pct.toFixed(2)}%`);
-    if (!pb.scrubbing && refs.progressSlider) {
-      refs.progressSlider.max = String(Math.max(1, duration));
-      refs.progressSlider.value = String(elapsed);
-    }
 
     refs.elapsedLabel.textContent = app.formatTime(elapsed);
     refs.songLengthLabel.textContent = app.formatTime(duration);
@@ -49,40 +45,46 @@
 
     const repeatActive = p.repeatMode !== "off";
     refs.repeatBtn.setAttribute("aria-pressed", repeatActive ? "true" : "false");
-    refs.repeatBadge.classList.toggle("is-hidden", !repeatActive);
-    refs.repeatBadge.textContent = p.repeatMode === "one" ? "RPT 1" : "RPT ALL";
+    const repeatLabel = p.repeatMode === "one"
+      ? "Repeat track"
+      : p.repeatMode === "all"
+        ? "Repeat playlist"
+        : "Repeat off";
+    refs.repeatBtn.setAttribute("title", repeatLabel);
+    refs.repeatBtn.setAttribute("aria-label", repeatLabel);
 
     const eqActive = Boolean(p.equalizerEnabled);
     refs.eqBtn?.setAttribute("aria-pressed", eqActive ? "true" : "false");
-    refs.eqBadge?.classList.toggle("is-hidden", !eqActive);
+    refs.eqBtn?.setAttribute("title", eqActive ? "Disable Equalizer" : "Enable Equalizer");
 
     const longPlayActive = Boolean(p.longPlayEnabled);
     refs.longPlayBtn.setAttribute("aria-pressed", longPlayActive ? "true" : "false");
-    refs.longPlayBadge?.classList.toggle("is-hidden", !longPlayActive);
-    if (refs.longPlayBadge) {
-      refs.longPlayBadge.textContent = `LP ${app.formatTime(p.manualPlayTimeSeconds)}`;
-    }
+    refs.longPlayBtn.setAttribute(
+      "title",
+      longPlayActive ? `Long Play (${app.formatTime(p.manualPlayTimeSeconds)})` : "Toggle Long Play"
+    );
 
+    const speedRatio = app.formatSpeedRatio(p.playbackSpeedRate || 1.25);
     refs.speedBtn.setAttribute("aria-pressed", p.playbackSpeedEnabled ? "true" : "false");
-    refs.speedBadge.classList.toggle("is-hidden", !p.playbackSpeedEnabled);
-    refs.speedBadge.textContent = `${Number(p.playbackSpeedRate || 1).toFixed(2)}×`;
+    refs.speedBtn.setAttribute(
+      "title",
+      p.playbackSpeedEnabled ? `Playback speed ${speedRatio}` : "Playback speed disabled"
+    );
 
     const pctVol = Math.round((Number(p.appVolume ?? 1) || 0) * 100);
     refs.volumeInput.value = String(pctVol);
     refs.volumeOutput.textContent = `${pctVol}%`;
+    refs.volumeBtn.setAttribute("title", `Volume ${pctVol}%`);
+    refs.volumeBtn.setAttribute("aria-label", `Volume ${pctVol}%`);
 
     const meta = pb.trackMeta || findTrackInAnyTab(pb.trackId);
-    if (meta) {
-      refs.nowPlayingTitle.textContent = meta.title;
-      refs.nowPlayingMeta.textContent = `${meta.artist} · ${meta.albumTitle}`;
-    } else {
-      const selected = app.activeTracks().find((t) => t.id === app.activeTab()?.selectedTrackId);
-      if (selected) {
-        refs.nowPlayingTitle.textContent = selected.title;
-        refs.nowPlayingMeta.textContent = `${selected.artist} · ${selected.albumTitle}`;
+    if (refs.currentTrackTitle) {
+      if (meta && pb.transportState !== "stopped") {
+        refs.currentTrackTitle.textContent = meta.title;
+        refs.currentTrackTitle.hidden = false;
       } else {
-        refs.nowPlayingTitle.textContent = "Select a track";
-        refs.nowPlayingMeta.textContent = "—";
+        refs.currentTrackTitle.textContent = "";
+        refs.currentTrackTitle.hidden = true;
       }
     }
 
@@ -256,7 +258,7 @@
   }
 
   function setPlaybackSpeed(enabled, rate) {
-    const cleanRate = Math.round(Math.min(2.0, Math.max(0.5, Number(rate) || 1.25)) * 100) / 100;
+    const cleanRate = app.parseSpeedInput(String(rate ?? 1.25), 1.25);
     app.queueSettingsPatch({
       playbackSpeedEnabled: Boolean(enabled),
       playbackSpeedRate: cleanRate
@@ -272,7 +274,8 @@
   }
 
   function setAppVolume(normalizedVolume) {
-    const clamped = Math.round(Math.min(1, Math.max(0, normalizedVolume)) * 20) / 20;
+    const detents = Number(window.appBoy?.volumeDetentCount) || 20;
+    const clamped = Math.round(Math.min(1, Math.max(0, normalizedVolume)) * detents) / detents;
     app.queueSettingsPatch({ appVolume: clamped });
     window.appBoy?.playbackSetVolume?.(clamped).catch(() => {});
     renderTransportChrome();
@@ -290,7 +293,7 @@
       if (found) state.playback.trackMeta = found;
     }
     state.playback.transportState = snap.transportState || state.playback.transportState;
-    if (!state.playback.scrubbing && typeof snap.elapsedSeconds === "number") {
+    if (typeof snap.elapsedSeconds === "number") {
       state.playback.elapsedSeconds = snap.elapsedSeconds;
     }
     if (typeof snap.durationSeconds === "number" && snap.durationSeconds > 0) {
@@ -303,6 +306,9 @@
       app.showErrorToast(snap.errorMessage);
     }
     renderTransportChrome();
+    if (state.optionsOpen && state.optionsTab === "diagnostics") {
+      void app.refreshDiagnostics();
+    }
   }
 
   function handleNaturalEnd(payload) {
@@ -320,6 +326,7 @@
         if (state.playback.transportState === "playing") void togglePlayback();
         break;
       case "playPause":
+      case "togglePlayPause":
         void togglePlayback();
         break;
       case "next":
@@ -327,6 +334,9 @@
         break;
       case "previous":
         void playAdjacent(-1);
+        break;
+      case "stop":
+        void stopPlayback();
         break;
       case "seek":
         if (typeof payload.positionTime === "number") void seekTo(payload.positionTime);

@@ -4,7 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "FrontendCore",
-    platforms: [.macOS(.v26)],
+    platforms: [.macOS(.v26), .iOS(.v17)],
     products: [
         .library(name: "LocalFileBrowserCore", targets: ["LocalFileBrowserCore"]),
         .library(name: "FavoriteTrackCore", targets: ["FavoriteTrackCore"]),
