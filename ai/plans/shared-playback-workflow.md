@@ -49,6 +49,15 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+New decoder integration, 2026-11-02: the experimental ares SNES state backend
+was added after the earlier shared-playback passes. Its helper can close its PCM
+pipe before exiting, and an unexpected exit must propagate as a decode failure
+rather than a natural track end. The shared decoder now handles both boundaries;
+three synthetic-helper tests cover closure while running, exit during priming,
+and exit after PCM during refill. SB2 compiled against the change. These tests
+do not establish real ares state playback, packaged runtime staging or audible
+output; archive-backed reconfiguration remains on the transport queue.
+
 ### Queued-fade ownership boundary
 
 The shared scheduler owns deadline tokens, fallback timing and ramp-ready

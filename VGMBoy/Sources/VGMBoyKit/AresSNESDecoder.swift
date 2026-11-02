@@ -30,10 +30,10 @@ final class AresSNESDecoder: AudioDecoder, @unchecked Sendable {
     private var failureMessage: String?
     private var closed = false
 
-    init(path: String, sampleRate: Int = 44_100) throws {
+    init(path: String, sampleRate: Int = 44_100, helperURL: URL? = nil) throws {
         self.statePath = path
         self.sampleRate = sampleRate
-        guard let helperURL = Self.resolveHelper() else {
+        guard let helperURL = helperURL ?? Self.resolveHelper() else {
             throw AresSNESDecoderError.runtimeUnavailable
         }
         self.helperURL = helperURL
@@ -46,7 +46,9 @@ final class AresSNESDecoder: AudioDecoder, @unchecked Sendable {
     var trackCount: Int { 1 }
     var systemName: String { "Nintendo SNES" }
     var absolutePlayedFrames: Int64 { absoluteFrames }
-    var trackEnded: Bool { closed || failureMessage != nil || !(process?.isRunning ?? false) }
+    // This family has no natural end. An unexpected helper exit or failed
+    // seek must reach readFrames so the session reports an error, not EOF.
+    var trackEnded: Bool { closed }
 
     func startTrack(_ index: Int) throws {
         guard index == 0 else {
@@ -152,7 +154,13 @@ final class AresSNESDecoder: AudioDecoder, @unchecked Sendable {
         bytes.reserveCapacity(byteCount)
         while bytes.count < byteCount {
             guard let chunk = try outputPipe.fileHandleForReading.read(upToCount: byteCount - bytes.count), !chunk.isEmpty else {
-                let status = process.map { "Process exited with status \($0.terminationStatus)." } ?? "The process was released."
+                let status: String
+                if let process {
+                    status = process.isRunning ? "The PCM pipe closed while the process was running."
+                        : "Process exited with status \(process.terminationStatus)."
+                } else {
+                    status = "The process was released."
+                }
                 throw AresSNESDecoderError.streamEnded(status)
             }
             bytes.append(chunk)
