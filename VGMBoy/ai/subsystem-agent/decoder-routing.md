@@ -28,6 +28,8 @@ deliberately exclusive to one family.
   source loop boundary. File-default playback uses the unknown-duration
   fallback; Long Play accepts a finite user-selected window or zero for
   unbounded execution of the state’s native SNES program.
+  Unexpected helper exit or PCM-pipe closure is a decoder error, not a natural
+  track end; the helper's exit status is read only after the process exits.
 - Frontends must project `FormatRegistry.playbackDescriptors` rather than rebuilding extension
   unions, backend IDs, Long Play support, tempo support, or natural-ending flags.
 - GameCube admission is fixture-backed and limited to primary playable DSP,
