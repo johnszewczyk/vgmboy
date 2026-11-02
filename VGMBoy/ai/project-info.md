@@ -6,15 +6,20 @@ VGMBoy owns playback format admission, decoder integration, timing, output gain,
 transport, and the macOS audio device for the VGMMan family. It is a shared
 in-process kit, not a daemon or catalog service.
 
-CocoaSpice, SB2, ViewBoy, and LineBoy are maintained player clients. Each
-bundles the shared playback core behind its own host adapter. SPCBoyWK's source
-is archived and no longer a maintained client. ScanSong consumes
-VGMBoy-built inspection helpers, but does not link the playback kit or invoke
-a player app.
+CocoaSpice, SB2, ViewBoy, LineBoy, and APPBOY (iOS via `VGMBoyEmbeddedCore`) are
+maintained player clients. Each bundles the shared playback core behind its own
+host adapter. SPCBoyWK's source is archived and no longer a maintained client.
+ScanSong consumes VGMBoy-built inspection helpers, but does not link the
+playback kit or invoke a player app.
 
 ## Major Components
 
-- `Sources/VGMBoyKit/` — playback core, decoder boundaries, and timing.
+- `Sources/VGMBoyKit/` — macOS playback core, decoder boundaries, and timing.
+- `Sources/VGMBoyEmbeddedCore/` — cross-platform (macOS + iOS) embedded playback
+  and UAC container core wrapping vendored Zstandard decompression, vendored
+  Game_Music_Emu (`SPC`, `NSF`/`NSFE`, `GBS`, `HES`, `GYM`, `KSS`, `AY`, `SAP`),
+  shared 10-band EQ math, and `1/32` playback tempo quantization without external
+  `Process` spawning or `/opt/homebrew` dependencies.
 - `Sources/VGMBoyArchiveCore/` — bounded archive inspection, safe member
   selection, UAC decompression, and temporary playback/export source
   preparation.

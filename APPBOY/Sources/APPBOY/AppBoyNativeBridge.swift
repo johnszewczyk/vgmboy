@@ -1,4 +1,7 @@
+import CatalogPlaylistPresentationCore
 import Foundation
+import FrontendPreferencesCore
+import PlaylistTabsPersistenceCore
 import WebKit
 
 /// Single JavaScript-to-native boundary for APPBOY, modeled on SB2's WKNativeBridge.
@@ -44,16 +47,19 @@ final class AppBoyNativeBridge: NSObject, WKScriptMessageHandler {
         let host = (url.host ?? "").lowercased()
         let pathPart = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let allowedViews: Set<String> = ["library", "playlist", "gallery", "favorites", "recent", "options"]
-        let allowedOptionTabs: Set<String> = ["interface", "fonts", "gallery", "audio", "playback", "source"]
+        let allowedOptionTabs: Set<String> = [
+            "database", "source", "gallery", "interface", "fonts", "audio", "diagnostics", "playback"
+        ]
         let allowedTransports: Set<String> = ["pause", "stop", "next", "previous", "togglePlayPause", "newTab"]
         var eventPayload: [String: Any]?
         if host == "view", allowedViews.contains(pathPart.lowercased()) {
             eventPayload = ["action": "view", "target": pathPart.lowercased()]
         } else if host == "options" {
-            let tab = pathPart.lowercased()
+            var tab = pathPart.lowercased()
+            if tab == "source" { tab = "database" }
             eventPayload = [
                 "action": "options",
-                "target": allowedOptionTabs.contains(tab) ? tab : "interface"
+                "target": allowedOptionTabs.contains(tab) ? tab : "database"
             ]
         } else if host == "play" {
             var payload: [String: Any] = ["action": "play"]
@@ -73,7 +79,8 @@ final class AppBoyNativeBridge: NSObject, WKScriptMessageHandler {
     }
 
     func userScript() -> WKUserScript {
-        WKUserScript(
+        let detents = FrontendPlaybackVolumeScale.detentCount
+        return WKUserScript(
             source: """
             (() => {
               const pending = new Map();
@@ -111,9 +118,13 @@ final class AppBoyNativeBridge: NSObject, WKScriptMessageHandler {
               };
 
               const api = {
-                volumeDetentCount: 20,
+                volumeDetentCount: \(detents),
                 bootstrap: () => request("bootstrap"),
                 albumTracks: (albumId) => request("albumTracks", [albumId]),
+                galleryArtworkRead: (albumId) => request("galleryArtworkRead", [albumId]),
+                playlistSort: (sortRequest) => request("playlistSort", [sortRequest]),
+                tabTransition: (tabRequest) => request("tabTransition", [tabRequest]),
+                audioDiagnostics: () => request("audioDiagnostics"),
                 favoritesList: () => request("favoritesList"),
                 historyList: () => request("historyList"),
                 favoritesToggle: (trackId) => request("favoritesToggle", [trackId]),
@@ -172,6 +183,7 @@ final class AppBoyNativeBridge: NSObject, WKScriptMessageHandler {
             let prefsValue = Self.encodeJSONValue(store.preferences) ?? [:]
             let catalogValue = Self.encodeJSONValue(store.catalog) ?? [:]
             let workspaceValue = Self.encodeJSONValue(store.workspace) ?? [:]
+            let diagValue = Self.encodeJSONValue(playback.diagnosticsSnapshot()) ?? [:]
             var tabTracks: [String: [[String: Any]]] = [:]
             for tab in store.workspace.tabs {
                 if tab.sourceKind == "favorites" {
@@ -193,6 +205,7 @@ final class AppBoyNativeBridge: NSObject, WKScriptMessageHandler {
                 "preferences": prefsValue,
                 "catalog": catalogValue,
                 "workspace": workspaceValue,
+                "diagnostics": diagValue,
                 "favoriteTrackIds": Array(store.allFavoriteIds()),
                 "initialTabTracks": tabTracks,
                 "initialDeepLinks": drainedLinks
@@ -201,6 +214,33 @@ final class AppBoyNativeBridge: NSObject, WKScriptMessageHandler {
         case "albumTracks":
             guard let albumId = args.first as? String else { return [] }
             return store.tracks(forAlbumId: albumId).map { store.serializeTrack($0) }
+
+        case "galleryArtworkRead":
+            guard let albumId = args.first as? String else { return ["dataURL": NSNull()] }
+            if let dataURL = store.artworkDataURL(forAlbumId: albumId) {
+                return ["albumId": albumId, "dataURL": dataURL]
+            }
+            return ["albumId": albumId, "dataURL": NSNull()]
+
+        case "playlistSort":
+            guard let raw = args.first,
+                  let data = try? JSONSerialization.data(withJSONObject: raw),
+                  let decoded = try? JSONDecoder().decode(CatalogPlaylistSortRequest.self, from: data) else {
+                throw NSError(domain: "APPBOY.Bridge", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid playlistSort request"])
+            }
+            return store.sortPlaylist(request: decoded)
+
+        case "tabTransition":
+            guard let raw = args.first,
+                  let data = try? JSONSerialization.data(withJSONObject: raw),
+                  let decoded = try? JSONDecoder().decode(PlaylistTabOrderTransitionRequest.self, from: data) else {
+                throw NSError(domain: "APPBOY.Bridge", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid tabTransition request"])
+            }
+            let nextState = store.reduceTabOrder(request: decoded)
+            return Self.encodeJSONValue(nextState) ?? [:]
+
+        case "audioDiagnostics":
+            return Self.encodeJSONValue(playback.diagnosticsSnapshot()) ?? [:]
 
         case "favoritesList":
             return store.favoritesTracks()

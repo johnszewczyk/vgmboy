@@ -14,6 +14,8 @@
   });
 
   window.addEventListener("resize", () => {
+    app.ui.syncModeButtons();
+    app.ui.updateTitlebarAndStats();
     app.ui.refreshIndicatorPosition();
   });
 
@@ -21,31 +23,33 @@
     const ro = new ResizeObserver(() => {
       app.ui.refreshIndicatorPosition();
     });
-    for (const sel of [".app-shell", ".sb-titlebar", "#mobile-mode-bar", ".workspace", ".transport-deck"]) {
+    for (const sel of [".app-shell", ".sb-titlebar", ".transport-toolbar", ".sidebar-search-wrap"]) {
       const el = document.querySelector(sel);
       if (el) ro.observe(el);
     }
   }
 
-  // Mobile mode bar
-  refs.mobileModeBar.querySelectorAll("[data-mobile-target]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      app.ui.setMobilePane(btn.dataset.mobileTarget);
-    });
+  // Titlebar active playlist jump
+  refs.albumLabel?.addEventListener("click", () => {
+    if (app.ui.isCompactViewport()) {
+      app.ui.toggleViewPane();
+    }
   });
 
-  // Split-view library shortcuts
-  refs.splitGalleryBtn?.addEventListener("click", () => {
-    state.contentMode = state.contentMode === "gallery" ? "playlist" : "gallery";
-    if (state.contentMode === "gallery") app.ui.renderGallery();
-    app.ui.renderAll();
+  // 5 Desktop-Coherent Sidebar / Workspace Controls
+  refs.viewToggleBtn?.addEventListener("click", () => {
+    app.ui.toggleViewPane();
   });
 
-  refs.splitFavoritesBtn?.addEventListener("click", () => {
+  refs.galleryBtn?.addEventListener("click", () => {
+    app.ui.toggleGalleryPane();
+  });
+
+  refs.favoritesBtn?.addEventListener("click", () => {
     void app.ui.openFavoritesTab();
   });
 
-  refs.splitRecentBtn?.addEventListener("click", () => {
+  refs.recentBtn?.addEventListener("click", () => {
     void app.ui.openRecentTab();
   });
 
@@ -69,7 +73,7 @@
   refs.sortAlbumBtn?.addEventListener("click", () => app.ui.toggleSort("album"));
   refs.sortTimeBtn?.addEventListener("click", () => app.ui.toggleSort("time"));
 
-  // Transport controls
+  // Top 10-Button Transport Toolbar
   refs.playBtn?.addEventListener("click", () => {
     void app.playback.togglePlayback();
   });
@@ -99,20 +103,6 @@
   });
   refs.volumeInput?.addEventListener("input", (ev) => {
     app.playback.setAppVolume(Number(ev.target.value) / 100);
-  });
-
-  // Scrubber
-  refs.progressSlider?.addEventListener("pointerdown", () => {
-    state.playback.scrubbing = true;
-  });
-  refs.progressSlider?.addEventListener("input", (ev) => {
-    state.playback.scrubbing = true;
-    state.playback.elapsedSeconds = Number(ev.target.value) || 0;
-    app.playback.updateProgressVisuals();
-  });
-  refs.progressSlider?.addEventListener("change", (ev) => {
-    state.playback.scrubbing = false;
-    void app.playback.seekTo(Number(ev.target.value) || 0);
   });
 
   // Options Drawer
@@ -210,7 +200,6 @@
       const idx = Number(ev.target.dataset.equalizerBand);
       const gain = Number(ev.target.value) || 0;
       if (!state.preferences.equalizerEnabled) {
-        // Automatically engage Equalizer when dragging a band slider so adjustments are immediately audible.
         state.preferences.equalizerEnabled = true;
         app.queueSettingsPatch({ equalizerEnabled: true });
       }
@@ -230,7 +219,12 @@
     app.playback.setAppVolume(Number(ev.target.value));
   });
 
-  // Options > Playback: Long Play + Fade Out + Playback Speed
+  // Options > Diagnostics
+  refs.diagRefreshBtn?.addEventListener("click", () => {
+    void app.refreshDiagnostics();
+  });
+
+  // Options > Playback: Long Play + Fade Out + 1/32 Playback Speed
   refs.optLongPlayEnabled?.addEventListener("change", (ev) => {
     const enabled = ev.target.checked;
     app.queueSettingsPatch({ longPlayEnabled: enabled });
@@ -269,19 +263,19 @@
   });
 
   refs.optSpeedRate?.addEventListener("change", (ev) => {
-    const rate = Math.min(2.0, Math.max(0.5, Number(ev.target.value) || 1.25));
-    ev.target.value = rate.toFixed(2);
+    const rate = app.parseSpeedInput(ev.target.value, state.preferences.playbackSpeedRate || 1.25);
+    ev.target.value = app.formatSpeedRatio(rate);
     app.playback.setPlaybackSpeed(state.preferences.playbackSpeedEnabled, rate);
   });
 
   document.querySelectorAll("[data-speed-preset]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const rate = Number(btn.dataset.speedPreset) || 1.0;
+      const rate = app.parseSpeedInput(btn.dataset.speedPreset, 1.0);
       app.playback.setPlaybackSpeed(true, rate);
     });
   });
 
-  // Options > Catalog Source
+  // Options > Database / Catalog Source
   refs.optRemoteURL?.addEventListener("change", (ev) => {
     app.queueSettingsPatch({ remoteCatalogURL: ev.target.value.trim() });
   });
@@ -414,6 +408,9 @@
       }
       if (payload?.catalog) {
         state.catalog = payload.catalog;
+      }
+      if (payload?.diagnostics) {
+        state.diagnostics = payload.diagnostics;
       }
       if (Array.isArray(payload?.favoriteTrackIds)) {
         state.favoriteIds = new Set(payload.favoriteTrackIds);

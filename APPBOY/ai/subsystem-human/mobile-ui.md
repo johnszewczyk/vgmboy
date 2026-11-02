@@ -3,88 +3,74 @@
 ## Scope
 
 User-visible layout, navigation, playback controls, gallery, and options
-behavior in APPBOY across iPhone and iPad viewports.
+behavior in APPBOY across iPhone Plus and iPad viewports.
 
 ## Shell and Chrome
 
-- The top title strip spans the device safe area and displays `SPCBOY`, the
-  active console name, and the current album or playlist title without platform
-  badges, desktop window buttons, or CPU meters.
+- The top title strip spans the device safe area (`env(safe-area-inset-top)`)
+  and displays `SPCBOY`, the active console name, and the tappable current album
+  or playlist title without platform noise labels, desktop window buttons, or
+  CPU meters.
+- Directly below the title strip sits SB2's 10-button equal-width transport
+  toolbar: Previous, Stop, Play/Pause (switching to the animated 4-bar playback
+  meter while playing), Next, Repeat (`off` / `all` / `one`), Equalizer toggle,
+  Long Play toggle, Playback Speed toggle, Volume (opening a downward 20-step
+  `5%` detent popover with tick marks and `%` readout), and Options.
+- Directly below the transport toolbar sits SB2's search and library action row,
+  pairing a zoom-safe `Search` input (`16px` rendered font size) with 5 square
+  glyph buttons: View Toggle (switching Library and Playlist on compact
+  portrait, or returning from Gallery to Playlist in split view), Gallery,
+  Recent, Favorites, and Collapse/Expand All.
 - The bottom status strip spans the home-indicator safe area and displays
-  library system/album totals on the left, playback state (`READY`, `PLAYING`,
-  `PAUSED`, `STOPPED`, `ERROR`) with a status dot, and `elapsed / length / total`
-  tabular time values on the right.
-- Surfaces use SB2's dark obsidian (`#090b0f`), chrome (`#111419` / `#1a1c20`),
-  button (`#15191f`), and cyan accent (`#38aaff`) palette with monospace tabular
-  numerals and `1px` dividers.
-- One shared animated selector highlights active mode buttons, tabs, and focused
-  controls when selection motion is enabled.
+  concise SB2 library stats (`X GAMES · Y SYSTEMS`) on the left, playback state
+  (`READY`, `PLAYING`, `PAUSED`, `ERROR`) with a status dot, and
+  `elapsed / length / total` tabular clocks on the right. There is no bottom
+  transport deck or visible progress scrubber rail, matching SB2's presentation
+  contract.
 
 ## Responsive Layout
 
 - Primary touch proportions are tuned around the **iPhone Plus** canvas
-  (`430 × 932 pt` portrait, `932 × 430 pt` landscape) with `44 × 44 pt` transport
-  controls and 2-column square album frames at `1.00×` gallery scale.
-- On compact viewports (`< 768px`, iPhone portrait), a primary mode bar switches
-  the workspace between `Library`, `Playlist`, `Gallery`, `Favorites`, and `Recent`
-  while keeping the docked Now Playing transport deck (including `Options`) and
-  status strip visible at the bottom.
-- On regular viewports (`>= 768px`, iPhone Plus landscape and iPad), the workspace
-  displays SB2's two-pane split layout with the Library sidebar on the left, a
-  `1px` vertical divider, and the active Playlist or Gallery pane on the right.
-  On compact-height landscape viewports (`<= 500px` tall, such as iPhone Plus
-  landscape), the transport deck condenses into a horizontal two-zone SB2 toolbar
-  to maximize vertical Library and Playlist row capacity.
-- Rotating the device or resizing iPad Split View switches between compact and
-  two-pane layouts while preserving open tabs, search query, selection, and
-  playback position.
+  (`430 × 932 pt` portrait, `932 × 430 pt` landscape) with `38 × 38 pt` toolbar
+  glyph buttons and 2-column square album frames at `1.00×` gallery scale.
+- Unified zero-duplication CSS Grid:
+  - On compact viewports (`< 768px`, iPhone portrait), `.app-shell` stacks the
+    titlebar, 10-button transport toolbar, search + 5 action buttons, active
+    workspace pane (`#library-pane` or `#content-pane`), and status bar in a
+    single column.
+  - On regular viewports (`>= 768px`, iPhone Plus landscape and iPad),
+    `.app-shell` switches to SB2's exact 2-column desktop split
+    (`minmax(356px, 39%) 1px minmax(0, 1fr)`), stacking the transport toolbar,
+    search/action bar, and Library tree in the left column while the Playlist or
+    Gallery pane spans full height in the right column.
 
-## Library and Navigation
+## Library, Playlist, and Gallery
 
-- The Library toolbar pairs a zoom-safe search input with an expand/collapse-all
-  control (plus `Gallery`, `Recent`, and `Favorites` shortcuts in split view).
-- Console rows expand or collapse their albums with disclosure markers and album
-  counts.
-- Each album row shows its title, track count, and an adjacent star button that
-  favorites or unfavorites all tracks in the album without starting playback.
-- Tapping an album loads its tracks into the active playlist tab; on compact
-  viewports it switches to the `Playlist` view.
+- Console rows expand or collapse their games with disclosure markers and game
+  counts; game rows show clean titles, optional track counts, and a star toggle
+  without soundchip format badge clutter.
+- Open playlist tabs share width equally (`flex: 1 1 0`) above the track table,
+  with `+` to create a tab and `×` to close tabs when multiple are open. The tab
+  bar hides automatically while Gallery is active.
+- Compact track rows display `#`, `TITLE` (with artist/game subtitle), `★`, and
+  `TIME`; regular split viewports add `GAME` and `SYSTEM` columns. Active and
+  selected rows render SB2's `1px` bottom accent underline.
+- Gallery renders square framed cards and lazily upgrades visible cards with
+  embedded UAC Title Snap artwork via `galleryArtworkRead`.
 
-## Playlist and Gallery
+## Options Modal
 
-- Open playlist tabs share the available tab-bar width equally (`flex: 1 1 0`)
-  above the track list, overflowing to horizontal scroll only when many tabs
-  exceed the minimum tab width, and support tab switching, creating a new tab
-  (`+`), and closing individual tabs when more than one tab is open.
-- Compact track rows display track number, title with artist/album subtitle,
-  favorite star toggle, and tabular duration (updating live when Long Play is
-  toggled) within the phone width; regular viewports add explicit `Album` and
-  `System` columns.
-- Active and selected playlist rows render SB2's `1px` bottom accent underline.
-  When Link Mode is enabled (default on touch), tapping a track selects and
-  starts playback immediately; when Link Mode is off, first tap selects and a
-  second tap on the selected row plays.
-- Gallery displays square framed album cards in a responsive grid. Tapping a
-  card opens its album playlist and starts playback.
-
-## Transport and Options
-
-- The docked transport deck displays the active track title and artist/album
-  subtitle (plus status pills when Equalizer, Long Play, Playback Speed, or
-  Repeat are active), a touch-scrubbable progress bar, and 10 equal-width
-  controls: Previous, Stop, Play/Pause (switching to animated 4-bar playback
-  meter while playing), Next, Repeat (`off` / `all` / `one`), Equalizer toggle,
-  Long Play toggle, Speed toggle, Volume popover, and Options.
-- Options slides top-down between the persistent title strip and bottom status
-  strip with 6 equal-width section tabs on compact portrait (`Chrome`, `Fonts`,
-  `Gallery`, `Audio`, `Playback`, `Catalog`; vertical left rail on regular
-  viewports) and closes via the header `×` button or `Escape`.
-- `Audio` provides a 10-band peaking Equalizer (`31, 62, 125, 250, 500, 1k, 2k,
-  4k, 8k, 16k` Hz, `-12` to `+12 dB` in `0.5 dB` steps with automatic headroom
-  compensation and `Reset`), `Mono` channel downmix, and app `Volume`.
-- `Playback` provides `Long Play` seamless loop extension with configurable
-  `m:ss` duration, `Fade Out` end-fade toggle and length, and pitch-preserving
-  `Playback Speed` (`0.50×`–`2.00×` plus quick-tap preset pills).
+- Options slides top-down between the titlebar and status bar, grouping sections
+  under **SPCBoy** (`Database`, `Gallery`, `UI Chrome`, `UI Fonts`) and
+  **VGMBoy** (`Audio`, `Diagnostics`, `Playback`).
+- `VGMBoy / Audio` uses `SharedWebUI/range-controls.{css,js}` for the 10-band
+  peaking Equalizer (`-12` to `+12 dB`, `0.5 dB` steps, automatic headroom
+  compensation, `Reset`), `Mono`, and `Volume`.
+- `VGMBoy / Diagnostics` displays live decoder backend, transport state, sample
+  rate, queued/target engine buffers, scheduled frames, `1/32` tempo ratio, EQ
+  headroom, container summary, and position in whitespace-separated rows.
+- `VGMBoy / Playback` configures `Long Play`, `Fade Out`, and `1/32`-quantized
+  `Playback Speed` accepting fractions (`3/4`, `5/4`, `3/2`, `2/1`) or decimals.
 
 ## Files
 

@@ -17,7 +17,7 @@ coreDependencies.append(.product(name: "Crypto", package: "swift-crypto"))
 
 let package = Package(
     name: "UACWrapper",
-    platforms: [.macOS("14.0")],
+    platforms: [.macOS("14.0"), .iOS(.v17)],
     products: [
         .library(name: "UACWrapperCore", targets: ["UACWrapperCore"])
     ],

@@ -16,6 +16,12 @@
 *.tar.gz
 *.tar.zst
 *.tgz
+*.uac
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.ipa
+APPBOY/DataPack/
 
 # macOS metadata.
 .DS_Store

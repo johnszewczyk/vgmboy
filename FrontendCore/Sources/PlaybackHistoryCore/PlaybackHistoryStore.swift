@@ -63,7 +63,7 @@ public final class PlaybackHistoryStore: @unchecked Sendable {
             in: .userDomainMask,
             appropriateFor: nil,
             create: false
-        )) ?? fileManager.homeDirectoryForCurrentUser.appendingPathComponent(
+        )) ?? URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true).appendingPathComponent(
             "Library/Application Support",
             isDirectory: true
         )
