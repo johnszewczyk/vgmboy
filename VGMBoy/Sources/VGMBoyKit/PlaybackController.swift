@@ -16,6 +16,13 @@ public final class PlaybackController: @unchecked Sendable {
         var loop: PlaybackLoopMetadata?
     }
 
+    /// Immutable source identity for preparing a mode change without touching
+    /// the live decoder or its archive lease.
+    public struct ReconfigurationSource: Sendable {
+        public let payload: PlaybackControlPayload
+        public let sourceData: Data?
+    }
+
     /// A prepared source owns its archive lease until it is committed or discarded.
     public final class PreparedSource: @unchecked Sendable {
         fileprivate let payload: PlaybackControlPayload
@@ -437,6 +444,25 @@ public final class PlaybackController: @unchecked Sendable {
         return requestedMode
     }
 
+    /// Capture the original source, member, loop and optional in-memory bytes.
+    /// The caller must separately guard session identity when committing it.
+    public func reconfigurationSource(for settings: PlaybackControlPayload) throws -> ReconfigurationSource {
+        try Self.validatePlaybackMode(settings)
+        lock.lock()
+        let current = loaded
+        lock.unlock()
+        guard let current else { throw PlaybackSessionError.notLoaded }
+        return Self.reconfigurationSource(current: current, tempo: settings.tempo)
+    }
+
+    private static func reconfigurationSource(current: LoadedTrack, tempo: Double?) -> ReconfigurationSource {
+        ReconfigurationSource(
+            payload: PlaybackControlPayload(path: current.path, archiveEntry: current.archiveEntry,
+                trackIndex: current.trackIndex, tempo: tempo ?? current.tempo, loop: current.loop),
+            sourceData: current.sourceData
+        )
+    }
+
     private func configurePlaybackMode(_ payload: PlaybackControlPayload, reloadCurrent: Bool = true) throws {
         let requestedMode = try Self.validatePlaybackMode(payload)
         lock.lock()
@@ -460,10 +486,8 @@ public final class PlaybackController: @unchecked Sendable {
         let nextTempo = FormatRegistry.effectiveTempo(payload.tempo ?? current.tempo, family: family)
         if unchangedTiming && nextTempo == previousStatus.statistics.tempo { return }
         do {
-            let replacedStatus = try load(
-                PlaybackControlPayload(path: current.path, archiveEntry: current.archiveEntry, trackIndex: current.trackIndex, tempo: payload.tempo ?? current.tempo, loop: current.loop),
-                sourceData: current.sourceData
-            )
+            let source = Self.reconfigurationSource(current: current, tempo: payload.tempo)
+            let replacedStatus = try load(source.payload, sourceData: source.sourceData)
             let resumeSeconds = replacedStatus.elapsedSeconds * replacedStatus.statistics.tempo / nextTempo
             if resumeSeconds > 0 { try session.seek(to: resumeSeconds) }
             if replacedStatus.isPlaying { try session.play() }
