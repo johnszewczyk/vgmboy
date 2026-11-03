@@ -49,6 +49,14 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Reconfiguration validation, 2026-11-03: the controller's existing mode and
+timing checks are now available as a non-mutating shared validation operation,
+and the existing mode-change path uses that same operation. Tests cover invalid
+settings without changing a playing session, unchanged buffered playback, and
+archive preparation failure. This is a prerequisite only: archive reload
+preparation still runs on the serialized transport queue and the generation,
+revision, audible-position and lease handoff work remains.
+
 Preparation-slot cancellation, 2026-11-03: a typed or legacy start waiting
 behind two active preparations now periodically checks its request and queued
 skip token, returning cancellation without waiting for a slot when superseded.

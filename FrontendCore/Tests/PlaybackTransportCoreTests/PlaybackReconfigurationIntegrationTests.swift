@@ -47,6 +47,29 @@ private func waitForSignal(_ semaphore: DispatchSemaphore, seconds: Int) -> Bool
     #expect(recorded.snapshot().isEmpty)
 }
 
+@Test func reconfigurationValidationDoesNotMutatePlayingSession() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 30).write(to: url)
+    let controller = PlaybackController()
+    defer { _ = controller.perform(.init(command: .stop)) }
+    #expect(controller.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    #expect(controller.perform(.init(command: .play)).kind != .error)
+    let generation = controller.status().diagnostics.generation
+    let invalid: [PlaybackControlPayload] = [
+        .init(), .init(playbackMode: .timed, playMilliseconds: 0),
+        .init(playbackMode: .longPlay, fadeMilliseconds: -1),
+        .init(tempo: .infinity, playbackMode: .fileDefault),
+        .init(playbackMode: .longPlay, playMilliseconds: Int(Int32.max), fadeMilliseconds: 1)
+    ]
+    for payload in invalid {
+        #expect(throws: PlaybackControlError.self) { try PlaybackController.validatePlaybackMode(payload) }
+    }
+    #expect(try PlaybackController.validatePlaybackMode(.init(playbackMode: .timed, playMilliseconds: 1)) == .timed)
+    #expect(controller.status().diagnostics.generation == generation)
+    #expect(controller.status().isPlaying)
+}
+
 @Test func staleReplacementCannotStopCurrentPlayback() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
