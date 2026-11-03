@@ -37,7 +37,6 @@ final class AresSNESDecoder: AudioDecoder, @unchecked Sendable {
             throw AresSNESDecoderError.runtimeUnavailable
         }
         self.helperURL = helperURL
-        try launch()
     }
 
     deinit { close() }
