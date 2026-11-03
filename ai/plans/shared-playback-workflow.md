@@ -49,6 +49,14 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Preparation-slot cancellation, 2026-11-03: a typed or legacy start waiting
+behind two active preparations now periodically checks its request and queued
+skip token, returning cancellation without waiting for a slot when superseded.
+An injected-gate test holds both slots and covers each invalidation path; the
+bounded shared transport suite passes with the SOTN UAC fixture. Running
+preparations are not interrupted, and archive-backed reconfiguration still
+requires its separate off-queue design and verification.
+
 New decoder integration, 2026-11-02: the experimental ares SNES state backend
 was added after the earlier shared-playback passes. Its helper can close its PCM
 pipe before exiting, and an unexpected exit must propagate as a decode failure

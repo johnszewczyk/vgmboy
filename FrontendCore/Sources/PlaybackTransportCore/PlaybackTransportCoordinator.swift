@@ -745,11 +745,13 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     }
 
     private func prepareOutsideTransport(_ start: PlaybackContinuationStart) throws -> PlaybackController.PreparedSource {
-        preparationSlots.wait()
-        defer { preparationSlots.signal() }
         let isCurrent = {
             self.isLatest(start.requestID) && (start.queuedSkipToken.map { self.queuedSkipLifecycle.isCurrent($0) } ?? true)
         }
+        while preparationSlots.wait(timeout: .now() + .milliseconds(100)) != .success {
+            guard isCurrent() else { throw CancellationError() }
+        }
+        defer { preparationSlots.signal() }
         guard isCurrent() else { throw CancellationError() }
         do {
             let prepared = try prepareSource(controller, start)
