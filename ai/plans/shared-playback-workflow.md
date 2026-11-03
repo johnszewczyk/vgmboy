@@ -58,6 +58,11 @@ and exit after PCM during refill. SB2 compiled against the change. These tests
 do not establish real ares state playback, packaged runtime staging or audible
 output; archive-backed reconfiguration remains on the transport queue.
 
+Ares helper startup, 2026-11-03: `AresSNESDecoder` no longer launches a helper
+in its initializer only to terminate and relaunch it in `startTrack`. A
+synthetic helper confirms no launch on construction and one on track start; the existing pipe and
+failure tests also pass. Real-state and packaged audible evidence remain open.
+
 ### Queued-fade ownership boundary
 
 The shared scheduler owns deadline tokens, fallback timing and ramp-ready

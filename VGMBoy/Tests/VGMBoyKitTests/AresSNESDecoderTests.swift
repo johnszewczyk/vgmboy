@@ -11,8 +11,27 @@ import Testing
     try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: helper.path)
     let decoder = try AresSNESDecoder(path: directory.appendingPathComponent("test.snesstate").path, helperURL: helper)
     defer { decoder.close() }
+    try decoder.startTrack(0)
     #expect(throws: AresSNESDecoderError.self) { try decoder.readFrames(1) }
     #expect(!decoder.trackEnded)
+}
+
+@Test func aresPlaybackStartsOneHelperPerTrack() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let helper = directory.appendingPathComponent("counting-helper")
+    try "#!/bin/sh\nprintf x >> \"$0.calls\"\n/bin/dd if=/dev/zero bs=1764 count=4 2>/dev/null\nexec /bin/sleep 30\n".write(to: helper, atomically: true, encoding: .utf8)
+    try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: helper.path)
+    let callsURL = URL(fileURLWithPath: helper.path + ".calls")
+    let decoder = try AresSNESDecoder(path: directory.appendingPathComponent("test.snesstate").path, helperURL: helper)
+    defer { decoder.close() }
+    Thread.sleep(forTimeInterval: 0.2)
+    #expect(!FileManager.default.fileExists(atPath: callsURL.path))
+    try decoder.startTrack(0)
+    _ = try decoder.readFrames(1)
+    let calls = try String(contentsOf: callsURL, encoding: .utf8)
+    #expect(calls == "x")
 }
 
 @Test func aresUnexpectedExitIsNotReportedAsNaturalEnd() throws {

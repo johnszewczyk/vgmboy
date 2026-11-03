@@ -30,6 +30,8 @@ deliberately exclusive to one family.
   unbounded execution of the state’s native SNES program.
   Unexpected helper exit or PCM-pipe closure is a decoder error, not a natural
   track end; the helper's exit status is read only after the process exits.
+  The helper starts when the track starts; constructing the decoder does not
+  launch a redundant emulator process.
 - Frontends must project `FormatRegistry.playbackDescriptors` rather than rebuilding extension
   unions, backend IDs, Long Play support, tempo support, or natural-ending flags.
 - GameCube admission is fixture-backed and limited to primary playable DSP,
