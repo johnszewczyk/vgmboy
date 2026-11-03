@@ -57,6 +57,15 @@ archive preparation failure. This is a prerequisite only: archive reload
 preparation still runs on the serialized transport queue and the generation,
 revision, audible-position and lease handoff work remains.
 
+Reconfiguration source snapshot, 2026-11-03: the controller now exposes a
+validated, non-mutating snapshot of the original loaded source, archive member,
+track index, loop metadata and in-memory bytes. The existing synchronous reload
+uses the same source construction. Focused tests cover in-memory SPC, a ZIP
+member, preparation failure and the read-only SOTN UAC's authored XA loop.
+This does not yet move preparation off the queue: callers must still guard the
+captured session and settings revision, capture position at commit, and transfer
+or release the prepared lease correctly.
+
 Preparation-slot cancellation, 2026-11-03: a typed or legacy start waiting
 behind two active preparations now periodically checks its request and queued
 skip token, returning cancellation without waiting for a slot when superseded.

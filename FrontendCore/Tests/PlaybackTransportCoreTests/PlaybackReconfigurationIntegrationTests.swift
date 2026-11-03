@@ -70,6 +70,28 @@ private func waitForSignal(_ semaphore: DispatchSemaphore, seconds: Int) -> Bool
     #expect(controller.status().isPlaying)
 }
 
+@Test func reconfigurationSourcePreservesInMemoryIdentityAndLoop() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let fixture = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let bytes = try Data(contentsOf: fixture)
+    let path = "/no-such-directory/reconfiguration-source.spc"
+    let loop = PlaybackLoopMetadata(startSample: 1_000, endSample: 20_000, sampleRateHz: 44_100,
+                                    repeatCount: 2, source: "fixture")
+    let controller = PlaybackController()
+    defer { _ = controller.perform(.init(command: .stop)) }
+    let event = controller.loadInMemory(sourceData: bytes, payload: .init(path: path, loop: loop))
+    #expect(event.kind != .error)
+    let generation = try #require(event.status?.diagnostics.generation)
+    let snapshot = try controller.reconfigurationSource(for: .init(tempo: 2, playbackMode: .longPlay))
+    #expect(snapshot.payload.path == path)
+    #expect(snapshot.payload.tempo == 2)
+    #expect(snapshot.payload.loop == loop)
+    #expect(snapshot.sourceData == bytes)
+    #expect(controller.status().diagnostics.generation == generation)
+}
+
 @Test func staleReplacementCannotStopCurrentPlayback() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
@@ -824,6 +846,19 @@ func archiveReconfigurationKeepsActiveSessionWhenPreparationFails() throws {
     zip.waitUntilExit()
     #expect(zip.terminationStatus == 0)
 
+    let controller = PlaybackController()
+    defer { _ = controller.perform(.init(command: .stop)) }
+    let sourceLoad = controller.perform(.init(command: .load, payload: .init(
+        path: archive.path, archiveEntry: fixture.lastPathComponent
+    )))
+    #expect(sourceLoad.kind != .error)
+    let snapshot = try controller.reconfigurationSource(for: .init(tempo: 2, playbackMode: .fileDefault))
+    #expect(snapshot.payload.path == archive.path)
+    #expect(snapshot.payload.archiveEntry == fixture.lastPathComponent)
+    #expect(snapshot.payload.tempo == 2)
+    #expect(snapshot.sourceData == nil)
+    _ = controller.perform(.init(command: .stop))
+
     let transport = PlaybackTransportCoordinator(label: "test.archive.reconfiguration")
     defer { _ = transport.perform(.init(command: .stop)) }
     let loaded = transport.perform(.init(command: .load, payload: .init(
@@ -1361,6 +1396,23 @@ func uacManifestLoopSurvivesPausedSeekAndSharedReconfiguration() async throws {
     #expect(finished.bufferedFrames == 0)
     // One-second source plus the two 50 ms manifest repeats.
     #expect((1.08...1.12).contains(finished.elapsedSeconds))
+}
+
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VGMBOY_SOTN_XA_UAC"] != nil))
+func sotnReconfigurationSourcePreservesAuthoredLoop() throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBOY_SOTN_XA_UAC"])
+    let entry = "audio/SD-XA_STR1/file00-channel00.xa"
+    let controller = PlaybackController()
+    defer { _ = controller.perform(.init(command: .stop)) }
+    let event = controller.perform(.init(command: .load, payload: .init(path: path, archiveEntry: entry)))
+    #expect(event.kind != .error, Comment(rawValue: event.message ?? ""))
+    let snapshot = try controller.reconfigurationSource(for: .init(playbackMode: .fileDefault))
+    #expect(snapshot.payload.path == path)
+    #expect(snapshot.payload.archiveEntry == entry)
+    let loop = try #require(snapshot.payload.loop)
+    #expect(loop.startSample == 2_153_088)
+    #expect(loop.endSample == 5_310_144)
+    #expect(loop.sampleRateHz == 37_800)
 }
 
 @Test(.enabled(if: ProcessInfo.processInfo.environment["VGMBOY_SOTN_XA_UAC"] != nil))

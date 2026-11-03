@@ -33,6 +33,10 @@ finite AAC export; it has no catalog, queue, or UI policy.
   resolved loop metadata until a guarded commit transfers that lease to the
   controller, or discarding the result releases it. Direct controller load
   commands still prepare synchronously.
+- `PlaybackController.reconfigurationSource` validates settings and snapshots
+  the loaded source's original path, member, track, loop and in-memory bytes
+  without changing playback. Callers must validate session identity separately
+  before committing work prepared from that snapshot.
 - UAC manifest, seek-table, and member-range validation remain in
   `UACWrapperCore`; `UACZstandardCLIFrameCodec` supplies bounded Zstandard
   frame decoding. Seekable UAC selected-member reads use only frames that
