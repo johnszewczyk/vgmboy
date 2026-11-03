@@ -41,6 +41,9 @@ opens or manipulates an audio device.
 - A frontend may request a bounded transport-gain ramp for an intentional musical transition such
   as SPCBoy's queued skip. The request changes only the core-owned final output gain; it does not
   create a second frontend audio graph or modify the user's volume/EQ setting.
+- `PlaybackController.validatePlaybackMode` checks mode, timing and tempo
+  parameters without changing playback. The controller uses the same validation
+  when applying a mode change; validation alone does not prepare or reload a source.
 - Envelope progress is callback-owned. Control writers serialize and publish coherent atomic
   gain-reset and ramp snapshots; the callback never waits for them and retries an in-flight
   snapshot on its next buffer. A reset followed by a ramp before the callback runs preserves

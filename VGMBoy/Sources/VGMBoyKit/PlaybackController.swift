@@ -407,7 +407,10 @@ public final class PlaybackController: @unchecked Sendable {
         return replacedStatus
     }
 
-    private func configurePlaybackMode(_ payload: PlaybackControlPayload, reloadCurrent: Bool = true) throws {
+    /// Validate a mode change without mutating the active playback session.
+    /// Hosts can reject invalid settings before starting source preparation.
+    @discardableResult
+    public static func validatePlaybackMode(_ payload: PlaybackControlPayload) throws -> PlaybackMode {
         guard let requestedMode = payload.playbackMode else {
             throw PlaybackControlError.invalidPayload("set_playback_mode requires a playback mode.")
         }
@@ -431,6 +434,11 @@ public final class PlaybackController: @unchecked Sendable {
         if let tempo = payload.tempo, !tempo.isFinite || tempo <= 0 {
             throw PlaybackControlError.invalidPayload("Tempo must be a positive finite value.")
         }
+        return requestedMode
+    }
+
+    private func configurePlaybackMode(_ payload: PlaybackControlPayload, reloadCurrent: Bool = true) throws {
+        let requestedMode = try Self.validatePlaybackMode(payload)
         lock.lock()
         let previousMode = mode
         let previousPlay = explicitPlayMilliseconds
