@@ -34,6 +34,8 @@ startup contracts shared by the VGMMan player frontends.
   request identity before preparation and recheck request, queued token and
   expected native generation on serialized commit. A rejected preparation
   releases its lease; an accepted commit transfers it to the controller.
+  A request waiting for a preparation slot periodically rechecks ownership and
+  exits when superseded; active archive preparation is not forcibly interrupted.
   Direct controller operations and reconfiguration still prepare on their
   existing execution paths.
 - A successful low-level mode change can reload the native session. The
