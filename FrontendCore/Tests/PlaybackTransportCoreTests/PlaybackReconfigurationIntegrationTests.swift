@@ -38,9 +38,11 @@ private final class FirstPreparationGate: @unchecked Sendable {
     let release = DispatchSemaphore(value: 0)
     private let lock = NSLock()
     private var count = 0
+    private let timeoutSeconds: Int
+    init(timeoutSeconds: Int = 20) { self.timeoutSeconds = timeoutSeconds }
     func waitIfFirst() {
         lock.lock(); count += 1; let first = count == 1; lock.unlock()
-        if first { entered.signal(); _ = release.wait(timeout: .now() + 20) }
+        if first { entered.signal(); _ = release.wait(timeout: .now() + .seconds(timeoutSeconds)) }
     }
 }
 
@@ -902,7 +904,7 @@ func newerPlaybackRequestSupersedesQueuedExplicitStop(asyncStop: Bool) async thr
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
     try silentWAV(seconds: 5).write(to: url)
-    let gate = FirstPreparationGate()
+    let gate = FirstPreparationGate(timeoutSeconds: 60)
     let transport = PlaybackTransportCoordinator(label: "test.queued.stop.newer.start")
     defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
     #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
@@ -1648,6 +1650,127 @@ func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
     #expect(changed.status?.diagnostics.generation != generation)
 }
 
+@Test(arguments: [false, true])
+func lowLevelSettingsPreparationKeepsControlsResponsive(tempoOnly: Bool) async throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let gate = FirstPreparationGate()
+    let transport = PlaybackTransportCoordinator(label: "test.lowlevel.settings.offqueue") { controller, start in
+        gate.waitIfFirst()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: source.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let generation = transport.statusSync().generation
+    let request: PlaybackControlRequest = tempoOnly
+        ? .init(requestID: "tempo", command: .setTempo, payload: .init(tempo: 2))
+        : .init(requestID: "mode", command: .setPlaybackMode,
+                payload: .init(playbackMode: .longPlay, playMilliseconds: 20_000, fadeMilliseconds: 0))
+    let changing = Task.detached { transport.perform(request) }
+    #expect(waitForSignal(gate.entered, seconds: 5))
+    let completed = DispatchSemaphore(value: 0)
+    let control = Task.detached {
+        defer { completed.signal() }
+        _ = try transport.performSessionControlSync(.pause, expectedGeneration: generation)
+        return try transport.performSessionControlSync(.seek, payload: .init(positionMilliseconds: 1_000),
+                                                       expectedGeneration: generation)
+    }
+    let responsive = waitForSignal(completed, seconds: 6)
+    gate.release.signal()
+    _ = try await control.value
+    let result = await changing.value
+    #expect(responsive)
+    #expect(result.kind == .response && result.requestID == request.requestID)
+    #expect(result.status?.diagnostics.generation != generation)
+    #expect(result.status?.isPlaying == false)
+    #expect(abs((result.status?.elapsedSeconds ?? -1) - (tempoOnly ? 0.5 : 1)) < 0.1)
+}
+
+@Test func lowLevelModePreparationFailureRetainsActiveArchiveSession() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let wav = directory.appendingPathComponent("source.wav")
+    let archive = directory.appendingPathComponent("source.zip")
+    try silentWAV(seconds: 5).write(to: wav)
+    let zip = Process(); zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+    zip.arguments = ["-q", "-j", archive.path, wav.path]
+    try zip.run(); zip.waitUntilExit()
+    #expect(zip.terminationStatus == 0)
+    let transport = PlaybackTransportCoordinator(label: "test.lowlevel.settings.archive.failure")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load,
+        payload: .init(path: archive.path, archiveEntry: wav.lastPathComponent))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let before = transport.statusSync()
+    try FileManager.default.removeItem(at: archive)
+    let error = transport.perform(.init(requestID: "missing-archive", command: .setPlaybackMode,
+        payload: .init(playbackMode: .longPlay, playMilliseconds: 3_000, fadeMilliseconds: 0)))
+    #expect(error.kind == .error && error.requestID == "missing-archive")
+    let after = transport.statusSync()
+    #expect(after.generation == before.generation && after.currentTrackID == before.currentTrackID)
+    #expect(after.isPlaying)
+}
+
+@Test func failedOverlappingLowLevelModeLeavesOlderPreparationEligible() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let wav = directory.appendingPathComponent("source.wav")
+    let archive = directory.appendingPathComponent("source.zip")
+    let heldArchive = directory.appendingPathComponent("held.zip")
+    try silentWAV(seconds: 5).write(to: wav)
+    let zip = Process(); zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+    zip.arguments = ["-q", "-j", archive.path, wav.path]
+    try zip.run(); zip.waitUntilExit()
+    #expect(zip.terminationStatus == 0)
+    let gate = FirstPreparationGate()
+    let transport = PlaybackTransportCoordinator(label: "test.lowlevel.overlap.failure") { controller, start in
+        gate.waitIfFirst()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load,
+        payload: .init(path: archive.path, archiveEntry: wav.lastPathComponent))).kind != .error)
+    let generation = transport.statusSync().generation
+    let old = Task.detached {
+        try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 3_000))
+    }
+    #expect(waitForSignal(gate.entered, seconds: 5))
+    try FileManager.default.moveItem(at: archive, to: heldArchive)
+    let rejected = transport.perform(.init(requestID: "missing-overlap", command: .setPlaybackMode,
+        payload: .init(playbackMode: .longPlay, playMilliseconds: 2_000, fadeMilliseconds: 0)))
+    #expect(rejected.kind == .error && rejected.requestID == "missing-overlap")
+    try FileManager.default.moveItem(at: heldArchive, to: archive)
+    gate.release.signal()
+    let accepted = try await old.value
+    #expect(accepted.generation != generation && accepted.currentTrackID == archive.path)
+}
+
+@Test func lowLevelTempoPreparationIsSupersededByStop() async throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let gate = FirstPreparationGate()
+    let transport = PlaybackTransportCoordinator(label: "test.lowlevel.tempo.stop") { controller, start in
+        gate.waitIfFirst()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: source.path))).kind != .error)
+    let changing = Task.detached {
+        transport.perform(.init(requestID: "stale-tempo", command: .setTempo, payload: .init(tempo: 2)))
+    }
+    #expect(waitForSignal(gate.entered, seconds: 5))
+    #expect(transport.perform(.init(command: .stop)).kind == .response)
+    gate.release.signal()
+    let result = await changing.value
+    #expect(result.kind == .error && result.requestID == "stale-tempo")
+    #expect(!transport.statusSync().trackLoaded)
+}
+
 @Test func lowLevelSettingsRejectUnsupportedVersionWithoutChangingSession() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
@@ -1665,6 +1788,9 @@ func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
         #expect(response.status?.diagnostics.generation == generation)
         #expect(response.message?.contains("Unsupported control API version") == true)
     }
+    let invalidTempo = transport.perform(.init(requestID: "invalid-tempo", command: .setPlaybackMode,
+        payload: .init(tempo: .infinity, playbackMode: .fileDefault)))
+    #expect(invalidTempo.kind == .error && invalidTempo.requestID == "invalid-tempo")
     #expect(transport.statusSync().generation == generation)
 }
 

@@ -520,8 +520,19 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
 
     private func reconfigure(expectedGeneration: Int?, settingsRevision: Int?, playbackPlan: PlaybackTimingPlan? = nil,
                              ignoreUnsupportedTempo: Bool = false, preservePendingTiming: Bool = false,
+                             lowLevelRequest: PlaybackControlRequest? = nil,
+                             captureEvent: ((PlaybackControlEvent) -> Void)? = nil,
                              payloadForTrack: (PlaybackTransportTrack) throws -> PlaybackControlPayload) throws -> PlaybackTransportStatus {
         let preparation: ReconfigurationPreparation = try queue.sync {
+            // Until partial low-level commands can preserve an older pending
+            // snapshot across preparation failure, keep their existing
+            // serialized ordering when such a snapshot is still current.
+            if let lowLevelRequest, currentTrack == nil ||
+                (pendingReconfiguration.map { isCurrentReconfiguration($0) } ?? false) {
+                let event = performLocked(lowLevelRequest)
+                captureEvent?(event)
+                return .completed(status(event.status))
+            }
             if let expected = expectedGeneration {
                 guard let start = currentTrackStartGeneration, let current = currentPlaybackGeneration,
                       expected >= start, expected <= current else { throw CancellationError() }
@@ -564,6 +575,9 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             pendingReconfiguration = nil
             guard try controller.reconfigurationRequiresReload(payload) else {
                 let result = try reconfigureLocked(payload: payload)
+                if let lowLevelRequest {
+                    captureEvent?(.init(requestID: lowLevelRequest.requestID, kind: .response, status: controller.status()))
+                }
                 if let acceptedPlan { currentPlaybackPlan = acceptedPlan }
                 return .completed(result)
             }
@@ -607,6 +621,9 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             }
             self.currentPlaybackGeneration = generation
             if let playbackPlan = work.playbackPlan { self.currentPlaybackPlan = playbackPlan }
+            if let lowLevelRequest {
+                captureEvent?(.init(requestID: lowLevelRequest.requestID, kind: .response, status: event.status))
+            }
             return self.status(event.status)
         }
     }
@@ -1107,6 +1124,26 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     /// Shared low-level command access for a host bridge. The command is still
     /// serialized here; hosts do not retain their own PlaybackController.
     public func perform(_ request: PlaybackControlRequest) -> PlaybackControlEvent {
+        if (request.command == .setTempo || request.command == .setPlaybackMode)
+            && request.version == PlaybackControlProtocol.version {
+            var result: PlaybackControlEvent?
+            do {
+                _ = try reconfigure(expectedGeneration: nil, settingsRevision: nil,
+                                    lowLevelRequest: request, captureEvent: { result = $0 }) { _ in
+                    if request.command == .setTempo {
+                        return try self.controller.tempoReconfigurationSettings(request.payload.tempo)
+                    }
+                    _ = try PlaybackController.validatePlaybackMode(request.payload)
+                    return request.payload
+                }
+                if let result { return result }
+            } catch {
+                return queue.sync {
+                    PlaybackControlEvent(requestID: request.requestID, kind: .error,
+                                         status: controller.status(), message: error.localizedDescription)
+                }
+            }
+        }
         if request.command == .stop && request.version == PlaybackControlProtocol.version {
             let requestID = reservePlaybackRequest()
             return queue.sync {
