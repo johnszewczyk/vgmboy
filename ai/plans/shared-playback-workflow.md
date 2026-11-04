@@ -49,6 +49,21 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Off-queue bridge reconfiguration, 2026-11-03: `reconfigureSync` now snapshots
+the loaded source and prepares a required reload outside the transport queue,
+sharing the two-preparation limit. It checks request, settings and track
+ownership before committing and resumes from the then-current position and play
+state. Same-track reload generations remain valid for queued skip decisions and
+starts, while an actual replacement invalidates the old lineage. Gated tests
+cover pause and seek during ZIP preparation, newer settings, replacement and
+stop supersession, and a queued replacement racing a reload. The bounded
+transport suite passed (84 reported, four fixture-dependent skips), including
+the read-only SOTN UAC; SB2 built with the existing macOS 26/27 linker warnings.
+Direct controller
+operations and legacy coordinator reconfiguration routes still need the same
+audit; packaged SB2 and live audible continuity have not been established by
+these tests. Earlier checkpoints below describe their state at the time.
+
 Reconfiguration validation, 2026-11-03: the controller's existing mode and
 timing checks are now available as a non-mutating shared validation operation,
 and the existing mode-change path uses that same operation. Tests cover invalid

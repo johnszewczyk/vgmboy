@@ -33,6 +33,17 @@ private func waitForSignal(_ semaphore: DispatchSemaphore, seconds: Int) -> Bool
     semaphore.wait(timeout: .now() + .seconds(seconds)) == .success
 }
 
+private final class FirstPreparationGate: @unchecked Sendable {
+    let entered = DispatchSemaphore(value: 0)
+    let release = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
+    private var count = 0
+    func waitIfFirst() {
+        lock.lock(); count += 1; let first = count == 1; lock.unlock()
+        if first { entered.signal(); _ = release.wait(timeout: .now() + 20) }
+    }
+}
+
 @Test func statusSnapshotReadsDoNotPublishEvents() async {
     let transport = PlaybackTransportCoordinator(label: "test.status.nonemitting")
     let recorded = StatusRecorder()
@@ -90,6 +101,222 @@ private func waitForSignal(_ semaphore: DispatchSemaphore, seconds: Int) -> Bool
     #expect(snapshot.payload.loop == loop)
     #expect(snapshot.sourceData == bytes)
     #expect(controller.status().diagnostics.generation == generation)
+}
+
+@Test func preparedReconfigurationUsesLatestPausedPosition() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 30).write(to: url)
+    let controller = PlaybackController()
+    defer { _ = controller.perform(.init(command: .stop)) }
+    #expect(controller.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    #expect(controller.perform(.init(command: .play)).kind != .error)
+    let settings = PlaybackControlPayload(tempo: 1, playbackMode: .longPlay, playMilliseconds: 30_000, fadeMilliseconds: 0)
+    #expect(try controller.reconfigurationRequiresReload(settings))
+    let source = try controller.reconfigurationSource(for: settings)
+    let prepared = try controller.prepareSource(payload: source.payload, sourceData: source.sourceData)
+    #expect(controller.perform(.init(command: .pause)).kind != .error)
+    #expect(controller.perform(.init(command: .seek, payload: .init(positionMilliseconds: 1_000))).kind != .error)
+    let original = controller.status()
+    let rejected = controller.reconfigurePrepared(prepared, settings: settings, isCurrent: { false })
+    #expect(rejected.kind == .error)
+    #expect(controller.status().diagnostics.generation == original.diagnostics.generation)
+    let event = controller.reconfigurePrepared(prepared, settings: settings, isCurrent: { true })
+    #expect(event.kind != .error, Comment(rawValue: event.message ?? ""))
+    let after = controller.status()
+    #expect(!after.isPlaying)
+    #expect(abs(after.elapsedSeconds - 1) < 0.1)
+    #expect(after.diagnostics.generation != original.diagnostics.generation)
+    #expect(try !controller.reconfigurationRequiresReload(settings))
+}
+
+@Test func reconfigurationPreparationDoesNotBlockPauseOrSeek() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 30).write(to: url)
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+    let transport = PlaybackTransportCoordinator(label: "test.reconfigure.preparation.pause") { controller, start in
+        entered.signal(); _ = release.wait(timeout: .now() + 20)
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let generation = transport.statusSync().generation
+    let request = PlaybackTransportReconfigurationRequest(longPlayEnabled: true, manualPlayMilliseconds: 30_000,
+        fadeMilliseconds: 0, expectedGeneration: generation, settingsRevision: transport.reserveSettingsRevision())
+    let changing = Task.detached { try transport.reconfigureSync(request) }
+    #expect(waitForSignal(entered, seconds: 5))
+    let completed = DispatchSemaphore(value: 0)
+    let pauseAndSeek = Task.detached {
+        defer { completed.signal() }
+        _ = try transport.performSessionControlSync(.pause, expectedGeneration: generation)
+        return try transport.performSessionControlSync(.seek, payload: .init(positionMilliseconds: 1_000),
+                                                       expectedGeneration: generation)
+    }
+    let controlsCompleted = waitForSignal(completed, seconds: 6)
+    release.signal()
+    _ = try await pauseAndSeek.value
+    let changed = try await changing.value
+    #expect(controlsCompleted)
+    #expect(!changed.isPlaying)
+    #expect(abs(changed.elapsedSeconds - 1) < 0.1)
+    #expect(changed.currentTrackID == url.path)
+}
+
+@Test func archiveReconfigurationPreparationKeepsControlsResponsive() async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let wav = directory.appendingPathComponent("source.wav")
+    try silentWAV(seconds: 30).write(to: wav)
+    let archive = directory.appendingPathComponent("source.zip")
+    let zip = Process(); zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+    zip.arguments = ["-q", "-j", archive.path, wav.path]
+    try zip.run(); zip.waitUntilExit()
+    #expect(zip.terminationStatus == 0)
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+    let transport = PlaybackTransportCoordinator(label: "test.archive.reconfigure.offqueue") { controller, start in
+        entered.signal(); _ = release.wait(timeout: .now() + 20)
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { release.signal(); _ = transport.perform(.init(command: .stop)) }
+    let loaded = transport.perform(.init(command: .load, payload: .init(path: archive.path, archiveEntry: wav.lastPathComponent)))
+    #expect(loaded.kind != .error, Comment(rawValue: loaded.message ?? ""))
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let generation = transport.statusSync().generation
+    let settings = PlaybackTransportReconfigurationRequest(longPlayEnabled: true, manualPlayMilliseconds: 30_000,
+        fadeMilliseconds: 0, expectedGeneration: generation, settingsRevision: transport.reserveSettingsRevision())
+    let changing = Task.detached { try transport.reconfigureSync(settings) }
+    #expect(waitForSignal(entered, seconds: 5))
+    let completed = DispatchSemaphore(value: 0)
+    let control = Task.detached {
+        defer { completed.signal() }
+        _ = try transport.performSessionControlSync(.pause, expectedGeneration: generation)
+        return try transport.performSessionControlSync(.seek, payload: .init(positionMilliseconds: 1_000),
+                                                       expectedGeneration: generation)
+    }
+    let responsive = waitForSignal(completed, seconds: 6)
+    release.signal()
+    _ = try await control.value
+    let result = try await changing.value
+    #expect(responsive)
+    #expect(!result.isPlaying && abs(result.elapsedSeconds - 1) < 0.1)
+    #expect(result.currentTrackID == archive.path)
+}
+
+@Test func newerReconfigurationSupersedesOlderPreparation() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 30).write(to: url)
+    let gate = FirstPreparationGate()
+    let transport = PlaybackTransportCoordinator(label: "test.reconfigure.preparation.order") { controller, start in
+        gate.waitIfFirst()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let generation = transport.statusSync().generation
+    let older = PlaybackTransportReconfigurationRequest(longPlayEnabled: true, manualPlayMilliseconds: 10_000,
+        fadeMilliseconds: 0, expectedGeneration: generation, settingsRevision: transport.reserveSettingsRevision())
+    let first = Task.detached { try transport.reconfigureSync(older) }
+    #expect(waitForSignal(gate.entered, seconds: 5))
+    let newer = PlaybackTransportReconfigurationRequest(longPlayEnabled: true, manualPlayMilliseconds: 20_000,
+        fadeMilliseconds: 0, expectedGeneration: generation, settingsRevision: transport.reserveSettingsRevision())
+    let completed = DispatchSemaphore(value: 0)
+    let second = Task.detached { defer { completed.signal() }; return try transport.reconfigureSync(newer) }
+    let secondFinishedBeforeRelease = waitForSignal(completed, seconds: 6)
+    gate.release.signal()
+    let accepted = try await second.value
+    do { _ = try await first.value; Issue.record("Older settings unexpectedly committed") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    #expect(secondFinishedBeforeRelease)
+    #expect(transport.statusSync().generation == accepted.generation)
+    let same = try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 20_000,
+        fadeMilliseconds: 0, expectedGeneration: accepted.generation, settingsRevision: transport.reserveSettingsRevision()))
+    #expect(same.generation == accepted.generation)
+}
+
+@Test func replacementSupersedesReconfigurationPreparation() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 30).write(to: url)
+    let gate = FirstPreparationGate()
+    let transport = PlaybackTransportCoordinator(label: "test.reconfigure.preparation.replacement") { controller, start in
+        gate.waitIfFirst()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let generation = transport.statusSync().generation
+    let settings = PlaybackTransportReconfigurationRequest(longPlayEnabled: true, manualPlayMilliseconds: 30_000,
+        fadeMilliseconds: 0, expectedGeneration: generation, settingsRevision: transport.reserveSettingsRevision())
+    let changing = Task.detached { try transport.reconfigureSync(settings) }
+    #expect(waitForSignal(gate.entered, seconds: 5))
+    let replacement = PlaybackContinuationStart(track: .init(id: "newer", path: url.path),
+        payload: .init(path: url.path), requestID: transport.reservePlaybackRequest())
+    try transport.start(replacement)
+    let newGeneration = transport.statusSync().generation
+    gate.release.signal()
+    do { _ = try await changing.value; Issue.record("Old reconfiguration unexpectedly committed") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    #expect(transport.statusSync().generation == newGeneration)
+    #expect(transport.statusSync().currentTrackID == "newer")
+    #expect(transport.statusSync().isPlaying)
+}
+
+@Test func stopSupersedesReconfigurationPreparation() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 30).write(to: url)
+    let gate = FirstPreparationGate()
+    let transport = PlaybackTransportCoordinator(label: "test.reconfigure.preparation.stop") { controller, start in
+        gate.waitIfFirst()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let generation = transport.statusSync().generation
+    let settings = PlaybackTransportReconfigurationRequest(longPlayEnabled: true, manualPlayMilliseconds: 30_000,
+        fadeMilliseconds: 0, expectedGeneration: generation, settingsRevision: transport.reserveSettingsRevision())
+    let changing = Task.detached { try transport.reconfigureSync(settings) }
+    #expect(waitForSignal(gate.entered, seconds: 5))
+    let stopID = transport.reservePlaybackRequest()
+    #expect(transport.stopForPlaybackRequestSync(stopID))
+    gate.release.signal()
+    do { _ = try await changing.value; Issue.record("Stopped session was unexpectedly reconfigured") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    #expect(!transport.statusSync().trackLoaded)
+    #expect(transport.statusSync().currentTrackID == nil)
+}
+
+@Test func reconfigurationDuringQueuedReplacementDoesNotLoseReplacement() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 30).write(to: url)
+    let gate = FirstPreparationGate()
+    let transport = PlaybackTransportCoordinator(label: "test.reconfigure.during.queued-start") { controller, start in
+        gate.waitIfFirst()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let generation = transport.statusSync().generation
+    #expect(transport.queuedSkipLifecycle.begin("queued"))
+    let replacement = PlaybackContinuationStart(track: .init(id: "replacement", path: url.path),
+        payload: .init(path: url.path), requestID: transport.reservePlaybackRequest(),
+        expectedPreviousGeneration: generation, queuedSkipToken: "queued")
+    let pending = Task.detached { try transport.start(replacement) }
+    #expect(waitForSignal(gate.entered, seconds: 5))
+    _ = try? transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 30_000,
+        fadeMilliseconds: 0, expectedGeneration: generation, settingsRevision: transport.reserveSettingsRevision()))
+    gate.release.signal()
+    try await pending.value
+    #expect(transport.statusSync().currentTrackID == "replacement")
 }
 
 @Test func staleReplacementCannotStopCurrentPlayback() async throws {
@@ -179,6 +406,10 @@ private func waitForSignal(_ semaphore: DispatchSemaphore, seconds: Int) -> Bool
     #expect(transport.queuedSkipDecisionSync(claimed) == nil)
     let distinct = PlaybackQueuedSkipDecisionRequest(expectedGeneration: generation, requestID: "skip-2", targetTrackID: "staged")
     #expect(transport.queuedSkipDecisionSync(distinct)?.trackID == "staged")
+    let reconfigured = try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 20_000,
+        fadeMilliseconds: 0, expectedGeneration: generation, settingsRevision: transport.reserveSettingsRevision()))
+    #expect(reconfigured.generation != generation)
+    #expect(transport.queuedSkipDecisionSync(decoded)?.trackID == "second")
     #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
     #expect(transport.queuedSkipDecisionSync(decoded) == nil)
     #expect(transport.queuedSkipDecisionSync(explicit) == nil)
