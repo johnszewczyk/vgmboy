@@ -1253,7 +1253,7 @@ func newerPlaybackRequestSupersedesQueuedExplicitStop(asyncStop: Bool) async thr
     #expect(changed.generation != unchanged.generation)
 }
 
-@Test func sharedReconfigurationRetiresFailedReload() throws {
+@Test func sharedReconfigurationKeepsSessionWhenAudioProbeFails() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
     try silentWAV(seconds: 2).write(to: url)
@@ -1266,16 +1266,15 @@ func newerPlaybackRequestSupersedesQueuedExplicitStop(asyncStop: Bool) async thr
     }
     #expect(transport.statusSync().trackLoaded)
     #expect(transport.statusSync().generation == generation)
-    // A readable invalid source gets past preparation but fails when the
-    // decoder is reopened, after the original session has been retired.
+    // An invalid replacement is rejected while the previous decoder remains loaded.
     try Data("not a WAV".utf8).write(to: url)
     #expect(throws: (any Error).self) {
         _ = try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 1_000))
     }
     let status = transport.statusSync()
-    #expect(!status.trackLoaded)
-    #expect(status.currentTrackID == nil)
-    #expect(!status.isPlaying)
+    #expect(status.trackLoaded)
+    #expect(status.currentTrackID == url.path)
+    #expect(status.generation == generation)
 }
 
 @Test(.enabled(if: FileManager.default.isExecutableFile(atPath: "/usr/bin/zip")
@@ -2868,12 +2867,27 @@ func sotnLoopSurvivesPausedSharedReconfiguration() async throws {
     #expect(transport.statusSync().currentTrackID == url.path)
     #expect(transport.statusSync().generation == firstGeneration)
 
-    // A readable but invalid WAV reaches session.load and retires the old
-    // decoder before the replacement fails to open.
+    // An unreadable audio payload must not retire the active decoder.
     let invalidWAV = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".wav")
     try Data("not a WAV".utf8).write(to: invalidWAV)
     defer { try? FileManager.default.removeItem(at: invalidWAV) }
-    let openError = transport.perform(.init(command: .load, payload: .init(path: invalidWAV.path)))
+    let invalidError = transport.perform(.init(command: .load, payload: .init(path: invalidWAV.path)))
+    #expect(invalidError.kind == .error)
+    #expect(transport.statusSync().currentTrackID == url.path)
+    #expect(transport.statusSync().generation == firstGeneration)
+    let invalidStart = PlaybackContinuationStart(
+        track: .init(id: "invalid", path: invalidWAV.path), payload: .init(path: invalidWAV.path),
+        requestID: transport.reservePlaybackRequest()
+    )
+    #expect(throws: (any Error).self) { try transport.start(invalidStart) }
+    #expect(transport.statusSync().currentTrackID == url.path)
+    #expect(transport.statusSync().generation == firstGeneration)
+
+    // A different format can still fail later, after replacement starts.
+    let invalidSPC = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".spc")
+    try Data("not an SPC".utf8).write(to: invalidSPC)
+    defer { try? FileManager.default.removeItem(at: invalidSPC) }
+    let openError = transport.perform(.init(command: .load, payload: .init(path: invalidSPC.path)))
     #expect(openError.kind == .error)
     let stopped = transport.statusSync()
     #expect(stopped.currentTrackID == nil)
@@ -2887,8 +2901,8 @@ func sotnLoopSurvivesPausedSharedReconfiguration() async throws {
 
     // The typed start route must apply the same failure boundary.
     let start = PlaybackContinuationStart(
-        track: PlaybackTransportTrack(id: "invalid", path: invalidWAV.path),
-        payload: .init(path: invalidWAV.path),
+        track: PlaybackTransportTrack(id: "invalid", path: invalidSPC.path),
+        payload: .init(path: invalidSPC.path),
         requestID: transport.reservePlaybackRequest()
     )
     #expect(throws: (any Error).self) { try transport.start(start) }
