@@ -49,6 +49,29 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Packaged replacement and missing-file fix, 2026-11-04: an isolated release
+SB2 build at `2a051613` used generated 60-second WAVs and a test-only 12-second
+delay before preparing a ZIP member. While the old track was playing, Pause
+and Stop each completed during the delay; after the delayed start returned,
+Pause retained the old paused generation and Stop remained unloaded. These
+instrumented checks do not measure real archive latency or audible continuity.
+The old WAV SHA-256 was
+`163acb59c834f0dcec4c587cebc1b60c445202a468c37ac3502ae60a59e547d7`, and
+the ZIP was `1e92d33a88770c016a76d4eb47d888adbf28324a1ab6b38dd231194e146204db`.
+A missing standalone WAV initially retired the old session because source
+preparation did not check the file. Shared preparation now checks standalone
+disk sources before commit, while retaining in-memory and symlink support.
+The patched isolated SB2 showed the error while the old track stayed playing
+on the same generation. Readable but invalid files and files removed after
+preflight can still fail after replacement begins; decoder replacement is not
+atomic. The isolated build redirected catalog, favorites, history, playlist
+tabs and archive cache, used a separate bundle identifier, and did not alter
+the normal playlist-tab file's previously recorded modification time. The
+shared transport suite passed with 117 discovered tests and six fixture-based
+skips; a focused VGMBoy check passed for directory rejection, in-memory input
+and symlinks. The SB2 release build retained existing macOS 26/27 linker
+warnings.
+
 AAC content regression, 2026-11-04: the VGMBoy exporter test decodes its
 2x AAC and aligns it against separately rendered 1x and 2x SPC decoder PCM,
 allowing for AAC encoder delay. The 2x signal matches its reference and is

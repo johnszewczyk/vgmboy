@@ -319,6 +319,21 @@ public final class PlaybackController: @unchecked Sendable {
         } else {
             nextArchiveMaterializer = nil
             playablePath = path
+            // Detect unavailable standalone files before retiring the current
+            // session. Decoder opening can still fail later (or the file can
+            // disappear), so commit retains its existing failure handling.
+            if sourceData == nil {
+                var isDirectory: ObjCBool = false
+                guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory), !isDirectory.boolValue else {
+                    throw PlaybackControlError.invalidPayload("Playback source is missing or is a directory: \(path)")
+                }
+                let fileURL = URL(fileURLWithPath: path).resolvingSymlinksInPath()
+                guard try fileURL.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true else {
+                    throw PlaybackControlError.invalidPayload("Playback source is not a regular file: \(path)")
+                }
+                let handle = try FileHandle(forReadingFrom: fileURL)
+                try handle.close()
+            }
         }
         let trackIndex = payload.trackIndex ?? 0
         let tempo = payload.tempo ?? 1
