@@ -961,6 +961,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     }
 
     private func retirePlaybackLocked() {
+        invalidatePendingReconfigurationLocked()
         _ = controller.perform(.init(command: .stop))
         currentTrack = nil
         currentPlaybackGeneration = nil
@@ -1117,12 +1118,9 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             }
             return event
         }
-        if request.command == .setPlaybackMode || request.command == .setTempo {
-            // A successful low-level update supersedes an older prepared
-            // settings snapshot even when it does not reload the session.
-            requestLock.lock()
-            reconfigurationEpoch &+= 1
-            requestLock.unlock()
+        if request.command == .setPlaybackMode || request.command == .setTempo
+            || request.command == .load || request.command == .stop || request.command == .shutdown {
+            invalidatePendingReconfigurationLocked()
         }
         switch request.command {
         case .load:
@@ -1160,6 +1158,15 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             }
         }
         return event
+    }
+
+    /// Called on the transport queue when the current settings or session is
+    /// retired, including changes that leave the native generation unchanged.
+    private func invalidatePendingReconfigurationLocked() {
+        requestLock.lock()
+        reconfigurationEpoch &+= 1
+        requestLock.unlock()
+        pendingReconfiguration = nil
     }
 
     private func timingMilliseconds(_ seconds: Int) throws -> Int {
