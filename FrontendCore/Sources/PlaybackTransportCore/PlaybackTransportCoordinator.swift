@@ -483,42 +483,46 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     }
 
     public func reconfigureCurrentTrack(plan: PlaybackTimingPlan, tempo: PlaybackTempo) async throws {
-        try await run {
-            guard let track = self.currentTrack else { throw PlaybackSessionError.notLoaded }
-            let timing = try PlaybackTimingRequest.standard(
-                path: track.archiveEntry ?? track.path,
-                longPlayEnabled: plan.isLongPlay,
-                manualPlayMilliseconds: try self.timingMilliseconds(plan.preFadeSeconds),
-                fadeMilliseconds: try self.timingMilliseconds(plan.fadeSeconds),
-                unknownDurationMilliseconds: try self.timingMilliseconds(plan.unknownDurationSeconds)
-            )
-            _ = try self.reconfigureLocked(payload: .init(
-                tempo: tempo.multiplier,
-                playbackMode: timing.playbackMode,
-                playMilliseconds: timing.playMilliseconds,
-                fadeMilliseconds: timing.fadeMilliseconds,
-                unknownDurationMilliseconds: timing.unknownDurationMilliseconds
-            ))
-            self.currentPlaybackPlan = plan
+        try await Task.detached(priority: .userInitiated) {
+            _ = try self.reconfigure(expectedGeneration: nil, settingsRevision: nil, playbackPlan: plan) { track in
+                let timing = try PlaybackTimingRequest.standard(
+                    path: track.archiveEntry ?? track.path,
+                    longPlayEnabled: plan.isLongPlay,
+                    manualPlayMilliseconds: try self.timingMilliseconds(plan.preFadeSeconds),
+                    fadeMilliseconds: try self.timingMilliseconds(plan.fadeSeconds),
+                    unknownDurationMilliseconds: try self.timingMilliseconds(plan.unknownDurationSeconds)
+                )
+                return .init(tempo: tempo.multiplier, playbackMode: timing.playbackMode,
+                             playMilliseconds: timing.playMilliseconds, fadeMilliseconds: timing.fadeMilliseconds,
+                             unknownDurationMilliseconds: timing.unknownDurationMilliseconds)
+            }
+        }.value
+    }
+
+    /// Applies a complete bridge settings snapshot with a serialized commit.
+    public func reconfigureSync(_ request: PlaybackTransportReconfigurationRequest) throws -> PlaybackTransportStatus {
+        try reconfigure(expectedGeneration: request.expectedGeneration, settingsRevision: request.settingsRevision) { _ in
+            var payload = request.playbackModePayload
+            payload.tempo = request.tempo.multiplier
+            return payload
         }
     }
 
-    /// Applies a complete bridge settings snapshot as one serialized reload.
-    public func reconfigureSync(_ request: PlaybackTransportReconfigurationRequest) throws -> PlaybackTransportStatus {
+    private func reconfigure(expectedGeneration: Int?, settingsRevision: Int?, playbackPlan: PlaybackTimingPlan? = nil,
+                             payloadForTrack: (PlaybackTransportTrack) throws -> PlaybackControlPayload) throws -> PlaybackTransportStatus {
         let preparation: ReconfigurationPreparation = try queue.sync {
-            if let expected = request.expectedGeneration {
+            if let expected = expectedGeneration {
                 guard let start = currentTrackStartGeneration, let current = currentPlaybackGeneration,
                       expected >= start, expected <= current else { throw CancellationError() }
             }
-            if let revision = request.settingsRevision {
-                guard request.expectedGeneration != nil, revision >= 0,
+            if let revision = settingsRevision {
+                guard expectedGeneration != nil, revision >= 0,
                       latestSettingsRevision.map({ revision > $0 }) ?? true else { throw CancellationError() }
                 latestSettingsRevision = revision
             }
-            var payload = request.playbackModePayload
-            payload.tempo = request.tempo.multiplier
             guard let track = currentTrack, let generation = currentPlaybackGeneration,
                   let trackStart = currentTrackStartGeneration else { throw PlaybackSessionError.notLoaded }
+            var payload = try payloadForTrack(track)
             if FormatRegistry.family(for: track.archiveEntry ?? track.path)?.supportsTempo != true {
                 payload.tempo = 1
             }
@@ -528,7 +532,9 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             let requestID = latestPlaybackRequest
             requestLock.unlock()
             guard try controller.reconfigurationRequiresReload(payload) else {
-                return .completed(try reconfigureLocked(payload: payload))
+                let result = try reconfigureLocked(payload: payload)
+                if let playbackPlan { currentPlaybackPlan = playbackPlan }
+                return .completed(result)
             }
             let source = try controller.reconfigurationSource(for: payload)
             return .prepare(ReconfigurationWork(epoch: epoch, generation: generation,
@@ -556,6 +562,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
                 self.continuationCoordinator.reset()
             }
             self.currentPlaybackGeneration = generation
+            if let playbackPlan { self.currentPlaybackPlan = playbackPlan }
             return self.status(event.status)
         }
     }

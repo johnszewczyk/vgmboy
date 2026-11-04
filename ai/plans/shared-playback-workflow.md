@@ -49,6 +49,14 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Native timing-plan reconfiguration, 2026-11-03: the async native-plan route
+now shares the bridge's bounded off-queue preparation and guarded commit. It
+publishes the plan only after an accepted commit or no-op. Gated tests cover
+pause/seek during preparation and supersession by newer bridge settings. The
+bounded transport suite passed (86 reported, four optional fixture skips), with
+the SOTN UAC; SB2 built with the existing macOS 26/27 linker warnings. This is
+not packaged or audible verification. Low-level mode and tempo commands and direct VGMBoy clients still require audit.
+
 Off-queue bridge reconfiguration, 2026-11-03: `reconfigureSync` now snapshots
 the loaded source and prepares a required reload outside the transport queue,
 sharing the two-preparation limit. It checks request, settings and track

@@ -36,10 +36,12 @@ startup contracts shared by the VGMMan player frontends.
   releases its lease; an accepted commit transfers it to the controller.
   A request waiting for a preparation slot periodically rechecks ownership and
   exits when superseded; active archive preparation is not forcibly interrupted.
-  Bridge `reconfigureSync` also prepares reloads outside the queue using the
-  same limit, then checks its request, settings and session ownership before
-  commit. No-op settings do not prepare a source. Direct controller operations
-  and legacy reconfiguration routes retain their existing execution paths.
+  Bridge `reconfigureSync` and async native timing-plan reconfiguration also
+  prepare reloads outside the queue using the same limit, then check request
+  and session ownership before commit. Bridge settings revisions are checked
+  during serialized admission. No-op settings do not prepare a source. Direct
+  controller operations and low-level tempo/mode commands retain their existing
+  execution paths.
 - A successful low-level mode change can reload the native session. The
   coordinator adopts its returned generation and resets completion claims;
   stale natural-end events are discarded before status or end delivery.
