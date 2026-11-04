@@ -36,7 +36,9 @@ finite AAC export; it has no catalog, queue, or UI policy.
   to regular files are accepted, and in-memory sources do not require a disk
   file. In-memory sources are checked against the decoder factory's supported
   SPC and SAP routes before replacement, without instantiating a decoder.
-  A file may still disappear or fail to decode after preparation, so this
+  Valid resolved loops must fit the shared output timeline at the format's
+  effective tempo before replacement; malformed loops continue to be ignored
+  as in the session. A file may still disappear or fail to decode after preparation, so this
   preflight does not make decoder replacement atomic. Direct controller
   load commands still prepare synchronously.
 - `PlaybackController.reconfigurationSource` validates settings and snapshots

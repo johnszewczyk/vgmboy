@@ -49,6 +49,17 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Loop-bound recovery, 2026-11-04: shared preparation now checks whether a
+valid resolved loop fits the output timeline at the decoder's effective tempo,
+before session replacement. An out-of-range loop previously stopped the old
+track; the regression test verifies that playback and generation survive, and
+temporarily removing the preflight reproduced the old failure. A focused
+check covers SPC tempo scaling and WAV's unsupported-tempo limit. The shared
+transport suite passed 119 discovered tests with four fixture skips and the
+read-only SOTN UAC enabled; SB2 built with existing macOS 26/27 linker warnings.
+These checks are shared-core evidence, not a packaged or audible transition
+measurement. Malformed decoders and later source failures remain open.
+
 In-memory admission recovery, 2026-11-04: shared source preparation now
 uses the decoder factory's SPC/SAP in-memory routing rule before committing a
 replacement. An unsupported in-memory WAV previously retired the active

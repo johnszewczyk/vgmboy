@@ -352,6 +352,14 @@ public final class PlaybackController: @unchecked Sendable {
         let loop = uacMember ? uacLoop : (payload.loop ?? (sourceData == nil
             ? PlaybackLoopTagReader.read(path: playablePath)
             : PlaybackLoopTagReader.read(data: sourceData ?? Data(), extensionName: URL(fileURLWithPath: playablePath).pathExtension)))
+        if let loop, loop.isValid {
+            let family = FormatRegistry.family(for: playablePath)
+            let effectiveTempo = FormatRegistry.effectiveTempo(tempo, family: family)
+            guard PlaybackLoopReader.bounds(loop, sampleRate: PlaybackSession.outputSampleRate,
+                                            tempo: effectiveTempo) != nil else {
+                throw PlaybackControlError.invalidPayload("Playback loop boundaries are outside the supported frame range.")
+            }
+        }
         let result = PreparedSource(payload: payload, sourceData: sourceData, path: path,
                                     archiveEntry: archiveEntry, playablePath: playablePath, loop: loop,
                                     materializer: nextArchiveMaterializer)

@@ -109,7 +109,8 @@ public enum PlaybackSessionError: LocalizedError {
 /// reconfiguration never lose the timeline.
 final class PlaybackSession: @unchecked Sendable {
     private let queue = DispatchQueue(label: "VGMBoy.playback-session", qos: .userInitiated)
-    private let sampleRate = 44_100
+    static let outputSampleRate = 44_100
+    private let sampleRate = PlaybackSession.outputSampleRate
     private let chunkFrameCount = 4096
     private let output: AudioOutput
     private let makeDecoder: (String, Data?, Int) throws -> any AudioDecoder

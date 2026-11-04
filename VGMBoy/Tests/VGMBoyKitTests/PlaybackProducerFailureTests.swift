@@ -220,6 +220,25 @@ private let fixturePlan = PlaybackPlan(preFadeMilliseconds: 5_000, fadeMilliseco
     }
 }
 
+@Test func preparedLoopBoundsUseEffectiveDecoderTempo() throws {
+    let controller = PlaybackController()
+    let end = Int64(Int32.max) * 44_100 / 1_000 * 3 / 2
+    let loop = PlaybackLoopMetadata(startSample: 1, endSample: end, sampleRateHz: 44_100)
+    let path = "/virtual.spc"
+    // SPC at 2x brings the loop inside the decoder timeline; 1x does not.
+    _ = try controller.prepareSource(payload: .init(path: path, tempo: 2, loop: loop), sourceData: Data([0]))
+    #expect(throws: (any Error).self) {
+        try controller.prepareSource(payload: .init(path: path, tempo: 1, loop: loop), sourceData: Data([0]))
+    }
+    // WAV does not support tempo; a requested 2x remains effectively 1x.
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    try Data([0]).write(to: url)
+    defer { try? FileManager.default.removeItem(at: url) }
+    #expect(throws: (any Error).self) {
+        try controller.prepareSource(payload: .init(path: url.path, tempo: 2, loop: loop))
+    }
+}
+
 @Test func invalidSeekDoesNotAlterTheLoadedSession() throws {
     let decoder = ScriptedProducerDecoder()
     let session = makeSession(decoder)
