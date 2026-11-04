@@ -344,10 +344,17 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         let settings: PlaybackControlPayload
         let source: PlaybackController.ReconfigurationSource
         let playbackPlan: PlaybackTimingPlan?
+        let candidateID: UInt64?
     }
     private enum ReconfigurationPreparation {
         case completed(PlaybackTransportStatus)
         case prepare(ReconfigurationWork)
+        case waitForCandidate(UInt64, Int, Int)
+    }
+    private struct ReconfigurationCandidate {
+        let id: UInt64
+        let epoch: UInt64
+        let requestID: Int
     }
     public let queuedSkipLifecycle = PlaybackQueuedSkipLifecycle()
     public typealias StatusHandler = @Sendable (PlaybackTransportStatus) -> Void
@@ -378,6 +385,8 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     private var latestSettingsRevision: Int?
     private var pendingReconfiguration: ReconfigurationWork? // Transport queue only.
     private var reconfigurationEpoch: UInt64 = 0 // Protected by requestLock.
+    private var nextReconfigurationCandidate: UInt64 = 0 // Protected by requestLock.
+    private var reconfigurationCandidate: ReconfigurationCandidate? // Protected by requestLock.
     private var latestSeekRevision: Int?
     private var latestRampRevision: Int?
     private var nextStatusSequence: UInt64 = 0
@@ -523,118 +532,207 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
                              lowLevelRequest: PlaybackControlRequest? = nil,
                              captureEvent: ((PlaybackControlEvent) -> Void)? = nil,
                              payloadForTrack: (PlaybackTransportTrack) throws -> PlaybackControlPayload) throws -> PlaybackTransportStatus {
-        let preparation: ReconfigurationPreparation = try queue.sync {
-            // Until partial low-level commands can preserve an older pending
-            // snapshot across preparation failure, keep their existing
-            // serialized ordering when such a snapshot is still current.
-            if let lowLevelRequest, currentTrack == nil ||
-                (pendingReconfiguration.map { isCurrentReconfiguration($0) } ?? false) {
-                let event = performLocked(lowLevelRequest)
-                captureEvent?(event)
-                return .completed(status(event.status))
+        var requiredGeneration = expectedGeneration
+        while true {
+            let preparation: ReconfigurationPreparation = try queue.sync {
+                if let expected = requiredGeneration {
+                    guard let start = currentTrackStartGeneration, let current = currentPlaybackGeneration,
+                          expected >= start, expected <= current else { throw CancellationError() }
+                }
+                if let lowLevelRequest, currentTrack == nil {
+                    let event = performLocked(lowLevelRequest)
+                    captureEvent?(event)
+                    return .completed(status(event.status))
+                }
+                if let revision = settingsRevision {
+                    guard requiredGeneration != nil, revision >= 0,
+                          latestSettingsRevision.map({ revision > $0 }) ?? true else { throw CancellationError() }
+                }
+                if ignoreUnsupportedTempo {
+                    guard let track = currentTrack,
+                          FormatRegistry.family(for: track.archiveEntry ?? track.path)?.supportsTempo == true else {
+                        return .completed(status(controller.status()))
+                    }
+                }
+                guard let track = currentTrack, let generation = currentPlaybackGeneration,
+                      let trackStart = currentTrackStartGeneration else { throw PlaybackSessionError.notLoaded }
+                var payload = try payloadForTrack(track)
+                if FormatRegistry.family(for: track.archiveEntry ?? track.path)?.supportsTempo != true {
+                    payload.tempo = 1
+                }
+                // Rejected settings must not consume a revision or supersede an
+                // already preparing, valid request. Pending timing has already
+                // passed this same validation; tempo is validated in this payload.
+                _ = try PlaybackController.validatePlaybackMode(payload)
+                if let settingsRevision { latestSettingsRevision = settingsRevision }
+                var acceptedPlan = playbackPlan
+                requestLock.lock()
+                let requestID = latestPlaybackRequest
+                let currentCandidate = reconfigurationCandidate.flatMap {
+                    $0.epoch == reconfigurationEpoch && $0.requestID == requestID ? $0 : nil
+                }
+                if lowLevelRequest != nil, let currentCandidate {
+                    requestLock.unlock()
+                    return .waitForCandidate(currentCandidate.id, requestID, generation)
+                }
+                let canSpeculate = lowLevelRequest != nil && pendingReconfiguration.map {
+                    $0.epoch == reconfigurationEpoch && $0.requestID == requestID &&
+                    $0.generation == generation && $0.trackStartGeneration == trackStart
+                } == true
+                if canSpeculate, let lowLevelRequest {
+                    requestLock.unlock()
+                    guard try controller.reconfigurationRequiresReload(payload) else {
+                        let event = performLocked(lowLevelRequest)
+                        captureEvent?(event)
+                        return .completed(status(event.status))
+                    }
+                    let source = try controller.reconfigurationSource(for: payload)
+                    requestLock.lock()
+                    guard latestPlaybackRequest == requestID,
+                          pendingReconfiguration?.epoch == reconfigurationEpoch else {
+                        requestLock.unlock()
+                        throw CancellationError()
+                    }
+                    nextReconfigurationCandidate &+= 1
+                    let candidate = ReconfigurationCandidate(id: nextReconfigurationCandidate,
+                        epoch: reconfigurationEpoch, requestID: requestID)
+                    reconfigurationCandidate = candidate
+                    requestLock.unlock()
+                    return .prepare(ReconfigurationWork(epoch: candidate.epoch, generation: generation,
+                        trackStartGeneration: trackStart, requestID: requestID, track: track,
+                        settings: payload, source: source, playbackPlan: nil, candidateID: candidate.id))
+                }
+                if preservePendingTiming, let pending = pendingReconfiguration,
+                   pending.generation == generation, pending.trackStartGeneration == trackStart,
+                   pending.epoch == reconfigurationEpoch, pending.requestID == requestID {
+                    let tempo = payload.tempo
+                    payload = pending.settings
+                    payload.tempo = tempo
+                    acceptedPlan = pending.playbackPlan
+                }
+                reconfigurationEpoch &+= 1
+                let epoch = reconfigurationEpoch
+                reconfigurationCandidate = nil
+                requestLock.unlock()
+                pendingReconfiguration = nil
+                guard try controller.reconfigurationRequiresReload(payload) else {
+                    let result = try reconfigureLocked(payload: payload)
+                    if let lowLevelRequest {
+                        captureEvent?(.init(requestID: lowLevelRequest.requestID, kind: .response, status: controller.status()))
+                    }
+                    if let acceptedPlan { currentPlaybackPlan = acceptedPlan }
+                    return .completed(result)
+                }
+                let source = try controller.reconfigurationSource(for: payload)
+                let work = ReconfigurationWork(epoch: epoch, generation: generation,
+                    trackStartGeneration: trackStart, requestID: requestID, track: track,
+                    settings: payload, source: source, playbackPlan: acceptedPlan, candidateID: nil)
+                pendingReconfiguration = work
+                return .prepare(work)
             }
-            if let expected = expectedGeneration {
-                guard let start = currentTrackStartGeneration, let current = currentPlaybackGeneration,
-                      expected >= start, expected <= current else { throw CancellationError() }
+            if case .waitForCandidate(let id, let requestID, let generation) = preparation {
+                while isCandidatePending(id) { Thread.sleep(forTimeInterval: 0.05) }
+                guard isLatest(requestID) else { throw CancellationError() }
+                requiredGeneration = requiredGeneration ?? generation
+                continue
             }
-            if let revision = settingsRevision {
-                guard expectedGeneration != nil, revision >= 0,
-                      latestSettingsRevision.map({ revision > $0 }) ?? true else { throw CancellationError() }
+            guard case .prepare(let work) = preparation else {
+                if case .completed(let status) = preparation { return status }
+                throw CancellationError()
             }
-            if ignoreUnsupportedTempo {
-                guard let track = currentTrack,
-                      FormatRegistry.family(for: track.archiveEntry ?? track.path)?.supportsTempo == true else {
-                    return .completed(status(controller.status()))
+            let prepared: PlaybackController.PreparedSource
+            do {
+                prepared = try prepareReconfigurationOutsideTransport(work)
+            } catch {
+                queue.sync {
+                    if let candidateID = work.candidateID {
+                        clearCandidate(candidateID)
+                    } else if pendingReconfiguration?.epoch == work.epoch {
+                        pendingReconfiguration = nil
+                    }
+                }
+                throw error
+            }
+            while true {
+                let result: PlaybackTransportStatus? = try queue.sync {
+                    guard self.isCurrentReconfiguration(work), self.currentPlaybackGeneration == work.generation,
+                          self.currentTrackStartGeneration == work.trackStartGeneration else {
+                        if let candidateID = work.candidateID { self.clearCandidate(candidateID) }
+                        else if self.pendingReconfiguration?.epoch == work.epoch { self.pendingReconfiguration = nil }
+                        throw CancellationError()
+                    }
+                    if work.candidateID == nil && self.hasCandidate(for: work) { return nil }
+                    if work.candidateID == nil && self.pendingReconfiguration?.epoch == work.epoch {
+                        self.pendingReconfiguration = nil
+                    }
+                    let event = self.controller.reconfigurePrepared(prepared, settings: work.settings) {
+                        self.isCurrentReconfiguration(work)
+                    }
+                    if event.kind == .error {
+                        if let lowLevelRequest {
+                            captureEvent?(.init(requestID: lowLevelRequest.requestID, kind: .error,
+                                                status: event.status, message: event.message))
+                        }
+                        if event.status?.diagnostics.generation != work.generation {
+                            self.retirePlaybackLocked()
+                        } else if let candidateID = work.candidateID {
+                            self.clearCandidate(candidateID)
+                        }
+                        try self.requireSuccess(event)
+                    }
+                    if let candidateID = work.candidateID {
+                        self.requestLock.lock()
+                        guard self.reconfigurationCandidate?.id == candidateID,
+                              self.reconfigurationEpoch == work.epoch, self.latestPlaybackRequest == work.requestID else {
+                            self.requestLock.unlock()
+                            self.retirePlaybackLocked()
+                            throw CancellationError()
+                        }
+                        self.reconfigurationEpoch &+= 1
+                        self.reconfigurationCandidate = nil
+                        self.requestLock.unlock()
+                        self.pendingReconfiguration = nil
+                    }
+                    let generation = event.status?.diagnostics.generation
+                    if generation != work.generation {
+                        self.naturalEndGate.reset()
+                        self.continuationCoordinator.reset()
+                    }
+                    self.currentPlaybackGeneration = generation
+                    if let playbackPlan = work.playbackPlan { self.currentPlaybackPlan = playbackPlan }
+                    if let lowLevelRequest {
+                        captureEvent?(.init(requestID: lowLevelRequest.requestID, kind: .response, status: event.status))
+                    }
+                    return self.status(event.status)
+                }
+                if let result { return result }
+                while hasCandidate(for: work) && isCurrentReconfiguration(work) {
+                    Thread.sleep(forTimeInterval: 0.05)
                 }
             }
-            guard let track = currentTrack, let generation = currentPlaybackGeneration,
-                  let trackStart = currentTrackStartGeneration else { throw PlaybackSessionError.notLoaded }
-            var payload = try payloadForTrack(track)
-            if FormatRegistry.family(for: track.archiveEntry ?? track.path)?.supportsTempo != true {
-                payload.tempo = 1
-            }
-            // Rejected settings must not consume a revision or supersede an
-            // already preparing, valid request. Pending timing has already
-            // passed this same validation; tempo is validated in this payload.
-            _ = try PlaybackController.validatePlaybackMode(payload)
-            if let settingsRevision { latestSettingsRevision = settingsRevision }
-            var acceptedPlan = playbackPlan
-            requestLock.lock()
-            let requestID = latestPlaybackRequest
-            if preservePendingTiming, let pending = pendingReconfiguration,
-               pending.generation == generation, pending.trackStartGeneration == trackStart,
-               pending.epoch == reconfigurationEpoch, pending.requestID == requestID {
-                let tempo = payload.tempo
-                payload = pending.settings
-                payload.tempo = tempo
-                acceptedPlan = pending.playbackPlan
-            }
-            reconfigurationEpoch &+= 1
-            let epoch = reconfigurationEpoch
-            requestLock.unlock()
-            pendingReconfiguration = nil
-            guard try controller.reconfigurationRequiresReload(payload) else {
-                let result = try reconfigureLocked(payload: payload)
-                if let lowLevelRequest {
-                    captureEvent?(.init(requestID: lowLevelRequest.requestID, kind: .response, status: controller.status()))
-                }
-                if let acceptedPlan { currentPlaybackPlan = acceptedPlan }
-                return .completed(result)
-            }
-            let source = try controller.reconfigurationSource(for: payload)
-            let work = ReconfigurationWork(epoch: epoch, generation: generation,
-                trackStartGeneration: trackStart, requestID: requestID, track: track,
-                settings: payload, source: source, playbackPlan: acceptedPlan)
-            pendingReconfiguration = work
-            return .prepare(work)
-        }
-        guard case .prepare(let work) = preparation else {
-            if case .completed(let status) = preparation { return status }
-            throw CancellationError()
-        }
-        let prepared: PlaybackController.PreparedSource
-        do {
-            prepared = try prepareReconfigurationOutsideTransport(work)
-        } catch {
-            queue.sync {
-                if pendingReconfiguration?.epoch == work.epoch { pendingReconfiguration = nil }
-            }
-            throw error
-        }
-        return try queue.sync {
-            defer {
-                if self.pendingReconfiguration?.epoch == work.epoch { self.pendingReconfiguration = nil }
-            }
-            guard self.isCurrentReconfiguration(work), self.currentPlaybackGeneration == work.generation,
-                  self.currentTrackStartGeneration == work.trackStartGeneration else { throw CancellationError() }
-            let event = self.controller.reconfigurePrepared(prepared, settings: work.settings) {
-                self.isCurrentReconfiguration(work)
-            }
-            if event.kind == .error {
-                if let lowLevelRequest {
-                    captureEvent?(.init(requestID: lowLevelRequest.requestID, kind: .error,
-                                        status: event.status, message: event.message))
-                }
-                if event.status?.diagnostics.generation != work.generation { self.retirePlaybackLocked() }
-                try self.requireSuccess(event)
-            }
-            let generation = event.status?.diagnostics.generation
-            if generation != work.generation {
-                self.naturalEndGate.reset()
-                self.continuationCoordinator.reset()
-            }
-            self.currentPlaybackGeneration = generation
-            if let playbackPlan = work.playbackPlan { self.currentPlaybackPlan = playbackPlan }
-            if let lowLevelRequest {
-                captureEvent?(.init(requestID: lowLevelRequest.requestID, kind: .response, status: event.status))
-            }
-            return self.status(event.status)
         }
     }
 
     private func isCurrentReconfiguration(_ work: ReconfigurationWork) -> Bool {
         requestLock.lock(); defer { requestLock.unlock() }
-        return reconfigurationEpoch == work.epoch && latestPlaybackRequest == work.requestID
+        return reconfigurationEpoch == work.epoch && latestPlaybackRequest == work.requestID &&
+            (work.candidateID.map { reconfigurationCandidate?.id == $0 } ?? true)
+    }
+
+    private func hasCandidate(for work: ReconfigurationWork) -> Bool {
+        requestLock.lock(); defer { requestLock.unlock() }
+        return reconfigurationCandidate.map { $0.epoch == work.epoch && $0.requestID == work.requestID } ?? false
+    }
+
+    private func isCandidatePending(_ id: UInt64) -> Bool {
+        requestLock.lock(); defer { requestLock.unlock() }
+        guard let candidate = reconfigurationCandidate else { return false }
+        return candidate.id == id && candidate.epoch == reconfigurationEpoch && candidate.requestID == latestPlaybackRequest
+    }
+
+    private func clearCandidate(_ id: UInt64) {
+        requestLock.lock(); defer { requestLock.unlock() }
+        if reconfigurationCandidate?.id == id { reconfigurationCandidate = nil }
     }
 
     private func prepareReconfigurationOutsideTransport(_ work: ReconfigurationWork) throws -> PlaybackController.PreparedSource {
@@ -1220,6 +1318,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     private func invalidatePendingReconfigurationLocked() {
         requestLock.lock()
         reconfigurationEpoch &+= 1
+        reconfigurationCandidate = nil
         requestLock.unlock()
         pendingReconfiguration = nil
     }

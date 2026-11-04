@@ -49,6 +49,24 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Overlapping low-level reloads, 2026-11-04: low-level settings now prepare a
+new candidate outside the transport queue while an older settings request is
+pending. The older commit waits outside the queue; candidate preparation
+failure leaves it eligible, successful native commit supersedes it, and failure
+after replacement retires playback. Gated tests cover pause/seek, success,
+preparation failure, failed native commit, Stop, newer typed settings, and
+consecutive low-level candidates, replacement starts, and retirement without
+a new request ID. Pre-load settings retain their serialized
+control behavior. A generated TXTP/WAV ZIP additionally exercises an archive
+with a sibling dependency across reload failure and seek. Generated UAC loop
+fixtures and the read-only SOTN UAC also pass paused seek/reconfiguration tests.
+The bounded shared suite passed (117 reported; three optional skips, including
+the historical RSF fixture); the two slow-extraction tests passed separately.
+The VGMBoy kit suite passed (109 reported, 17 optional fixture skips) after
+updating a stale descriptor expectation for the existing ares-snes backend.
+SB2 built with the existing macOS 26/27 linker warnings. These tests do not
+establish packaged SB2 behavior or audible continuity.
+
 Slow archive verification, 2026-11-04: using a test-owned wrapper around the
 installed 7zz that delays and signals extraction, the optional real ZIP tests
 passed for position capture during preparation and six superseded-start routes,
