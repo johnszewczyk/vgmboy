@@ -49,6 +49,14 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Slow archive verification, 2026-11-04: using a test-owned wrapper around the
+installed 7zz that delays and signals extraction, the optional real ZIP tests
+passed for position capture during preparation and six superseded-start routes,
+including an old session ending during extraction. This is native process and
+transport evidence, not packaged SB2 or audible proof. The optional TXTP/RSF
+dependency fixture and generated loop.uac fixture remain unavailable at their
+expected paths; the separate read-only SOTN authored-loop test remains covered.
+
 Low-level error status delivery, 2026-11-04: low-level settings failures
 during validation or off-queue preparation again publish the current status as
 well as returning their request-scoped error. Controller-emitted commit errors
