@@ -38,11 +38,9 @@ private final class FirstPreparationGate: @unchecked Sendable {
     let release = DispatchSemaphore(value: 0)
     private let lock = NSLock()
     private var count = 0
-    private let timeoutSeconds: Int
-    init(timeoutSeconds: Int = 20) { self.timeoutSeconds = timeoutSeconds }
     func waitIfFirst() {
         lock.lock(); count += 1; let first = count == 1; lock.unlock()
-        if first { entered.signal(); _ = release.wait(timeout: .now() + .seconds(timeoutSeconds)) }
+        if first { entered.signal(); _ = release.wait(timeout: .now() + 20) }
     }
 }
 
@@ -904,14 +902,13 @@ func newerPlaybackRequestSupersedesQueuedExplicitStop(asyncStop: Bool) async thr
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
     try silentWAV(seconds: 5).write(to: url)
-    let gate = FirstPreparationGate(timeoutSeconds: 60)
+    let gate = FirstPreparationGate()
     let transport = PlaybackTransportCoordinator(label: "test.queued.stop.newer.start")
     defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
     #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
     transport.setStatusHandler { _ in gate.waitIfFirst() }
-    _ = transport.statusSync()
     let oldRequest = transport.reservePlaybackRequest()
-    _ = transport.perform(.init(command: .pause))
+    let triggering = Task.detached { transport.perform(.init(command: .pause)) }
     #expect(waitForSignal(gate.entered, seconds: 5))
     let stopping = Task.detached { () -> PlaybackControlEvent? in
         if asyncStop { await transport.stop(); return nil }
@@ -923,6 +920,7 @@ func newerPlaybackRequestSupersedesQueuedExplicitStop(asyncStop: Bool) async thr
     #expect(!transport.isCurrentPlaybackRequest(oldRequest))
     let newRequest = transport.reservePlaybackRequest()
     gate.release.signal()
+    _ = await triggering.value
     let result = await stopping.value
     if !asyncStop { #expect(result?.kind == .error && result?.requestID == "queued-stop") }
     #expect(transport.statusSync().currentTrackID == url.path)
@@ -1792,6 +1790,43 @@ func lowLevelSettingsPreparationKeepsControlsResponsive(tempoOnly: Bool) async t
         payload: .init(tempo: .infinity, playbackMode: .fileDefault)))
     #expect(invalidTempo.kind == .error && invalidTempo.requestID == "invalid-tempo")
     #expect(transport.statusSync().generation == generation)
+}
+
+@Test func lowLevelSettingsValidationFailurePublishesCurrentStatus() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.lowlevel.settings.error.status")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let recorder = StatusRecorder()
+    transport.setStatusHandler { recorder.record($0) }
+    let before = transport.statusSync()
+    recorder.clear()
+    let event = transport.perform(.init(requestID: "bad-tempo", command: .setTempo, payload: .init(tempo: -1)))
+    #expect(event.kind == .error && event.requestID == "bad-tempo")
+    _ = transport.statusSync()
+    #expect(recorder.snapshot().contains { $0.generation == before.generation && $0.trackLoaded })
+}
+
+@Test func lowLevelPreparationFailurePublishesCurrentStatus() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.lowlevel.preparation.error.status") { _, _ in
+        throw CocoaError(.fileReadNoSuchFile)
+    }
+    defer { _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let recorder = StatusRecorder()
+    transport.setStatusHandler { recorder.record($0) }
+    let before = transport.statusSync()
+    recorder.clear()
+    let event = transport.perform(.init(requestID: "bad-source", command: .setPlaybackMode,
+        payload: .init(playbackMode: .longPlay, playMilliseconds: 2_000)))
+    #expect(event.kind == .error && event.requestID == "bad-source")
+    _ = transport.statusSync()
+    #expect(recorder.snapshot().contains { $0.generation == before.generation && $0.trackLoaded })
 }
 
 @Test func typedTempoPreparationPreservesTimingAndKeepsControlsResponsive() async throws {

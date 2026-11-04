@@ -611,6 +611,10 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
                 self.isCurrentReconfiguration(work)
             }
             if event.kind == .error {
+                if let lowLevelRequest {
+                    captureEvent?(.init(requestID: lowLevelRequest.requestID, kind: .error,
+                                        status: event.status, message: event.message))
+                }
                 if event.status?.diagnostics.generation != work.generation { self.retirePlaybackLocked() }
                 try self.requireSuccess(event)
             }
@@ -1138,9 +1142,12 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
                 }
                 if let result { return result }
             } catch {
+                if let result { return result }
                 return queue.sync {
-                    PlaybackControlEvent(requestID: request.requestID, kind: .error,
-                                         status: controller.status(), message: error.localizedDescription)
+                    let current = controller.status()
+                    publish(status: current, naturalEnd: false)
+                    return PlaybackControlEvent(requestID: request.requestID, kind: .error,
+                                                status: current, message: error.localizedDescription)
                 }
             }
         }

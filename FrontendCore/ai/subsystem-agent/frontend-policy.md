@@ -44,7 +44,10 @@ startup contracts shared by the VGMMan player frontends.
   controller operations retain their existing execution paths. Low-level
   tempo/mode requests use the shared off-queue handoff for loaded sessions;
   mode changes before load and commands overlapping eligible pending settings
-  retain their existing serialized path. Typed tempo-only updates retain the timing of an eligible
+  retain their existing serialized path. Low-level validation and source
+  preparation failures return a request-scoped error and publish the current
+  status; errors already emitted by the controller are not republished.
+  Typed tempo-only updates retain the timing of an eligible
   pending settings snapshot for the same track and playback request; otherwise
   they use active timing. The merged request supersedes the older request. If
   its preparation fails, the active session remains and the older request is
