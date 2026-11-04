@@ -49,6 +49,21 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Async start task cancellation, 2026-11-04: shared `startContinuation` and
+`play` now carry a start-specific cancellation token through preparation and
+commit. Canceling a Swift task prevents its pending start from taking over,
+without invalidating a newer start or the epoch used by settings work. A test
+holds source preparation and verifies both outcomes, including a settings
+reload while the start is canceled. A second test fills both preparation slots
+and confirms a canceled async waiter exits before either slot is released.
+Temporarily restoring the prior async implementation reproduced the failures.
+An already-running materializer is not forcibly interrupted, and cancellation
+once native replacement starts may retire that replacement. The shared suite
+passed 123 discovered tests with four fixture skips and SOTN enabled; SB2 built
+with existing linker warnings. SB2 currently uses the synchronous bridge start,
+so this is shared async API evidence, not a packaged SB2 cancellation test or
+an audible continuity measurement.
+
 Malformed SPC recovery, 2026-11-04: source preparation opens, starts and
 reads metadata through a temporary independent libgme SPC instance, for both
 file-backed and in-memory sources, before replacing playback. A shared test

@@ -335,6 +335,13 @@ public struct PlaybackNaturalEndGate: Sendable {
 /// presentation stay outside this boundary; shared queue policy is consulted
 /// only for generation-checked completion retirement.
 public final class PlaybackTransportCoordinator: @unchecked Sendable {
+    private final class StartCancellation: @unchecked Sendable {
+        private let lock = NSLock()
+        private var cancelled = false
+        func cancel() { lock.lock(); cancelled = true; lock.unlock() }
+        var isCancelled: Bool { lock.lock(); defer { lock.unlock() }; return cancelled }
+    }
+
     private struct ReconfigurationWork: Sendable {
         let epoch: UInt64
         let generation: Int
@@ -940,13 +947,23 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     }
 
     private func startContinuation(_ start: PlaybackContinuationStart, playbackPlan: PlaybackTimingPlan?) async throws {
-        try await run { try self.validateStartLocked(start) }
-        let prepared = try await Task.detached(priority: .userInitiated) {
-            try self.prepareOutsideTransport(start)
-        }.value
-        try await run {
-            try self.startContinuationLocked(start, prepared: prepared)
-            if let playbackPlan { self.currentPlaybackPlan = playbackPlan }
+        let cancellation = StartCancellation()
+        try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            try await run {
+                guard !cancellation.isCancelled else { throw CancellationError() }
+                try self.validateStartLocked(start)
+            }
+            let prepared = try await Task.detached(priority: .userInitiated) {
+                try self.prepareOutsideTransport(start, isCancelled: { cancellation.isCancelled })
+            }.value
+            try Task.checkCancellation()
+            try await run {
+                try self.startContinuationLocked(start, prepared: prepared, isCancelled: { cancellation.isCancelled })
+                if let playbackPlan { self.currentPlaybackPlan = playbackPlan }
+            }
+        } onCancel: {
+            cancellation.cancel()
         }
     }
 
@@ -998,9 +1015,11 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         return expected >= start && expected <= current
     }
 
-    private func prepareOutsideTransport(_ start: PlaybackContinuationStart) throws -> PlaybackController.PreparedSource {
+    private func prepareOutsideTransport(_ start: PlaybackContinuationStart,
+                                         isCancelled: @escaping @Sendable () -> Bool = { false }) throws -> PlaybackController.PreparedSource {
         let isCurrent = {
-            self.isLatest(start.requestID) && (start.queuedSkipToken.map { self.queuedSkipLifecycle.isCurrent($0) } ?? true)
+            !isCancelled() && self.isLatest(start.requestID)
+                && (start.queuedSkipToken.map { self.queuedSkipLifecycle.isCurrent($0) } ?? true)
         }
         while preparationSlots.wait(timeout: .now() + .milliseconds(100)) != .success {
             guard isCurrent() else { throw CancellationError() }
@@ -1017,10 +1036,13 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         }
     }
 
-    private func startContinuationLocked(_ start: PlaybackContinuationStart, prepared: PlaybackController.PreparedSource) throws {
+    private func startContinuationLocked(_ start: PlaybackContinuationStart, prepared: PlaybackController.PreparedSource,
+                                         isCancelled: @escaping @Sendable () -> Bool = { false }) throws {
         let isCurrent: @Sendable () -> Bool = {
-            self.isLatest(start.requestID) && (start.queuedSkipToken.map { self.queuedSkipLifecycle.isCurrent($0) } ?? true)
+            !isCancelled() && self.isLatest(start.requestID)
+                && (start.queuedSkipToken.map { self.queuedSkipLifecycle.isCurrent($0) } ?? true)
         }
+        guard isCurrent() else { throw CancellationError() }
         try validateStartLocked(start)
         let event = controller.loadPreparedIfCurrent(prepared) {
             isCurrent() && (start.expectedPreviousGeneration.map { self.matchesCurrentTrackGeneration($0) } ?? true)
