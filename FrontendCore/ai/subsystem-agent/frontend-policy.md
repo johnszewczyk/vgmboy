@@ -43,8 +43,12 @@ startup contracts shared by the VGMMan player frontends.
   supersede valid preparation. No-op settings do not prepare a source. Direct
   controller operations retain their existing execution paths. Low-level
   tempo/mode requests use the shared off-queue handoff for loaded sessions;
-  mode changes before load and commands overlapping eligible pending settings
-  retain their existing serialized path. Low-level validation and source
+  mode changes before load retain their serialized path. For an overlapping
+  low-level reload, source preparation is speculative: the older request waits
+  outside the transport queue and stays eligible if preparation fails before
+  replacement. Successful commit supersedes it; failure after native session
+  replacement retires the session. Later low-level requests wait off queue
+  for the candidate and recheck playback ownership. Low-level validation and source
   preparation failures return a request-scoped error and publish the current
   status; errors already emitted by the controller are not republished.
   Typed tempo-only updates retain the timing of an eligible

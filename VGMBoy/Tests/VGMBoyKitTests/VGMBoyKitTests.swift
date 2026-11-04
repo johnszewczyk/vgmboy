@@ -15,7 +15,7 @@ struct FormatRegistryTests {
         let expectedIDs = [
             "libgme", "asap", "libvgm", "psgplay", "mdx", "standard-audio", "ffmpeg-audio",
             "highly-complete", "twosf", "vgmstream", "lazyusf",
-            "playpsf", "qsf", "sidplayfp", "openmpt", "amiga-uade"
+            "playpsf", "ares-snes", "qsf", "sidplayfp", "openmpt", "amiga-uade"
         ]
         #expect(FormatRegistry.playbackDescriptors.map(\.id) == expectedIDs)
 

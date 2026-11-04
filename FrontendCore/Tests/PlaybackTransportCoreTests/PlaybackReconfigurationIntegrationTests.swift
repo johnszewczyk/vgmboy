@@ -44,6 +44,21 @@ private final class FirstPreparationGate: @unchecked Sendable {
     }
 }
 
+private final class TwoPreparationGates: @unchecked Sendable {
+    let firstEntered = DispatchSemaphore(value: 0), secondEntered = DispatchSemaphore(value: 0)
+    let thirdEntered = DispatchSemaphore(value: 0)
+    let firstRelease = DispatchSemaphore(value: 0), secondRelease = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
+    private var count = 0
+    func wait() -> Int {
+        lock.lock(); count += 1; let number = count; lock.unlock()
+        if number == 1 { firstEntered.signal(); _ = firstRelease.wait(timeout: .now() + 20) }
+        if number == 2 { secondEntered.signal(); _ = secondRelease.wait(timeout: .now() + 20) }
+        if number == 3 { thirdEntered.signal() }
+        return number
+    }
+}
+
 @Test func statusSnapshotReadsDoNotPublishEvents() async {
     let transport = PlaybackTransportCoordinator(label: "test.status.nonemitting")
     let recorded = StatusRecorder()
@@ -1490,6 +1505,40 @@ func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
     #expect((seek.status?.diagnostics.bufferedFrames ?? 0) > 0)
 }
 
+@Test func generatedTXTPArchiveRetainsSiblingAcrossReconfigurationFailure() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let wav = directory.appendingPathComponent("tone.wav")
+    let txtp = directory.appendingPathComponent("track.txtp")
+    let archive = directory.appendingPathComponent("dependencies.zip")
+    try silentWAV(seconds: 5).write(to: wav)
+    try "tone.wav\n".write(to: txtp, atomically: true, encoding: .utf8)
+    let zip = Process(); zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+    zip.currentDirectoryURL = directory
+    zip.arguments = ["-q", archive.path, wav.lastPathComponent, txtp.lastPathComponent]
+    try zip.run(); zip.waitUntilExit()
+    #expect(zip.terminationStatus == 0)
+    try FileManager.default.removeItem(at: wav)
+    try FileManager.default.removeItem(at: txtp)
+    let transport = PlaybackTransportCoordinator(label: "test.generated.txtp.archive")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    let loaded = transport.perform(.init(command: .load,
+        payload: .init(path: archive.path, archiveEntry: txtp.lastPathComponent)))
+    #expect(loaded.kind != .error, Comment(rawValue: loaded.message ?? ""))
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let configured = try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 5_000))
+    try FileManager.default.removeItem(at: archive)
+    #expect(throws: (any Error).self) {
+        try transport.reconfigureSync(.init(longPlayEnabled: false))
+    }
+    let after = transport.statusSync()
+    #expect(after.generation == configured.generation && after.isPlaying && after.trackLoaded)
+    let sought = transport.perform(.init(command: .seek, payload: .init(positionMilliseconds: 2_000)))
+    #expect(sought.kind != .error, Comment(rawValue: sought.message ?? ""))
+    #expect(sought.status?.isPlaying == true)
+}
+
 @Test func sharedReconfigurationAppliesTempoForNativeTempoFamilies() throws {
     let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()
@@ -1745,6 +1794,299 @@ func lowLevelSettingsPreparationKeepsControlsResponsive(tempoOnly: Bool) async t
     gate.release.signal()
     let accepted = try await old.value
     #expect(accepted.generation != generation && accepted.currentTrackID == archive.path)
+}
+
+@Test(arguments: [false, true])
+func overlappingLowLevelPreparationKeepsControlsResponsiveAndOrdersCommit(failNewer: Bool) async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 10).write(to: url)
+    let gate = TwoPreparationGates()
+    let transport = PlaybackTransportCoordinator(label: "test.lowlevel.overlap.two.phase") { controller, start in
+        let number = gate.wait()
+        if number == 2 && failNewer { throw CocoaError(.fileReadNoSuchFile) }
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.firstRelease.signal(); gate.secondRelease.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let generation = transport.statusSync().generation
+    let olderFinished = DispatchSemaphore(value: 0)
+    let older = Task.detached {
+        defer { olderFinished.signal() }
+        return try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 8_000))
+    }
+    #expect(waitForSignal(gate.firstEntered, seconds: 5))
+    let newer = Task.detached {
+        transport.perform(.init(requestID: "new-mode", command: .setPlaybackMode,
+            payload: .init(playbackMode: .longPlay, playMilliseconds: 6_000)))
+    }
+    #expect(waitForSignal(gate.secondEntered, seconds: 5))
+    let controlsFinished = DispatchSemaphore(value: 0)
+    let controls = Task.detached {
+        defer { controlsFinished.signal() }
+        _ = try transport.performSessionControlSync(.pause, expectedGeneration: generation)
+        return try transport.performSessionControlSync(.seek, payload: .init(positionMilliseconds: 1_000),
+                                                       expectedGeneration: generation)
+    }
+    let responsive = waitForSignal(controlsFinished, seconds: 5)
+    gate.firstRelease.signal()
+    let committedTooEarly = waitForSignal(olderFinished, seconds: 1)
+    gate.secondRelease.signal()
+    _ = try await controls.value
+    let newerResult = await newer.value
+    #expect(responsive && !committedTooEarly)
+    #expect(newerResult.requestID == "new-mode")
+    if failNewer {
+        #expect(newerResult.kind == .error)
+        let accepted = try await older.value
+        #expect(!accepted.isPlaying && abs(accepted.elapsedSeconds - 1) < 0.1)
+        #expect(accepted.generation != generation)
+    } else {
+        #expect(newerResult.kind == .response)
+        do { _ = try await older.value; Issue.record("Superseded older settings unexpectedly committed") }
+        catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+        let accepted = transport.statusSync()
+        #expect(!accepted.isPlaying && abs(accepted.elapsedSeconds - 1) < 0.1)
+        #expect(accepted.generation != generation)
+    }
+}
+
+@Test func stopCancelsOverlappingLowLevelPreparationsAndWaiter() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 10).write(to: url)
+    let gate = TwoPreparationGates()
+    let transport = PlaybackTransportCoordinator(label: "test.lowlevel.overlap.stop") { controller, start in
+        _ = gate.wait()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.firstRelease.signal(); gate.secondRelease.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let older = Task.detached { try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 8_000)) }
+    #expect(waitForSignal(gate.firstEntered, seconds: 5))
+    let newer = Task.detached {
+        transport.perform(.init(requestID: "candidate", command: .setPlaybackMode,
+            payload: .init(playbackMode: .longPlay, playMilliseconds: 6_000)))
+    }
+    #expect(waitForSignal(gate.secondEntered, seconds: 5))
+    let waiterStarted = DispatchSemaphore(value: 0), waiterFinished = DispatchSemaphore(value: 0)
+    let waiter = Task.detached {
+        waiterStarted.signal(); defer { waiterFinished.signal() }
+        return transport.perform(.init(requestID: "waiter", command: .setPlaybackMode,
+            payload: .init(playbackMode: .longPlay, playMilliseconds: 4_000)))
+    }
+    #expect(waitForSignal(waiterStarted, seconds: 5))
+    #expect(!waitForSignal(waiterFinished, seconds: 1))
+    #expect(transport.perform(.init(command: .stop)).kind == .response)
+    let waiterCanceled = waitForSignal(waiterFinished, seconds: 5)
+    gate.firstRelease.signal(); gate.secondRelease.signal()
+    let pendingEvent = await newer.value
+    let waiterEvent = await waiter.value
+    #expect(waiterCanceled && pendingEvent.kind == .error && waiterEvent.kind == .error)
+    do { _ = try await older.value; Issue.record("Stopped older settings unexpectedly committed") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    #expect(!transport.statusSync().trackLoaded)
+}
+
+@Test func retirementRejectsWaitingLowLevelSettingsWithoutNewRequestID() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 10).write(to: url)
+    let gate = TwoPreparationGates()
+    let transport = PlaybackTransportCoordinator(label: "test.lowlevel.overlap.retirement") { controller, start in
+        _ = gate.wait()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.firstRelease.signal(); gate.secondRelease.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let requestID = transport.reservePlaybackRequest()
+    let older = Task.detached { try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 8_000)) }
+    #expect(waitForSignal(gate.firstEntered, seconds: 5))
+    let candidate = Task.detached {
+        transport.perform(.init(requestID: "candidate", command: .setPlaybackMode,
+            payload: .init(playbackMode: .longPlay, playMilliseconds: 6_000)))
+    }
+    #expect(waitForSignal(gate.secondEntered, seconds: 5))
+    let waiterStarted = DispatchSemaphore(value: 0), waiterFinished = DispatchSemaphore(value: 0)
+    let waiter = Task.detached {
+        waiterStarted.signal(); defer { waiterFinished.signal() }
+        return transport.perform(.init(requestID: "waiter", command: .setPlaybackMode,
+            payload: .init(playbackMode: .longPlay, playMilliseconds: 4_000)))
+    }
+    #expect(waitForSignal(waiterStarted, seconds: 5))
+    #expect(!waitForSignal(waiterFinished, seconds: 1))
+    #expect(transport.stopForPlaybackRequestSync(requestID))
+    #expect(waitForSignal(waiterFinished, seconds: 5))
+    gate.firstRelease.signal(); gate.secondRelease.signal()
+    #expect((await waiter.value).kind == .error)
+    #expect((await candidate.value).kind == .error)
+    do { _ = try await older.value; Issue.record("Retired older settings unexpectedly committed") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    #expect(!transport.statusSync().trackLoaded)
+}
+
+@Test func overlappingLowLevelTempoPreservesItsActiveTimingContract() async throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let gate = TwoPreparationGates()
+    let transport = PlaybackTransportCoordinator(label: "test.lowlevel.tempo.overlap") { controller, start in
+        _ = gate.wait()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.firstRelease.signal(); gate.secondRelease.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: source.path))).kind != .error)
+    let older = Task.detached { try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 8_000)) }
+    #expect(waitForSignal(gate.firstEntered, seconds: 5))
+    let candidate = Task.detached {
+        transport.perform(.init(requestID: "tempo", command: .setTempo, payload: .init(tempo: 2)))
+    }
+    #expect(waitForSignal(gate.secondEntered, seconds: 5))
+    gate.secondRelease.signal()
+    let result = await candidate.value
+    #expect(result.kind == .response && result.requestID == "tempo" && result.status?.statistics.tempo == 2)
+    gate.firstRelease.signal()
+    do { _ = try await older.value; Issue.record("Older timing unexpectedly committed") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    let generation = transport.statusSync().generation
+    let same = transport.perform(.init(command: .setPlaybackMode, payload: .init(playbackMode: .fileDefault)))
+    #expect(same.kind == .response && same.status?.diagnostics.generation == generation)
+}
+
+@Test func failedCandidateCommitRetiresSessionAndDoesNotReviveOlderSettings() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 10).write(to: url)
+    let gate = TwoPreparationGates()
+    let transport = PlaybackTransportCoordinator(label: "test.lowlevel.overlap.commit.failure") { controller, start in
+        let number = gate.wait()
+        let prepared = try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+        if number == 2 { try FileManager.default.removeItem(at: url) }
+        return prepared
+    }
+    defer { gate.firstRelease.signal(); gate.secondRelease.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let older = Task.detached { try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 8_000)) }
+    #expect(waitForSignal(gate.firstEntered, seconds: 5))
+    let newer = Task.detached {
+        transport.perform(.init(requestID: "candidate", command: .setPlaybackMode,
+            payload: .init(playbackMode: .longPlay, playMilliseconds: 6_000)))
+    }
+    #expect(waitForSignal(gate.secondEntered, seconds: 5))
+    gate.secondRelease.signal()
+    let result = await newer.value
+    #expect(result.kind == .error && result.requestID == "candidate")
+    gate.firstRelease.signal()
+    do { _ = try await older.value; Issue.record("Older settings unexpectedly revived after failed commit") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    #expect(!transport.statusSync().trackLoaded)
+}
+
+@Test func newerTypedSettingsSupersedeBothOverlappingPreparations() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 10).write(to: url)
+    let gate = TwoPreparationGates()
+    let transport = PlaybackTransportCoordinator(label: "test.lowlevel.overlap.newer.settings") { controller, start in
+        _ = gate.wait()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.firstRelease.signal(); gate.secondRelease.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let generation = transport.statusSync().generation
+    let older = Task.detached { try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 8_000)) }
+    #expect(waitForSignal(gate.firstEntered, seconds: 5))
+    let candidate = Task.detached {
+        transport.perform(.init(requestID: "candidate", command: .setPlaybackMode,
+            payload: .init(playbackMode: .longPlay, playMilliseconds: 6_000)))
+    }
+    #expect(waitForSignal(gate.secondEntered, seconds: 5))
+    let latest = Task.detached {
+        try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 4_000,
+            expectedGeneration: generation, settingsRevision: transport.reserveSettingsRevision()))
+    }
+    gate.firstRelease.signal()
+    #expect(waitForSignal(gate.thirdEntered, seconds: 5))
+    gate.secondRelease.signal()
+    let accepted = try await latest.value
+    let candidateEvent = await candidate.value
+    #expect(candidateEvent.kind == .error && candidateEvent.requestID == "candidate")
+    do { _ = try await older.value; Issue.record("Older settings unexpectedly committed") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    #expect(transport.statusSync().generation == accepted.generation)
+}
+
+@Test func replacementStartSupersedesBothOverlappingPreparations() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 10).write(to: url)
+    let gate = TwoPreparationGates()
+    let transport = PlaybackTransportCoordinator(label: "test.lowlevel.overlap.replacement") { controller, start in
+        _ = gate.wait()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.firstRelease.signal(); gate.secondRelease.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let older = Task.detached { try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 8_000)) }
+    #expect(waitForSignal(gate.firstEntered, seconds: 5))
+    let candidate = Task.detached {
+        transport.perform(.init(requestID: "candidate", command: .setPlaybackMode,
+            payload: .init(playbackMode: .longPlay, playMilliseconds: 6_000)))
+    }
+    #expect(waitForSignal(gate.secondEntered, seconds: 5))
+    let replacement = PlaybackContinuationStart(track: .init(id: "replacement", path: url.path),
+        payload: .init(path: url.path), requestID: transport.reservePlaybackRequest())
+    let start = Task.detached { try transport.start(replacement) }
+    gate.firstRelease.signal()
+    #expect(waitForSignal(gate.thirdEntered, seconds: 5))
+    gate.secondRelease.signal()
+    try await start.value
+    let event = await candidate.value
+    #expect(event.kind == .error && event.requestID == "candidate")
+    do { _ = try await older.value; Issue.record("Older settings unexpectedly committed") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    #expect(transport.statusSync().currentTrackID == "replacement")
+}
+
+@Test func consecutiveLowLevelCandidatesCommitInOrder() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 10).write(to: url)
+    let gate = TwoPreparationGates()
+    let transport = PlaybackTransportCoordinator(label: "test.lowlevel.overlap.consecutive") { controller, start in
+        _ = gate.wait()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.firstRelease.signal(); gate.secondRelease.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let older = Task.detached { try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 8_000)) }
+    #expect(waitForSignal(gate.firstEntered, seconds: 5))
+    let second = Task.detached {
+        transport.perform(.init(requestID: "second", command: .setPlaybackMode,
+            payload: .init(playbackMode: .longPlay, playMilliseconds: 6_000)))
+    }
+    #expect(waitForSignal(gate.secondEntered, seconds: 5))
+    let thirdStarted = DispatchSemaphore(value: 0), thirdFinished = DispatchSemaphore(value: 0)
+    let third = Task.detached {
+        thirdStarted.signal(); defer { thirdFinished.signal() }
+        return transport.perform(.init(requestID: "third", command: .setPlaybackMode,
+            payload: .init(playbackMode: .longPlay, playMilliseconds: 4_000)))
+    }
+    #expect(waitForSignal(thirdStarted, seconds: 5))
+    #expect(!waitForSignal(thirdFinished, seconds: 1))
+    gate.secondRelease.signal()
+    #expect((await second.value).kind == .response)
+    #expect(waitForSignal(gate.thirdEntered, seconds: 5))
+    gate.firstRelease.signal()
+    let result = await third.value
+    #expect(result.kind == .response && result.requestID == "third")
+    do { _ = try await older.value; Issue.record("Older settings unexpectedly committed") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    let finalGeneration = transport.statusSync().generation
+    let same = transport.perform(.init(command: .setPlaybackMode,
+        payload: .init(playbackMode: .longPlay, playMilliseconds: 4_000)))
+    #expect(same.status?.diagnostics.generation == finalGeneration)
 }
 
 @Test func lowLevelTempoPreparationIsSupersededByStop() async throws {
