@@ -49,6 +49,16 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Async tempo preparation, 2026-11-03: the coordinator's async tempo route now
+uses the shared bounded preparation and guarded commit. Its previous no-op
+behavior for missing or unsupported tracks remains: an ignored request also
+leaves any older pending settings eligible. Gated SPC tests check pause/seek
+during preparation; a WAV test covers the ignored-request ordering. The bounded
+transport suite passed (91 reported, four optional fixture skips) with the SOTN
+UAC, followed by three focused async-tempo tests. SB2 built with existing macOS
+26/27 linker warnings; packaged and audible behavior were not tested. Direct
+low-level commands and partial-update merging still require follow-up.
+
 Typed tempo-only bridge, 2026-11-03: SB2's native tempo-only bridge now uses
 the shared bounded off-queue handoff. VGMBoy snapshots the existing timing
 fields and resolves effective tempo using the same logic as its direct control
