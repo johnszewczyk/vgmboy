@@ -49,6 +49,20 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Regression sweep after standalone source preflight, 2026-11-04: at
+`4cc7f3cf`, the VGMBoyKit suite passed 110 discovered tests with 20 optional
+fixture skips, and 46 focused SB2 renderer tests for queued fades, repeated
+navigation, cancellation, completion and start/settings races passed. The
+read-only Castlevania SOTN XA export UAC (SHA-256
+`b65b8ebbd8f75cad96d8be0c322261f7713b1badc3c0ac8b6ba205e14c7dd45a`)
+then passed its VGMBoy authored-loop test and both shared-transport loop and
+paused-reconfiguration checks. These tests do not establish audible output,
+packaged race delivery, or compatibility for the other skipped fixtures.
+A blanket speculative decoder-open step is not safe: the QSF decoder enforces
+a process-global lease, and 2SF also wraps a process-global core. Preserving
+the old session on decoder-open failure would need format-aware ownership and
+cleanup design; the standalone path preflight only catches earlier failures.
+
 Packaged replacement and missing-file fix, 2026-11-04: an isolated release
 SB2 build at `2a051613` used generated 60-second WAVs and a test-only 12-second
 delay before preparing a ZIP member. While the old track was playing, Pause
