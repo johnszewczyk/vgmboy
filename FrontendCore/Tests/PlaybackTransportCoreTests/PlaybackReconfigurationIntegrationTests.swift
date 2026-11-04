@@ -238,6 +238,45 @@ private final class FirstPreparationGate: @unchecked Sendable {
     #expect(same.generation == accepted.generation)
 }
 
+@Test func lowLevelSettingsSupersedePendingReconfigurationOnlyWhenAccepted() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 30).write(to: url)
+    let commands: [(PlaybackControlRequest, Bool)] = [
+        (.init(command: .setTempo, payload: .init(tempo: 1)), true),
+        (.init(command: .setPlaybackMode, payload: .init(playbackMode: .fileDefault)), true),
+        (.init(command: .setTempo, payload: .init(tempo: -1)), false),
+        (.init(command: .setPlaybackMode, payload: .init(playbackMode: .timed, playMilliseconds: 0)), false)
+    ]
+    for (command, accepted) in commands {
+        let gate = FirstPreparationGate()
+        let transport = PlaybackTransportCoordinator(label: "test.lowlevel.settings.supersession") { controller, start in
+            gate.waitIfFirst()
+            return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+        }
+        defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
+        #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+        let generation = transport.statusSync().generation
+        let pending = Task.detached {
+            try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 20_000,
+                expectedGeneration: generation, settingsRevision: transport.reserveSettingsRevision()))
+        }
+        #expect(waitForSignal(gate.entered, seconds: 5))
+        let event = transport.perform(command)
+        #expect((event.kind != .error) == accepted)
+        #expect(transport.statusSync().generation == generation)
+        gate.release.signal()
+        do {
+            let result = try await pending.value
+            #expect(!accepted)
+            #expect(result.generation != generation)
+        } catch is CancellationError {
+            #expect(accepted)
+            #expect(transport.statusSync().generation == generation)
+        }
+    }
+}
+
 @Test func replacementSupersedesReconfigurationPreparation() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }

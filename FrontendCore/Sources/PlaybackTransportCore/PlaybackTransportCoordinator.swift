@@ -1075,6 +1075,13 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             }
             return event
         }
+        if request.command == .setPlaybackMode || request.command == .setTempo {
+            // A successful low-level update supersedes an older prepared
+            // settings snapshot even when it does not reload the session.
+            requestLock.lock()
+            reconfigurationEpoch &+= 1
+            requestLock.unlock()
+        }
         switch request.command {
         case .load:
             if let path = request.payload.path, !path.isEmpty {
