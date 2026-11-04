@@ -752,10 +752,13 @@ struct PlaybackControlProtocolTests {
             try controller.prepareSource(payload: .init(path: directory.path))
         }
         let virtualPath = directory.appendingPathComponent("memory.spc").path
-        _ = try controller.prepareSource(payload: .init(path: virtualPath), sourceData: Data([0]))
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let fixture = root.appendingPathComponent("vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+        let data = try Data(contentsOf: fixture)
+        _ = try controller.prepareSource(payload: .init(path: virtualPath), sourceData: data)
         let original = directory.appendingPathComponent("original.spc")
         let link = directory.appendingPathComponent("link.spc")
-        try Data([0]).write(to: original)
+        try data.write(to: original)
         try FileManager.default.createSymbolicLink(at: link, withDestinationURL: original)
         _ = try controller.prepareSource(payload: .init(path: link.path))
     }

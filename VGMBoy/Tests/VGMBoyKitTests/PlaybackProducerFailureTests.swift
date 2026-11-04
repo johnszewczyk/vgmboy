@@ -297,6 +297,11 @@ private let fixturePlan = PlaybackPlan(preFadeMilliseconds: 5_000, fadeMilliseco
     try Data("SWAV".utf8).write(to: url)
     defer { try? FileManager.default.removeItem(at: url) }
     try DecoderFactory.validateTrackIndex(1, path: url.path, sourceData: nil)
+    let swavWithSPCExtension = url.deletingPathExtension().appendingPathExtension("spc")
+    try Data("SWAV".utf8).write(to: swavWithSPCExtension)
+    defer { try? FileManager.default.removeItem(at: swavWithSPCExtension) }
+    try DecoderFactory.validateSPCSource(path: swavWithSPCExtension.path, sourceData: nil,
+                                         trackIndex: 0, sampleRate: 44_100)
     try Data("RIFF".utf8).write(to: url)
     #expect(throws: (any Error).self) {
         try DecoderFactory.validateTrackIndex(1, path: url.path, sourceData: nil)
@@ -308,14 +313,16 @@ private let fixturePlan = PlaybackPlan(preFadeMilliseconds: 5_000, fadeMilliseco
     let end = Int64(Int32.max) * 44_100 / 1_000 * 3 / 2
     let loop = PlaybackLoopMetadata(startSample: 1, endSample: end, sampleRateHz: 44_100)
     let path = "/virtual.spc"
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let fixture = root.appendingPathComponent("vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let data = try Data(contentsOf: fixture)
     // SPC at 2x brings the loop inside the decoder timeline; 1x does not.
-    _ = try controller.prepareSource(payload: .init(path: path, tempo: 2, loop: loop), sourceData: Data([0]))
+    _ = try controller.prepareSource(payload: .init(path: path, tempo: 2, loop: loop), sourceData: data)
     #expect(throws: (any Error).self) {
-        try controller.prepareSource(payload: .init(path: path, tempo: 1, loop: loop), sourceData: Data([0]))
+        try controller.prepareSource(payload: .init(path: path, tempo: 1, loop: loop), sourceData: data)
     }
     // WAV does not support tempo; a requested 2x remains effectively 1x.
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
-    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     try FileManager.default.copyItem(at: root.appendingPathComponent("vendor/play/js/psfplayer_browser/public/silence.wav"), to: url)
     defer { try? FileManager.default.removeItem(at: url) }
     #expect(throws: (any Error).self) {

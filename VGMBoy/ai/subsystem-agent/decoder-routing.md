@@ -11,9 +11,9 @@ Extension-based routing of files to the correct upstream decoder core, and the u
 `supportsTempo`, `hasNaturalEnding`). Its `playbackDescriptors` projection is the single
 frontend-facing capability table: it carries the stable backend ID, admitted extensions, and the
 same timing flags. `DecoderFactory.make` builds the matching decoder through the internal
-`AudioDecoder` protocol. Ordinary AVFoundation audio is also opened briefly during source
-preparation to reject reader and conversion failures before replacement. Other decoder headers
-are read inside a live playback session for subtrack validation and timing; the core does not
+`AudioDecoder` protocol. Ordinary AVFoundation audio and SPC are also opened briefly during
+source preparation to reject setup failures before replacement; SPC probing uses an independent
+libgme instance. Other decoder headers are read inside a live playback session for subtrack validation and timing; the core does not
 expose inspection or catalog metadata. Extensions are
 deliberately exclusive to one family.
 

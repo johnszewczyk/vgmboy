@@ -2843,6 +2843,37 @@ func sotnLoopSurvivesPausedSharedReconfiguration() async throws {
     #expect(after.generation == before.generation)
 }
 
+@Test func invalidSPCReplacementPreservesPlayingSPC() async throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let valid = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let invalid = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".spc")
+    try Data("not an SPC".utf8).write(to: invalid)
+    defer { try? FileManager.default.removeItem(at: invalid) }
+    let transport = PlaybackTransportCoordinator(label: "test.invalid.spc.replacement")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    _ = try transport.configureAudio(.init(outputVolume: 0, equalizerEnabled: false,
+        equalizerBandGains: Array(repeating: 0, count: 10), monoEnabled: false))
+    #expect(transport.perform(.init(command: .load, payload: .init(path: valid.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let before = transport.statusSync()
+    // A valid second instance may be prepared concurrently with playback.
+    let probe = PlaybackController()
+    _ = try probe.prepareSource(payload: .init(path: valid.path))
+    for data: Data? in [nil, Data("not an SPC".utf8)] {
+        let start = PlaybackContinuationStart(
+            track: .init(id: "invalid-spc", path: invalid.path, sourceData: data),
+            payload: .init(path: invalid.path), requestID: transport.reservePlaybackRequest()
+        )
+        #expect(throws: (any Error).self) { try transport.start(start) }
+        let after = transport.statusSync()
+        #expect(after.trackLoaded && after.isPlaying)
+        #expect(after.currentTrackID == before.currentTrackID)
+        #expect(after.generation == before.generation)
+    }
+    try await Task.sleep(for: .milliseconds(400))
+    #expect(transport.statusSync().elapsedSeconds > before.elapsedSeconds)
+}
+
 @Test func failedReplacementRetiresOnlyAfterSessionReplacementBegins() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
@@ -2893,10 +2924,10 @@ func sotnLoopSurvivesPausedSharedReconfiguration() async throws {
     #expect(transport.statusSync().generation == firstGeneration)
 
     // A different format can still fail later, after replacement starts.
-    let invalidSPC = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".spc")
-    try Data("not an SPC".utf8).write(to: invalidSPC)
-    defer { try? FileManager.default.removeItem(at: invalidSPC) }
-    let openError = transport.perform(.init(command: .load, payload: .init(path: invalidSPC.path)))
+    let invalidSAP = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".sap")
+    try Data("not a SAP".utf8).write(to: invalidSAP)
+    defer { try? FileManager.default.removeItem(at: invalidSAP) }
+    let openError = transport.perform(.init(command: .load, payload: .init(path: invalidSAP.path)))
     #expect(openError.kind == .error)
     let stopped = transport.statusSync()
     #expect(stopped.currentTrackID == nil)
@@ -2910,8 +2941,8 @@ func sotnLoopSurvivesPausedSharedReconfiguration() async throws {
 
     // The typed start route must apply the same failure boundary.
     let start = PlaybackContinuationStart(
-        track: PlaybackTransportTrack(id: "invalid", path: invalidSPC.path),
-        payload: .init(path: invalidSPC.path),
+        track: PlaybackTransportTrack(id: "invalid", path: invalidSAP.path),
+        payload: .init(path: invalidSAP.path),
         requestID: transport.reservePlaybackRequest()
     )
     #expect(throws: (any Error).self) { try transport.start(start) }
