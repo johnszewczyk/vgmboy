@@ -49,6 +49,16 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Low-level error status delivery, 2026-11-04: low-level settings failures
+during validation or off-queue preparation again publish the current status as
+well as returning their request-scoped error. Controller-emitted commit errors
+are passed through without a duplicate publish. Tests cover validation and
+injected preparation failure on an unchanged loaded session. A queue-gate test
+was corrected so a prior status cannot block its own setup; the initial full
+run hit that test timeout, and the corrected bounded suite passed (108 reported,
+four optional fixture skips) with the SOTN UAC. SB2 built with existing macOS
+26/27 linker warnings. Packaged and audible behavior were not tested.
+
 Low-level settings handoff, 2026-11-04: the coordinator now prepares ordinary
 low-level mode and tempo reloads outside the transport queue and returns the
 original control request ID. Gated real-SPC tests cover pause/seek and Stop; a
