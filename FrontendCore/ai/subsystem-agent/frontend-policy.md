@@ -36,6 +36,13 @@ startup contracts shared by the VGMMan player frontends.
   releases its lease; an accepted commit transfers it to the controller.
   A request waiting for a preparation slot periodically rechecks ownership and
   exits when superseded; active archive preparation is not forcibly interrupted.
+  Async `startContinuation` and `play` also fence task cancellation with a
+  start-specific token. Cancellation cannot invalidate a later start or the
+  request epoch used by settings work. A canceled slot waiter exits promptly;
+  an already-running preparation must finish before its task returns. Once
+  native replacement begins, cancellation may retire that replacement rather
+  than restore the prior decoder. Synchronous bridge starts use the existing
+  request and queued-token ownership checks.
   Bridge `reconfigureSync`, typed `setTempoSync`, async `setTempo`, and native
   timing-plan reconfiguration also prepare reloads outside the queue using the
   same limit, then check request and session ownership before commit. Bridge settings revisions are checked

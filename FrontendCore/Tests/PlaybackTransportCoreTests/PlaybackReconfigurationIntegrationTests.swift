@@ -723,6 +723,56 @@ private final class TwoPreparationGates: @unchecked Sendable {
     #expect(retained.trackLoaded && !retained.isPlaying)
 }
 
+@Test(arguments: [false, true])
+func taskCancellationDoesNotStartOrCancelNewerRequests(startNewer: Bool) async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 5).write(to: url)
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+    let transport = PlaybackTransportCoordinator(label: "test.task.cancel.start") { controller, start in
+        if start.track.id == "pending" { entered.signal(); _ = release.wait(timeout: .now() + 20) }
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { release.signal(); _ = transport.perform(.init(command: .stop)) }
+    _ = try transport.configureAudio(.init(outputVolume: 0, equalizerEnabled: false,
+        equalizerBandGains: Array(repeating: 0, count: 10), monoEnabled: false))
+    let old = PlaybackContinuationStart(track: .init(id: "old", path: url.path),
+        payload: .init(path: url.path), requestID: transport.reservePlaybackRequest())
+    try transport.start(old)
+    let oldGeneration = transport.statusSync().generation
+    let pending = PlaybackContinuationStart(track: .init(id: "pending", path: url.path),
+        payload: .init(path: url.path), requestID: transport.reservePlaybackRequest())
+    let task = Task.detached { try await transport.startContinuation(pending) }
+    #expect(waitForSignal(entered, seconds: 5))
+    let newer = startNewer ? PlaybackContinuationStart(track: .init(id: "newer", path: url.path),
+        payload: .init(path: url.path), requestID: transport.reservePlaybackRequest()) : nil
+    task.cancel()
+    var retainedGeneration = oldGeneration
+    if let newer {
+        try transport.start(newer)
+    } else {
+        // Canceling this start must not invalidate the epoch used by newer
+        // settings work on the still-playing track.
+        #expect(transport.isCurrentPlaybackRequest(pending.requestID))
+        let updated = try transport.reconfigureSync(.init(longPlayEnabled: true,
+            manualPlayMilliseconds: 4_000, expectedGeneration: oldGeneration,
+            settingsRevision: transport.reserveSettingsRevision()))
+        retainedGeneration = updated.generation
+    }
+    release.signal()
+    do { try await task.value; Issue.record("Canceled start unexpectedly succeeded") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    let result = transport.statusSync()
+    #expect(result.trackLoaded && result.isPlaying)
+    if startNewer {
+        #expect(result.currentTrackID == "newer")
+        #expect(result.generation != oldGeneration)
+    } else {
+        #expect(result.currentTrackID == "old")
+        #expect(result.generation == retainedGeneration)
+    }
+}
+
 @Test func overlappingPreparationsAreBounded() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
@@ -797,6 +847,41 @@ func supersededStartDoesNotWaitForBusyPreparationSlots(cancelByToken: Bool) asyn
     let canceledBeforeRelease = waitForSignal(waitingFinished, seconds: 5)
     release.signal(); release.signal()
     do { try await waiting.value; Issue.record("Superseded waiter unexpectedly started") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    _ = try? await first.value
+    _ = try? await second.value
+    #expect(canceledBeforeRelease)
+}
+
+@Test func canceledAsyncStartLeavesBusyPreparationQueuePromptly() async throws {
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+    let started = DispatchSemaphore(value: 0), finished = DispatchSemaphore(value: 0)
+    let transport = PlaybackTransportCoordinator(label: "test.task.cancel.busy.slots") { controller, start in
+        entered.signal(); _ = release.wait(timeout: .now() + 20)
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { release.signal(); release.signal() }
+    func request(_ id: String) -> PlaybackContinuationStart {
+        .init(track: .init(id: id, path: "/missing.wav"), payload: .init(path: "/missing.wav"),
+              requestID: transport.reservePlaybackRequest())
+    }
+    let firstRequest = request("first")
+    let first = Task.detached { try transport.start(firstRequest) }
+    #expect(waitForSignal(entered, seconds: 5))
+    let secondRequest = request("second")
+    let second = Task.detached { try transport.start(secondRequest) }
+    #expect(waitForSignal(entered, seconds: 5))
+    let waitingRequest = request("waiting")
+    let waiting = Task.detached {
+        started.signal(); defer { finished.signal() }
+        try await transport.startContinuation(waitingRequest)
+    }
+    #expect(waitForSignal(started, seconds: 5))
+    #expect(!waitForSignal(entered, seconds: 1))
+    waiting.cancel()
+    let canceledBeforeRelease = waitForSignal(finished, seconds: 5)
+    release.signal(); release.signal()
+    do { try await waiting.value; Issue.record("Canceled waiter unexpectedly started") }
     catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
     _ = try? await first.value
     _ = try? await second.value
