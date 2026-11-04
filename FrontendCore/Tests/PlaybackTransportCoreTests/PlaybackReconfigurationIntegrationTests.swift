@@ -238,6 +238,37 @@ private final class FirstPreparationGate: @unchecked Sendable {
     #expect(same.generation == accepted.generation)
 }
 
+@Test func invalidNewerSettingsDoNotCancelValidPreparation() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 30).write(to: url)
+    let gate = FirstPreparationGate()
+    let transport = PlaybackTransportCoordinator(label: "test.reconfigure.invalid.newer") { controller, start in
+        gate.waitIfFirst()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let generation = transport.statusSync().generation
+    let olderRevision = transport.reserveSettingsRevision()
+    let newerRevision = transport.reserveSettingsRevision()
+    let pending = Task.detached {
+        try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 20_000,
+            expectedGeneration: generation, settingsRevision: olderRevision))
+    }
+    #expect(waitForSignal(gate.entered, seconds: 5))
+    #expect(throws: (any Error).self) {
+        try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: Int(Int32.max),
+            fadeMilliseconds: 1, expectedGeneration: generation, settingsRevision: newerRevision))
+    }
+    gate.release.signal()
+    let accepted = try await pending.value
+    #expect(accepted.generation != generation)
+    let revised = try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 10_000,
+        expectedGeneration: accepted.generation, settingsRevision: newerRevision))
+    #expect(revised.generation != accepted.generation)
+}
+
 @Test func lowLevelSettingsSupersedePendingReconfigurationOnlyWhenAccepted() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }

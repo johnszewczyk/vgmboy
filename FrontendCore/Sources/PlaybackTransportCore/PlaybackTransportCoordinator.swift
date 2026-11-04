@@ -529,7 +529,6 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             if let revision = settingsRevision {
                 guard expectedGeneration != nil, revision >= 0,
                       latestSettingsRevision.map({ revision > $0 }) ?? true else { throw CancellationError() }
-                latestSettingsRevision = revision
             }
             if ignoreUnsupportedTempo {
                 guard let track = currentTrack,
@@ -540,6 +539,14 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             guard let track = currentTrack, let generation = currentPlaybackGeneration,
                   let trackStart = currentTrackStartGeneration else { throw PlaybackSessionError.notLoaded }
             var payload = try payloadForTrack(track)
+            if FormatRegistry.family(for: track.archiveEntry ?? track.path)?.supportsTempo != true {
+                payload.tempo = 1
+            }
+            // Rejected settings must not consume a revision or supersede an
+            // already preparing, valid request. Pending timing has already
+            // passed this same validation; tempo is validated in this payload.
+            _ = try PlaybackController.validatePlaybackMode(payload)
+            if let settingsRevision { latestSettingsRevision = settingsRevision }
             var acceptedPlan = playbackPlan
             requestLock.lock()
             let requestID = latestPlaybackRequest
@@ -554,9 +561,6 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             reconfigurationEpoch &+= 1
             let epoch = reconfigurationEpoch
             requestLock.unlock()
-            if FormatRegistry.family(for: track.archiveEntry ?? track.path)?.supportsTempo != true {
-                payload.tempo = 1
-            }
             pendingReconfiguration = nil
             guard try controller.reconfigurationRequiresReload(payload) else {
                 let result = try reconfigureLocked(payload: payload)
