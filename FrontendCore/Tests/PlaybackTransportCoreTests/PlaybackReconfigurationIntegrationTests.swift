@@ -803,6 +803,47 @@ func supersededStartDoesNotWaitForBusyPreparationSlots(cancelByToken: Bool) asyn
     #expect(controller.status().diagnostics.generation == generation)
 }
 
+@Test func lowLevelStopCancelsReconfigurationWaitingForPreparationSlot() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 5).write(to: url)
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+    let started = DispatchSemaphore(value: 0), finished = DispatchSemaphore(value: 0)
+    let transport = PlaybackTransportCoordinator(label: "test.lowlevel.stop.waiting.settings") { controller, start in
+        entered.signal()
+        _ = release.wait(timeout: .now() + 20)
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { release.signal(); release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    func request(_ id: String) -> PlaybackContinuationStart {
+        .init(track: .init(id: id, path: url.path), payload: .init(path: url.path),
+              requestID: transport.reservePlaybackRequest())
+    }
+    let firstRequest = request("first")
+    let first = Task.detached { try transport.start(firstRequest) }
+    #expect(waitForSignal(entered, seconds: 5))
+    let secondRequest = request("second")
+    let second = Task.detached { try transport.start(secondRequest) }
+    #expect(waitForSignal(entered, seconds: 5))
+    let pending = Task.detached {
+        started.signal()
+        defer { finished.signal() }
+        return try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 3_000))
+    }
+    #expect(waitForSignal(started, seconds: 5))
+    #expect(!waitForSignal(finished, seconds: 1))
+    #expect(transport.perform(.init(command: .stop)).kind != .error)
+    let canceledBeforeRelease = waitForSignal(finished, seconds: 3)
+    transport.invalidatePlaybackRequests()
+    release.signal(); release.signal()
+    do { _ = try await pending.value; Issue.record("Stopped reconfiguration unexpectedly succeeded") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    _ = try? await first.value
+    _ = try? await second.value
+    #expect(canceledBeforeRelease)
+}
+
 @Test func supersededPreparationFailureReportsCancellation() async throws {
     let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
     let transport = PlaybackTransportCoordinator(label: "test.superseded.preparation.failure") { _, _ in
@@ -1499,6 +1540,46 @@ func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
     #expect(after.elapsedSeconds == before.elapsedSeconds)
     #expect(after.diagnostics.bufferedFrames == before.diagnostics.bufferedFrames)
     _ = transport.perform(.init(command: .stop))
+}
+
+@Test func lowLevelModeBeforeLoadRetainsTimingAndRequestIdentity() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.lowlevel.mode.before.load")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    let payload = PlaybackControlPayload(playbackMode: .longPlay, playMilliseconds: 2_000, fadeMilliseconds: 0)
+    let beforeLoad = transport.perform(.init(requestID: "mode-before-load", command: .setPlaybackMode, payload: payload))
+    #expect(beforeLoad.kind == .response && beforeLoad.requestID == "mode-before-load")
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let generation = transport.statusSync().generation
+    let repeated = transport.perform(.init(requestID: "same-mode", command: .setPlaybackMode, payload: payload))
+    #expect(repeated.kind == .response && repeated.requestID == "same-mode")
+    #expect(repeated.status?.diagnostics.generation == generation)
+    let changed = transport.perform(.init(requestID: "changed-mode", command: .setPlaybackMode,
+        payload: .init(playbackMode: .longPlay, playMilliseconds: 1_000, fadeMilliseconds: 0)))
+    #expect(changed.kind == .response && changed.requestID == "changed-mode")
+    #expect(changed.status?.diagnostics.generation != generation)
+}
+
+@Test func lowLevelSettingsRejectUnsupportedVersionWithoutChangingSession() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.lowlevel.settings.version")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let generation = transport.statusSync().generation
+    for command in [PlaybackControlCommand.setTempo, .setPlaybackMode] {
+        var request = PlaybackControlRequest(requestID: "invalid-version", command: command,
+            payload: .init(tempo: 2, playbackMode: .longPlay, playMilliseconds: 1_000))
+        request.version = PlaybackControlProtocol.version + 1
+        let response = transport.perform(request)
+        #expect(response.kind == .error && response.requestID == "invalid-version")
+        #expect(response.status?.diagnostics.generation == generation)
+        #expect(response.message?.contains("Unsupported control API version") == true)
+    }
+    #expect(transport.statusSync().generation == generation)
 }
 
 @Test func typedTempoPreparationPreservesTimingAndKeepsControlsResponsive() async throws {

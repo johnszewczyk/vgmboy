@@ -49,6 +49,18 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Retired-session preparation waiters, 2026-11-04: shared session retirement
+and successful low-level load, stop, or shutdown invalidate pending settings
+preparation. A gated test holds both preparation slots and confirms a low-level
+Stop cancels a waiting settings request before either slot is released. Active
+extractions are not interrupted. Separate compatibility tests capture low-level
+mode-before-load, request ID and version-error behavior for the remaining
+low-level command migration. The bounded suite passed (99 reported, four
+optional fixture skips) with the SOTN UAC; SB2 built with the existing macOS
+26/27 linker warnings. Packaged and audible behavior were not tested. Low-level
+stop versus pending start ownership
+remains a separate audit; this change only invalidates settings preparation.
+
 Invalid newer settings, 2026-11-04: shared reconfiguration validates an
 accepted payload before consuming its settings revision or invalidating older
 preparation. A gated test reproduces the former cancellation and verifies

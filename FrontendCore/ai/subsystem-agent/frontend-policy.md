@@ -52,6 +52,9 @@ startup contracts shared by the VGMMan player frontends.
   pending prepared settings snapshot even if it is a no-op for the current
   generation; a rejected command leaves that pending snapshot eligible. This
   supersession discards the entire older snapshot, including its timing fields.
+  Session retirement and successful low-level load, stop, or shutdown also
+  invalidate pending settings work, allowing a slot waiter to exit promptly.
+  Active source extraction is not forcibly interrupted.
 - A successful low-level mode change can reload the native session. The
   coordinator adopts its returned generation and resets completion claims;
   stale natural-end events are discarded before status or end delivery.
