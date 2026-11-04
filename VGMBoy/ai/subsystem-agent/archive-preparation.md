@@ -31,8 +31,12 @@ finite AAC export; it has no catalog, queue, or UI policy.
 - `PlaybackController.prepareSource` prepares the selected source without
   changing the live session. Its single-use result owns the archive lease and
   resolved loop metadata until a guarded commit transfers that lease to the
-  controller, or discarding the result releases it. Direct controller load
-  commands still prepare synchronously.
+  controller, or discarding the result releases it. Standalone disk sources
+  must be readable regular files before a session is replaced; symbolic links
+  to regular files are accepted, and in-memory sources do not require a disk
+  file. A file may still disappear or fail to decode after preparation, so
+  this preflight does not make decoder replacement atomic. Direct controller
+  load commands still prepare synchronously.
 - `PlaybackController.reconfigurationSource` validates settings and snapshots
   the loaded source's original path, member, track, loop and in-memory bytes
   without changing playback. Callers must validate session identity separately

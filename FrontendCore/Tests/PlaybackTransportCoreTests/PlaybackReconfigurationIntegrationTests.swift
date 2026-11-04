@@ -1259,7 +1259,16 @@ func newerPlaybackRequestSupersedesQueuedExplicitStop(asyncStop: Bool) async thr
     try silentWAV(seconds: 2).write(to: url)
     let transport = PlaybackTransportCoordinator(label: "test.shared.reconfiguration.failure")
     #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let generation = transport.statusSync().generation
     try FileManager.default.removeItem(at: url)
+    #expect(throws: (any Error).self) {
+        _ = try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 1_000))
+    }
+    #expect(transport.statusSync().trackLoaded)
+    #expect(transport.statusSync().generation == generation)
+    // A readable invalid source gets past preparation but fails when the
+    // decoder is reopened, after the original session has been retired.
+    try Data("not a WAV".utf8).write(to: url)
     #expect(throws: (any Error).self) {
         _ = try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 1_000))
     }
@@ -2778,10 +2787,26 @@ func sotnLoopSurvivesPausedSharedReconfiguration() async throws {
     #expect(transport.statusSync().currentTrackID == url.path)
     #expect(transport.statusSync().generation == firstGeneration)
 
-    // This admitted extension reaches session.load, which retires the old
-    // decoder before failing to open the missing replacement.
+    // Missing standalone files also fail before the old decoder is released.
     let missingWAV = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".wav")
-    let openError = transport.perform(.init(command: .load, payload: .init(path: missingWAV.path)))
+    let missingError = transport.perform(.init(command: .load, payload: .init(path: missingWAV.path)))
+    #expect(missingError.kind == .error)
+    #expect(transport.statusSync().currentTrackID == url.path)
+    #expect(transport.statusSync().generation == firstGeneration)
+    let missingStart = PlaybackContinuationStart(
+        track: PlaybackTransportTrack(id: "missing", path: missingWAV.path),
+        payload: .init(path: missingWAV.path), requestID: transport.reservePlaybackRequest()
+    )
+    #expect(throws: (any Error).self) { try transport.start(missingStart) }
+    #expect(transport.statusSync().currentTrackID == url.path)
+    #expect(transport.statusSync().generation == firstGeneration)
+
+    // A readable but invalid WAV reaches session.load and retires the old
+    // decoder before the replacement fails to open.
+    let invalidWAV = url.deletingLastPathComponent().appendingPathComponent(UUID().uuidString + ".wav")
+    try Data("not a WAV".utf8).write(to: invalidWAV)
+    defer { try? FileManager.default.removeItem(at: invalidWAV) }
+    let openError = transport.perform(.init(command: .load, payload: .init(path: invalidWAV.path)))
     #expect(openError.kind == .error)
     let stopped = transport.statusSync()
     #expect(stopped.currentTrackID == nil)
@@ -2795,8 +2820,8 @@ func sotnLoopSurvivesPausedSharedReconfiguration() async throws {
 
     // The typed start route must apply the same failure boundary.
     let start = PlaybackContinuationStart(
-        track: PlaybackTransportTrack(id: "missing", path: missingWAV.path),
-        payload: .init(path: missingWAV.path),
+        track: PlaybackTransportTrack(id: "invalid", path: invalidWAV.path),
+        payload: .init(path: invalidWAV.path),
         requestID: transport.reservePlaybackRequest()
     )
     #expect(throws: (any Error).self) { try transport.start(start) }

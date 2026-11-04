@@ -742,6 +742,24 @@ struct PlaybackControlProtocolTests {
         #expect(EqualizerConfiguration.bandFrequencies == [31, 62, 125, 250, 500, 1_000, 2_000, 4_000, 8_000, 16_000])
     }
 
+    @Test("Source preparation rejects directories and permits in-memory sources")
+    func sourcePreparationChecksStandaloneFiles() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".spc", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let controller = PlaybackController()
+        #expect(throws: (any Error).self) {
+            try controller.prepareSource(payload: .init(path: directory.path))
+        }
+        let virtualPath = directory.appendingPathComponent("memory.spc").path
+        _ = try controller.prepareSource(payload: .init(path: virtualPath), sourceData: Data([0]))
+        let original = directory.appendingPathComponent("original.spc")
+        let link = directory.appendingPathComponent("link.spc")
+        try Data([0]).write(to: original)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: original)
+        _ = try controller.prepareSource(payload: .init(path: link.path))
+    }
+
     @Test("AAC export writes ADTS without using the live transport")
     func exportsADTS() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
