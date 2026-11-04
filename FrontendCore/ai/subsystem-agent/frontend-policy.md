@@ -41,7 +41,10 @@ startup contracts shared by the VGMMan player frontends.
   and session ownership before commit. Bridge settings revisions are checked
   during serialized admission. No-op settings do not prepare a source. Direct
   controller operations and low-level tempo/mode commands retain their existing
-  execution paths.
+  execution paths. A successful low-level tempo or mode command supersedes a
+  pending prepared settings snapshot even if it is a no-op for the current
+  generation; a rejected command leaves that pending snapshot eligible. This
+  supersession discards the entire older snapshot, including its timing fields.
 - A successful low-level mode change can reload the native session. The
   coordinator adopts its returned generation and resets completion claims;
   stale natural-end events are discarded before status or end delivery.

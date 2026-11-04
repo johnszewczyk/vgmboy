@@ -49,6 +49,18 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Low-level settings ordering, 2026-11-03: successful low-level tempo and mode
+commands now invalidate older off-queue settings preparation even if the
+command is a no-op and leaves the native generation unchanged. Rejected
+commands do not invalidate it. Supersession discards the entire older settings
+snapshot; these low-level commands still prepare any reload on the transport
+queue and should be migrated with their partial-update semantics preserved.
+A gated regression reproduces the old overwrite for both no-op commands and
+checks that invalid commands do not cancel the pending work. The bounded
+transport suite passed (87 reported, four fixture-dependent skips), including
+the SOTN UAC, and SB2 built with the existing macOS 26/27 linker warnings.
+Packaged and audible behavior were not tested.
+
 Native timing-plan reconfiguration, 2026-11-03: the async native-plan route
 now shares the bridge's bounded off-queue preparation and guarded commit. It
 publishes the plan only after an accepted commit or no-op. Gated tests cover
