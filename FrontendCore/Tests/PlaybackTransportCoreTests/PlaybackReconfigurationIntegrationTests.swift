@@ -2787,6 +2787,15 @@ func sotnLoopSurvivesPausedSharedReconfiguration() async throws {
     #expect(after.trackLoaded && after.isPlaying)
     #expect(after.currentTrackID == before.currentTrackID)
     #expect(after.generation == before.generation)
+    let oversized = PlaybackContinuationStart(
+        track: .init(id: "oversized", path: "/virtual.spc", trackIndex: Int.max, sourceData: Data([0])),
+        payload: .init(path: "/virtual.spc", trackIndex: Int.max), requestID: transport.reservePlaybackRequest()
+    )
+    #expect(throws: (any Error).self) { try transport.start(oversized) }
+    let afterOversized = transport.statusSync()
+    #expect(afterOversized.trackLoaded && afterOversized.isPlaying)
+    #expect(afterOversized.currentTrackID == before.currentTrackID)
+    #expect(afterOversized.generation == before.generation)
 }
 
 @Test func unrepresentableLoopReplacementPreservesPlayingSession() throws {

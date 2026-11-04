@@ -103,6 +103,9 @@ public final class PlaybackController: @unchecked Sendable {
         cancellation: AACExportCancellation? = nil,
         progress: (@Sendable (AACExportProgress) -> Void)? = nil
     ) throws -> AACExportResult {
+        guard PlaybackTrackIndex.isRepresentable(request.trackIndex) else {
+            throw AACExportError.invalidRequest("AAC export track index is outside the supported range.")
+        }
         guard let archiveEntry = request.archiveEntry, !archiveEntry.isEmpty else {
             return try AACExporter.export(request, cancellation: cancellation, progress: progress)
         }
@@ -290,6 +293,9 @@ public final class PlaybackController: @unchecked Sendable {
     public func prepareSource(payload: PlaybackControlPayload, sourceData: Data? = nil) throws -> PreparedSource {
         guard let path = payload.path, !path.isEmpty else {
             throw PlaybackControlError.invalidPayload("Load requires a path.")
+        }
+        guard PlaybackTrackIndex.isRepresentable(payload.trackIndex ?? 0) else {
+            throw PlaybackControlError.invalidPayload("Track index is outside the supported range.")
         }
         let archiveEntry = payload.archiveEntry?.trimmingCharacters(in: .whitespacesAndNewlines)
         let playablePath: String

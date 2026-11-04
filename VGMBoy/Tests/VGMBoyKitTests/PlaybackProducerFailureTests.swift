@@ -220,6 +220,56 @@ private let fixturePlan = PlaybackPlan(preFadeMilliseconds: 5_000, fadeMilliseco
     }
 }
 
+@Test func invalidNativeTrackIndicesFailWithoutOpeningDecodersOrPublishingAAC() throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let controller = PlaybackController()
+    for index in [-1, Int(Int32.max), Int.max] {
+        #expect(throws: (any Error).self) {
+            try controller.prepareSource(payload: .init(path: "/virtual.spc", trackIndex: index), sourceData: Data([0]))
+        }
+        let request = AACExportRequest(sourcePath: "/virtual.spc", trackIndex: index,
+            outputDirectory: folder, filenameStem: "invalid", playMilliseconds: 100, fadeMilliseconds: 0)
+        #expect(throws: AACExportError.self) {
+            try AACExporter.export(request, decoderFactory: { _, _ in
+                Issue.record("An invalid index must not open a decoder")
+                throw ProducerFixtureError.injected
+            })
+        }
+        #expect(throws: AACExportError.self) { try controller.exportAAC(request) }
+        var archiveRequest = request
+        archiveRequest.archiveEntry = "track.spc"
+        #expect(throws: AACExportError.self) { try controller.exportAAC(archiveRequest) }
+    }
+    #expect(PlaybackTrackIndex.isRepresentable(Int(Int32.max) - 1))
+    #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)
+}
+
+@Test func vgmstreamRejectsUnrepresentableTrackIndices() throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("vendor/play/js/psfplayer_browser/public/silence.wav")
+    for index in [-1, Int(Int32.max), Int.max] {
+        #expect(throws: (any Error).self) { try VgmstreamDecoder(path: source.path, trackIndex: index) }
+    }
+    let decoder = try VgmstreamDecoder(path: source.path)
+    for index in [-1, Int(Int32.max), Int.max] {
+        #expect(throws: (any Error).self) { try decoder.startTrack(index) }
+        #expect(throws: (any Error).self) { try decoder.metadata(for: index) }
+    }
+}
+
+@Test func gmeRejectsUnrepresentableAndUnavailableTrackIndices() throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let decoder = try GMEDecoder(path: source.path)
+    for index in [-1, decoder.trackCount, Int(Int32.max) + 1, Int.max] {
+        #expect(throws: (any Error).self) { try decoder.startTrack(index) }
+        #expect(throws: (any Error).self) { try decoder.metadata(for: index) }
+    }
+    try decoder.startTrack(0)
+}
+
 @Test func standardAudioProbeRespectsNintendoDSOverrides() throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

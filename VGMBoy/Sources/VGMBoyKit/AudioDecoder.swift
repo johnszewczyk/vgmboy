@@ -42,6 +42,12 @@ enum DecoderFactoryError: LocalizedError {
     }
 }
 
+/// Zero-based track indices must fit native decoder APIs, including bridges
+/// that convert them to a one-based Int32 subsong number.
+enum PlaybackTrackIndex {
+    static func isRepresentable(_ index: Int) -> Bool { index >= 0 && index < Int(Int32.max) }
+}
+
 enum DecoderFactory {
     static func make(family: DecoderFamily, path: String, sampleRate: Int = 44_100) throws -> any AudioDecoder {
         switch family.id {

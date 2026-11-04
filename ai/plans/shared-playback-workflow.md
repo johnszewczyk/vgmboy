@@ -49,6 +49,18 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Native track-index safety, 2026-11-04: playback source preparation and AAC
+export reject track indices that cannot be converted safely to the native
+zero- or one-based signed 32-bit APIs. Direct GME and vgmstream decoder
+entrypoints also reject unavailable or unrepresentable indices without integer
+conversion traps. Focused tests include negative values, the boundary and
+`Int.max`, verify no AAC decoder or output is created, and confirm an invalid
+replacement leaves the old session playing. The shared transport suite passed
+120 discovered tests with four fixture skips and the SOTN UAC enabled;
+VGMBoyKit passed 116 discovered tests with 19 fixture skips. SB2 built with
+existing macOS 26/27 linker warnings. This is shared-core and build evidence,
+not a packaged SB2 or audible check.
+
 Malformed ordinary-audio recovery, 2026-11-04: source preparation now creates
 and releases an AVFoundation reader/converter for ordinary audio before session
 replacement. SWAV and legacy Nintendo DS raw-audio overrides bypass this probe;

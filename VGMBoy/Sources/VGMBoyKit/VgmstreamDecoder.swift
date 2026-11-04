@@ -31,6 +31,9 @@ final class VgmstreamDecoder: AudioDecoder, @unchecked Sendable {
     private var absoluteFrames: Int64 = 0
 
     init(path: String, sampleRate: Int = 44_100, trackIndex: Int = 0) throws {
+        guard PlaybackTrackIndex.isRepresentable(trackIndex) else {
+            throw VgmstreamDecoderError.trackSelectionFailed("Subsong index is outside the supported range.")
+        }
         self.sampleRate = sampleRate
         var error: UnsafeMutablePointer<CChar>?
         guard let handle = vgmstream_player_create(path, Int32(sampleRate), Int32(trackIndex + 1), &error) else {
@@ -70,8 +73,8 @@ final class VgmstreamDecoder: AudioDecoder, @unchecked Sendable {
     }
 
     func startTrack(_ index: Int) throws {
-        guard index >= 0, index < trackCount else {
-            throw VgmstreamDecoderError.trackSelectionFailed("Subsong \(index + 1) is out of range.")
+        guard PlaybackTrackIndex.isRepresentable(index), index < trackCount else {
+            throw VgmstreamDecoderError.trackSelectionFailed("Subsong index \(index) is out of range.")
         }
         if index != currentTrack {
             var error: UnsafeMutablePointer<CChar>?
