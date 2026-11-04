@@ -1522,6 +1522,95 @@ func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
     #expect(after.generation == before.generation && after.tempo == 1)
 }
 
+@Test func tempoUpdateCarriesPendingTimingAcrossSupersession() async throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    for asyncTempo in [false, true] {
+        let gate = FirstPreparationGate()
+        let transport = PlaybackTransportCoordinator(label: "test.tempo.pending.timing") { controller, start in
+            gate.waitIfFirst()
+            return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+        }
+        defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
+        #expect(transport.perform(.init(command: .load, payload: .init(path: source.path))).kind != .error)
+        let generation = transport.statusSync().generation
+        let old = Task.detached {
+            try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 20_000,
+                fadeMilliseconds: 0, expectedGeneration: generation,
+                settingsRevision: transport.reserveSettingsRevision()))
+        }
+        #expect(waitForSignal(gate.entered, seconds: 5))
+        if asyncTempo {
+            try await transport.setTempo(.init(numerator: 2, denominator: 1))
+        } else {
+            _ = try transport.setTempoSync(.init(tempo: .init(numerator: 2, denominator: 1)))
+        }
+        gate.release.signal()
+        do { _ = try await old.value; Issue.record("Older request unexpectedly committed") }
+        catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+        let merged = transport.statusSync()
+        #expect(merged.tempo == 2 && merged.generation != generation)
+        let same = try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 20_000,
+            fadeMilliseconds: 0, tempo: .init(numerator: 2, denominator: 1)))
+        #expect(same.generation == merged.generation)
+    }
+}
+
+@Test func failedMergedTempoDoesNotReviveOlderTiming() async throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let gate = FirstPreparationGate()
+    let transport = PlaybackTransportCoordinator(label: "test.tempo.pending.failure") { controller, start in
+        gate.waitIfFirst()
+        if start.payload.tempo == 2 { throw CocoaError(.fileReadNoSuchFile) }
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: source.path))).kind != .error)
+    let generation = transport.statusSync().generation
+    let old = Task.detached {
+        try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 20_000, fadeMilliseconds: 0))
+    }
+    #expect(waitForSignal(gate.entered, seconds: 5))
+    do {
+        _ = try transport.setTempoSync(.init(tempo: .init(numerator: 2, denominator: 1)))
+        Issue.record("Injected preparation failure unexpectedly succeeded")
+    } catch {}
+    let unchanged = try transport.setTempoSync(.init(tempo: .defaultValue))
+    #expect(unchanged.generation == generation && unchanged.tempo == 1)
+    gate.release.signal()
+    do { _ = try await old.value; Issue.record("Superseded request unexpectedly committed") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    #expect(transport.statusSync().generation == generation)
+}
+
+@Test func tempoDoesNotInheritTimingFromSupersededPlaybackRequest() async throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let gate = FirstPreparationGate()
+    let transport = PlaybackTransportCoordinator(label: "test.tempo.pending.request") { controller, start in
+        gate.waitIfFirst()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: source.path))).kind != .error)
+    let old = Task.detached {
+        try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 20_000, fadeMilliseconds: 0))
+    }
+    #expect(waitForSignal(gate.entered, seconds: 5))
+    _ = transport.reservePlaybackRequest()
+    let tempo = try transport.setTempoSync(.init(tempo: .init(numerator: 2, denominator: 1)))
+    gate.release.signal()
+    do { _ = try await old.value; Issue.record("Superseded request unexpectedly committed") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    let timing = try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 20_000,
+        fadeMilliseconds: 0, tempo: .init(numerator: 2, denominator: 1)))
+    #expect(timing.generation != tempo.generation)
+}
+
 @Test func asyncTempoPreparationKeepsControlsResponsive() async throws {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent().deletingLastPathComponent()
