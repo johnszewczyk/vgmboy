@@ -455,6 +455,77 @@ public final class PlaybackController: @unchecked Sendable {
         return Self.reconfigurationSource(current: current, tempo: settings.tempo)
     }
 
+    /// Check whether applying these settings needs a decoder reload. Callers
+    /// serialize this snapshot with their other session operations.
+    public func reconfigurationRequiresReload(_ settings: PlaybackControlPayload) throws -> Bool {
+        let requestedMode = try Self.validatePlaybackMode(settings)
+        lock.lock()
+        let current = loaded
+        let sameTiming = mode == requestedMode && explicitPlayMilliseconds == settings.playMilliseconds
+            && explicitFadeMilliseconds == settings.fadeMilliseconds
+            && explicitUnknownDurationMilliseconds == settings.unknownDurationMilliseconds
+        lock.unlock()
+        guard let current else { throw PlaybackSessionError.notLoaded }
+        let family = FormatRegistry.family(for: current.archiveEntry ?? current.path)
+        let tempo = FormatRegistry.effectiveTempo(settings.tempo ?? current.tempo, family: family)
+        return !sameTiming || tempo != session.status().statistics.tempo
+    }
+
+    /// Apply settings and a previously prepared source as one serialized
+    /// operation. The caller must guard the captured session identity.
+    public func reconfigurePrepared(_ prepared: PreparedSource, settings: PlaybackControlPayload,
+                                    isCurrent: @escaping @Sendable () -> Bool) -> PlaybackControlEvent {
+        do {
+            guard isCurrent() else { throw CancellationError() }
+            lock.lock()
+            let current = loaded
+            let previousMode = mode, previousPlay = explicitPlayMilliseconds
+            let previousFade = explicitFadeMilliseconds, previousUnknown = explicitUnknownDurationMilliseconds
+            lock.unlock()
+            guard let current, current.path == prepared.path, current.archiveEntry == prepared.archiveEntry,
+                  current.trackIndex == (prepared.payload.trackIndex ?? 0), current.sourceData == prepared.sourceData,
+                  current.loop == prepared.payload.loop,
+                  prepared.payload.tempo == (settings.tempo ?? current.tempo) else {
+                throw CancellationError()
+            }
+            let previousStatus = session.status()
+            let family = FormatRegistry.family(for: current.archiveEntry ?? current.path)
+            let nextTempo = FormatRegistry.effectiveTempo(settings.tempo ?? current.tempo, family: family)
+            do {
+                try configurePlaybackMode(settings, reloadCurrent: false)
+                let replaced = try commitPrepared(prepared, isCurrent: isCurrent)
+                guard isCurrent() else { throw CancellationError() }
+                let resumeSeconds = replaced.elapsedSeconds * replaced.statistics.tempo / nextTempo
+                if resumeSeconds > 0 { try session.seek(to: resumeSeconds) }
+                guard isCurrent() else { throw CancellationError() }
+                if replaced.isPlaying { try session.play() }
+                guard isCurrent() else { throw CancellationError() }
+            } catch {
+                if session.status().diagnostics.generation == previousStatus.diagnostics.generation {
+                    lock.lock()
+                    mode = previousMode; explicitPlayMilliseconds = previousPlay
+                    explicitFadeMilliseconds = previousFade; explicitUnknownDurationMilliseconds = previousUnknown
+                    lock.unlock()
+                } else {
+                    session.stop()
+                    lock.lock()
+                    let materializer = activeArchiveMaterializer
+                    activeArchiveMaterializer = nil; loaded = nil
+                    lock.unlock()
+                    materializer?.release()
+                }
+                throw error
+            }
+            let event = PlaybackControlEvent(kind: .response, status: session.status())
+            emit(event)
+            return event
+        } catch {
+            let event = PlaybackControlEvent(kind: .error, status: session.status(), message: error.localizedDescription)
+            emit(event)
+            return event
+        }
+    }
+
     private static func reconfigurationSource(current: LoadedTrack, tempo: Double?) -> ReconfigurationSource {
         ReconfigurationSource(
             payload: PlaybackControlPayload(path: current.path, archiveEntry: current.archiveEntry,

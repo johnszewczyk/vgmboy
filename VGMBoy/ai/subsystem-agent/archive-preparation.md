@@ -36,7 +36,10 @@ finite AAC export; it has no catalog, queue, or UI policy.
 - `PlaybackController.reconfigurationSource` validates settings and snapshots
   the loaded source's original path, member, track, loop and in-memory bytes
   without changing playback. Callers must validate session identity separately
-  before committing work prepared from that snapshot.
+  before committing work prepared from that snapshot. `reconfigurePrepared`
+  verifies the prepared source, transfers its lease during guarded replacement,
+  and resumes from the position and play state at commit. The caller serializes
+  session operations and supplies the ownership guard.
 - UAC manifest, seek-table, and member-range validation remain in
   `UACWrapperCore`; `UACZstandardCLIFrameCodec` supplies bounded Zstandard
   frame decoding. Seekable UAC selected-member reads use only frames that

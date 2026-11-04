@@ -335,6 +335,19 @@ public struct PlaybackNaturalEndGate: Sendable {
 /// presentation stay outside this boundary; shared queue policy is consulted
 /// only for generation-checked completion retirement.
 public final class PlaybackTransportCoordinator: @unchecked Sendable {
+    private struct ReconfigurationWork: Sendable {
+        let epoch: UInt64
+        let generation: Int
+        let trackStartGeneration: Int
+        let requestID: Int
+        let track: PlaybackTransportTrack
+        let settings: PlaybackControlPayload
+        let source: PlaybackController.ReconfigurationSource
+    }
+    private enum ReconfigurationPreparation {
+        case completed(PlaybackTransportStatus)
+        case prepare(ReconfigurationWork)
+    }
     public let queuedSkipLifecycle = PlaybackQueuedSkipLifecycle()
     public typealias StatusHandler = @Sendable (PlaybackTransportStatus) -> Void
     public typealias NaturalEndHandler = @Sendable (PlaybackTransportStatus) -> Void
@@ -362,6 +375,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     private var queuedSkipClaims = Set<String>()
     private var currentTrackStartGeneration: Int?
     private var latestSettingsRevision: Int?
+    private var reconfigurationEpoch: UInt64 = 0 // Protected by requestLock.
     private var latestSeekRevision: Int?
     private var latestRampRevision: Int?
     private var nextStatusSequence: UInt64 = 0
@@ -491,7 +505,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
 
     /// Applies a complete bridge settings snapshot as one serialized reload.
     public func reconfigureSync(_ request: PlaybackTransportReconfigurationRequest) throws -> PlaybackTransportStatus {
-        try queue.sync {
+        let preparation: ReconfigurationPreparation = try queue.sync {
             if let expected = request.expectedGeneration {
                 guard let start = currentTrackStartGeneration, let current = currentPlaybackGeneration,
                       expected >= start, expected <= current else { throw CancellationError() }
@@ -503,7 +517,71 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             }
             var payload = request.playbackModePayload
             payload.tempo = request.tempo.multiplier
-            return try reconfigureLocked(payload: payload)
+            guard let track = currentTrack, let generation = currentPlaybackGeneration,
+                  let trackStart = currentTrackStartGeneration else { throw PlaybackSessionError.notLoaded }
+            if FormatRegistry.family(for: track.archiveEntry ?? track.path)?.supportsTempo != true {
+                payload.tempo = 1
+            }
+            requestLock.lock()
+            reconfigurationEpoch &+= 1
+            let epoch = reconfigurationEpoch
+            let requestID = latestPlaybackRequest
+            requestLock.unlock()
+            guard try controller.reconfigurationRequiresReload(payload) else {
+                return .completed(try reconfigureLocked(payload: payload))
+            }
+            let source = try controller.reconfigurationSource(for: payload)
+            return .prepare(ReconfigurationWork(epoch: epoch, generation: generation,
+                trackStartGeneration: trackStart, requestID: requestID, track: track,
+                settings: payload, source: source))
+        }
+        guard case .prepare(let work) = preparation else {
+            if case .completed(let status) = preparation { return status }
+            throw CancellationError()
+        }
+        let prepared = try prepareReconfigurationOutsideTransport(work)
+        return try queue.sync {
+            guard self.isCurrentReconfiguration(work), self.currentPlaybackGeneration == work.generation,
+                  self.currentTrackStartGeneration == work.trackStartGeneration else { throw CancellationError() }
+            let event = self.controller.reconfigurePrepared(prepared, settings: work.settings) {
+                self.isCurrentReconfiguration(work)
+            }
+            if event.kind == .error {
+                if event.status?.diagnostics.generation != work.generation { self.retirePlaybackLocked() }
+                try self.requireSuccess(event)
+            }
+            let generation = event.status?.diagnostics.generation
+            if generation != work.generation {
+                self.naturalEndGate.reset()
+                self.continuationCoordinator.reset()
+            }
+            self.currentPlaybackGeneration = generation
+            return self.status(event.status)
+        }
+    }
+
+    private func isCurrentReconfiguration(_ work: ReconfigurationWork) -> Bool {
+        requestLock.lock(); defer { requestLock.unlock() }
+        return reconfigurationEpoch == work.epoch && latestPlaybackRequest == work.requestID
+    }
+
+    private func prepareReconfigurationOutsideTransport(_ work: ReconfigurationWork) throws -> PlaybackController.PreparedSource {
+        while preparationSlots.wait(timeout: .now() + .milliseconds(100)) != .success {
+            guard isCurrentReconfiguration(work) else { throw CancellationError() }
+        }
+        defer { preparationSlots.signal() }
+        guard isCurrentReconfiguration(work) else { throw CancellationError() }
+        let track = PlaybackTransportTrack(id: work.track.id, path: work.track.path,
+            trackIndex: work.track.trackIndex, sourceData: work.source.sourceData, loop: work.track.loop,
+            archivePath: work.track.archivePath, archiveEntry: work.track.archiveEntry)
+        let start = PlaybackContinuationStart(track: track, payload: work.source.payload, requestID: work.requestID)
+        do {
+            let prepared = try prepareSource(controller, start)
+            guard isCurrentReconfiguration(work) else { throw CancellationError() }
+            return prepared
+        } catch {
+            guard isCurrentReconfiguration(work) else { throw CancellationError() }
+            throw error
         }
     }
 
@@ -719,7 +797,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     public func queuedSkipDecisionSync(_ request: PlaybackQueuedSkipDecisionRequest) -> PlaybackQueueAdjacentResponse? {
         queue.sync {
             if let expected = request.expectedGeneration {
-                guard expected > 0, expected == self.currentPlaybackGeneration else { return nil }
+                guard self.matchesCurrentTrackGeneration(expected) else { return nil }
             }
             if let requestID = request.requestID {
                 guard !requestID.isEmpty, let generation = request.expectedGeneration else { return nil }
@@ -740,8 +818,15 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         guard isLatest(start.requestID),
               start.queuedSkipToken.map({ queuedSkipLifecycle.isCurrent($0) }) ?? true else { throw CancellationError() }
         if let expected = start.expectedPreviousGeneration {
-            guard expected > 0, expected == currentPlaybackGeneration else { throw CancellationError() }
+            guard matchesCurrentTrackGeneration(expected) else { throw CancellationError() }
         }
+    }
+
+    /// Reconfiguration can reload the same track with a newer native generation.
+    /// A replacement start advances the lower bound and rejects older lineages.
+    private func matchesCurrentTrackGeneration(_ expected: Int) -> Bool {
+        guard expected > 0, let start = currentTrackStartGeneration, let current = currentPlaybackGeneration else { return false }
+        return expected >= start && expected <= current
     }
 
     private func prepareOutsideTransport(_ start: PlaybackContinuationStart) throws -> PlaybackController.PreparedSource {
@@ -769,8 +854,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         }
         try validateStartLocked(start)
         let event = controller.loadPreparedIfCurrent(prepared) {
-            isCurrent() && (start.expectedPreviousGeneration == nil
-                || start.expectedPreviousGeneration == self.currentPlaybackGeneration)
+            isCurrent() && (start.expectedPreviousGeneration.map { self.matchesCurrentTrackGeneration($0) } ?? true)
         }
         do {
             guard isCurrent() else { throw CancellationError() }

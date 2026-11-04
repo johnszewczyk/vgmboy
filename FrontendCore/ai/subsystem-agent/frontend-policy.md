@@ -36,8 +36,10 @@ startup contracts shared by the VGMMan player frontends.
   releases its lease; an accepted commit transfers it to the controller.
   A request waiting for a preparation slot periodically rechecks ownership and
   exits when superseded; active archive preparation is not forcibly interrupted.
-  Direct controller operations and reconfiguration still prepare on their
-  existing execution paths.
+  Bridge `reconfigureSync` also prepares reloads outside the queue using the
+  same limit, then checks its request, settings and session ownership before
+  commit. No-op settings do not prepare a source. Direct controller operations
+  and legacy reconfiguration routes retain their existing execution paths.
 - A successful low-level mode change can reload the native session. The
   coordinator adopts its returned generation and resets completion claims;
   stale natural-end events are discarded before status or end delivery.
@@ -50,8 +52,9 @@ startup contracts shared by the VGMMan player frontends.
   before a newer queued request can begin.
 - A start may carry an expected previous native generation. The coordinator
   checks it on the serialized transport queue before and after preparation;
-  a queued fade cannot replace a newer session if its captured generation is
-  stale. Omitting the field preserves the existing start contract.
+  generations from the active track's reload lineage remain valid, while a
+  replacement track invalidates the old lineage. Omitting the field preserves
+  the existing start contract.
 - Queued status for a retired generation is not published as the current track.
   Snapshot reads are non-emitting so a callback may safely refresh the current
   state without recursively producing another status event.
@@ -75,9 +78,9 @@ startup contracts shared by the VGMMan player frontends.
   same for an explicit user navigation gesture. A renderer supplies IDs,
   direction, and wrapping preference; it does not compute the anchor or target.
 - `PlaybackQueuedSkipDecisionRequest` lets the transport check the captured
-  native generation and resolve either an explicit staged target or shared
-  adjacent navigation in one serialized operation. The later guarded start
-  rechecks generation after source preparation; presentation still owns the
+  native generation against the active track's reload lineage and resolve either
+  an explicit staged target or shared adjacent navigation in one serialized
+  operation. The later guarded start rechecks that lineage after preparation; presentation still owns the
   queued request, staged queue and error display.
 - `PlaybackQueuedSkipLifecycle` serializes one current queued transition on a
   separate lock from the transport queue. Unique tokens support supersession,
@@ -101,9 +104,11 @@ startup contracts shared by the VGMMan player frontends.
   rate changes. Frontends that scale a track's playback window by tempo must
   refresh the timing preview and reconfigure with both the new plan and tempo.
 - SB2 and ViewBoy submit `PlaybackTransportReconfigurationRequest` to the
-  coordinator as one serialized operation; CocoaSpice's native timing-plan
-  route uses the same coordinator operation. It gates tempo by decoder family
-  and reloads with timing and tempo together, retaining track and source identity.
+  coordinator; CocoaSpice's native timing-plan route uses the same coordinator
+  operation. It gates tempo by decoder family and reloads with timing and tempo
+  together, retaining track and source identity. Source preparation is outside
+  the transport queue, while validation and commit remain serialized. Commit
+  uses the latest paused/playing state and position after preparation.
 - A reconfiguration request can carry an expected native generation and a
   monotonically increasing settings revision. The coordinator accepts earlier
   generations from the same loaded track's reload lineage, rejects generations
