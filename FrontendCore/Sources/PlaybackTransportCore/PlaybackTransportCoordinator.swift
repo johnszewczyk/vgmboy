@@ -508,6 +508,14 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         }
     }
 
+    /// Updates tempo while retaining the current timing settings. Preparation
+    /// shares the same bounded, guarded handoff as a complete settings update.
+    public func setTempoSync(_ request: PlaybackTransportTempoRequest) throws -> PlaybackTransportStatus {
+        try reconfigure(expectedGeneration: nil, settingsRevision: nil) { _ in
+            try self.controller.tempoReconfigurationSettings(request.tempo.multiplier)
+        }
+    }
+
     private func reconfigure(expectedGeneration: Int?, settingsRevision: Int?, playbackPlan: PlaybackTimingPlan? = nil,
                              payloadForTrack: (PlaybackTransportTrack) throws -> PlaybackControlPayload) throws -> PlaybackTransportStatus {
         let preparation: ReconfigurationPreparation = try queue.sync {

@@ -20,7 +20,9 @@ When present, the shared preview supplies the output-time duration and total
 directly, using its millisecond fields when available; a local catalog estimate
 is used only until a preview is available. Timing, start and reconfiguration
 requests pass the selected speed to shared policy, which resolves backend limits;
-SB2's local speed projection applies only to the temporary estimate.
+SB2's local speed projection applies only to the temporary estimate. The native
+tempo-only bridge uses the shared guarded preparation path and preserves active
+timing settings.
 On stop, the selected track's current preview supplies the displayed duration;
 the manual default is used when no track is selected.
 Live timing requests carry the observed native generation. The native bridge

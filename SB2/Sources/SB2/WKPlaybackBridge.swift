@@ -151,8 +151,7 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 args,
                 errorMessage: "Tempo update requires a tempo value."
             )
-            try perform(.setTempo, payload: .init(tempo: request.tempo.multiplier))
-            return statusResponse()
+            return statusResponse(try transport.setTempoSync(request))
         case "nativePlaybackStart":
             guard requestID.map(transport.isCurrentPlaybackRequest) ?? true else {
                 throw PlaybackBridgeError.superseded

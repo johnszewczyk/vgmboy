@@ -225,25 +225,9 @@ public final class PlaybackController: @unchecked Sendable {
             }
             try session.seek(to: Double(milliseconds) / 1_000)
         case .setTempo:
-            guard let tempo = request.payload.tempo, tempo.isFinite, tempo > 0 else {
-                throw PlaybackControlError.invalidPayload("Tempo must be a positive finite value.")
-            }
-            lock.lock()
-            let current = loaded
-            let currentMode = mode
-            let currentPlay = explicitPlayMilliseconds
-            let currentFade = explicitFadeMilliseconds
-            let currentUnknown = explicitUnknownDurationMilliseconds
-            lock.unlock()
-            guard let current else { throw PlaybackSessionError.notLoaded }
-            let family = FormatRegistry.family(for: current.archiveEntry ?? current.path)
-            let effectiveTempo = FormatRegistry.effectiveTempo(tempo, family: family)
-            if effectiveTempo != session.status().statistics.tempo {
-                try configurePlaybackMode(.init(
-                    tempo: effectiveTempo, playbackMode: currentMode,
-                    playMilliseconds: currentPlay, fadeMilliseconds: currentFade,
-                    unknownDurationMilliseconds: currentUnknown
-                ))
+            let settings = try tempoReconfigurationSettings(request.payload.tempo)
+            if settings.tempo != session.status().statistics.tempo {
+                try configurePlaybackMode(settings)
             }
         case .setPlaybackMode:
             try configurePlaybackMode(request.payload)
@@ -469,6 +453,24 @@ public final class PlaybackController: @unchecked Sendable {
         let family = FormatRegistry.family(for: current.archiveEntry ?? current.path)
         let tempo = FormatRegistry.effectiveTempo(settings.tempo ?? current.tempo, family: family)
         return !sameTiming || tempo != session.status().statistics.tempo
+    }
+
+    /// Snapshot the active timing settings for a tempo-only update. The caller
+    /// serializes this read with session changes and guards any later commit.
+    public func tempoReconfigurationSettings(_ tempo: Double?) throws -> PlaybackControlPayload {
+        guard let tempo, tempo.isFinite, tempo > 0 else {
+            throw PlaybackControlError.invalidPayload("Tempo must be a positive finite value.")
+        }
+        lock.lock()
+        let current = loaded
+        let currentMode = mode, currentPlay = explicitPlayMilliseconds
+        let currentFade = explicitFadeMilliseconds, currentUnknown = explicitUnknownDurationMilliseconds
+        lock.unlock()
+        guard let current else { throw PlaybackSessionError.notLoaded }
+        let family = FormatRegistry.family(for: current.archiveEntry ?? current.path)
+        return .init(tempo: FormatRegistry.effectiveTempo(tempo, family: family), playbackMode: currentMode,
+                     playMilliseconds: currentPlay, fadeMilliseconds: currentFade,
+                     unknownDurationMilliseconds: currentUnknown)
     }
 
     /// Apply settings and a previously prepared source as one serialized

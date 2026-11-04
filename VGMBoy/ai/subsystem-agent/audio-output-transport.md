@@ -44,6 +44,8 @@ opens or manipulates an audio device.
 - `PlaybackController.validatePlaybackMode` checks mode, timing and tempo
   parameters without changing playback. The controller uses the same validation
   when applying a mode change; validation alone does not prepare or reload a source.
+  `tempoReconfigurationSettings` validates a tempo and snapshots the active
+  mode and timing fields for a guarded tempo-only reload.
 - Envelope progress is callback-owned. Control writers serialize and publish coherent atomic
   gain-reset and ramp snapshots; the callback never waits for them and retries an in-flight
   snapshot on its next buffer. A reset followed by a ramp before the callback runs preserves
