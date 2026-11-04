@@ -59,7 +59,10 @@ startup contracts shared by the VGMMan player frontends.
   coordinator adopts its returned generation and resets completion claims;
   stale natural-end events are discarded before status or end delivery.
 - A replacement-request stop is serialized with its newest-request check, so
-  an older request cannot retire playback owned by a newer request.
+  an older request cannot retire playback owned by a newer request. Explicit
+  async and low-level Stop reserve their own playback request before entering
+  the transport queue: they cancel older starts, and a newer reservation makes
+  the queued stop stale. Invalid-version low-level Stop does not reserve.
 - Start requests recheck ownership inside the shared load boundary after source
   preparation and before replacing the native session, then after load, seek,
   and playback start. A superseded preparation preserves the previous session;

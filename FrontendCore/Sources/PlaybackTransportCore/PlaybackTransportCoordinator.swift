@@ -737,8 +737,9 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     }
 
     public func stop() async {
+        let requestID = reservePlaybackRequest()
         await run {
-            self.retirePlaybackLocked()
+            if self.isLatest(requestID) { self.retirePlaybackLocked() }
         }
     }
 
@@ -1106,7 +1107,17 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     /// Shared low-level command access for a host bridge. The command is still
     /// serialized here; hosts do not retain their own PlaybackController.
     public func perform(_ request: PlaybackControlRequest) -> PlaybackControlEvent {
-        queue.sync { performLocked(request) }
+        if request.command == .stop && request.version == PlaybackControlProtocol.version {
+            let requestID = reservePlaybackRequest()
+            return queue.sync {
+                guard isLatest(requestID) else {
+                    return PlaybackControlEvent(requestID: request.requestID, kind: .error,
+                                                status: controller.status(), message: CancellationError().localizedDescription)
+                }
+                return performLocked(request)
+            }
+        }
+        return queue.sync { performLocked(request) }
     }
 
     private func performLocked(_ request: PlaybackControlRequest) -> PlaybackControlEvent {

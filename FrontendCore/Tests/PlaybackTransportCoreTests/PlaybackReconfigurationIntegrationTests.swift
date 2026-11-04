@@ -844,6 +844,92 @@ func supersededStartDoesNotWaitForBusyPreparationSlots(cancelByToken: Bool) asyn
     #expect(canceledBeforeRelease)
 }
 
+@Test(arguments: [false, true])
+func explicitStopCancelsStartBeingPrepared(asyncStop: Bool) async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 5).write(to: url)
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+    let transport = PlaybackTransportCoordinator(label: "test.stop.pending.start") { controller, start in
+        entered.signal()
+        _ = release.wait(timeout: .now() + 20)
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let request = PlaybackContinuationStart(track: .init(id: "pending", path: url.path),
+        payload: .init(path: url.path), requestID: transport.reservePlaybackRequest())
+    let pending = Task.detached { try transport.start(request) }
+    #expect(waitForSignal(entered, seconds: 5))
+    if asyncStop {
+        await transport.stop()
+    } else {
+        let stopped = transport.perform(.init(requestID: "stop", command: .stop))
+        #expect(stopped.kind == .response && stopped.requestID == "stop")
+    }
+    release.signal()
+    do { try await pending.value; Issue.record("Stopped pending start unexpectedly played") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    #expect(!transport.statusSync().trackLoaded)
+}
+
+@Test func invalidVersionStopDoesNotCancelPendingStart() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 5).write(to: url)
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+    let transport = PlaybackTransportCoordinator(label: "test.invalid.stop.pending.start") { controller, start in
+        entered.signal()
+        _ = release.wait(timeout: .now() + 20)
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { release.signal(); _ = transport.perform(.init(command: .stop)) }
+    let request = PlaybackContinuationStart(track: .init(id: "pending", path: url.path),
+        payload: .init(path: url.path), requestID: transport.reservePlaybackRequest())
+    let pending = Task.detached { try transport.start(request) }
+    #expect(waitForSignal(entered, seconds: 5))
+    var stop = PlaybackControlRequest(requestID: "invalid-stop", command: .stop)
+    stop.version = PlaybackControlProtocol.version + 1
+    let event = transport.perform(stop)
+    #expect(event.kind == .error && event.requestID == "invalid-stop")
+    release.signal()
+    try await pending.value
+    #expect(transport.statusSync().currentTrackID == "pending")
+}
+
+@Test(arguments: [false, true])
+func newerPlaybackRequestSupersedesQueuedExplicitStop(asyncStop: Bool) async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 5).write(to: url)
+    let gate = FirstPreparationGate()
+    let transport = PlaybackTransportCoordinator(label: "test.queued.stop.newer.start")
+    defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    transport.setStatusHandler { _ in gate.waitIfFirst() }
+    _ = transport.statusSync()
+    let oldRequest = transport.reservePlaybackRequest()
+    _ = transport.perform(.init(command: .pause))
+    #expect(waitForSignal(gate.entered, seconds: 5))
+    let stopping = Task.detached { () -> PlaybackControlEvent? in
+        if asyncStop { await transport.stop(); return nil }
+        return transport.perform(.init(requestID: "queued-stop", command: .stop))
+    }
+    for _ in 0..<500 where transport.isCurrentPlaybackRequest(oldRequest) {
+        try await Task.sleep(nanoseconds: 10_000_000)
+    }
+    #expect(!transport.isCurrentPlaybackRequest(oldRequest))
+    let newRequest = transport.reservePlaybackRequest()
+    gate.release.signal()
+    let result = await stopping.value
+    if !asyncStop { #expect(result?.kind == .error && result?.requestID == "queued-stop") }
+    #expect(transport.statusSync().currentTrackID == url.path)
+    let start = PlaybackContinuationStart(track: .init(id: "newer", path: url.path),
+        payload: .init(path: url.path), requestID: newRequest)
+    try transport.start(start)
+    #expect(transport.statusSync().currentTrackID == "newer")
+}
+
 @Test func supersededPreparationFailureReportsCancellation() async throws {
     let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
     let transport = PlaybackTransportCoordinator(label: "test.superseded.preparation.failure") { _, _ in
