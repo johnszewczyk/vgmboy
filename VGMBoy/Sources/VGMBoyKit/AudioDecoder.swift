@@ -84,15 +84,21 @@ enum DecoderFactory {
         }
     }
 
+    /// Validate the in-memory routing contract without creating a decoder or
+    /// taking process-global decoder ownership.
+    static func validateInMemorySource(path: String) throws {
+        let ext = URL(fileURLWithPath: path).pathExtension.lowercased()
+        let family = FormatRegistry.family(for: path)?.id
+        guard (ext == "sap" && family == "asap") || (ext == "spc" && family == "libgme") else {
+            throw DecoderFactoryError.unsupportedFamily("in-memory \(ext)")
+        }
+    }
+
     static func make(path: String, sourceData: Data? = nil, sampleRate: Int = 44_100) throws -> any AudioDecoder {
         if let sourceData {
-            if URL(fileURLWithPath: path).pathExtension.caseInsensitiveCompare("sap") == .orderedSame,
-               FormatRegistry.family(for: path)?.id == "asap" {
+            try validateInMemorySource(path: path)
+            if URL(fileURLWithPath: path).pathExtension.caseInsensitiveCompare("sap") == .orderedSame {
                 return try ASAPDecoder(data: sourceData, filename: URL(fileURLWithPath: path).lastPathComponent, sampleRate: sampleRate)
-            }
-            guard URL(fileURLWithPath: path).pathExtension.lowercased() == "spc",
-                  FormatRegistry.family(for: path)?.id == "libgme" else {
-                throw DecoderFactoryError.unsupportedFamily("in-memory \(URL(fileURLWithPath: path).pathExtension)")
             }
             return try GMEDecoder(data: sourceData, sampleRate: sampleRate)
         }
