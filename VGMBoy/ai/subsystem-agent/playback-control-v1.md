@@ -78,7 +78,10 @@ same typed endpoint operations.
   An unsupported or already-effective direct tempo command leaves buffered PCM intact.
 - `PlaybackTimingPlan.totalSeconds` saturates on integer addition overflow;
   transport conversion independently rejects durations outside its native range.
-- AAC export rejects play and fade durations whose sum exceeds the native
+- Playback and AAC export reject track indices outside 0 through 2,147,483,646
+  before source preparation or decoder creation. The upper bound permits native
+  bridges to convert zero-based indices to one-based signed 32-bit subsongs.
+  AAC export rejects play and fade durations whose sum exceeds the native
   millisecond range before opening a decoder or creating an output file.
 - A `set_playback_mode` request can include a tempo multiplier. VGMBoy applies
   both to the same reload and resumes from the prior session position and play

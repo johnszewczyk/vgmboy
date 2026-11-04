@@ -87,6 +87,9 @@ final class GMEDecoder: AudioDecoder, @unchecked Sendable {
     }
 
     func startTrack(_ index: Int) throws {
+        guard index >= 0, index < trackCount else {
+            throw GMEDecoderError.startFailed("Track index is unavailable.")
+        }
         let error = gme_start_track(emu, Int32(index))
         guard error == nil else {
             throw GMEDecoderError.startFailed(
@@ -97,6 +100,9 @@ final class GMEDecoder: AudioDecoder, @unchecked Sendable {
     }
 
     func metadata(for index: Int) throws -> TrackMetadata {
+        guard index >= 0, index < trackCount else {
+            throw GMEDecoderError.metadataFailed("Track index is unavailable.")
+        }
         var infoPointer: UnsafeMutablePointer<gme_info_t>?
         let error = gme_track_info(emu, &infoPointer, Int32(index))
         guard error == nil, let info = infoPointer?.pointee else {

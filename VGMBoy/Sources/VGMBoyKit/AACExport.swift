@@ -128,8 +128,8 @@ public enum AACExporter {
         progress: (@Sendable (AACExportProgress) -> Void)? = nil,
         decoderFactory: (String, Int) throws -> any AudioDecoder
     ) throws -> AACExportResult {
-        guard request.trackIndex >= 0 else {
-            throw AACExportError.invalidRequest("AAC export requires a non-negative track index.")
+        guard PlaybackTrackIndex.isRepresentable(request.trackIndex) else {
+            throw AACExportError.invalidRequest("AAC export track index is outside the supported range.")
         }
         guard request.playMilliseconds > 0, request.fadeMilliseconds >= 0 else {
             throw AACExportError.invalidRequest("AAC export requires a positive play length and a non-negative fade.")
