@@ -49,6 +49,15 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Invalid newer settings, 2026-11-04: shared reconfiguration validates an
+accepted payload before consuming its settings revision or invalidating older
+preparation. A gated test reproduces the former cancellation and verifies
+that valid older work completes and the rejected revision can be reused. The
+bounded transport suite passed (96 reported, four optional fixture skips) with
+the SOTN UAC; SB2 built with existing macOS 26/27 linker warnings. Packaged and
+audible behavior were not tested. Direct low-level mode/tempo command preparation remains a separate migration, with
+its control-protocol and pre-load semantics requiring preservation.
+
 Pending timing and tempo, 2026-11-03: typed sync and async tempo changes now
 carry forward an eligible pending timing snapshot for the same track and
 playback request. The merged request supersedes the older request; if its
