@@ -1470,6 +1470,58 @@ func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
     _ = transport.perform(.init(command: .stop))
 }
 
+@Test func typedTempoPreparationPreservesTimingAndKeepsControlsResponsive() async throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let gate = FirstPreparationGate()
+    let transport = PlaybackTransportCoordinator(label: "test.typed.tempo.offqueue") { controller, start in
+        gate.waitIfFirst()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .setPlaybackMode, payload: .init(
+        playbackMode: .longPlay, playMilliseconds: 20_000, fadeMilliseconds: 0,
+        unknownDurationMilliseconds: 150_000))).kind != .error)
+    #expect(transport.perform(.init(command: .load, payload: .init(path: source.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let generation = transport.statusSync().generation
+    let changing = Task.detached {
+        try transport.setTempoSync(.init(tempo: .init(numerator: 2, denominator: 1)))
+    }
+    #expect(waitForSignal(gate.entered, seconds: 5))
+    let completed = DispatchSemaphore(value: 0)
+    let control = Task.detached {
+        defer { completed.signal() }
+        _ = try transport.performSessionControlSync(.pause, expectedGeneration: generation)
+        return try transport.performSessionControlSync(.seek, payload: .init(positionMilliseconds: 1_000),
+                                                       expectedGeneration: generation)
+    }
+    let responsive = waitForSignal(completed, seconds: 6)
+    gate.release.signal()
+    _ = try await control.value
+    let result = try await changing.value
+    #expect(responsive)
+    #expect(!result.isPlaying && abs(result.elapsedSeconds - 0.5) < 0.1)
+    #expect(result.tempo == 2 && result.generation != generation)
+    let sameSettings = try transport.reconfigureSync(.init(longPlayEnabled: true,
+        manualPlayMilliseconds: 20_000, fadeMilliseconds: 0,
+        tempo: .init(numerator: 2, denominator: 1)))
+    #expect(sameSettings.generation == result.generation)
+}
+
+@Test func typedTempoNoOpPreservesBufferedUnsupportedPlayback() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 3).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.typed.tempo.unsupported")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let before = transport.statusSync()
+    let after = try transport.setTempoSync(.init(tempo: .init(numerator: 2, denominator: 1)))
+    #expect(after.generation == before.generation && after.tempo == 1)
+}
+
 @Test func nativePlanPreparationKeepsControlsResponsiveAndUsesLatestPosition() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }

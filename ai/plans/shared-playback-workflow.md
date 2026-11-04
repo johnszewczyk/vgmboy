@@ -49,6 +49,17 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Typed tempo-only bridge, 2026-11-03: SB2's native tempo-only bridge now uses
+the shared bounded off-queue handoff. VGMBoy snapshots the existing timing
+fields and resolves effective tempo using the same logic as its direct control
+command. A gated real-SPC test checks responsive pause/seek, position scaling
+and retained timing; a WAV test checks the unsupported-tempo no-op. The bounded
+transport suite passed (89 reported, four optional fixture skips) with the SOTN
+UAC; two existing VGMBoy direct-tempo tests passed, and SB2 built with existing
+macOS 26/27 linker warnings. Packaged and audible behavior were not tested. Direct
+low-level mode/tempo commands and async legacy tempo still use their existing
+paths; merging a partial command with an older pending snapshot remains open.
+
 Low-level settings ordering, 2026-11-03: successful low-level tempo and mode
 commands now invalidate older off-queue settings preparation even if the
 command is a no-op and leaves the native generation unchanged. Rejected
