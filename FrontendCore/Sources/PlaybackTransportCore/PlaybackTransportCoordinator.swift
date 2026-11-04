@@ -343,6 +343,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         let track: PlaybackTransportTrack
         let settings: PlaybackControlPayload
         let source: PlaybackController.ReconfigurationSource
+        let playbackPlan: PlaybackTimingPlan?
     }
     private enum ReconfigurationPreparation {
         case completed(PlaybackTransportStatus)
@@ -375,6 +376,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     private var queuedSkipClaims = Set<String>()
     private var currentTrackStartGeneration: Int?
     private var latestSettingsRevision: Int?
+    private var pendingReconfiguration: ReconfigurationWork? // Transport queue only.
     private var reconfigurationEpoch: UInt64 = 0 // Protected by requestLock.
     private var latestSeekRevision: Int?
     private var latestRampRevision: Int?
@@ -511,13 +513,13 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     /// Updates tempo while retaining the current timing settings. Preparation
     /// shares the same bounded, guarded handoff as a complete settings update.
     public func setTempoSync(_ request: PlaybackTransportTempoRequest) throws -> PlaybackTransportStatus {
-        try reconfigure(expectedGeneration: nil, settingsRevision: nil) { _ in
+        try reconfigure(expectedGeneration: nil, settingsRevision: nil, preservePendingTiming: true) { _ in
             try self.controller.tempoReconfigurationSettings(request.tempo.multiplier)
         }
     }
 
     private func reconfigure(expectedGeneration: Int?, settingsRevision: Int?, playbackPlan: PlaybackTimingPlan? = nil,
-                             ignoreUnsupportedTempo: Bool = false,
+                             ignoreUnsupportedTempo: Bool = false, preservePendingTiming: Bool = false,
                              payloadForTrack: (PlaybackTransportTrack) throws -> PlaybackControlPayload) throws -> PlaybackTransportStatus {
         let preparation: ReconfigurationPreparation = try queue.sync {
             if let expected = expectedGeneration {
@@ -538,30 +540,53 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
             guard let track = currentTrack, let generation = currentPlaybackGeneration,
                   let trackStart = currentTrackStartGeneration else { throw PlaybackSessionError.notLoaded }
             var payload = try payloadForTrack(track)
+            var acceptedPlan = playbackPlan
+            requestLock.lock()
+            let requestID = latestPlaybackRequest
+            if preservePendingTiming, let pending = pendingReconfiguration,
+               pending.generation == generation, pending.trackStartGeneration == trackStart,
+               pending.epoch == reconfigurationEpoch, pending.requestID == requestID {
+                let tempo = payload.tempo
+                payload = pending.settings
+                payload.tempo = tempo
+                acceptedPlan = pending.playbackPlan
+            }
+            reconfigurationEpoch &+= 1
+            let epoch = reconfigurationEpoch
+            requestLock.unlock()
             if FormatRegistry.family(for: track.archiveEntry ?? track.path)?.supportsTempo != true {
                 payload.tempo = 1
             }
-            requestLock.lock()
-            reconfigurationEpoch &+= 1
-            let epoch = reconfigurationEpoch
-            let requestID = latestPlaybackRequest
-            requestLock.unlock()
+            pendingReconfiguration = nil
             guard try controller.reconfigurationRequiresReload(payload) else {
                 let result = try reconfigureLocked(payload: payload)
-                if let playbackPlan { currentPlaybackPlan = playbackPlan }
+                if let acceptedPlan { currentPlaybackPlan = acceptedPlan }
                 return .completed(result)
             }
             let source = try controller.reconfigurationSource(for: payload)
-            return .prepare(ReconfigurationWork(epoch: epoch, generation: generation,
+            let work = ReconfigurationWork(epoch: epoch, generation: generation,
                 trackStartGeneration: trackStart, requestID: requestID, track: track,
-                settings: payload, source: source))
+                settings: payload, source: source, playbackPlan: acceptedPlan)
+            pendingReconfiguration = work
+            return .prepare(work)
         }
         guard case .prepare(let work) = preparation else {
             if case .completed(let status) = preparation { return status }
             throw CancellationError()
         }
-        let prepared = try prepareReconfigurationOutsideTransport(work)
+        let prepared: PlaybackController.PreparedSource
+        do {
+            prepared = try prepareReconfigurationOutsideTransport(work)
+        } catch {
+            queue.sync {
+                if pendingReconfiguration?.epoch == work.epoch { pendingReconfiguration = nil }
+            }
+            throw error
+        }
         return try queue.sync {
+            defer {
+                if self.pendingReconfiguration?.epoch == work.epoch { self.pendingReconfiguration = nil }
+            }
             guard self.isCurrentReconfiguration(work), self.currentPlaybackGeneration == work.generation,
                   self.currentTrackStartGeneration == work.trackStartGeneration else { throw CancellationError() }
             let event = self.controller.reconfigurePrepared(prepared, settings: work.settings) {
@@ -577,7 +602,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
                 self.continuationCoordinator.reset()
             }
             self.currentPlaybackGeneration = generation
-            if let playbackPlan { self.currentPlaybackPlan = playbackPlan }
+            if let playbackPlan = work.playbackPlan { self.currentPlaybackPlan = playbackPlan }
             return self.status(event.status)
         }
     }
@@ -631,7 +656,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     public func setTempo(_ tempo: PlaybackTempo) async throws {
         try await Task.detached(priority: .userInitiated) {
             _ = try self.reconfigure(expectedGeneration: nil, settingsRevision: nil,
-                                     ignoreUnsupportedTempo: true) { _ in
+                                     ignoreUnsupportedTempo: true, preservePendingTiming: true) { _ in
                 try self.controller.tempoReconfigurationSettings(tempo.multiplier)
             }
         }.value

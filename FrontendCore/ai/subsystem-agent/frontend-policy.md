@@ -37,13 +37,15 @@ startup contracts shared by the VGMMan player frontends.
   A request waiting for a preparation slot periodically rechecks ownership and
   exits when superseded; active archive preparation is not forcibly interrupted.
   Bridge `reconfigureSync`, typed `setTempoSync`, async `setTempo`, and native
-  timing-plan reconfiguration also prepare reloads outside the queue using the same limit,
-  then check request
-  and session ownership before commit. Bridge settings revisions are checked
+  timing-plan reconfiguration also prepare reloads outside the queue using the
+  same limit, then check request and session ownership before commit. Bridge settings revisions are checked
   during serialized admission. No-op settings do not prepare a source. Direct
   controller operations and low-level tempo/mode commands retain their existing
-  execution paths. Typed tempo-only updates snapshot the active timing fields
-  and use the same prepared handoff; they do not rewrite timing policy. Async
+  execution paths. Typed tempo-only updates retain the timing of an eligible
+  pending settings snapshot for the same track and playback request; otherwise
+  they use active timing. The merged request supersedes the older request. If
+  its preparation fails, the active session remains and the older request is
+  not revived. Async
   `setTempo` ignores missing and unsupported tracks without superseding a
   pending settings update. A successful low-level tempo or mode command supersedes a
   pending prepared settings snapshot even if it is a no-op for the current

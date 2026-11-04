@@ -49,6 +49,16 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Pending timing and tempo, 2026-11-03: typed sync and async tempo changes now
+carry forward an eligible pending timing snapshot for the same track and
+playback request. The merged request supersedes the older request; if its
+preparation fails, the active session remains and the older request is not
+revived. Gated tests exercise both tempo APIs, failure, and playback-request
+replacement. The bounded transport suite passed (95 reported, four optional
+fixture skips) with the SOTN UAC; SB2 built with the existing macOS 26/27
+linker warnings. Packaged and audible behavior were not tested. Direct
+low-level commands retain their separate semantics.
+
 Async tempo preparation, 2026-11-03: the coordinator's async tempo route now
 uses the shared bounded preparation and guarded commit. Its previous no-op
 behavior for missing or unsupported tracks remains: an ignored request also
