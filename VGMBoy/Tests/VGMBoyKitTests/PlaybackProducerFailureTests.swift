@@ -220,6 +220,22 @@ private let fixturePlan = PlaybackPlan(preFadeMilliseconds: 5_000, fadeMilliseco
     }
 }
 
+@Test func singleTrackPreflightPreservesVariableTrackRoutes() throws {
+    // SPC and SAP use decoder-discovered subtune counts, even in memory.
+    try DecoderFactory.validateTrackIndex(1, path: "/virtual.spc", sourceData: Data([0]))
+    try DecoderFactory.validateTrackIndex(1, path: "/virtual.sap", sourceData: Data([0]))
+    // A SWAV payload can override ordinary WAV extension routing, so its
+    // count must remain the responsibility of the vgmstream decoder.
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    try Data("SWAV".utf8).write(to: url)
+    defer { try? FileManager.default.removeItem(at: url) }
+    try DecoderFactory.validateTrackIndex(1, path: url.path, sourceData: nil)
+    try Data("RIFF".utf8).write(to: url)
+    #expect(throws: (any Error).self) {
+        try DecoderFactory.validateTrackIndex(1, path: url.path, sourceData: nil)
+    }
+}
+
 @Test func preparedLoopBoundsUseEffectiveDecoderTempo() throws {
     let controller = PlaybackController()
     let end = Int64(Int32.max) * 44_100 / 1_000 * 3 / 2

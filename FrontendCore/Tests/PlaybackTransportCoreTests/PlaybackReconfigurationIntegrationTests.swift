@@ -2768,6 +2768,28 @@ func sotnLoopSurvivesPausedSharedReconfiguration() async throws {
     _ = transport.perform(.init(command: .stop))
 }
 
+@Test func invalidSingleTrackIndexPreservesPlayingSession() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 2).write(to: url)
+    let transport = PlaybackTransportCoordinator(label: "test.invalid.track.replacement")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    _ = try transport.configureAudio(.init(outputVolume: 0, equalizerEnabled: false,
+        equalizerBandGains: Array(repeating: 0, count: 10), monoEnabled: false))
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let before = transport.statusSync()
+    let start = PlaybackContinuationStart(
+        track: .init(id: "invalid-index", path: url.path, trackIndex: 1),
+        payload: .init(path: url.path, trackIndex: 1), requestID: transport.reservePlaybackRequest()
+    )
+    #expect(throws: (any Error).self) { try transport.start(start) }
+    let after = transport.statusSync()
+    #expect(after.trackLoaded && after.isPlaying)
+    #expect(after.currentTrackID == before.currentTrackID)
+    #expect(after.generation == before.generation)
+}
+
 @Test func unrepresentableLoopReplacementPreservesPlayingSession() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
