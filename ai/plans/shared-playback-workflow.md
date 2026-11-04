@@ -49,6 +49,18 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+AAC content regression, 2026-11-04: the VGMBoy exporter test decodes its
+2x AAC and aligns it against separately rendered 1x and 2x SPC decoder PCM,
+allowing for AAC encoder delay. The 2x signal matches its reference and is
+distinct from the 1x reference. The focused test passed; temporarily forcing
+the exporter decoder to 1x made both new assertions fail, and the restored
+code passed again. A separate ffmpeg PCM analysis measured correlations of
+0.991 with the 2x reference and -0.126 at its strongest short-lag alignment
+with the 1x reference. This is shared-core output evidence for the vendored SPC,
+not a measurement of the earlier packaged AAC files, an independent musical
+clock measurement, or proof of audible continuity. Existing macOS 26/27 native
+dependency linker warnings remain.
+
 Isolated packaged SB2 smoke and AAC comparison, 2026-11-04: a release app built
 from `0980d026` with a test-only WebKit control panel and redirected catalog,
 favorites, history, tabs and archive cache played the vendored Big Blue SPC.
