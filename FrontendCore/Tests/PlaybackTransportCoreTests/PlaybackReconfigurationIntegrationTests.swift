@@ -1431,6 +1431,70 @@ func dependencyArchiveReconfigurationKeepsPreparedSetAlive() throws {
     _ = transport.perform(.init(command: .stop))
 }
 
+@Test func nativePlanPreparationKeepsControlsResponsiveAndUsesLatestPosition() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 30).write(to: url)
+    let gate = FirstPreparationGate()
+    let transport = PlaybackTransportCoordinator(label: "test.native.plan.offqueue") { controller, start in
+        gate.waitIfFirst()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let generation = transport.statusSync().generation
+    let changing = Task.detached {
+        try await transport.reconfigureCurrentTrack(
+            plan: .init(preFadeSeconds: 20, fadeSeconds: 0, usesNativeEnding: false, isLongPlay: true),
+            tempo: .defaultValue)
+    }
+    #expect(waitForSignal(gate.entered, seconds: 5))
+    let completed = DispatchSemaphore(value: 0)
+    let control = Task.detached {
+        defer { completed.signal() }
+        _ = try transport.performSessionControlSync(.pause, expectedGeneration: generation)
+        return try transport.performSessionControlSync(.seek, payload: .init(positionMilliseconds: 1_000),
+                                                       expectedGeneration: generation)
+    }
+    let responsive = waitForSignal(completed, seconds: 6)
+    gate.release.signal()
+    _ = try await control.value
+    try await changing.value
+    let result = transport.statusSync()
+    #expect(responsive)
+    #expect(!result.isPlaying && abs(result.elapsedSeconds - 1) < 0.1)
+    #expect(result.generation != generation)
+}
+
+@Test func nativePlanPreparationIsSupersededByBridgeSettings() async throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try silentWAV(seconds: 30).write(to: url)
+    let gate = FirstPreparationGate()
+    let transport = PlaybackTransportCoordinator(label: "test.native.plan.superseded") { controller, start in
+        gate.waitIfFirst()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: url.path))).kind != .error)
+    let generation = transport.statusSync().generation
+    let old = Task.detached {
+        try await transport.reconfigureCurrentTrack(
+            plan: .init(preFadeSeconds: 20, fadeSeconds: 0, usesNativeEnding: false, isLongPlay: true),
+            tempo: .defaultValue)
+    }
+    #expect(waitForSignal(gate.entered, seconds: 5))
+    let newer = try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 10_000,
+        expectedGeneration: generation, settingsRevision: transport.reserveSettingsRevision()))
+    gate.release.signal()
+    do {
+        try await old.value
+        Issue.record("Superseded native reconfiguration unexpectedly succeeded")
+    } catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    #expect(transport.statusSync().generation == newer.generation)
+}
+
 @Test func nativePlanReconfigurationUsesSharedSessionOperation() async throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }
