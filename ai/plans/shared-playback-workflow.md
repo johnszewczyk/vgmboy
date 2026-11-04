@@ -49,6 +49,22 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Isolated packaged SB2 smoke and AAC comparison, 2026-11-04: a release app built
+from `0980d026` with a test-only WebKit control panel and redirected catalog,
+favorites, history, tabs and archive cache played the vendored Big Blue SPC.
+The packaged bridge reported generation 1 at 1x, then generation 2 at 2x;
+Pause, Resume and Stop reflected the expected state. The same fixture was
+exported through the app at 2x and 1x: ffprobe counted 649 and 1,295 AAC
+frames, respectively, at 44,100 Hz. ADTS duration estimates were not used as
+frame-accurate measurements. This demonstrates packaged bridge/status and
+export-length behavior for this fixture; it does not establish audible
+continuity or prove the encoded music tempo by PCM comparison.
+The first disposable launch accidentally used the normal SB2 playlist-tab
+store before it was redirected; the file was written at 06:02:16 local time.
+It contains no test fixture, but no pre-launch baseline was captured, so
+content equivalence cannot be established. Subsequent runs used the isolated
+store and did not change that timestamp.
+
 Overlapping low-level reloads, 2026-11-04: low-level settings now prepare a
 new candidate outside the transport queue while an older settings request is
 pending. The older commit waits outside the queue; candidate preparation
