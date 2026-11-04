@@ -49,6 +49,17 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Single-track index recovery, 2026-11-04: source preparation rejects nonzero
+indices for known single-track decoder families before replacing the current
+session. SWAV header overrides and variable-track decoders retain their own
+track-count validation. A focused test confirms an invalid WAV track index
+leaves the old track playing on the same generation; temporarily removing the
+preflight reproduced the interruption. Routing checks cover SPC/SAP and SWAV
+exceptions. The shared transport suite passed 120 discovered tests with four
+fixture skips and SOTN enabled; SB2 built with existing macOS 26/27 linker
+warnings. This is shared-core coverage, not packaged or audible proof.
+Malformed content and failures after decoder opening remain unresolved.
+
 Loop-bound recovery, 2026-11-04: shared preparation now checks whether a
 valid resolved loop fits the output timeline at the decoder's effective tempo,
 before session replacement. An out-of-range loop previously stopped the old

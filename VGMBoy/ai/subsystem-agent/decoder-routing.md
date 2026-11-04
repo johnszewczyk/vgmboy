@@ -19,6 +19,10 @@ deliberately exclusive to one family.
 
 - A file must resolve to exactly one family. Unsupported input throws
   `DecoderFactoryError.unsupportedFamily` — never an invented track.
+- `DecoderFactory.validateTrackIndex` lists decoder families whose current
+  implementations expose exactly one track. Keep it synchronized with those
+  decoder contracts. SWAV can override extension routing and variable-track
+  families still validate their source-specific counts in their decoders.
 - Experimental `.snesstate` playback routes to `ares-snes`. `AresSNESDecoder`
   starts the separately built `ares-agent-host` with no ROM and streams stereo
   PCM16 from the restored SMP/DSP state. The ares runtime is staged beside the

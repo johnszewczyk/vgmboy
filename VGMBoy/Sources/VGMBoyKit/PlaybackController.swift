@@ -346,6 +346,7 @@ public final class PlaybackController: @unchecked Sendable {
         if sourceData != nil {
             try DecoderFactory.validateInMemorySource(path: playablePath)
         }
+        try DecoderFactory.validateTrackIndex(trackIndex, path: playablePath, sourceData: sourceData)
         // UAC member metadata is authoritative, including an absent loop.
         // Standalone files and other archives retain their existing override
         // and embedded-tag precedence.

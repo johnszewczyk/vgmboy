@@ -84,6 +84,22 @@ enum DecoderFactory {
         }
     }
 
+    /// Families whose decoder contract guarantees exactly one track. Keep
+    /// variable-track decoders out of this list: their counts require opening
+    /// the source. SWAV overrides extension routing and must be checked first.
+    static func validateTrackIndex(_ index: Int, path: String, sourceData: Data?) throws {
+        guard index > 0 else { return }
+        if sourceData == nil && NDSWAVDetection.isSWAV(path) { return }
+        guard let family = FormatRegistry.family(for: path) else { return }
+        switch family.id {
+        case "standardaudio", "ffmpegaudio", "mdx", "openmpt", "highlycomplete",
+             "twosf", "lazyusf", "playpsf", "ares-snes", "qsf":
+            throw PlaybackControlError.invalidPayload("Track index is not available for this single-track format.")
+        default:
+            return
+        }
+    }
+
     /// Validate the in-memory routing contract without creating a decoder or
     /// taking process-global decoder ownership.
     static func validateInMemorySource(path: String) throws {
