@@ -49,6 +49,17 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Explicit stop and pending starts, 2026-11-04: async Stop and the low-level
+valid-version Stop reserve a playback request before entering the transport
+queue. Older preparing starts are canceled; a newer reservation supersedes a
+queued Stop before it can retire the session. Invalid-version low-level Stop
+does not cancel a pending start. Injected preparation and queue gates cover both
+entry points and both ordering directions. The replacement-specific stop keeps
+its existing request identity so its associated start remains eligible. The
+bounded transport suite passed (102 reported, four optional fixture skips) with
+the SOTN UAC, and SB2 built with the existing macOS 26/27 linker warnings.
+Packaged and audible behavior were not tested.
+
 Retired-session preparation waiters, 2026-11-04: shared session retirement
 and successful low-level load, stop, or shutdown invalidate pending settings
 preparation. A gated test holds both preparation slots and confirms a low-level
