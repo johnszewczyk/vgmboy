@@ -49,6 +49,19 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Low-level settings handoff, 2026-11-04: the coordinator now prepares ordinary
+low-level mode and tempo reloads outside the transport queue and returns the
+original control request ID. Gated real-SPC tests cover pause/seek and Stop; a
+removed ZIP test covers failure while retaining the active session. Pre-load
+commands and low-level commands overlapping eligible pending settings still
+use the serialized path to preserve their existing failure ordering. Direct
+VGMBoy controller clients remain outside this coordinator change. The bounded
+transport suite passed (105 reported, four optional fixture skips) with the
+SOTN UAC; an additional focused ZIP overlap-failure test passed. An earlier
+full run timed out in an existing queue-gate test; its gate timeout was raised
+and the focused and full reruns passed. SB2 built with existing macOS 26/27
+linker warnings. Packaged and audible behavior were not tested.
+
 Explicit stop and pending starts, 2026-11-04: async Stop and the low-level
 valid-version Stop reserve a playback request before entering the transport
 queue. Older preparing starts are canceled; a newer reservation supersedes a
