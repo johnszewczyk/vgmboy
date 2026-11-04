@@ -49,6 +49,28 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Malformed SPC recovery, 2026-11-04: source preparation opens, starts and
+reads metadata through a temporary independent libgme SPC instance, for both
+file-backed and in-memory sources, before replacing playback. A shared test
+prepared a second valid SPC while an SPC was playing and rejected malformed
+file and memory inputs without changing track or generation; its playback
+clock kept advancing. Temporarily removing the probe reproduced the old
+interruption. An isolated release SB2 at `da2be5c4` plus the patch displayed
+the malformed-SPC error while the previous SPC stayed playing on generation 1.
+The valid vendored fixture SHA-256 was
+`c2e3fbc4ecee60a2f9102acd374387438ac3a9ba5bfaca2f02a12fc6315bee85`; the
+malformed file was `aaed6720b634bb26fa8f069575c725120b6771020abf69a1f03e2101cfd55093`.
+The disposable app redirected catalog, favorites, history, tabs and cache; the
+normal playlist-tab file's previously recorded modification time was unchanged.
+The transport suite passed 121 discovered tests with four fixture skips, and
+VGMBoyKit passed 116 discovered tests with 19 skips, both with SOTN enabled.
+A subsequent routing check added an exception for disk SWAV signatures with
+an SPC extension, matching the factory's vgmstream override; that final guard
+was checked separately, not in the packaged run. The probe creates an extra
+temporary SPC decoder and cannot guarantee later reads or audible continuity.
+Other decoder families retain their prior failure boundary; existing linker
+warnings remain.
+
 Native track-index safety, 2026-11-04: playback source preparation and AAC
 export reject track indices that cannot be converted safely to the native
 zero- or one-based signed 32-bit APIs. Direct GME and vgmstream decoder

@@ -98,6 +98,23 @@ enum DecoderFactory {
         _ = try StandardAudioDecoder(path: path, sampleRate: sampleRate)
     }
 
+    /// SPC uses independent libgme instances, so its open and initial track
+    /// setup can be checked without disturbing the current playback decoder.
+    static func validateSPCSource(path: String, sourceData: Data?, trackIndex: Int, sampleRate: Int) throws {
+        guard URL(fileURLWithPath: path).pathExtension.caseInsensitiveCompare("spc") == .orderedSame,
+              FormatRegistry.family(for: path)?.id == "libgme" else { return }
+        // Disk SWAV signatures override extension routing in DecoderFactory.
+        if sourceData == nil && NDSWAVDetection.isSWAV(path) { return }
+        let decoder: GMEDecoder
+        if let sourceData {
+            decoder = try GMEDecoder(data: sourceData, sampleRate: sampleRate)
+        } else {
+            decoder = try GMEDecoder(path: path, sampleRate: sampleRate)
+        }
+        try decoder.startTrack(trackIndex)
+        _ = try decoder.metadata(for: trackIndex)
+    }
+
     /// Families whose decoder contract guarantees exactly one track. Keep
     /// variable-track decoders out of this list: their counts require opening
     /// the source. SWAV overrides extension routing and must be checked first.

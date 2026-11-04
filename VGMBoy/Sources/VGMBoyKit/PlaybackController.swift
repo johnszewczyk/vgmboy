@@ -355,6 +355,8 @@ public final class PlaybackController: @unchecked Sendable {
         try DecoderFactory.validateTrackIndex(trackIndex, path: playablePath, sourceData: sourceData)
         try DecoderFactory.validateStandardAudioSource(path: playablePath, sourceData: sourceData,
                                                        sampleRate: PlaybackSession.outputSampleRate)
+        try DecoderFactory.validateSPCSource(path: playablePath, sourceData: sourceData, trackIndex: trackIndex,
+                                             sampleRate: PlaybackSession.outputSampleRate)
         // UAC member metadata is authoritative, including an absent loop.
         // Standalone files and other archives retain their existing override
         // and embedded-tag precedence.
