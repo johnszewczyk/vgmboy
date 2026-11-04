@@ -793,6 +793,41 @@ struct PlaybackControlProtocolTests {
         #expect(!normal.isEmpty && normal.count == fast.count)
         let difference = zip(normal, fast).reduce(0.0) { $0 + Double(abs($1.0 - $1.1)) } / Double(max(1, normal.count))
         #expect(difference > 0.001)
+
+        // Compare encoded audio with independent decoder output. AAC priming adds
+        // a platform-dependent delay, so find the alignment before comparing.
+        func reference(_ tempo: Double) throws -> [Float] {
+            let decoder = try GMEDecoder(path: source.path)
+            defer { decoder.close() }
+            try decoder.startTrack(0)
+            decoder.setTempo(tempo)
+            return decoder.readFrames(80_000).left
+        }
+        let referenceNormal = try reference(1), referenceFast = try reference(2)
+        func correlation(_ reference: [Float], delay: Int) -> Double {
+            let count = min(reference.count, fast.count - delay)
+            guard count > 0 else { return 0 }
+            var dot = 0.0, referenceEnergy = 0.0, outputEnergy = 0.0
+            for i in stride(from: 0, to: count, by: 8) {
+                let a = Double(reference[i]), b = Double(fast[i + delay])
+                dot += a * b
+                referenceEnergy += a * a
+                outputEnergy += b * b
+            }
+            let denominator = (referenceEnergy * outputEnergy).squareRoot()
+            return denominator > 0 ? dot / denominator : 0
+        }
+        let coarseDelay = stride(from: 0, through: 4_096, by: 8).max {
+            correlation(referenceFast, delay: $0) < correlation(referenceFast, delay: $1)
+        } ?? 0
+        let delay = max(0, coarseDelay - 7)...min(4_096, coarseDelay + 7)
+        let alignedDelay = delay.max {
+            correlation(referenceFast, delay: $0) < correlation(referenceFast, delay: $1)
+        } ?? 0
+        let fastMatch = correlation(referenceFast, delay: alignedDelay)
+        let normalMatch = correlation(referenceNormal, delay: alignedDelay)
+        #expect(fastMatch > 0.8)
+        #expect(fastMatch > abs(normalMatch) + 0.4)
         #expect(capped.count == overLimit.count)
         let capDifference = zip(capped, overLimit).reduce(0.0) { $0 + Double(abs($1.0 - $1.1)) } / Double(max(1, capped.count))
         #expect(capDifference < 0.000001)
