@@ -343,6 +343,9 @@ public final class PlaybackController: @unchecked Sendable {
         guard trackIndex >= 0, FormatRegistry.family(for: playablePath) != nil else {
             throw PlaybackControlError.invalidPayload("Track index must be non-negative and the file format must be supported.")
         }
+        if sourceData != nil {
+            try DecoderFactory.validateInMemorySource(path: playablePath)
+        }
         // UAC member metadata is authoritative, including an absent loop.
         // Standalone files and other archives retain their existing override
         // and embedded-tag precedence.

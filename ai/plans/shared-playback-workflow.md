@@ -49,6 +49,18 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+In-memory admission recovery, 2026-11-04: shared source preparation now
+uses the decoder factory's SPC/SAP in-memory routing rule before committing a
+replacement. An unsupported in-memory WAV previously retired the active
+session; the new focused test confirms it remains playing on the same track
+and generation. Removing the new preflight temporarily reproduced the old
+failure, and restoring it passed again. The shared transport suite passed with
+118 tests discovered and four fixture skips, including the read-only SOTN XA
+UAC and existing in-memory SPC/SAP reconfiguration. SB2 built with the
+existing macOS 26/27 linker warnings. This is shared-core evidence, not a
+packaged SB2 interaction; malformed supported data and later decode failures
+can still retire a session.
+
 Regression sweep after standalone source preflight, 2026-11-04: at
 `4cc7f3cf`, the VGMBoyKit suite passed 110 discovered tests with 20 optional
 fixture skips, and 46 focused SB2 renderer tests for queued fades, repeated
