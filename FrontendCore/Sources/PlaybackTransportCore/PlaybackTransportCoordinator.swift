@@ -517,6 +517,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     }
 
     private func reconfigure(expectedGeneration: Int?, settingsRevision: Int?, playbackPlan: PlaybackTimingPlan? = nil,
+                             ignoreUnsupportedTempo: Bool = false,
                              payloadForTrack: (PlaybackTransportTrack) throws -> PlaybackControlPayload) throws -> PlaybackTransportStatus {
         let preparation: ReconfigurationPreparation = try queue.sync {
             if let expected = expectedGeneration {
@@ -527,6 +528,12 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
                 guard expectedGeneration != nil, revision >= 0,
                       latestSettingsRevision.map({ revision > $0 }) ?? true else { throw CancellationError() }
                 latestSettingsRevision = revision
+            }
+            if ignoreUnsupportedTempo {
+                guard let track = currentTrack,
+                      FormatRegistry.family(for: track.archiveEntry ?? track.path)?.supportsTempo == true else {
+                    return .completed(status(controller.status()))
+                }
             }
             guard let track = currentTrack, let generation = currentPlaybackGeneration,
                   let trackStart = currentTrackStartGeneration else { throw PlaybackSessionError.notLoaded }
@@ -622,14 +629,12 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     }
 
     public func setTempo(_ tempo: PlaybackTempo) async throws {
-        try await run {
-            guard let track = self.currentTrack,
-                  FormatRegistry.family(for: track.archiveEntry ?? track.path)?.supportsTempo == true else { return }
-            try self.requireSuccess(self.performLocked(.init(
-                command: .setTempo,
-                payload: .init(tempo: tempo.multiplier)
-            )))
-        }
+        try await Task.detached(priority: .userInitiated) {
+            _ = try self.reconfigure(expectedGeneration: nil, settingsRevision: nil,
+                                     ignoreUnsupportedTempo: true) { _ in
+                try self.controller.tempoReconfigurationSettings(tempo.multiplier)
+            }
+        }.value
     }
 
     public func setPlaying(_ shouldPlay: Bool) async -> Bool {
