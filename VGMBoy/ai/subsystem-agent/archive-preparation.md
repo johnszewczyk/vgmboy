@@ -38,8 +38,11 @@ finite AAC export; it has no catalog, queue, or UI policy.
   SPC and SAP routes before replacement, without instantiating a decoder.
   Known single-track decoder families reject nonzero track indices before
   replacement. SWAV header routing and decoder-discovered multi-track families
-  retain decoder-owned validation. Valid resolved loops must fit the shared
-  output timeline at the format's effective tempo before replacement; malformed loops continue to be ignored
+  retain decoder-owned validation. Ordinary AVFoundation audio gets a temporary
+  reader and converter check before replacement; SWAV and legacy raw Nintendo
+  DS audio follow their own decoder routes. The probe adds an extra source open
+  and cannot predict a later decode or source-change failure. Valid resolved
+  loops must fit the shared output timeline at the format's effective tempo before replacement; malformed loops continue to be ignored
   as in the session. A file may still disappear or fail to decode after preparation, so this
   preflight does not make decoder replacement atomic. Direct controller
   load commands still prepare synchronously.

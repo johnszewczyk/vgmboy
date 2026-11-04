@@ -49,6 +49,26 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Malformed ordinary-audio recovery, 2026-11-04: source preparation now creates
+and releases an AVFoundation reader/converter for ordinary audio before session
+replacement. SWAV and legacy Nintendo DS raw-audio overrides bypass this probe;
+other decoder families remain unchanged. This adds one temporary source open
+and does not prove that a later reopen or decode will succeed. In an isolated
+release SB2 at `589de939` plus the patch, a test-only WebKit control started a
+generated WAV then selected a malformed WAV. SB2 displayed an error while the
+original track remained playing on generation 1. The valid WAV SHA-256 was
+`163acb59c834f0dcec4c587cebc1b60c445202a468c37ac3502ae60a59e547d7`; the
+malformed WAV was `63969f8cf564dc24786de787bb57e4f9e5f8fd2f468d785a1b6f80326917d5f5`.
+The app used redirected disposable catalog, favorites, history, tabs and cache;
+the normal playlist-tab file's previously recorded modification time did not
+change. The shared transport suite passed 120 discovered tests with four fixture
+skips and SOTN enabled; VGMBoyKit passed 113 discovered tests with 19 fixture
+skips, and targeted routing checks passed. Removing the probe reproduced the
+old failure in the focused test. A local sequential smoke benchmark opened a small vendored WAV and created its
+converter 100 times in 14.2 ms total; this is not a cold, remote, or large-file
+latency bound. The app result does not prove audible continuity or naturally
+slow storage behavior. Existing linker warnings remain.
+
 Single-track index recovery, 2026-11-04: source preparation rejects nonzero
 indices for known single-track decoder families before replacing the current
 session. SWAV header overrides and variable-track decoders retain their own

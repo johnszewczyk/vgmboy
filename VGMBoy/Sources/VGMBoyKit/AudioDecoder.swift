@@ -84,6 +84,14 @@ enum DecoderFactory {
         }
     }
 
+    /// Probe ordinary AVFoundation sources without touching the active
+    /// playback session. The Nintendo DS overrides use different decoders.
+    static func validateStandardAudioSource(path: String, sourceData: Data?, sampleRate: Int) throws {
+        guard sourceData == nil, FormatRegistry.family(for: path)?.id == "standardaudio",
+              !NDSWAVDetection.isSWAV(path), !NDSWAVDetection.isRawPCM22(path) else { return }
+        _ = try StandardAudioDecoder(path: path, sampleRate: sampleRate)
+    }
+
     /// Families whose decoder contract guarantees exactly one track. Keep
     /// variable-track decoders out of this list: their counts require opening
     /// the source. SWAV overrides extension routing and must be checked first.

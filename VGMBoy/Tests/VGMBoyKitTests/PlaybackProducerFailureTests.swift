@@ -220,6 +220,23 @@ private let fixturePlan = PlaybackPlan(preFadeMilliseconds: 5_000, fadeMilliseco
     }
 }
 
+@Test func standardAudioProbeRespectsNintendoDSOverrides() throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let swav = directory.appendingPathComponent("sample.wav")
+    try Data("SWAV".utf8).write(to: swav)
+    try DecoderFactory.validateStandardAudioSource(path: swav.path, sourceData: nil, sampleRate: 44_100)
+    let raw = directory.appendingPathComponent("sample_01.wav")
+    try Data(repeating: 0, count: 65_536).write(to: raw)
+    try DecoderFactory.validateStandardAudioSource(path: raw.path, sourceData: nil, sampleRate: 44_100)
+    let invalid = directory.appendingPathComponent("invalid.wav")
+    try Data("not a WAV".utf8).write(to: invalid)
+    #expect(throws: (any Error).self) {
+        try DecoderFactory.validateStandardAudioSource(path: invalid.path, sourceData: nil, sampleRate: 44_100)
+    }
+}
+
 @Test func singleTrackPreflightPreservesVariableTrackRoutes() throws {
     // SPC and SAP use decoder-discovered subtune counts, even in memory.
     try DecoderFactory.validateTrackIndex(1, path: "/virtual.spc", sourceData: Data([0]))
@@ -248,7 +265,8 @@ private let fixturePlan = PlaybackPlan(preFadeMilliseconds: 5_000, fadeMilliseco
     }
     // WAV does not support tempo; a requested 2x remains effectively 1x.
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
-    try Data([0]).write(to: url)
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    try FileManager.default.copyItem(at: root.appendingPathComponent("vendor/play/js/psfplayer_browser/public/silence.wav"), to: url)
     defer { try? FileManager.default.removeItem(at: url) }
     #expect(throws: (any Error).self) {
         try controller.prepareSource(payload: .init(path: url.path, tempo: 2, loop: loop))
