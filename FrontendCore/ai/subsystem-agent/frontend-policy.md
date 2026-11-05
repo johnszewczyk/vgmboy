@@ -45,7 +45,12 @@ startup contracts shared by the VGMMan player frontends.
   request and queued-token ownership checks.
   Bridge `reconfigureSync`, typed `setTempoSync`, async `setTempo`, and native
   timing-plan reconfiguration also prepare reloads outside the queue using the
-  same limit, then check request and session ownership before commit. Bridge settings revisions are checked
+  same limit, then check request and session ownership before commit. Async
+  tempo and timing-plan changes carry operation-specific cancellation through
+  slot waiting, source preparation and the guarded reload. A canceled pending
+  timing snapshot cannot be inherited by a later tempo change; cancellation
+  does not invalidate newer work. In-flight preparation is not forcibly stopped,
+  and cancellation after replacement begins may retire that replacement. Bridge settings revisions are checked
   during serialized admission. Invalid settings do not consume a revision or
   supersede valid preparation. No-op settings do not prepare a source. Direct
   controller operations retain their existing execution paths. Low-level

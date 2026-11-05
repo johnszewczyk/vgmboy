@@ -2405,6 +2405,101 @@ func overlappingLowLevelPreparationKeepsControlsResponsiveAndOrdersCommit(failNe
     #expect(timing.generation != tempo.generation)
 }
 
+@Test(arguments: [false, true])
+func canceledAsyncTempoDoesNotOverrideNewerTempo(startNewer: Bool) async throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let gate = FirstPreparationGate()
+    let transport = PlaybackTransportCoordinator(label: "test.cancel.async.tempo") { controller, start in
+        gate.waitIfFirst()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: source.path))).kind != .error)
+    let before = transport.statusSync()
+    let changing = Task.detached { try await transport.setTempo(.init(numerator: 2, denominator: 1)) }
+    #expect(waitForSignal(gate.entered, seconds: 5))
+    changing.cancel()
+    let expected = startNewer
+        ? try transport.setTempoSync(.init(tempo: .init(numerator: 3, denominator: 2)))
+        : before
+    gate.release.signal()
+    do { try await changing.value; Issue.record("Canceled tempo unexpectedly committed") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    let after = transport.statusSync()
+    #expect(after.generation == expected.generation && after.tempo == (startNewer ? 1.5 : 1))
+}
+
+@Test(arguments: [false, true])
+func canceledAsyncTimingIsNotInheritedByNewerTempo(startNewer: Bool) async throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let gate = FirstPreparationGate()
+    let transport = PlaybackTransportCoordinator(label: "test.cancel.async.timing") { controller, start in
+        gate.waitIfFirst()
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { gate.release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: source.path))).kind != .error)
+    let before = transport.statusSync()
+    let plan = PlaybackTimingPlan(preFadeSeconds: 20, fadeSeconds: 0, usesNativeEnding: false, isLongPlay: true)
+    let changing = Task.detached { try await transport.reconfigureCurrentTrack(plan: plan, tempo: .defaultValue) }
+    #expect(waitForSignal(gate.entered, seconds: 5))
+    changing.cancel()
+    let expected = startNewer ? try transport.setTempoSync(.init(tempo: .init(numerator: 2, denominator: 1))) : before
+    gate.release.signal()
+    do { try await changing.value; Issue.record("Canceled timing unexpectedly committed") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    #expect(transport.statusSync().generation == expected.generation)
+    let timing = try transport.reconfigureSync(.init(longPlayEnabled: true, manualPlayMilliseconds: 20_000,
+        fadeMilliseconds: 0, tempo: .init(numerator: startNewer ? 2 : 1, denominator: 1)))
+    #expect(timing.generation != expected.generation)
+}
+
+@Test func canceledAsyncTempoLeavesBusyPreparationQueuePromptly() async throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+    let started = DispatchSemaphore(value: 0), finished = DispatchSemaphore(value: 0)
+    let transport = PlaybackTransportCoordinator(label: "test.cancel.async.tempo.busy") { controller, start in
+        if start.track.id.hasPrefix("blocker") { entered.signal(); _ = release.wait(timeout: .now() + 20) }
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { release.signal(); release.signal(); _ = transport.perform(.init(command: .stop)) }
+    #expect(transport.perform(.init(command: .load, payload: .init(path: source.path))).kind != .error)
+    let before = transport.statusSync()
+    func request(_ id: String) -> PlaybackContinuationStart {
+        .init(track: .init(id: id, path: source.path), payload: .init(path: source.path),
+              requestID: transport.reservePlaybackRequest())
+    }
+    let firstRequest = request("blocker1")
+    let first = Task.detached { try transport.start(firstRequest) }
+    #expect(waitForSignal(entered, seconds: 5))
+    let secondRequest = request("blocker2")
+    let second = Task.detached { try transport.start(secondRequest) }
+    #expect(waitForSignal(entered, seconds: 5))
+    let changing = Task.detached {
+        started.signal(); defer { finished.signal() }
+        try await transport.setTempo(.init(numerator: 2, denominator: 1))
+    }
+    #expect(waitForSignal(started, seconds: 5))
+    #expect(!waitForSignal(entered, seconds: 1))
+    changing.cancel()
+    let canceledBeforeRelease = waitForSignal(finished, seconds: 5)
+    _ = transport.reservePlaybackRequest() // Retire the held fixture starts before releasing them.
+    release.signal(); release.signal()
+    do { try await changing.value; Issue.record("Canceled tempo unexpectedly committed") }
+    catch is CancellationError {} catch { Issue.record("Unexpected error: \(error)") }
+    _ = try? await first.value
+    _ = try? await second.value
+    #expect(canceledBeforeRelease)
+    let after = transport.statusSync()
+    #expect(after.generation == before.generation && after.tempo == before.tempo)
+}
+
 @Test func asyncTempoPreparationKeepsControlsResponsive() async throws {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent().deletingLastPathComponent()
