@@ -156,6 +156,55 @@ public final class PlaybackController: @unchecked Sendable {
         return prepared
     }
 
+    /// UAC XA exports retain their own materialization until rendering ends.
+    /// Restrict admission to raw CD-sector XA; other inputs use the normal route.
+    public func prepareIndependentXAAACExport(
+        _ request: AACExportRequest, cancellation: AACExportCancellation? = nil
+    ) throws -> PreparedIndependentXAAACExport? {
+        guard PlaybackTrackIndex.isRepresentable(request.trackIndex) else {
+            throw AACExportError.invalidRequest("AAC export track index is outside the supported range.")
+        }
+        if cancellation?.isCancelled == true { throw AACExportError.cancelled }
+        guard let entry = request.archiveEntry, !entry.isEmpty,
+              URL(fileURLWithPath: request.sourcePath).pathExtension.lowercased() == "uac",
+              URL(fileURLWithPath: entry).pathExtension.lowercased() == "xa" else { return nil }
+        guard let requirement = FormatRegistry.archiveMaterializationRequirement(for: [entry]) else {
+            throw PlaybackControlError.invalidPayload("VGMBoy does not admit archive member \(entry).")
+        }
+        let materializer = ArchiveMaterializer()
+        var transferred = false
+        defer { if !transferred { materializer.release() } }
+        // Limit eligibility by declared size; larger members retain the
+        // serialized route. This is not a disk quota for archive extraction.
+        let byteSize: UInt64?
+        do { byteSize = try materializer.uacMemberByteSize(archivePath: request.sourcePath, entry: entry) }
+        catch {
+            if cancellation?.isCancelled == true { throw AACExportError.cancelled }
+            throw error
+        }
+        if cancellation?.isCancelled == true { throw AACExportError.cancelled }
+        guard let byteSize, byteSize > 0, byteSize <= 256 * 1_024 * 1_024 else { return nil }
+        let source: MaterializedArchiveSource
+        do {
+            source = try materializer.materializeSource(archivePath: request.sourcePath, entry: entry,
+                                                        requirement: requirement)
+        } catch {
+            if cancellation?.isCancelled == true { throw AACExportError.cancelled }
+            throw error
+        }
+        if cancellation?.isCancelled == true { throw AACExportError.cancelled }
+        let handle = try FileHandle(forReadingFrom: source.url)
+        defer { try? handle.close() }
+        let signature = try handle.read(upToCount: 12) ?? Data()
+        guard signature == Data([0x00, 0xff, 0xff, 0xff, 0xff, 0xff,
+                                 0xff, 0xff, 0xff, 0xff, 0xff, 0x00]) else { return nil }
+        if cancellation?.isCancelled == true { throw AACExportError.cancelled }
+        let prepared = PreparedIndependentXAAACExport(request: Self.resolvedAACRequest(request, source: source),
+                                                      materializer: materializer)
+        transferred = true
+        return prepared
+    }
+
     private static func resolvedAACRequest(_ request: AACExportRequest,
                                            source: MaterializedArchiveSource) -> AACExportRequest {
         var resolved = request

@@ -116,6 +116,61 @@ func sotnXAExportRetainsNormalArchiveRoute() throws {
     #expect(FileManager.default.fileExists(atPath: result.outputURL.path))
 }
 
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VGMBOY_SOTN_XA_UAC"] != nil))
+func independentSotnXAExportOwnsMaterializationAndAuthoredLoop() throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBOY_SOTN_XA_UAC"])
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let controller = PlaybackController()
+    let request = AACExportRequest(sourcePath: path, archiveEntry: "audio/SD-XA_STR1/file00-channel00.xa",
+        outputDirectory: folder, filenameStem: "xa", playMilliseconds: 1_000, fadeMilliseconds: 0,
+        loop: .init(startSample: 0, endSample: 100, sampleRateHz: 44_100, repeatCount: 0))
+    let size = try ArchiveMaterializer().uacMemberByteSize(
+        archivePath: path, entry: "audio/SD-XA_STR1/file00-channel00.xa")
+    let declaredSize = try #require(size)
+    let reference = try controller.exportAAC(request)
+    let candidate = try controller.prepareIndependentXAAACExport(request)
+    let prepared = try #require(candidate)
+    let source = prepared.request.sourcePath
+    #expect(FileManager.default.fileExists(atPath: source))
+    let attributes = try FileManager.default.attributesOfItem(atPath: source)
+    #expect((attributes[.size] as? NSNumber)?.uint64Value == declaredSize)
+    #expect(prepared.request.loop?.startSample == 2_153_088)
+    #expect(prepared.request.loop?.endSample == 5_310_144)
+    #expect(prepared.request.loop?.sampleRateHz == 37_800)
+    #expect(prepared.request.loop?.repeatCount == nil)
+    #expect(!prepared.request.readEmbeddedLoopTags)
+    let output = try prepared.export(progress: { _ in
+        #expect(FileManager.default.fileExists(atPath: source))
+    })
+    #expect(try Data(contentsOf: output.outputURL) == Data(contentsOf: reference.outputURL))
+    #expect(!FileManager.default.fileExists(atPath: source))
+    #expect(throws: AACExportError.self) { try prepared.export() }
+
+    var abandoned: PreparedIndependentXAAACExport? = try controller.prepareIndependentXAAACExport(request)
+    let abandonedPath = try #require(abandoned?.request.sourcePath)
+    #expect(FileManager.default.fileExists(atPath: abandonedPath))
+    abandoned = nil
+    #expect(!FileManager.default.fileExists(atPath: abandonedPath))
+    let cancelledCandidate = try controller.prepareIndependentXAAACExport(request)
+    let cancelled = try #require(cancelledCandidate)
+    let cancelledPath = cancelled.request.sourcePath
+    let token = AACExportCancellation(); token.cancel()
+    #expect(throws: AACExportError.cancelled) { try cancelled.export(cancellation: token) }
+    #expect(!FileManager.default.fileExists(atPath: cancelledPath))
+    let runningCandidate = try controller.prepareIndependentXAAACExport(request)
+    let running = try #require(runningCandidate)
+    let runningPath = running.request.sourcePath
+    let duringRender = AACExportCancellation()
+    #expect(throws: AACExportError.cancelled) {
+        try running.export(cancellation: duringRender, progress: { _ in duringRender.cancel() })
+    }
+    #expect(!FileManager.default.fileExists(atPath: runningPath))
+    let leftovers = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+    #expect(!leftovers.contains { $0.hasSuffix(".partial.aac") })
+}
+
 // Exercise two native decoder instances on the same extracted member. Each
 // worker seeks independently so shared decoder or resampler state changes the
 // PCM compared with its sequential reference.

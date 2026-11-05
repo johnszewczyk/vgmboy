@@ -49,6 +49,28 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+UAC XA AAC responsiveness, 2026-11-05: the shared coordinator prepares raw
+CD-sector XA members of UACs off its transport queue and retains their own
+materialization for one export attempt. The UAC's declared member size must be
+nonzero and no more than 256 MiB; larger or unrecognized inputs retain the
+previous serialized path. Preparation shares the two-slot limit with playback,
+and the slot is released before rendering. This size check uses the UAC's
+declared size; it is not a general disk quota or a guarantee against a changing
+archive. Cancellation is checked around extraction and during render, but does
+not forcibly stop an extraction already running. A test using the SOTN XA UAC
+verified the authored loop overrides a conflicting request, AAC bytes match the
+previous exporter, and success, cancellation and unused preparations release
+their materializations. A held export allowed Pause of concurrent SOTN XA
+playback without changing its generation; cancellation while waiting for both
+occupied preparation slots was also checked. VGMBoyKit passed 121 discovered
+tests; the shared transport suite passed 133 discovered tests before the size
+preflight was added, and its SOTN responsiveness test passed again afterward.
+The SB2 release executable built, and its AAC speed renderer test passed; the
+build retains existing macOS 26/27 linker and WebKit delegate warnings. This does not
+establish audible continuity or packaged SB2 UI behavior for this new route.
+Next verify SB2's packaged bridge and real output, slow/canceled UAC extraction,
+and other export formats before expanding the independent route.
+
 XA decoder coexistence, 2026-11-05: a fixture-gated VGMBoyKit test extracts
 `audio/SD-XA_STR1/file00-channel00.xa` from the read-only SOTN UAC (SHA-256
 `b65b8ebbd8f75cad96d8be0c322261f7713b1badc3c0ac8b6ba205e14c7dd45a`).

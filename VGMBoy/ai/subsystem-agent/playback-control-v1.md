@@ -123,6 +123,11 @@ same typed endpoint operations.
   Playback and export use the same authored sample-loop boundary reader;
   export applies the PCM fade for decoders that do not fade internally. UAC
   member loop metadata remains authoritative for export as well as playback.
+  A prepared raw-sector XA UAC export with a declared member size at most
+  256 MiB owns an independent materialization
+  until its single rendering attempt ends, or until the unused preparation is
+  discarded. Cleanup also runs on errors and cancellation. Other XA inputs
+  continue through the ordinary export route.
   Offline export retries transient empty decoder reads with a bounded delay;
   persistent stalls and zero-frame outputs fail without publishing a partial
   AAC file. A genuine end after decoded audio can still finish before the cap.
