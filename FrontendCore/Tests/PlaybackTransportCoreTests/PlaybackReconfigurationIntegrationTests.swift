@@ -2984,6 +2984,191 @@ func sotnLoopSurvivesPausedSharedReconfiguration() async throws {
     #expect(FileManager.default.fileExists(atPath: output.path))
 }
 
+@Test(.enabled(if: FileManager.default.isExecutableFile(atPath: "/usr/bin/zip")
+    && ["/opt/homebrew/bin/7zz", "/usr/local/bin/7zz", "/usr/bin/7zz"]
+        .contains { FileManager.default.isExecutableFile(atPath: $0) }, "Requires zip and 7zz."))
+func archivedSPCAACExportKeepsPlaybackControlsResponsive() async throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let member = folder.appendingPathComponent("tone.spc")
+    try FileManager.default.copyItem(at: source, to: member)
+    let archive = folder.appendingPathComponent("spc.zip")
+    let zip = Process(); zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+    zip.currentDirectoryURL = folder; zip.arguments = ["-q", archive.path, member.lastPathComponent]
+    try zip.run(); zip.waitUntilExit(); #expect(zip.terminationStatus == 0)
+    let loop = PlaybackLoopMetadata(startSample: 11_025, endSample: 22_050, sampleRateHz: 44_100, repeatCount: 1)
+    let request = AACExportRequest(sourcePath: archive.path, archiveEntry: member.lastPathComponent,
+        outputDirectory: folder, filenameStem: "archive", playMilliseconds: 1_200, fadeMilliseconds: 0, loop: loop)
+    let reference = try PlaybackController().exportAAC(request)
+    let transport = PlaybackTransportCoordinator(label: "test.archive.spc.export.controls")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    _ = try transport.configureAudio(.init(outputVolume: 0, equalizerEnabled: false,
+        equalizerBandGains: Array(repeating: 0, count: 10), monoEnabled: false))
+    #expect(transport.perform(.init(command: .load, payload: .init(path: source.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let generation = transport.statusSync().generation
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0), controlled = DispatchSemaphore(value: 0)
+    defer { release.signal() }
+    let exporting = Task.detached {
+        try transport.exportAAC(request, progress: { progress in
+            if progress.renderedFrames == 0 { entered.signal(); _ = release.wait(timeout: .now() + 20) }
+        })
+    }
+    #expect(waitForSignal(entered, seconds: 5))
+    let pause = Task.detached {
+        defer { controlled.signal() }
+        return try transport.performSessionControlSync(.pause, expectedGeneration: generation)
+    }
+    let responsive = waitForSignal(controlled, seconds: 5)
+    release.signal()
+    let paused = try await pause.value
+    let output = try await exporting.value
+    #expect(responsive && paused.trackLoaded && !paused.isPlaying && paused.generation == generation)
+    #expect(try Data(contentsOf: output) == Data(contentsOf: reference.outputURL))
+}
+
+@Test(.enabled(if: FileManager.default.isExecutableFile(atPath: "/usr/bin/zip")
+    && ["/opt/homebrew/bin/7zz", "/usr/local/bin/7zz", "/usr/bin/7zz"]
+        .contains { FileManager.default.isExecutableFile(atPath: $0) }, "Requires zip and 7zz."))
+func archiveSPCExportReleasesPreparationSlotBeforeRendering() async throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let member = folder.appendingPathComponent("tone.spc")
+    try FileManager.default.copyItem(at: source, to: member)
+    let archive = folder.appendingPathComponent("spc.zip")
+    let zip = Process(); zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+    zip.currentDirectoryURL = folder; zip.arguments = ["-q", archive.path, member.lastPathComponent]
+    try zip.run(); zip.waitUntilExit(); #expect(zip.terminationStatus == 0)
+    let blockerEntered = DispatchSemaphore(value: 0), blockerRelease = DispatchSemaphore(value: 0)
+    let exportEntered = DispatchSemaphore(value: 0), exportRelease = DispatchSemaphore(value: 0), started = DispatchSemaphore(value: 0)
+    let transport = PlaybackTransportCoordinator(label: "test.archive.spc.export.slot.release") { controller, start in
+        if start.track.id == "blocker" { blockerEntered.signal(); _ = blockerRelease.wait(timeout: .now() + 20) }
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { blockerRelease.signal(); exportRelease.signal(); _ = transport.perform(.init(command: .stop)) }
+    _ = try transport.configureAudio(.init(outputVolume: 0, equalizerEnabled: false,
+        equalizerBandGains: Array(repeating: 0, count: 10), monoEnabled: false))
+    let request = AACExportRequest(sourcePath: archive.path, archiveEntry: member.lastPathComponent,
+        outputDirectory: folder, filenameStem: "archive", playMilliseconds: 1_000, fadeMilliseconds: 0)
+    let exporting = Task.detached {
+        try transport.exportAAC(request, progress: { progress in
+            if progress.renderedFrames == 0 { exportEntered.signal(); _ = exportRelease.wait(timeout: .now() + 20) }
+        })
+    }
+    #expect(waitForSignal(exportEntered, seconds: 5))
+    func startRequest(_ id: String) -> PlaybackContinuationStart {
+        .init(track: .init(id: id, path: source.path), payload: .init(path: source.path),
+              requestID: transport.reservePlaybackRequest())
+    }
+    let blockerRequest = startRequest("blocker")
+    let blocker = Task.detached { try transport.start(blockerRequest) }
+    #expect(waitForSignal(blockerEntered, seconds: 5))
+    let nextRequest = startRequest("next")
+    let next = Task.detached {
+        defer { started.signal() }
+        try transport.start(nextRequest)
+    }
+    let startedBeforeRelease = waitForSignal(started, seconds: 5)
+    blockerRelease.signal(); exportRelease.signal()
+    try await next.value
+    _ = try? await blocker.value
+    _ = try await exporting.value
+    #expect(startedBeforeRelease)
+    #expect(transport.statusSync().currentTrackID == "next")
+}
+
+@Test func canceledArchiveSPCExportLeavesBusyPreparationQueuePromptly() async throws {
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+    let started = DispatchSemaphore(value: 0), finished = DispatchSemaphore(value: 0)
+    let transport = PlaybackTransportCoordinator(label: "test.archive.export.busy.slots") { controller, start in
+        entered.signal(); _ = release.wait(timeout: .now() + 20)
+        return try controller.prepareSource(payload: start.payload, sourceData: start.track.sourceData)
+    }
+    defer { release.signal(); release.signal() }
+    func request(_ id: String) -> PlaybackContinuationStart {
+        .init(track: .init(id: id, path: "/missing.wav"), payload: .init(path: "/missing.wav"),
+              requestID: transport.reservePlaybackRequest())
+    }
+    let firstRequest = request("first")
+    let first = Task.detached { try transport.start(firstRequest) }
+    #expect(waitForSignal(entered, seconds: 5))
+    let secondRequest = request("second")
+    let second = Task.detached { try transport.start(secondRequest) }
+    #expect(waitForSignal(entered, seconds: 5))
+    let cancellation = AACExportCancellation()
+    let exportRequest = AACExportRequest(sourcePath: "/missing.zip", archiveEntry: "tone.spc",
+        outputDirectory: FileManager.default.temporaryDirectory, filenameStem: "invalid",
+        playMilliseconds: 1_000, fadeMilliseconds: 0)
+    let exporting = Task.detached {
+        started.signal(); defer { finished.signal() }
+        return try transport.exportAAC(exportRequest, cancellation: cancellation)
+    }
+    #expect(waitForSignal(started, seconds: 5))
+    #expect(!waitForSignal(finished, seconds: 1))
+    cancellation.cancel()
+    let canceledBeforeRelease = waitForSignal(finished, seconds: 5)
+    release.signal(); release.signal()
+    do { _ = try await exporting.value; Issue.record("Canceled export unexpectedly succeeded") }
+    catch let error as AACExportError { #expect(error == .cancelled) }
+    catch { Issue.record("Unexpected error: \(error)") }
+    _ = try? await first.value; _ = try? await second.value
+    #expect(canceledBeforeRelease)
+}
+
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VGMBOY_SLOW_7Z_SIGNAL"] != nil,
+               "Set a signaling, deliberately delayed VGMBOY_7Z_BINARY."))
+func canceledArchiveSPCExportKeepsControlsResponsiveDuringExtraction() async throws {
+    let signal = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["VGMBOY_SLOW_7Z_SIGNAL"]))
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let member = folder.appendingPathComponent("tone.spc")
+    try FileManager.default.copyItem(at: source, to: member)
+    let archive = folder.appendingPathComponent("spc.zip")
+    let zip = Process(); zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+    zip.currentDirectoryURL = folder; zip.arguments = ["-q", archive.path, member.lastPathComponent]
+    try zip.run(); zip.waitUntilExit(); #expect(zip.terminationStatus == 0)
+    let transport = PlaybackTransportCoordinator(label: "test.archive.spc.export.extraction")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    _ = try transport.configureAudio(.init(outputVolume: 0, equalizerEnabled: false,
+        equalizerBandGains: Array(repeating: 0, count: 10), monoEnabled: false))
+    #expect(transport.perform(.init(command: .load, payload: .init(path: source.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let generation = transport.statusSync().generation
+    let cancellation = AACExportCancellation()
+    let request = AACExportRequest(sourcePath: archive.path, archiveEntry: member.lastPathComponent,
+        outputDirectory: folder, filenameStem: "canceled", playMilliseconds: 1_000, fadeMilliseconds: 0)
+    let exporting = Task.detached { try transport.exportAAC(request, cancellation: cancellation) }
+    for _ in 0..<500 where !FileManager.default.fileExists(atPath: signal.path) {
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(FileManager.default.fileExists(atPath: signal.path))
+    let paused = DispatchSemaphore(value: 0)
+    let control = Task.detached {
+        defer { paused.signal() }
+        return try transport.performSessionControlSync(.pause, expectedGeneration: generation)
+    }
+    let responsive = waitForSignal(paused, seconds: 3)
+    cancellation.cancel()
+    let status = try await control.value
+    do { _ = try await exporting.value; Issue.record("Canceled export unexpectedly succeeded") }
+    catch let error as AACExportError { #expect(error == .cancelled) }
+    catch { Issue.record("Unexpected error: \(error)") }
+    #expect(responsive && status.trackLoaded && !status.isPlaying && status.generation == generation)
+    #expect(!FileManager.default.fileExists(atPath: folder.appendingPathComponent("canceled.aac").path))
+}
+
 @Test(arguments: [false, true])
 func queuedExportCanBeCancelledWhileSPCExportRuns(secondIsWAV: Bool) async throws {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()

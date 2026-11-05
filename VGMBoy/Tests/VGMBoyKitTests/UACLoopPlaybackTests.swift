@@ -100,6 +100,49 @@ private func verifyUACPlayback(path: String, expectedSeconds: Double) async thro
     #expect(abs(status.elapsedSeconds - expectedSeconds) < 0.02)
 }
 
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VGMBOY_SOTN_XA_UAC"] != nil))
+func sotnXAExportRetainsNormalArchiveRoute() throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBOY_SOTN_XA_UAC"])
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let controller = PlaybackController()
+    let request = AACExportRequest(sourcePath: path, archiveEntry: "audio/SD-XA_STR1/file00-channel00.xa",
+        outputDirectory: folder, filenameStem: "sotn-xa", playMilliseconds: 1_000, fadeMilliseconds: 0)
+    let independent = try controller.prepareIndependentSPCAACExport(request)
+    #expect(independent == nil)
+    let result = try controller.exportAAC(request)
+    #expect(result.renderedFrames == 44_100)
+    #expect(FileManager.default.fileExists(atPath: result.outputURL.path))
+}
+
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VGMBOY_SPC_UAC_FIXTURES"] != nil))
+func independentSPCUACExportPreservesAuthoritativeLoop() throws {
+    let root = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["VGMBOY_SPC_UAC_FIXTURES"]))
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let controller = PlaybackController()
+    for tempo in [1.0, 2.0] {
+        var outputs: [Data] = []
+        for name in ["loop", "none"] {
+            let override = PlaybackLoopMetadata(startSample: 0, endSample: 4_410, sampleRateHz: 44_100, repeatCount: 0)
+            let request = AACExportRequest(sourcePath: root.appendingPathComponent("\(name).uac").path,
+                archiveEntry: "tone.spc", outputDirectory: folder, filenameStem: "\(name)-\(tempo)",
+                playMilliseconds: 1_200, fadeMilliseconds: 0, tempo: tempo, loop: override)
+            let reference = try controller.exportAAC(request)
+            let candidate = try controller.prepareIndependentSPCAACExport(request)
+            let prepared = try #require(candidate)
+            let independent = try prepared.export()
+            let data = try Data(contentsOf: independent.outputURL)
+            let expected = try Data(contentsOf: reference.outputURL)
+            #expect(data == expected, Comment(rawValue: "\(name) at \(tempo)x"))
+            outputs.append(data)
+        }
+        #expect(outputs[0] != outputs[1], Comment(rawValue: "\(tempo)x"))
+    }
+}
+
 @Test(.enabled(if: ProcessInfo.processInfo.environment["VGMBOY_UAC_LOOP_FIXTURES"] != nil))
 func uacAACExportUsesLoopAndSharedFade() throws {
     let directory = try #require(ProcessInfo.processInfo.environment["VGMBOY_UAC_LOOP_FIXTURES"])

@@ -119,18 +119,57 @@ public final class PlaybackController: @unchecked Sendable {
             entry: archiveEntry,
             requirement: requirement
         )
-        var resolvedRequest = request
-        resolvedRequest.sourcePath = prepared.url.path
-        resolvedRequest.archiveEntry = nil
-        if prepared.isUAC {
-            resolvedRequest.readEmbeddedLoopTags = false
-            resolvedRequest.loop = prepared.authoredLoop.map { loop in
+        let resolvedRequest = Self.resolvedAACRequest(request, source: prepared)
+        return try AACExporter.export(resolvedRequest, cancellation: cancellation, progress: progress)
+    }
+
+    /// Prepare an independent SPC export, retaining authoritative archive loop
+    /// metadata in the snapshot. No playback session state is read or changed.
+    public func prepareIndependentSPCAACExport(
+        _ request: AACExportRequest, cancellation: AACExportCancellation? = nil
+    ) throws -> PreparedIndependentSPCAACExport? {
+        guard PlaybackTrackIndex.isRepresentable(request.trackIndex) else {
+            throw AACExportError.invalidRequest("AAC export track index is outside the supported range.")
+        }
+        if cancellation?.isCancelled == true { throw AACExportError.cancelled }
+        guard let entry = request.archiveEntry, !entry.isEmpty else {
+            return AACExporter.prepareIndependentSPCExport(request)
+        }
+        guard URL(fileURLWithPath: entry).pathExtension.caseInsensitiveCompare("spc") == .orderedSame else { return nil }
+        guard let requirement = FormatRegistry.archiveMaterializationRequirement(for: [entry]) else {
+            throw PlaybackControlError.invalidPayload("VGMBoy does not admit archive member \(entry).")
+        }
+        let materializer = ArchiveMaterializer()
+        defer { materializer.release() }
+        let source: MaterializedArchiveSource
+        do {
+            source = try materializer.materializeSource(archivePath: request.sourcePath, entry: entry,
+                                                        requirement: requirement)
+        } catch {
+            if cancellation?.isCancelled == true { throw AACExportError.cancelled }
+            throw error
+        }
+        if cancellation?.isCancelled == true { throw AACExportError.cancelled }
+        let resolved = Self.resolvedAACRequest(request, source: source)
+        let prepared = AACExporter.prepareIndependentSPCExport(resolved)
+        if cancellation?.isCancelled == true { throw AACExportError.cancelled }
+        return prepared
+    }
+
+    private static func resolvedAACRequest(_ request: AACExportRequest,
+                                           source: MaterializedArchiveSource) -> AACExportRequest {
+        var resolved = request
+        resolved.sourcePath = source.url.path
+        resolved.archiveEntry = nil
+        if source.isUAC {
+            resolved.readEmbeddedLoopTags = false
+            resolved.loop = source.authoredLoop.map { loop in
                 PlaybackLoopMetadata(startSample: loop.startSamples, endSample: loop.endSamples,
                                      sampleRateHz: loop.sampleRateHz, repeatCount: loop.repeatCount,
                                      source: loop.source ?? "uac-manifest")
             }
         }
-        return try AACExporter.export(resolvedRequest, cancellation: cancellation, progress: progress)
+        return resolved
     }
 
     @discardableResult

@@ -81,7 +81,11 @@ same typed endpoint operations.
 - `AACExporter.prepareIndependentSPCExport` accepts only direct, signature-verified
   SPC files and captures at most 8 MiB as an immutable snapshot. The prepared
   export renders through an independent libgme instance using the existing AAC
-  timing, tempo and loop path. Other sources use the normal export route.
+  timing, tempo and loop path. `PlaybackController.prepareIndependentSPCAACExport`
+  also materializes an archive-selected SPC before snapshotting and applies the
+  same UAC-authored loop precedence as normal export. Other sources use the normal
+  export route. Cancellation is checked before and after archive materialization;
+  it does not forcibly interrupt an extraction already in progress.
 - Playback and AAC export reject track indices outside 0 through 2,147,483,646
   before source preparation or decoder creation. The upper bound permits native
   bridges to convert zero-based indices to one-based signed 32-bit subsongs.

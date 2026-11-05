@@ -49,6 +49,38 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Archived SPC AAC responsiveness, 2026-11-05: the shared export path now
+materializes archive-selected SPC members outside the transport queue, captures
+the existing bounded snapshot, and applies the same authoritative UAC loop
+metadata as ordinary export. Archive extraction shares the existing two-slot
+preparation limit, releasing its slot before AAC rendering. A held ZIP export
+allowed Pause and produced bytes matching the previous exporter; a separate
+slot test verified playback preparation can proceed while rendering is held.
+A canceled export waiting for a slot exited before the occupied slots were
+released. With a signaling 7zz wrapper delaying real extraction, Pause remained
+responsive and cancellation produced no AAC file; both successful and failing
+extraction were checked. Cancellation does not forcibly interrupt the process.
+Generated UAC fixtures checked loop and absent-loop precedence against the old
+exporter at 1x and 2x. Recreate them with `python3 -B
+VGMBoy/scripts/generate-spc-uac-test-fixtures.py <new-directory>` and set
+`VGMBOY_SPC_UAC_FIXTURES` to that directory. The loop and no-loop fixtures had
+SHA-256 `2f4e6576212b8236f60e459545eed6423349ecc479d69d753e7a812bca4e46ce`
+and `1139f51003299dae50983440339b43f5126528a2d4469a8e492d5098e3c44045`.
+An isolated SB2 release from `db1bb3f4` plus the patch used an eight-second
+injected export delay: Pause completed while the generated loop UAC export was
+active, and the track remained paused on the same generation after completion.
+The 2x output had 347 AAC frames at 44.1 kHz and SHA-256
+`e7bb1686349da5394d489fdfee956146ef7053e5ca7f06097f65c6180b233be1`.
+The packaged check preceded the later shared preparation-slot limit; that limit
+was verified by the focused tests and final build. Catalog, favorites, history,
+tabs and cache were redirected; the normal tabs file's previous modification
+time was unchanged. The transport suite passed 132 discovered tests with five
+fixture skips; VGMBoyKit passed 118 with 19 skips, including the generated SPC
+UAC and read-only SOTN fixtures. A separate one-second AAC export of the
+read-only SOTN XA member passed on its existing fallback route. This does not
+prove audible continuity, real slow-storage latency, or responsiveness for
+SOTN's XA and other formats, which still use the prior serialized export route. Existing linker warnings remain.
+
 Standalone SPC AAC responsiveness, 2026-11-05: AAC export previously held
 the shared transport queue throughout rendering. Direct, signature-verified
 SPC files of at most 8 MiB are now captured as immutable snapshots and exported
