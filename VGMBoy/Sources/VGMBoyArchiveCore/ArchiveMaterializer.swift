@@ -92,6 +92,13 @@ public final class ArchiveMaterializer: @unchecked Sendable {
                               includePlaybackMetadata: true)
     }
 
+    /// Read the selected UAC member's declared size without extracting it.
+    public func uacMemberByteSize(archivePath: String, entry: String) throws -> UInt64? {
+        let normalized = try normalizedArchiveEntry(entry)
+        return try selectedUACMemberIfNeeded(URL(fileURLWithPath: archivePath).standardizedFileURL,
+                                             entryPath: normalized)?.byteSize
+    }
+
     private func materializeSource(
         archivePath: String,
         entry: String,

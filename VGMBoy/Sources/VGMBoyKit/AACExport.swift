@@ -1,5 +1,6 @@
 import AudioToolbox
 import Foundation
+import VGMBoyArchiveCore
 
 /// A finite, offline render request. The frontend supplies its already-known
 /// display name and timing policy; VGMBoy never looks up catalog metadata.
@@ -112,6 +113,32 @@ public struct PreparedIndependentSPCAACExport: Sendable {
         try AACExporter.export(request, cancellation: cancellation, progress: progress) { _, sampleRate in
             try GMEDecoder(data: data, sampleRate: sampleRate)
         }
+    }
+}
+
+/// A single-use export which owns its extracted XA source until rendering ends.
+public final class PreparedIndependentXAAACExport: @unchecked Sendable {
+    let request: AACExportRequest
+    private let materializer: ArchiveMaterializer
+    private let lock = NSLock()
+    private var consumed = false
+
+    init(request: AACExportRequest, materializer: ArchiveMaterializer) {
+        self.request = request
+        self.materializer = materializer
+    }
+
+    deinit { materializer.release() }
+
+    public func export(cancellation: AACExportCancellation? = nil,
+                       progress: (@Sendable (AACExportProgress) -> Void)? = nil) throws -> AACExportResult {
+        lock.lock()
+        let available = !consumed
+        consumed = true
+        lock.unlock()
+        guard available else { throw AACExportError.invalidRequest("Prepared XA export has already been consumed.") }
+        defer { materializer.release() }
+        return try AACExporter.export(request, cancellation: cancellation, progress: progress)
     }
 }
 

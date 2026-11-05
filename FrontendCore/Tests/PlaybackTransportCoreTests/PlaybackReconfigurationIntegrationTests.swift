@@ -2984,6 +2984,43 @@ func sotnLoopSurvivesPausedSharedReconfiguration() async throws {
     #expect(FileManager.default.fileExists(atPath: output.path))
 }
 
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VGMBOY_SOTN_XA_UAC"] != nil))
+func sotnXAAACExportKeepsPlaybackControlsResponsive() async throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBOY_SOTN_XA_UAC"])
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let request = AACExportRequest(sourcePath: path, archiveEntry: "audio/SD-XA_STR1/file00-channel00.xa",
+        outputDirectory: folder, filenameStem: "sotn", playMilliseconds: 1_000, fadeMilliseconds: 0)
+    let reference = try PlaybackController().exportAAC(request)
+    let transport = PlaybackTransportCoordinator(label: "test.uac.xa.export.controls")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    _ = try transport.configureAudio(.init(outputVolume: 0, equalizerEnabled: false,
+        equalizerBandGains: Array(repeating: 0, count: 10), monoEnabled: false))
+    #expect(transport.perform(.init(command: .load, payload: .init(path: path,
+        archiveEntry: "audio/SD-XA_STR1/file00-channel00.xa"))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let generation = transport.statusSync().generation
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0), controlled = DispatchSemaphore(value: 0)
+    defer { release.signal() }
+    let exporting = Task.detached {
+        try transport.exportAAC(request, progress: { progress in
+            if progress.renderedFrames == 0 { entered.signal(); _ = release.wait(timeout: .now() + 20) }
+        })
+    }
+    #expect(waitForSignal(entered, seconds: 10))
+    let pause = Task.detached {
+        defer { controlled.signal() }
+        return try transport.performSessionControlSync(.pause, expectedGeneration: generation)
+    }
+    let responsive = waitForSignal(controlled, seconds: 5)
+    release.signal()
+    let paused = try await pause.value
+    let output = try await exporting.value
+    #expect(responsive && paused.trackLoaded && !paused.isPlaying && paused.generation == generation)
+    #expect(try Data(contentsOf: output) == Data(contentsOf: reference.outputURL))
+}
+
 @Test(.enabled(if: FileManager.default.isExecutableFile(atPath: "/usr/bin/zip")
     && ["/opt/homebrew/bin/7zz", "/usr/local/bin/7zz", "/usr/bin/7zz"]
         .contains { FileManager.default.isExecutableFile(atPath: $0) }, "Requires zip and 7zz."))
@@ -3085,7 +3122,8 @@ func archiveSPCExportReleasesPreparationSlotBeforeRendering() async throws {
     #expect(transport.statusSync().currentTrackID == "next")
 }
 
-@Test func canceledArchiveSPCExportLeavesBusyPreparationQueuePromptly() async throws {
+@Test(arguments: [false, true])
+func canceledArchiveExportLeavesBusyPreparationQueuePromptly(isXA: Bool) async throws {
     let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
     let started = DispatchSemaphore(value: 0), finished = DispatchSemaphore(value: 0)
     let transport = PlaybackTransportCoordinator(label: "test.archive.export.busy.slots") { controller, start in
@@ -3104,7 +3142,8 @@ func archiveSPCExportReleasesPreparationSlotBeforeRendering() async throws {
     let second = Task.detached { try transport.start(secondRequest) }
     #expect(waitForSignal(entered, seconds: 5))
     let cancellation = AACExportCancellation()
-    let exportRequest = AACExportRequest(sourcePath: "/missing.zip", archiveEntry: "tone.spc",
+    let exportRequest = AACExportRequest(sourcePath: isXA ? "/missing.uac" : "/missing.zip",
+        archiveEntry: isXA ? "tone.xa" : "tone.spc",
         outputDirectory: FileManager.default.temporaryDirectory, filenameStem: "invalid",
         playMilliseconds: 1_000, fadeMilliseconds: 0)
     let exporting = Task.detached {
