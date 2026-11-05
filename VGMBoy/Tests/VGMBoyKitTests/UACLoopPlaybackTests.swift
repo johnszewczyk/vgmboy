@@ -116,6 +116,56 @@ func sotnXAExportRetainsNormalArchiveRoute() throws {
     #expect(FileManager.default.fileExists(atPath: result.outputURL.path))
 }
 
+// Exercise two native decoder instances on the same extracted member. Each
+// worker seeks independently so shared decoder or resampler state changes the
+// PCM compared with its sequential reference.
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VGMBOY_SOTN_XA_UAC"] != nil))
+func sotnXADecodersProduceIndependentConcurrentPCM() async throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBOY_SOTN_XA_UAC"])
+    let entry = "audio/SD-XA_STR1/file00-channel00.xa"
+    let requirement = try #require(FormatRegistry.archiveMaterializationRequirement(for: [entry]))
+    let materializer = ArchiveMaterializer()
+    defer { materializer.release() }
+    let source = try materializer.materializeSource(archivePath: path, entry: entry, requirement: requirement)
+
+    @Sendable func render(_ seekMs: Int, ready: DispatchSemaphore? = nil,
+                          peer: DispatchSemaphore? = nil) throws -> [Float] {
+        let decoder = try VgmstreamDecoder(path: source.url.path)
+        try decoder.startTrack(0)
+        var samples: [Float] = []
+        for chunk in 0..<96 {
+            if chunk == 32 {
+                ready?.signal()
+                if let peer, peer.wait(timeout: .now() + 15) != .success {
+                    throw VgmstreamDecoderError.renderFailed("XA decoder peer did not reach the coexistence barrier.")
+                }
+                decoder.seek(milliseconds: seekMs)
+            }
+            if chunk == 64 { decoder.seek(milliseconds: seekMs + 2_000) }
+            let pcm = try decoder.readFrames(4_096)
+            guard pcm.left.count == 4_096, pcm.right.count == 4_096 else {
+                throw VgmstreamDecoderError.renderFailed("Unexpected short XA read in coexistence test.")
+            }
+            samples.append(contentsOf: pcm.left)
+            samples.append(contentsOf: pcm.right)
+        }
+        return samples
+    }
+
+    let referenceA = try render(60_000)
+    let referenceB = try render(120_000)
+    #expect(referenceA.contains { $0 != 0 })
+    #expect(referenceB.contains { $0 != 0 })
+    let readyA = DispatchSemaphore(value: 0)
+    let readyB = DispatchSemaphore(value: 0)
+    let first = Task.detached { try render(60_000, ready: readyA, peer: readyB) }
+    let second = Task.detached { try render(120_000, ready: readyB, peer: readyA) }
+    let actualA = try await first.value
+    let actualB = try await second.value
+    #expect(actualA.elementsEqual(referenceA))
+    #expect(actualB.elementsEqual(referenceB))
+}
+
 @Test(.enabled(if: ProcessInfo.processInfo.environment["VGMBOY_SPC_UAC_FIXTURES"] != nil))
 func independentSPCUACExportPreservesAuthoritativeLoop() throws {
     let root = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["VGMBOY_SPC_UAC_FIXTURES"]))

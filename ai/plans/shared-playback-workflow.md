@@ -49,6 +49,23 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+XA decoder coexistence, 2026-11-05: a fixture-gated VGMBoyKit test extracts
+`audio/SD-XA_STR1/file00-channel00.xa` from the read-only SOTN UAC (SHA-256
+`b65b8ebbd8f75cad96d8be0c322261f7713b1badc3c0ac8b6ba205e14c7dd45a`).
+Two simultaneously live vgmstream instances independently decode and seek at
+60 and 120 seconds; a barrier confirms both have decoded before either
+continues. Their non-silent PCM matches each instance's sequential reference.
+The bridge holds decoder, streamfile and resampler state per player. Upstream
+also exposes process-global logging; the bridge does not configure it, and the
+current native build has `VGM_LOG_OUTPUT` but not `VGM_DEBUG_OUTPUT`. This
+single-fixture test is not a general thread-safety guarantee. The VGMBoyKit
+suite passed 120 discovered tests with 20 fixture skips, with the SOTN loop,
+existing serialized AAC export and coexistence tests enabled. No production
+export route changed in this pass. Before moving XA export off the transport
+queue, establish an owned materialization lease through render and cleanup,
+preserve UAC loop precedence, cover cancellation and bounded extraction, then
+verify SB2 responsiveness and live output with the actual packaged path.
+
 Archived SPC AAC responsiveness, 2026-11-05: the shared export path now
 materializes archive-selected SPC members outside the transport queue, captures
 the existing bounded snapshot, and applies the same authoritative UAC loop
