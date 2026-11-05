@@ -49,6 +49,24 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Original-path SB2 reproduction, 2026-11-05: an isolated SB2 release from
+`7f171887`, with separate identity and redirected catalog, favorites, history,
+tabs and archive cache, requested the original SOTN UAC through the SB2
+renderer. Playback did not start within the test's 45-second limit. A process
+sample showed its preparation worker waiting in `getxattr` beneath
+`UACContainerReader.read`'s Foundation file-attributes call. In a second
+test-only build, that one attributes call was replaced with POSIX `stat`;
+the preparation worker then waited in `open` while constructing the file
+handle, and this second attempt also exceeded the 45-second limit. This shows
+that an attributes-only change cannot resolve the observed
+access wait. The source remains unmodified, and the production implementation
+was not changed. The cause, installed-app behavior, and appropriate remedy
+remain unverified; do not infer a permissions diagnosis from these samples.
+The isolated renderer did not reach the export or Pause control, so the earlier
+byte-identical temporary-copy bridge check remains the successful packaged XA
+evidence. Follow up on original-path access and ordinary controls, and verify
+audible output before closing the SB2 gate.
+
 Original-path and preparation-delay follow-up, 2026-11-05: a separate,
 ad-hoc-signed AppKit probe read the original SOTN file without modification.
 In one run, POSIX `stat` returned immediately, while concurrent `open`/`fstat`,
