@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "lastReviewed": "2026-09-17",
+  "lastReviewed": "2026-11-05",
   "reviewIntervalDays": 90,
   "policy": "Review upstream milestones quarterly and before a release. Do not adopt a decoder update without the format regression corpus and representative playback checks.",
   "plugins": [
@@ -13,6 +13,17 @@
       "upstream": "https://github.com/libgme/game-music-emu",
       "milestoneCheck": "release-or-tag",
       "formats": ["AY", "GBS", "HES", "KSS", "NSF", "NSFE", "SPC"]
+    },
+    {
+      "id": "sameboy-uacngb",
+      "name": "SameBoy UACNGB native Game Boy runtime",
+      "kind": "snapshot",
+      "current": "v1.0.3",
+      "sourceIdentity": "official SameBoy v1.0.3 release commit 208ba4afabffab9edde416f2dbb8ae459e34adb8; host built separately in the Game Rips pilot",
+      "upstream": "https://github.com/LIJI32/SameBoy",
+      "milestoneCheck": "release-or-tag",
+      "license": "Expat",
+      "formats": ["UACNGB v1 (.ngbd)"]
     },
     {
       "id": "asap",

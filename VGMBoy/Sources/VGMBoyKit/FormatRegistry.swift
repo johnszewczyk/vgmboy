@@ -67,6 +67,13 @@ public enum FormatRegistry {
         supportsTempo: true
     )
 
+    public static let uacngbFamily = DecoderFamily(
+        id: "uacngb",
+        supportsLongPlay: true,
+        supportsTempo: false,
+        hasNaturalEnding: false
+    )
+
     public static let asapFamily = DecoderFamily(
         id: "asap",
         supportsLongPlay: true,
@@ -177,6 +184,9 @@ public enum FormatRegistry {
         "ay", "gbs", "hes", "kss", "nsf", "nsfe", "spc"
     ]
 
+    /// UAC-native ROM-derived Game Boy driver and sequence members.
+    public static let uacngbExtensions: Set<String> = ["ngbd"]
+
     public static let asapExtensions: Set<String> = ["sap"]
 
     public static let libvgmExtensions: Set<String> = [
@@ -236,6 +246,7 @@ public enum FormatRegistry {
     /// exposed by the playback controls.
     public static let playbackDescriptors: [PlaybackFormatDescriptor] = [
         PlaybackFormatDescriptor(id: "libgme", family: libgmeFamily, extensions: libgmeExtensions),
+        PlaybackFormatDescriptor(id: "uacngb", family: uacngbFamily, extensions: uacngbExtensions),
         PlaybackFormatDescriptor(id: "asap", family: asapFamily, extensions: asapExtensions),
         PlaybackFormatDescriptor(id: "libvgm", family: libvgmFamily, extensions: libvgmExtensions),
         PlaybackFormatDescriptor(id: "psgplay", family: psgPlayFamily, extensions: psgPlayExtensions),
@@ -274,6 +285,9 @@ public enum FormatRegistry {
         let ext = normalizedExtension(for: path)
         if libgmeExtensions.contains(ext) {
             return libgmeFamily
+        }
+        if uacngbExtensions.contains(ext) {
+            return uacngbFamily
         }
         if asapExtensions.contains(ext) {
             return asapFamily
