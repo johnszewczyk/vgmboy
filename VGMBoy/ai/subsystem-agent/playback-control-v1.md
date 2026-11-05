@@ -78,6 +78,10 @@ same typed endpoint operations.
   An unsupported or already-effective direct tempo command leaves buffered PCM intact.
 - `PlaybackTimingPlan.totalSeconds` saturates on integer addition overflow;
   transport conversion independently rejects durations outside its native range.
+- `AACExporter.prepareIndependentSPCExport` accepts only direct, signature-verified
+  SPC files and captures at most 8 MiB as an immutable snapshot. The prepared
+  export renders through an independent libgme instance using the existing AAC
+  timing, tempo and loop path. Other sources use the normal export route.
 - Playback and AAC export reject track indices outside 0 through 2,147,483,646
   before source preparation or decoder creation. The upper bound permits native
   bridges to convert zero-based indices to one-based signed 32-bit subsongs.

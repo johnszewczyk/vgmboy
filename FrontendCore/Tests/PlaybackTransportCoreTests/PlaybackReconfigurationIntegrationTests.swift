@@ -2947,6 +2947,88 @@ func sotnLoopSurvivesPausedSharedReconfiguration() async throws {
     _ = transport.perform(.init(command: .stop))
 }
 
+@Test func directSPCAACExportDoesNotBlockPlaybackControls() async throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let transport = PlaybackTransportCoordinator(label: "test.spc.export.controls")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    _ = try transport.configureAudio(.init(outputVolume: 0, equalizerEnabled: false,
+        equalizerBandGains: Array(repeating: 0, count: 10), monoEnabled: false))
+    #expect(transport.perform(.init(command: .load, payload: .init(path: source.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let generation = transport.statusSync().generation
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0), controlled = DispatchSemaphore(value: 0)
+    defer { release.signal() }
+    let request = AACExportRequest(sourcePath: source.path, outputDirectory: folder,
+        filenameStem: "export", playMilliseconds: 2_000, fadeMilliseconds: 0, tempo: 2)
+    let exporting = Task.detached {
+        try transport.exportAAC(request, progress: { progress in
+            if progress.renderedFrames == 0 { entered.signal(); _ = release.wait(timeout: .now() + 20) }
+        })
+    }
+    #expect(waitForSignal(entered, seconds: 5))
+    let pause = Task.detached {
+        defer { controlled.signal() }
+        return try transport.performSessionControlSync(.pause, expectedGeneration: generation)
+    }
+    let responsive = waitForSignal(controlled, seconds: 5)
+    release.signal()
+    let paused = try await pause.value
+    let output = try await exporting.value
+    #expect(responsive)
+    #expect(paused.generation == generation && !paused.isPlaying && paused.trackLoaded)
+    #expect(FileManager.default.fileExists(atPath: output.path))
+}
+
+@Test(arguments: [false, true])
+func queuedExportCanBeCancelledWhileSPCExportRuns(secondIsWAV: Bool) async throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let transport = PlaybackTransportCoordinator(label: "test.spc.export.cancel.waiter")
+    let entered = DispatchSemaphore(value: 0), release = DispatchSemaphore(value: 0)
+    let started = DispatchSemaphore(value: 0), finished = DispatchSemaphore(value: 0)
+    defer { release.signal() }
+    let firstRequest = AACExportRequest(sourcePath: source.path, outputDirectory: folder,
+        filenameStem: "first", playMilliseconds: 1_000, fadeMilliseconds: 0)
+    let first = Task.detached {
+        try transport.exportAAC(firstRequest, progress: { progress in
+            if progress.renderedFrames == 0 { entered.signal(); _ = release.wait(timeout: .now() + 20) }
+        })
+    }
+    #expect(waitForSignal(entered, seconds: 5))
+    let cancellation = AACExportCancellation()
+    var secondRequest = firstRequest
+    secondRequest.filenameStem = "second"
+    if secondIsWAV {
+        let wav = folder.appendingPathComponent("second-source.wav")
+        try silentWAV(seconds: 1).write(to: wav)
+        secondRequest.sourcePath = wav.path
+    }
+    let second = Task.detached { [secondRequest] in
+        started.signal(); defer { finished.signal() }
+        return try transport.exportAAC(secondRequest, cancellation: cancellation)
+    }
+    #expect(waitForSignal(started, seconds: 5))
+    #expect(!waitForSignal(finished, seconds: 1))
+    cancellation.cancel()
+    let canceledBeforeRelease = waitForSignal(finished, seconds: 5)
+    release.signal()
+    do { _ = try await second.value; Issue.record("Canceled export unexpectedly succeeded") }
+    catch let error as AACExportError { #expect(error == .cancelled) }
+    catch { Issue.record("Unexpected error: \(error)") }
+    _ = try await first.value
+    #expect(canceledBeforeRelease)
+    #expect(!FileManager.default.fileExists(atPath: folder.appendingPathComponent("second.aac").path))
+}
+
 @Test func invalidSingleTrackIndexPreservesPlayingSession() throws {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
     defer { try? FileManager.default.removeItem(at: url) }

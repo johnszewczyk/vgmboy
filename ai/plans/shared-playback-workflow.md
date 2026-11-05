@@ -49,6 +49,29 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Standalone SPC AAC responsiveness, 2026-11-05: AAC export previously held
+the shared transport queue throughout rendering. Direct, signature-verified
+SPC files of at most 8 MiB are now captured as immutable snapshots and exported
+through an independent libgme decoder outside that queue. A per-coordinator
+cancellation-aware export slot serializes all formats to prevent output-name
+races. Archives, oversized SPC and other formats retain the existing serialized
+render path; decoder isolation for those remains open. A gated test verified
+Pause during a held export and cancellation of waiting SPC and WAV exports;
+restoring the old route reproduced the blocked Pause. A snapshot regression
+matched the normal 2x AAC bytes even after the original source was changed.
+An isolated release SB2 built from `9f8ba211` plus the patch used a test-only
+eight-second export delay: Pause completed while export was still active,
+and the same generation remained paused when export finished. The SPC fixture
+SHA-256 was `c2e3fbc4ecee60a2f9102acd374387438ac3a9ba5bfaca2f02a12fc6315bee85`;
+the 2x output had 907 AAC frames at 44.1 kHz and SHA-256
+`abb33c30b403808d57ae8c2fe9c5cb8dd10e24ef85a4ff1522f2137b79f2d41b`.
+The disposable app redirected catalog, favorites, history, tabs and cache; the
+normal playlist-tab file's previously recorded modification time was unchanged.
+The shared transport suite passed 128 discovered tests with four fixture skips,
+and VGMBoyKit passed 117 discovered tests with 19 skips, both with SOTN enabled.
+Five SB2 AAC-speed and timing renderer checks also passed. This instrumented packaged check does not establish audible continuity, real
+slow-storage performance, or responsiveness for other export formats.
+
 Async reconfiguration task cancellation, 2026-11-04: shared async tempo
 and timing-plan changes now carry their own cancellation state through source
 preparation and guarded commit. A canceled pending timing snapshot is excluded
