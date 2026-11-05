@@ -335,7 +335,7 @@ public struct PlaybackNaturalEndGate: Sendable {
 /// presentation stay outside this boundary; shared queue policy is consulted
 /// only for generation-checked completion retirement.
 public final class PlaybackTransportCoordinator: @unchecked Sendable {
-    private final class StartCancellation: @unchecked Sendable {
+    private final class OperationCancellation: @unchecked Sendable {
         private let lock = NSLock()
         private var cancelled = false
         func cancel() { lock.lock(); cancelled = true; lock.unlock() }
@@ -352,6 +352,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         let source: PlaybackController.ReconfigurationSource
         let playbackPlan: PlaybackTimingPlan?
         let candidateID: UInt64?
+        let isCancelled: @Sendable () -> Bool
     }
     private enum ReconfigurationPreparation {
         case completed(PlaybackTransportStatus)
@@ -501,20 +502,25 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     }
 
     public func reconfigureCurrentTrack(plan: PlaybackTimingPlan, tempo: PlaybackTempo) async throws {
-        try await Task.detached(priority: .userInitiated) {
-            _ = try self.reconfigure(expectedGeneration: nil, settingsRevision: nil, playbackPlan: plan) { track in
-                let timing = try PlaybackTimingRequest.standard(
-                    path: track.archiveEntry ?? track.path,
-                    longPlayEnabled: plan.isLongPlay,
-                    manualPlayMilliseconds: try self.timingMilliseconds(plan.preFadeSeconds),
-                    fadeMilliseconds: try self.timingMilliseconds(plan.fadeSeconds),
-                    unknownDurationMilliseconds: try self.timingMilliseconds(plan.unknownDurationSeconds)
-                )
-                return .init(tempo: tempo.multiplier, playbackMode: timing.playbackMode,
-                             playMilliseconds: timing.playMilliseconds, fadeMilliseconds: timing.fadeMilliseconds,
-                             unknownDurationMilliseconds: timing.unknownDurationMilliseconds)
-            }
-        }.value
+        let cancellation = OperationCancellation()
+        try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            try await Task.detached(priority: .userInitiated) {
+                _ = try self.reconfigure(expectedGeneration: nil, settingsRevision: nil, playbackPlan: plan,
+                                         isCancelled: { cancellation.isCancelled }) { track in
+                    let timing = try PlaybackTimingRequest.standard(
+                        path: track.archiveEntry ?? track.path,
+                        longPlayEnabled: plan.isLongPlay,
+                        manualPlayMilliseconds: try self.timingMilliseconds(plan.preFadeSeconds),
+                        fadeMilliseconds: try self.timingMilliseconds(plan.fadeSeconds),
+                        unknownDurationMilliseconds: try self.timingMilliseconds(plan.unknownDurationSeconds)
+                    )
+                    return .init(tempo: tempo.multiplier, playbackMode: timing.playbackMode,
+                                 playMilliseconds: timing.playMilliseconds, fadeMilliseconds: timing.fadeMilliseconds,
+                                 unknownDurationMilliseconds: timing.unknownDurationMilliseconds)
+                }
+            }.value
+        } onCancel: { cancellation.cancel() }
     }
 
     /// Applies a complete bridge settings snapshot with a serialized commit.
@@ -538,10 +544,13 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
                              ignoreUnsupportedTempo: Bool = false, preservePendingTiming: Bool = false,
                              lowLevelRequest: PlaybackControlRequest? = nil,
                              captureEvent: ((PlaybackControlEvent) -> Void)? = nil,
+                             isCancelled: @escaping @Sendable () -> Bool = { false },
                              payloadForTrack: (PlaybackTransportTrack) throws -> PlaybackControlPayload) throws -> PlaybackTransportStatus {
         var requiredGeneration = expectedGeneration
         while true {
+            guard !isCancelled() else { throw CancellationError() }
             let preparation: ReconfigurationPreparation = try queue.sync {
+                guard !isCancelled() else { throw CancellationError() }
                 if let expected = requiredGeneration {
                     guard let start = currentTrackStartGeneration, let current = currentPlaybackGeneration,
                           expected >= start, expected <= current else { throw CancellationError() }
@@ -584,7 +593,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
                 }
                 let canSpeculate = lowLevelRequest != nil && pendingReconfiguration.map {
                     $0.epoch == reconfigurationEpoch && $0.requestID == requestID &&
-                    $0.generation == generation && $0.trackStartGeneration == trackStart
+                    $0.generation == generation && $0.trackStartGeneration == trackStart && !$0.isCancelled()
                 } == true
                 if canSpeculate, let lowLevelRequest {
                     requestLock.unlock()
@@ -607,11 +616,12 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
                     requestLock.unlock()
                     return .prepare(ReconfigurationWork(epoch: candidate.epoch, generation: generation,
                         trackStartGeneration: trackStart, requestID: requestID, track: track,
-                        settings: payload, source: source, playbackPlan: nil, candidateID: candidate.id))
+                        settings: payload, source: source, playbackPlan: nil, candidateID: candidate.id,
+                        isCancelled: isCancelled))
                 }
                 if preservePendingTiming, let pending = pendingReconfiguration,
                    pending.generation == generation, pending.trackStartGeneration == trackStart,
-                   pending.epoch == reconfigurationEpoch, pending.requestID == requestID {
+                   pending.epoch == reconfigurationEpoch, pending.requestID == requestID, !pending.isCancelled() {
                     let tempo = payload.tempo
                     payload = pending.settings
                     payload.tempo = tempo
@@ -622,7 +632,9 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
                 reconfigurationCandidate = nil
                 requestLock.unlock()
                 pendingReconfiguration = nil
+                guard !isCancelled() else { throw CancellationError() }
                 guard try controller.reconfigurationRequiresReload(payload) else {
+                    guard !isCancelled() else { throw CancellationError() }
                     let result = try reconfigureLocked(payload: payload)
                     if let lowLevelRequest {
                         captureEvent?(.init(requestID: lowLevelRequest.requestID, kind: .response, status: controller.status()))
@@ -633,13 +645,14 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
                 let source = try controller.reconfigurationSource(for: payload)
                 let work = ReconfigurationWork(epoch: epoch, generation: generation,
                     trackStartGeneration: trackStart, requestID: requestID, track: track,
-                    settings: payload, source: source, playbackPlan: acceptedPlan, candidateID: nil)
+                    settings: payload, source: source, playbackPlan: acceptedPlan, candidateID: nil,
+                    isCancelled: isCancelled)
                 pendingReconfiguration = work
                 return .prepare(work)
             }
             if case .waitForCandidate(let id, let requestID, let generation) = preparation {
-                while isCandidatePending(id) { Thread.sleep(forTimeInterval: 0.05) }
-                guard isLatest(requestID) else { throw CancellationError() }
+                while isCandidatePending(id) && !isCancelled() { Thread.sleep(forTimeInterval: 0.05) }
+                guard !isCancelled(), isLatest(requestID) else { throw CancellationError() }
                 requiredGeneration = requiredGeneration ?? generation
                 continue
             }
@@ -685,6 +698,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
                         } else if let candidateID = work.candidateID {
                             self.clearCandidate(candidateID)
                         }
+                        if work.isCancelled() { throw CancellationError() }
                         try self.requireSuccess(event)
                     }
                     if let candidateID = work.candidateID {
@@ -722,7 +736,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
 
     private func isCurrentReconfiguration(_ work: ReconfigurationWork) -> Bool {
         requestLock.lock(); defer { requestLock.unlock() }
-        return reconfigurationEpoch == work.epoch && latestPlaybackRequest == work.requestID &&
+        return !work.isCancelled() && reconfigurationEpoch == work.epoch && latestPlaybackRequest == work.requestID &&
             (work.candidateID.map { reconfigurationCandidate?.id == $0 } ?? true)
     }
 
@@ -784,12 +798,17 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     }
 
     public func setTempo(_ tempo: PlaybackTempo) async throws {
-        try await Task.detached(priority: .userInitiated) {
-            _ = try self.reconfigure(expectedGeneration: nil, settingsRevision: nil,
-                                     ignoreUnsupportedTempo: true, preservePendingTiming: true) { _ in
-                try self.controller.tempoReconfigurationSettings(tempo.multiplier)
-            }
-        }.value
+        let cancellation = OperationCancellation()
+        try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            try await Task.detached(priority: .userInitiated) {
+                _ = try self.reconfigure(expectedGeneration: nil, settingsRevision: nil,
+                                         ignoreUnsupportedTempo: true, preservePendingTiming: true,
+                                         isCancelled: { cancellation.isCancelled }) { _ in
+                    try self.controller.tempoReconfigurationSettings(tempo.multiplier)
+                }
+            }.value
+        } onCancel: { cancellation.cancel() }
     }
 
     public func setPlaying(_ shouldPlay: Bool) async -> Bool {
@@ -947,7 +966,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     }
 
     private func startContinuation(_ start: PlaybackContinuationStart, playbackPlan: PlaybackTimingPlan?) async throws {
-        let cancellation = StartCancellation()
+        let cancellation = OperationCancellation()
         try await withTaskCancellationHandler {
             try Task.checkCancellation()
             try await run {

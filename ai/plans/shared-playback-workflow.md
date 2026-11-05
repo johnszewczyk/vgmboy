@@ -49,6 +49,19 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Async reconfiguration task cancellation, 2026-11-04: shared async tempo
+and timing-plan changes now carry their own cancellation state through source
+preparation and guarded commit. A canceled pending timing snapshot is excluded
+from a later tempo request. Focused gated tests cover cancellation with and
+without newer work, inherited-timing protection, and prompt exit from a busy
+preparation-slot queue. Restoring the prior implementation reproduced the
+canceled-commit and inherited-timing failures. In-flight source preparation is
+not forcibly interrupted; cancellation after native replacement starts can
+retire that replacement. The shared transport suite passed 126 discovered
+tests with four fixture skips and SOTN enabled; SB2 built with existing linker
+warnings. SB2 uses synchronous bridge reconfiguration, so these are async
+shared-API checks, not packaged SB2 cancellation or audible evidence.
+
 Async start task cancellation, 2026-11-04: shared `startContinuation` and
 `play` now carry a start-specific cancellation token through preparation and
 commit. Canceling a Swift task prevents its pending start from taking over,
