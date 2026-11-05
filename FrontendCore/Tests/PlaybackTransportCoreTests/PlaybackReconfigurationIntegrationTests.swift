@@ -3021,6 +3021,48 @@ func sotnXAAACExportKeepsPlaybackControlsResponsive() async throws {
     #expect(try Data(contentsOf: output) == Data(contentsOf: reference.outputURL))
 }
 
+@Test(.enabled(if: ProcessInfo.processInfo.environment["VGMBOY_SLOW_UAC_SIGNAL"] != nil
+    && ProcessInfo.processInfo.environment["VGMBOY_SOTN_XA_UAC"] != nil,
+    "Requires the SOTN UAC and a signaling, delayed UAC frame decoder."))
+func canceledSotnXAExportKeepsPlaybackResponsiveDuringExtraction() async throws {
+    let path = try #require(ProcessInfo.processInfo.environment["VGMBOY_SOTN_XA_UAC"])
+    let signal = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["VGMBOY_SLOW_UAC_SIGNAL"]))
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let transport = PlaybackTransportCoordinator(label: "test.uac.xa.export.extraction")
+    defer { _ = transport.perform(.init(command: .stop)) }
+    _ = try transport.configureAudio(.init(outputVolume: 0, equalizerEnabled: false,
+        equalizerBandGains: Array(repeating: 0, count: 10), monoEnabled: false))
+    #expect(transport.perform(.init(command: .load, payload: .init(path: source.path))).kind != .error)
+    #expect(transport.perform(.init(command: .play)).kind != .error)
+    let generation = transport.statusSync().generation
+    let cancellation = AACExportCancellation()
+    let request = AACExportRequest(sourcePath: path, archiveEntry: "audio/SD-XA_STR1/file00-channel00.xa",
+        outputDirectory: folder, filenameStem: "canceled", playMilliseconds: 1_000, fadeMilliseconds: 0)
+    let exporting = Task.detached { try transport.exportAAC(request, cancellation: cancellation) }
+    for _ in 0..<1_000 where !FileManager.default.fileExists(atPath: signal.path) {
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(FileManager.default.fileExists(atPath: signal.path))
+    let controlled = DispatchSemaphore(value: 0)
+    let pause = Task.detached {
+        defer { controlled.signal() }
+        return try transport.performSessionControlSync(.pause, expectedGeneration: generation)
+    }
+    let responsive = waitForSignal(controlled, seconds: 3)
+    cancellation.cancel()
+    let status = try await pause.value
+    do { _ = try await exporting.value; Issue.record("Canceled XA export unexpectedly succeeded") }
+    catch let error as AACExportError { #expect(error == .cancelled) }
+    catch { Issue.record("Unexpected error: \(error)") }
+    #expect(responsive && status.trackLoaded && !status.isPlaying && status.generation == generation)
+    #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).isEmpty)
+}
+
 @Test(.enabled(if: FileManager.default.isExecutableFile(atPath: "/usr/bin/zip")
     && ["/opt/homebrew/bin/7zz", "/usr/local/bin/7zz", "/usr/bin/7zz"]
         .contains { FileManager.default.isExecutableFile(atPath: $0) }, "Requires zip and 7zz."))

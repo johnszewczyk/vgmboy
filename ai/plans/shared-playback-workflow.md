@@ -49,6 +49,36 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Packaged XA bridge and slow extraction, 2026-11-05: an isolated SB2 release
+based on `6824cae6` used a distinct bundle identity, redirected catalog,
+favorites, history, tabs and cache, and a test-only eight-second delay at the
+first export progress callback. A test overlay called the actual SB2 native
+bridge: SOTN XA playback was playing at generation 1, Pause returned while the
+export was held, and the same generation remained paused after export finished.
+The one-second output was stereo 44.1 kHz AAC, 46 AAC frames, SHA-256
+`2db18958da3fdc5c39a169e6ec91f1fbb044c775a8e6f13ac90356d19e3ef97e`.
+This was a bridge-driven, muted test rather than an audible or ordinary
+playlist-control check. The source was a temporary byte-identical copy of the
+SOTN UAC (SHA-256
+`b65b8ebbd8f75cad96d8be0c322261f7713b1badc3c0ac8b6ba205e14c7dd45a`).
+The first attempt using the original Game Rips path stalled in macOS `getxattr`
+during source inspection in the isolated bundle; the copy succeeded. Its cause
+and behavior in the installed app are unverified. The real SB2 tabs file's
+modification time remained `2026-11-04 06:02:16`.
+
+The fixture-gated `canceledSotnXAExportKeepsPlaybackResponsiveDuringExtraction`
+test held a real UAC payload frame for eight seconds, verified Pause while it
+was held, then canceled and checked that no output or partial file was
+published. Both successful and failing frame-decoder exits returned the
+cancellation error. To reproduce, set `VGMBOY_SOTN_XA_UAC` to the fixture,
+`VGMBOY_TEST_REAL_ZSTD` to the real executable, `VGMBOY_ZSTD_BINARY` to
+`VGMBoy/scripts/test-delayed-uac-zstd.sh`, and `VGMBOY_SLOW_UAC_SIGNAL` to a
+new temporary path; run that test in `FrontendCore` with two jobs and test
+parallelization width two. Set `VGMBOY_FAIL_UAC_FRAME=1` and a fresh signal
+path for the failure variant. The helper identifies payload frames using the
+current codec's `--memory=64MB` argument. Cancellation waits for the running
+extraction to return; it does not terminate it.
+
 UAC XA AAC responsiveness, 2026-11-05: the shared coordinator prepares raw
 CD-sector XA members of UACs off its transport queue and retains their own
 materialization for one export attempt. The UAC's declared member size must be
