@@ -192,7 +192,13 @@ startup contracts shared by the VGMMan player frontends.
   may publish UI progress, but it does not extract the source, parse export
   fields, or reconstruct `AACExportRequest`.
   Its optional tempo defaults to 1x for older requests; a frontend must use the
-  same captured tempo for the timing preview and offline export.
+  same captured tempo for the timing preview and offline export. Exports are
+  serialized by a cancellation-aware per-coordinator slot. For a standalone,
+  signature-verified SPC that fits VGMBoy's bounded snapshot, decoding and AAC
+  rendering run outside the transport queue; playback controls remain available.
+  Archives and other formats retain the serialized transport route pending
+  decoder-isolation verification. Running source reads or decoders are not
+  forcibly interrupted by cancellation.
 - `PlaybackTransportSeekRequest` and `PlaybackTransportRampGainRequest` name
   the direct session controls at the bridge boundary. Their shared
   normalization keeps a renderer from relying on scalar argument order. The

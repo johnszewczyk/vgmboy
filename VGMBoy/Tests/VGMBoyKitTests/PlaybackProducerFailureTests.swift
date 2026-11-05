@@ -220,6 +220,36 @@ private let fixturePlan = PlaybackPlan(preFadeMilliseconds: 5_000, fadeMilliseco
     }
 }
 
+@Test func independentSPCAACUsesBoundedImmutableSnapshot() throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let source = root.appendingPathComponent("vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc")
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let copy = folder.appendingPathComponent("source.spc")
+    try FileManager.default.copyItem(at: source, to: copy)
+    var request = AACExportRequest(sourcePath: copy.path, outputDirectory: folder,
+        filenameStem: "snapshot", playMilliseconds: 1_000, fadeMilliseconds: 0, tempo: 2)
+    let prepared = try #require(AACExporter.prepareIndependentSPCExport(request))
+    let reference = try AACExporter.export(request)
+    request.archiveEntry = "track.spc"
+    #expect(AACExporter.prepareIndependentSPCExport(request) == nil)
+    request.archiveEntry = nil
+    try Data("SWAV".utf8).write(to: copy)
+    #expect(AACExporter.prepareIndependentSPCExport(request) == nil)
+    let result = try prepared.export()
+    #expect(result.renderedFrames == 44_100)
+    #expect(FileManager.default.fileExists(atPath: result.outputURL.path))
+    #expect(try Data(contentsOf: result.outputURL) == Data(contentsOf: reference.outputURL))
+    let oversized = folder.appendingPathComponent("oversized.spc")
+    try FileManager.default.copyItem(at: source, to: oversized)
+    let handle = try FileHandle(forWritingTo: oversized)
+    try handle.truncate(atOffset: 8 * 1_024 * 1_024 + 1)
+    try handle.close()
+    request.sourcePath = oversized.path
+    #expect(AACExporter.prepareIndependentSPCExport(request) == nil)
+}
+
 @Test func invalidNativeTrackIndicesFailWithoutOpeningDecodersOrPublishingAAC() throws {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

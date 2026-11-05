@@ -372,6 +372,7 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
     private let queue: PlaybackSerialExecutor
     private let prepareSource: @Sendable (PlaybackController, PlaybackContinuationStart) throws -> PlaybackController.PreparedSource
     private let preparationSlots = DispatchSemaphore(value: 2)
+    private let exportSlot = DispatchSemaphore(value: 1)
     private let requestLock = NSLock()
     private var latestPlaybackRequest = 0
     private var settingsRevisionCounter = 0
@@ -1258,7 +1259,18 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         cancellation: AACExportCancellation? = nil,
         progress: (@Sendable (AACExportProgress) -> Void)? = nil
     ) throws -> URL {
-        try queue.sync {
+        if cancellation?.isCancelled == true { throw AACExportError.cancelled }
+        // Keep all exports serialized per coordinator, including legacy formats,
+        // so parallel renders cannot race for the same output filename.
+        while exportSlot.wait(timeout: .now() + .milliseconds(100)) != .success {
+            if cancellation?.isCancelled == true { throw AACExportError.cancelled }
+        }
+        defer { exportSlot.signal() }
+        if cancellation?.isCancelled == true { throw AACExportError.cancelled }
+        if let prepared = AACExporter.prepareIndependentSPCExport(request) {
+            return try prepared.export(cancellation: cancellation, progress: progress).outputURL
+        }
+        return try queue.sync {
             let result = try controller.exportAAC(request, cancellation: cancellation, progress: progress)
             return result.outputURL
         }

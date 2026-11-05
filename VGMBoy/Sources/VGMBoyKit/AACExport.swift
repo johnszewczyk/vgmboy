@@ -101,9 +101,45 @@ public enum AACExportError: LocalizedError, Equatable {
     }
 }
 
+/// A bounded immutable SPC snapshot that can be exported without taking the
+/// live playback transport queue. It never changes or owns the live decoder.
+public struct PreparedIndependentSPCAACExport: Sendable {
+    fileprivate let request: AACExportRequest
+    fileprivate let data: Data
+
+    public func export(cancellation: AACExportCancellation? = nil,
+                       progress: (@Sendable (AACExportProgress) -> Void)? = nil) throws -> AACExportResult {
+        try AACExporter.export(request, cancellation: cancellation, progress: progress) { _, sampleRate in
+            try GMEDecoder(data: data, sampleRate: sampleRate)
+        }
+    }
+}
+
 /// Offline AAC/ADTS renderer. It builds a separate decoder and never touches
 /// the live output device, transport buffer, queue, or frontend catalog.
 public enum AACExporter {
+    /// Only a standalone, signature-verified SPC snapshot is admitted here.
+    /// Other formats and archives retain their existing serialized route.
+    public static func prepareIndependentSPCExport(_ request: AACExportRequest) -> PreparedIndependentSPCAACExport? {
+        guard PlaybackTrackIndex.isRepresentable(request.trackIndex), request.archiveEntry?.isEmpty != false,
+              URL(fileURLWithPath: request.sourcePath).pathExtension.caseInsensitiveCompare("spc") == .orderedSame else { return nil }
+        let url = URL(fileURLWithPath: request.sourcePath).resolvingSymlinksInPath()
+        guard (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true,
+              let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        let limit = 8 * 1_024 * 1_024
+        var data = Data()
+        do {
+            while data.count <= limit {
+                let part = try handle.read(upToCount: min(65_536, limit + 1 - data.count)) ?? Data()
+                if part.isEmpty { break }
+                data.append(part)
+            }
+        } catch { return nil }
+        guard data.count <= limit, data.starts(with: Data("SNES-SPC700 Sound File Data".utf8)) else { return nil }
+        return PreparedIndependentSPCAACExport(request: request, data: data)
+    }
+
     private static let sampleRate = 44_100
     private static let chunkFrames = 4_096
     /// Progress is a presentation channel, not a per-decode-block callback.
