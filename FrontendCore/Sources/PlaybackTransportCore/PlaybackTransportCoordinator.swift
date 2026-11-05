@@ -1267,7 +1267,20 @@ public final class PlaybackTransportCoordinator: @unchecked Sendable {
         }
         defer { exportSlot.signal() }
         if cancellation?.isCancelled == true { throw AACExportError.cancelled }
-        if let prepared = AACExporter.prepareIndependentSPCExport(request) {
+        let prepared: PreparedIndependentSPCAACExport?
+        if let entry = request.archiveEntry, !entry.isEmpty,
+           URL(fileURLWithPath: entry).pathExtension.caseInsensitiveCompare("spc") == .orderedSame {
+            // Share the existing materialization limit with playback starts.
+            while preparationSlots.wait(timeout: .now() + .milliseconds(100)) != .success {
+                if cancellation?.isCancelled == true { throw AACExportError.cancelled }
+            }
+            defer { preparationSlots.signal() }
+            if cancellation?.isCancelled == true { throw AACExportError.cancelled }
+            prepared = try controller.prepareIndependentSPCAACExport(request, cancellation: cancellation)
+        } else {
+            prepared = try controller.prepareIndependentSPCAACExport(request, cancellation: cancellation)
+        }
+        if let prepared {
             return try prepared.export(cancellation: cancellation, progress: progress).outputURL
         }
         return try queue.sync {
