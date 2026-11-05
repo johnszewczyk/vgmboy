@@ -37,6 +37,12 @@ for ScanSong's external inspection executables.
   helper and pinned SFC database. The host is intentionally separate from
   `build-dependencies.sh` because its source/build belongs to the Game Rips
   workshop, not VGMBoy's ordinary decoder dependency garden.
+- The experimental UACNGB Game Boy decoder uses the SameBoy core and host built
+  from the Game Rips pilot. Use
+  `scripts/stage-sameboy-uacngb-host.sh <host>` to stage the executable and
+  Expat license under `.build/dependencies/sameboy-uacngb`; macOS app builders
+  copy both into `Contents/Resources/sameboy-uacngb/`. The host source and
+  SameBoy build remain owned by the Game Rips workshop.
 - The decoder-library and scanner-plugin builders target macOS 26.0, matching
   the Swift packages. The dependency input stamps include the selected SDK and
   deployment target, so changing either rebuilds native archives rather than

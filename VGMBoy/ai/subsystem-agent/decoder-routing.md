@@ -38,6 +38,17 @@ deliberately exclusive to one family.
   track end; the helper's exit status is read only after the process exits.
   The helper starts when the track starts; constructing the decoder does not
   launch a redundant emulator process.
+- Experimental `.ngbd` playback routes to `uacngb`. `NativeGameBoyDecoder`
+  launches the separately built SameBoy v1.0.3 DMG-B host and streams stereo
+  PCM16LE. UACNGB v1 members are single-cue ROM-driver slices; the host checks
+  the envelope and ROM-slice SHA-256 before running SameBoy. Runtime setup is
+  staged under `.build/dependencies/sameboy-uacngb` and copied into app
+  resources by `copy-sameboy-uacngb-runtime.sh`. This route has no natural
+  ending, tempo control, authored sample loop, or certified loop boundary.
+  The same host runs the game's selector shim through SameBoy's GBS execution
+  API using an in-memory adapter; it runs uncapped with frame skipping disabled
+  because VGMBoy's output device owns real-time pacing. No GBS file is written
+  or required in the UAC payload.
 - Frontends must project `FormatRegistry.playbackDescriptors` rather than rebuilding extension
   unions, backend IDs, Long Play support, tempo support, or natural-ending flags.
 - GameCube admission is fixture-backed and limited to primary playable DSP,

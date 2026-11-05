@@ -13,7 +13,7 @@ struct FormatRegistryTests {
     @Test("publishes one complete frontend descriptor table")
     func frontendDescriptorsMatchPlaybackRouting() {
         let expectedIDs = [
-            "libgme", "asap", "libvgm", "psgplay", "mdx", "standard-audio", "ffmpeg-audio",
+            "libgme", "uacngb", "asap", "libvgm", "psgplay", "mdx", "standard-audio", "ffmpeg-audio",
             "highly-complete", "twosf", "vgmstream", "lazyusf",
             "playpsf", "ares-snes", "qsf", "sidplayfp", "openmpt", "amiga-uade"
         ]
