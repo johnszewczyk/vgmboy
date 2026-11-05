@@ -49,6 +49,24 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Original-path SB2 control retest, 2026-11-05: an isolated release built from
+`fba75b68` used the original SOTN UAC path, redirected catalog, favorites,
+history, tabs and cache, and the temporary
+`com.john.spcboy.sb2.originalpathcheck` identity. macOS logged a Downloads
+authorization prompt followed about 3.6 seconds later by an allowed result;
+the prompt was not visible in the observed app view. A test overlay added a
+track and invoked SB2's renderer playback and AAC export functions; an
+instrumented 25-second export-progress delay made the race observable. The
+ordinary SB2 Pause button returned during the export, and native status remained
+paused on generation 1 when export finished. The ordinary Play and Stop buttons
+then updated the controls as expected. The four-second output contained 175
+stereo AAC frames at 44.1 kHz, SHA-256
+`074f4551ddaee01b1a3e175d7236ee425047db0f41f2d67174cec30316fdb70e`.
+The test was muted; it proves neither audible continuity nor the local app's
+permission state. The normal SB2 tabs file modification time was unchanged.
+The remaining SB2 gate includes audible output, full playlist-driven start and
+export, and the broader control/failure matrix.
+
 Downloads-folder authorization follow-up, 2026-11-05: macOS `tccd` logs
 identify a pending Downloads-folder authorization prompt for each isolated SB2
 identity used in the original-path attempts below. For
