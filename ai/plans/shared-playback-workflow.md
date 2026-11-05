@@ -49,6 +49,20 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Original-path and preparation-delay follow-up, 2026-11-05: a separate,
+ad-hoc-signed AppKit probe read the original SOTN file without modification.
+In one run, POSIX `stat` returned immediately, while concurrent `open`/`fstat`,
+provenance `getxattr`, and Foundation attributes returned after 3.612, 3.621,
+and 3.655 seconds respectively. All returned the expected size or attribute;
+this does not explain the earlier isolated SB2 stall or establish installed-app
+behavior. It does show that changing the Foundation attribute call alone is not
+evidence that source opening cannot also wait. The shared transport test now
+holds manifest decoding as well as payload decoding, verifying that Pause and
+cancellation behave while preparation is delayed. Delayed manifest success,
+delayed manifest failure, and delayed payload success each passed using a
+byte-identical temporary fixture. The helper selects the
+manifest gate with `VGMBOY_UAC_DELAY_STAGE=manifest` (the default is payload).
+
 Packaged XA bridge and slow extraction, 2026-11-05: an isolated SB2 release
 based on `6824cae6` used a distinct bundle identity, redirected catalog,
 favorites, history, tabs and cache, and a test-only eight-second delay at the
@@ -66,7 +80,7 @@ during source inspection in the isolated bundle; the copy succeeded. Its cause
 and behavior in the installed app are unverified. The real SB2 tabs file's
 modification time remained `2026-11-04 06:02:16`.
 
-The fixture-gated `canceledSotnXAExportKeepsPlaybackResponsiveDuringExtraction`
+The fixture-gated `canceledSotnXAExportKeepsPlaybackResponsiveDuringPreparation`
 test held a real UAC payload frame for eight seconds, verified Pause while it
 was held, then canceled and checked that no output or partial file was
 published. Both successful and failing frame-decoder exits returned the
