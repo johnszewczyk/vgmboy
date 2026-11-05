@@ -49,6 +49,22 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Downloads-folder authorization follow-up, 2026-11-05: macOS `tccd` logs
+identify a pending Downloads-folder authorization prompt for each isolated SB2
+identity used in the original-path attempts below. For
+`com.john.spcboy.sb2.originalpathcheck`, the request began at 18:21:16 and its
+result was logged at 18:27:47, after the bounded 45-second checks; the logged
+result was allowed. The earlier `com.john.spcboy.sb2.xaverification` request
+was pending from 13:35:28 to 13:36:40 and also later returned allowed. This
+accounts for the observed wait during those temporary-identity tests and is not
+evidence that the installed SB2 app has the same access state. The local SB2
+bundle identifies as `com.john.spcboy.sb2` and is signed by team `CG827857AH`;
+no installed-app permission state or audible playback was tested. The earlier
+byte-identical temporary-copy bridge check remains valid for the transport
+behavior it exercised. Future original-path checks should account for the
+system prompt for the actual test identity and obtain any required user action
+through the normal macOS flow, without changing privacy settings automatically.
+
 Original-path SB2 reproduction, 2026-11-05: an isolated SB2 release from
 `7f171887`, with separate identity and redirected catalog, favorites, history,
 tabs and archive cache, requested the original SOTN UAC through the SB2
@@ -61,7 +77,8 @@ handle, and this second attempt also exceeded the 45-second limit. This shows
 that an attributes-only change cannot resolve the observed
 access wait. The source remains unmodified, and the production implementation
 was not changed. The cause, installed-app behavior, and appropriate remedy
-remain unverified; do not infer a permissions diagnosis from these samples.
+remained unverified by those samples alone; the later authorization evidence
+above identifies the pending temporary-identity request.
 The isolated renderer did not reach the export or Pause control, so the earlier
 byte-identical temporary-copy bridge check remains the successful packaged XA
 evidence. Follow up on original-path access and ordinary controls, and verify
