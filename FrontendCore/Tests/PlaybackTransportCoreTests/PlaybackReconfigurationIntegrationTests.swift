@@ -3024,7 +3024,7 @@ func sotnXAAACExportKeepsPlaybackControlsResponsive() async throws {
 @Test(.enabled(if: ProcessInfo.processInfo.environment["VGMBOY_SLOW_UAC_SIGNAL"] != nil
     && ProcessInfo.processInfo.environment["VGMBOY_SOTN_XA_UAC"] != nil,
     "Requires the SOTN UAC and a signaling, delayed UAC frame decoder."))
-func canceledSotnXAExportKeepsPlaybackResponsiveDuringExtraction() async throws {
+func canceledSotnXAExportKeepsPlaybackResponsiveDuringPreparation() async throws {
     let path = try #require(ProcessInfo.processInfo.environment["VGMBOY_SOTN_XA_UAC"])
     let signal = URL(fileURLWithPath: try #require(ProcessInfo.processInfo.environment["VGMBOY_SLOW_UAC_SIGNAL"]))
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
