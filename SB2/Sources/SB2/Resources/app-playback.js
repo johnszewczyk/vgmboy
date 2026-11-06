@@ -700,8 +700,12 @@ async function handleNativePlaybackEnded(event) {
     const trackId = observedNativeGeneration === expectedNativeGeneration && state.currentTrackId
       ? state.currentTrackId : pendingPlaybackIntent.trackId;
     if (trackId) {
-      deferredNativeEnds = deferredNativeEnds.filter(item => item.nativeGeneration !== observedNativeGeneration);
-      deferredNativeEnds.push({ event, trackId, nativeGeneration: observedNativeGeneration });
+      const previous = deferredNativeEnds.find(item => item.nativeGeneration === observedNativeGeneration);
+      const sequence = Number(event.status_sequence) || 0;
+      if (!previous || sequence >= (Number(previous.event?.status_sequence) || 0)) {
+        deferredNativeEnds = deferredNativeEnds.filter(item => item.nativeGeneration !== observedNativeGeneration);
+        deferredNativeEnds.push({ event, trackId, nativeGeneration: observedNativeGeneration });
+      }
     }
     return;
   }

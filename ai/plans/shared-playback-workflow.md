@@ -49,6 +49,17 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Deferred end ordering, 2026-11-06: SB2 now retains the highest status sequence
+when duplicate natural-end events for the same native generation arrive while
+a replacement intent is pending. Previously, a delayed older event could replace
+the newer one; if the retained event was then rejected as stale, the real end
+was lost. A focused regression reproduced that failure before the fix and
+checks both arrival orders afterward. All 72 SB2 renderer tests passed. This
+is a renderer correctness fix, not completion of the planned shared ownership
+extraction; packaged race and audible verification remain open. The run used
+no new large build because free disk space was approximately 13 GiB, and
+unrelated in-progress VGMBoy changes were left untouched.
+
 Playlist XA export, 2026-11-05: an isolated SB2 release from `2717ef29` used
 separate identity and redirected catalog, favorites, history, tabs and cache.
 A setup-only overlay inserted the original SOTN XA UAC member as a playlist

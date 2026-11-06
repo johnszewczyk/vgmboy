@@ -75,6 +75,8 @@ frontend playback generation and native generation remain current.
 During an explicit start or navigation, defer native end events until that
 intent settles. Replay only an event matching the accepted or retained track and
 generation, including an incoming track that ended before its start reply.
+When end events for the same generation arrive out of order during an intent,
+retain the event with the newest status sequence for that generation.
 
 ## Preferences
 
