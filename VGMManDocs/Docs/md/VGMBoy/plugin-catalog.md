@@ -7,7 +7,7 @@ this page records what each input does at the VGMBoy and ScanSong boundaries.
 It describes the current implementation, not a claim that every file in a
 format family is playable.
 
-Last full milestone review recorded in the manifest: **2026-09-17**. Individual
+Last full milestone review recorded in the manifest: **2026-11-05**. Individual
 decoder updates and their verification may be newer; see the
 [decoder update evidence](../../../../VGMBoy/ai/verification/plugin-updates.md).
 Homebrew versions describe the reviewed development environment and are not
@@ -29,7 +29,7 @@ repository-enforced package locks.
 | `play-psf` | `50aedca2639521bc498ace0b2be1ea012801a86a` plus PSF-core patch | `CPlayPSF` | Native PSF route | PSF, miniPSF, PSF2, miniPSF2; `.psflib` companions |
 | `aosdk-qsf` | `e359a6e5154b2ba8499fb1f24a1f5f8a18538a61` plus lifecycle patch | `CQSF` | Playback only; ScanSong uses its own direct reader | QSF and miniQSF; `.qsflib` companions |
 | `ares-snes-state` | ares v148, commit `0aafd85789215e84e1e43415c07d4c88461b7899`, built in the Game Rips SCV4 workshop | `AresSNESDecoder` / staged `ares-agent-host` subprocess | Playback only; no ScanSong route | Experimental `UACNSNES` v1 (`.snesstate`); requires separately staged runtime; no source-loop certification |
-| `sameboy-uacngb` | SameBoy v1.0.3, commit `208ba4afabffab9edde416f2dbb8ae459e34adb8`, built in the Game Rips Game Boy pilot | `NativeGameBoyDecoder` / staged headless SameBoy host | Playback only; no ScanSong route | Experimental `UACNGB` v1 (`.ngbd`); DMG-B execution; native driver slice only; no source-loop certification; Expat license |
+| `sameboy-uacngb` | SameBoy v1.0.5, commit `ea667ad79aa28409f034b1fd6da7304e1844750d`, built in the Game Rips Game Boy pilot | `NativeGameBoyDecoder` / staged headless SameBoy host | Playback only; no ScanSong route | Experimental `UACNGB` v3 (`.ngbd`); one exact ROM, direct cartridge audio-routine execution, no GBS loader; no source-loop certification; Expat license |
 | `mgba` | mGBA 0.11.0 source snapshot; tree SHA-256 `b7b71f64dab500433f3662b818e3521cf67524dcdee1a9952c1f555629ff55c0` | `CHighlyComplete` | GSF playback only; MetaManCore reads GSF metadata and validates the dependency/ROM-header structure | GSF and miniGSF playback; PSFLib assembles dependency chains. The scanner neither links nor prepares mGBA. |
 | `2sf2wav` | DeSmuME 0.9.9 svn 4608 source snapshot; tree SHA-256 `c3e329f9cf72881d25dabb03b9a89ebd4125ca9bd6d44c26f642589c622a9fb7` | `C2SF` | Native 2SF route | 2SF and mini2SF; relative library dependencies |
 | `psflib` | VGMBoy-managed source snapshot; tree SHA-256 `c3adb7ea371fbeeedc68b3747c314419b52d9cb46aa0d75f177f428bcdb7d021` | Used by PSF-family bridges | Dependency support, not a standalone route | PSF and GSF library resolution |

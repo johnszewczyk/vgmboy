@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FAMILY_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MODE="verify"
 RESULT_ROOT=""
-PROJECTS=(CatalogReader VGMBoy FrontendCore MetaMan UACMan UACMan/Wrapper ScanSong CocoaSpice ViewBoy)
+PROJECTS=(CatalogReader VGMBoy FrontendCore MetaMan ScanSong CocoaSpice ViewBoy)
 
 usage() {
   echo "Usage: $0 [--inventory-only] [--output-dir PATH]"
@@ -215,9 +215,6 @@ if [[ "$MODE" == "verify" ]]; then
   run_check vgmboy-tests VGMBoy swift test --disable-sandbox --jobs 1
   run_check frontendcore-tests FrontendCore swift test --disable-sandbox
   run_check metaman-tests MetaMan swift test --disable-sandbox
-  run_check uac-wrapper-tests UACMan/Wrapper swift test --disable-sandbox
-  run_check uac-wrapper-python-tests UACMan python3 -B -m unittest discover -s Wrapper/python/tests
-  run_check uacman-tests UACMan swift test --disable-sandbox
   run_check scansong-tests ScanSong swift test --disable-sandbox --jobs 1
   run_check cocoaspice-tests CocoaSpice swift test --disable-sandbox --jobs 1
   run_check viewboy-build ViewBoy ./build.sh

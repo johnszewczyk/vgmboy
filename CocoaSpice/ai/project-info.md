@@ -15,7 +15,7 @@ VGMBoyKit through a host adapter.
   startup-progress policy.
 - VGMBoyArchiveCore owns archive/member source preparation; VGMBoyKit owns
   format admission, decoding, timing, and audio output.
-- MetaMan owns native-format metadata. UACMan owns the UAC package contract.
+- MetaMan owns native-format metadata. UAC Tags owns the UAC package contract.
 - SB2 and ViewBoy are active frontend siblings. SPCBoyWK is retired; its source
   is preserved in a local ZIP and Git history.
 
@@ -36,7 +36,7 @@ Engineering constraints:
 - VGMBoy playback integration:
   [audio-playback-backend-routing.md](subsystem-agent/audio-playback-backend-routing.md)
 - UAC member playback:
-  [player-integration.md](../../UACMan/ai/subsystem-agent/player-integration.md)
+  [player-integration.md](../../../UACMAN/UAC%20Tags/ai/subsystem-agent/player-integration.md)
 - Skin-neutral Options controls:
   [frontend-control-surface.md](subsystem-agent/frontend-control-surface.md)
 - Catalog ownership and browser projection:
@@ -63,7 +63,7 @@ Engineering constraints:
 - Keep catalog/playlist queries separate from decoder and audio work.
 - Keep format routing, decoder integration, timing, output, and scanner-plugin
   builds in VGMBoy; do not add a second decoder/audio path here.
-- UAC manifest and seek-table semantics belong to UACMan. VGMBoyArchiveCore
+- UAC manifest and seek-table semantics belong to UAC Tags. VGMBoyArchiveCore
   uses that API to prepare playback sources; frontend cache policy remains in
   FrontendCore and source member bytes remain preserved.
 - User-facing behavior belongs in `subsystem-human/`; current engineering

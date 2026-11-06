@@ -39,7 +39,7 @@ missing **Game** or platform value falls back to structural `game.title` or
 `game.console`; **Artist** and **Album** fall back to package **Album Artist**
 and **Album**. These are reader projections and do not create duplicate member
 tags. See
-[`uac-wrapper-format.md`](../../../../UACMan/ai/subsystem-agent/uac-wrapper-format.md)
+[`uac-wrapper-format.md`](../../../../../UACMAN/UAC%20Tags/ai/subsystem-agent/uac-wrapper-format.md)
 for the complete binary and manifest contract.
 
 For NSF playlist entries, the UAC reader accepts the current nested

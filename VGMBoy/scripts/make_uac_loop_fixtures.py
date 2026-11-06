@@ -22,7 +22,7 @@ with wave.open(str(source / 'tone.wav'), 'wb') as audio:
         frames.extend(struct.pack('<hh', sample, sample))
     audio.writeframes(frames)
 root = Path(__file__).resolve().parents[2]
-packer = root / 'UACMan/Wrapper/python/uacman.py'
+packer = root / '../UACMAN/UAC Tags/Wrapper/python/uacman.py'
 loop = {'mode': 'forward', 'startSamples': 2205, 'endSamples': 4410,
         'sampleRateHz': 44100, 'repeat': 2, 'source': 'generated-test'}
 for name, metadata in [('loop', {'loop': loop}), ('none', {}),

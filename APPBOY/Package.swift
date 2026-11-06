@@ -11,7 +11,7 @@ let package = Package(
     dependencies: [
         .package(path: "../CatalogReader"),
         .package(path: "../FrontendCore"),
-        .package(path: "../UACMan/Wrapper"),
+        .package(path: "../../UACMAN/UAC Tags/Wrapper"),
         .package(path: "../VGMBoy")
     ],
     targets: [

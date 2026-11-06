@@ -3,14 +3,14 @@
 ## Scope
 
 `scripts/verify-family.sh` inventories the VGMMan Git repository and checks
-nine maintained Swift packages/apps: CatalogReader, VGMBoy, FrontendCore,
-MetaMan, UACMan, UACMan/Wrapper, ScanSong, CocoaSpice, and ViewBoy. The retired
+seven maintained Swift packages/apps: CatalogReader, VGMBoy, FrontendCore,
+MetaMan, ScanSong, CocoaSpice, and ViewBoy. The retired
 SPCBoyWK source snapshot is excluded from maintained checks and retained as a
 local ZIP under `LocalRecovery/`. The script does not include in-development
 SB2 in its package list, so SB2 changes require
 their own focused renderer syntax, build, and packaged UI verification. It also
 checks current documentation links and canonical project-info routing,
-UACWrapper's Python CLI, active WebKit renderer JavaScript sources, and their
+active WebKit renderer JavaScript sources, and their
 `*.test.js` suites.
 
 The checker records branch and dirty state, Git archive refs, toolchain and

@@ -10,7 +10,7 @@ let package = Package(
         .executable(name: "metaman", targets: ["metaman"])
     ],
     dependencies: [
-        .package(name: "UACWrapper", path: "../UACMan/Wrapper")
+        .package(name: "UACWrapper", path: "../../UACMAN/UAC Tags/Wrapper")
     ],
     targets: [
         .target(

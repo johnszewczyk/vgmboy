@@ -1,7 +1,7 @@
 # MetaMan
 
 MetaMan is the family’s decoder-independent metadata reader. `MetaManCore`
-exposes typed metadata documents to ScanSong, UACMan, and other Swift clients;
+exposes typed metadata documents to ScanSong, UAC Tags, and other Swift clients;
 the command-line tool is a thin inspection front end.
 
 `MetaManCore` does not link VGMMan emulator/playback plugin libraries and

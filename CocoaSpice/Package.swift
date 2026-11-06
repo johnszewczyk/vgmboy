@@ -13,7 +13,7 @@ let package = Package(
     dependencies: [
         .package(path: "../CatalogReader"),
         .package(path: "../FrontendCore"),
-        .package(name: "UACWrapper", path: "../UACMan/Wrapper"),
+        .package(name: "UACWrapper", path: "../../UACMAN/UAC Tags/Wrapper"),
         .package(path: "../VGMBoy")
     ],
     targets: [

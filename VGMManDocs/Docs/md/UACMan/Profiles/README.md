@@ -18,7 +18,7 @@ from embedded metadata and hashes without waiting for fixture or package
 approval. The profiles make new packages and richer metadata extraction
 consistent across the supported file types. Actual tag coverage and package
 disposition belong in AudioMan's per-set reports. Dated field evidence belongs
-in `UACMan/ai/reports/`; published profile pages carry reusable mappings.
+in `UACMAN/UAC Tags/ai/reports/`; published profile pages carry reusable mappings.
 
 Platform identity uses one canonical package-level value. Apply the approved
 names and source-label mappings in [`PLATFORMS.md`](PLATFORMS.md).
@@ -36,20 +36,20 @@ been reviewed.
 | `ay` | Mapping documented; fixture review pending | See [AY/SAP/NSFE/SNDH/S98](AY-SAP-NSFE-SNDH-S98.md#ay). |
 | `sap` | Mapping documented; fixture review pending | See [AY/SAP/NSFE/SNDH/S98](AY-SAP-NSFE-SNDH-S98.md#sap). |
 | `nsf` | Mapping documented; fixture review pending | See [`NSF.md`](NSF.md); reader mappings are documented, while new package conversion still requires fixture and consumer review. |
-| `gbs` | Mapping and pack/unpack fixtures verified; set review remains required | See [`GBS.md`](GBS.md) and the [2026-10-26 major-format review](../../../../../UACMan/ai/reports/Major-Audio-Profile-Review-2026-10-26.md); header identity stays at package scope; each logical track carries `Format`, source index, and approved title/order. M3Us remain byte-exact attachments; timing is not surfaced. |
+| `gbs` | Mapping and pack/unpack fixtures verified; set review remains required | See [`GBS.md`](GBS.md) and the [2026-10-26 major-format review](../../../../../../UACMAN/UAC%20Tags/ai/reports/Major-Audio-Profile-Review-2026-10-26.md); header identity stays at package scope; each logical track carries `Format`, source index, and approved title/order. M3Us remain byte-exact attachments; timing is not surfaced. |
 | `nsfe` | Mapping documented; fixture review pending | Separate from NSF; see [NSFE profile](AY-SAP-NSFE-SNDH-S98.md#nsfe). |
 | `hes` | Mapping documented; fixture review pending | See [HES.md](HES.md). |
 | `sndh` | Mapping documented; fixture review pending | See [SNDH profile](AY-SAP-NSFE-SNDH-S98.md#sndh). |
 | `kss` | Mapping documented; fixture review pending | See [KSS.md](KSS.md). |
 | `s98` | Mapping documented; fixture review pending | See [S98 profile](AY-SAP-NSFE-SNDH-S98.md#s98). |
-| `vgm` | Mapping and wrapper package fixtures verified; set review remains required | See [VGM.md](VGM.md) and the [2026-10-26 major-format review](../../../../../UACMan/ai/reports/Major-Audio-Profile-Review-2026-10-26.md). |
+| `vgm` | Mapping and wrapper package fixtures verified; set review remains required | See [VGM.md](VGM.md) and the [2026-10-26 major-format review](../../../../../../UACMAN/UAC%20Tags/ai/reports/Major-Audio-Profile-Review-2026-10-26.md). |
 | `mdx` | Mapping documented; fixture review pending | See [MDX and MOD](MDX-MOD.md). |
 | `mod-protracker` | Mapping documented; fixture review pending | See [MDX and MOD](MDX-MOD.md). |
 | `uac` | Wrapper profile | Container manifest reader; use the UAC wrapper contract, not a native-audio conversion profile. |
-| `psf-family` | USF mapping and fixtures verified; other extensions remain pending | See [PSF family](PSF-FAMILY.md), [USF](USF.md), and the [2026-10-26 major-format review](../../../../../UACMan/ai/reports/Major-Audio-Profile-Review-2026-10-26.md). |
+| `psf-family` | USF mapping and fixtures verified; other extensions remain pending | See [PSF family](PSF-FAMILY.md), [USF](USF.md), and the [2026-10-26 major-format review](../../../../../../UACMAN/UAC%20Tags/ai/reports/Major-Audio-Profile-Review-2026-10-26.md). |
 | `gsf` | Mapping documented; fixture review pending | See [GSF profile](GSF.md). |
 | `qsf` | Mapping documented; fixture review pending | See [QSF profile](QSF.md). |
-| `spc` | Mapping and projection fixtures verified; set review remains required | See [`SPC.md`](SPC.md) and the [2026-10-26 major-format review](../../../../../UACMan/ai/reports/Major-Audio-Profile-Review-2026-10-26.md); source `Game` maps to track `Album`, xID6 `OST Title` remains separate, and xID6 `OST Track` is not UAC `Track Number`. Existing UAC cleanup remains separate. |
+| `spc` | Mapping and projection fixtures verified; set review remains required | See [`SPC.md`](SPC.md) and the [2026-10-26 major-format review](../../../../../../UACMAN/UAC%20Tags/ai/reports/Major-Audio-Profile-Review-2026-10-26.md); source `Game` maps to track `Album`, xID6 `OST Title` remains separate, and xID6 `OST Track` is not UAC `Track Number`. Existing UAC cleanup remains separate. |
 | `sid` | Mapping documented; fixture review pending | See [SID profile](SID.md). |
 | `ape` | Mapping documented; fixture review pending | See [APE profile](APE.md). |
 | `adx` | Mapping documented; fixture review pending | See [console streams](CONSOLE-STREAMS.md). |
@@ -165,7 +165,7 @@ source relationship between collections from title or content overlap alone.
 ## Wrapper and ownership references
 
 - UAC binary, manifest, and byte-preservation rules:
-  [`ai/subsystem-agent/uac-wrapper-format.md`](../../../../../UACMan/ai/subsystem-agent/uac-wrapper-format.md)
+  [`ai/subsystem-agent/uac-wrapper-format.md`](../../../../../../UACMAN/UAC%20Tags/ai/subsystem-agent/uac-wrapper-format.md)
 - SPC native reader and field layout:
   [`MetaMan/format-layouts.md`](../../MetaMan/format-layouts.md)
 - SPC-to-UAC profile: [`SPC.md`](SPC.md)
@@ -180,22 +180,22 @@ source relationship between collections from title or content overlap alone.
 - GBS profile: [`GBS.md`](GBS.md)
 - PlayStation CD-XA and Red Book profile: [`PSX-CDXA.md`](PSX-CDXA.md)
 - Current PSX beta-package review:
-  [`PSX-Beta-UAC-Review-2026-09-29.md`](../../../../../UACMan/ai/reports/PSX-Beta-UAC-Review-2026-09-29.md)
+  [`PSX-Beta-UAC-Review-2026-09-29.md`](../../../../../../UACMAN/UAC%20Tags/ai/reports/PSX-Beta-UAC-Review-2026-09-29.md)
 - Dated field and set audit:
-  [`SNESMusicOrg-SPC-2026-09-23.md`](../../../../../UACMan/ai/reports/SNESMusicOrg-SPC-2026-09-23.md)
+  [`SNESMusicOrg-SPC-2026-09-23.md`](../../../../../../UACMAN/UAC%20Tags/ai/reports/SNESMusicOrg-SPC-2026-09-23.md)
 - Current SNESMusic.org tag-cleanup preview:
-  [`SNESMusicOrg-SPC-Tag-Cleanup-Preview-2026-09-24.md`](../../../../../UACMan/ai/reports/SNESMusicOrg-SPC-Tag-Cleanup-Preview-2026-09-24.md)
+  [`SNESMusicOrg-SPC-Tag-Cleanup-Preview-2026-09-24.md`](../../../../../../UACMAN/UAC%20Tags/ai/reports/SNESMusicOrg-SPC-Tag-Cleanup-Preview-2026-09-24.md)
 - Historical SNESMusic.org source-tag and numeric Game ID surfacing preview
   and execution (audit only; current Game ID values are canonical title roots):
-  [`SNESMusicOrg-Source-Tag-Surfacing-Preview-2026-09-24.md`](../../../../../UACMan/ai/reports/SNESMusicOrg-Source-Tag-Surfacing-Preview-2026-09-24.md),
-  [`SNESMusicOrg-Source-Tag-Surfacing-Execution-2026-09-24.md`](../../../../../UACMan/ai/reports/SNESMusicOrg-Source-Tag-Surfacing-Execution-2026-09-24.md)
+  [`SNESMusicOrg-Source-Tag-Surfacing-Preview-2026-09-24.md`](../../../../../../UACMAN/UAC%20Tags/ai/reports/SNESMusicOrg-Source-Tag-Surfacing-Preview-2026-09-24.md),
+  [`SNESMusicOrg-Source-Tag-Surfacing-Execution-2026-09-24.md`](../../../../../../UACMAN/UAC%20Tags/ai/reports/SNESMusicOrg-Source-Tag-Surfacing-Execution-2026-09-24.md)
 - Historical numeric Game ID assignment and Game Title review ledgers (audit
   only; do not use numeric DAT IDs as UAC Game ID values):
-  [`SNESMusicOrg-Source-Tag-GameID-Preview-2026-09-24.tsv`](../../../../../UACMan/ai/reports/SNESMusicOrg-Source-Tag-GameID-Preview-2026-09-24.tsv),
-  [`SNESMusicOrg-GameTitle-Review-Routing-Preview-2026-09-24.tsv`](../../../../../UACMan/ai/reports/SNESMusicOrg-GameTitle-Review-Routing-Preview-2026-09-24.tsv)
+  [`SNESMusicOrg-Source-Tag-GameID-Preview-2026-09-24.tsv`](../../../../../../UACMAN/UAC%20Tags/ai/reports/SNESMusicOrg-Source-Tag-GameID-Preview-2026-09-24.tsv),
+  [`SNESMusicOrg-GameTitle-Review-Routing-Preview-2026-09-24.tsv`](../../../../../../UACMAN/UAC%20Tags/ai/reports/SNESMusicOrg-GameTitle-Review-Routing-Preview-2026-09-24.tsv)
 - OST Disc to Disc Number member ledger:
-  [`SNESMusicOrg-Disc-Number-Preview-2026-09-24.tsv`](../../../../../UACMan/ai/reports/SNESMusicOrg-Disc-Number-Preview-2026-09-24.tsv)
+  [`SNESMusicOrg-Disc-Number-Preview-2026-09-24.tsv`](../../../../../../UACMAN/UAC%20Tags/ai/reports/SNESMusicOrg-Disc-Number-Preview-2026-09-24.tsv)
 - Album / Game Title discrepancy audit:
-  [`SNESMusicOrg-Album-GameTitle-Discrepancy-2026-09-24.md`](../../../../../UACMan/ai/reports/SNESMusicOrg-Album-GameTitle-Discrepancy-2026-09-24.md)
+  [`SNESMusicOrg-Album-GameTitle-Discrepancy-2026-09-24.md`](../../../../../../UACMAN/UAC%20Tags/ai/reports/SNESMusicOrg-Album-GameTitle-Discrepancy-2026-09-24.md)
 - Package and member discrepancy ledger:
-  [`SNESMusicOrg-GameTitle-Discrepancies-2026-09-24.tsv`](../../../../../UACMan/ai/reports/SNESMusicOrg-GameTitle-Discrepancies-2026-09-24.tsv)
+  [`SNESMusicOrg-GameTitle-Discrepancies-2026-09-24.tsv`](../../../../../../UACMAN/UAC%20Tags/ai/reports/SNESMusicOrg-GameTitle-Discrepancies-2026-09-24.tsv)

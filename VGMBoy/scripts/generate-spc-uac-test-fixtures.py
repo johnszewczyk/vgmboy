@@ -19,7 +19,7 @@ def main() -> None:
     args = parser.parse_args()
     project = Path(__file__).resolve().parents[2]
     source = project / "VGMBoy/vendor/zxtune/samples/chiptunes/SPC700/spc/f-zero - big blue.spc"
-    packer = project / "UACMan/Wrapper/python/uacman.py"
+    packer = project / "../UACMAN/UAC Tags/Wrapper/python/uacman.py"
     output = args.output.resolve()
     output.mkdir(exist_ok=False)
     with tempfile.TemporaryDirectory(prefix="fixture-build-", dir=output) as temporary:

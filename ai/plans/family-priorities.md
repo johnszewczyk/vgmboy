@@ -12,7 +12,7 @@ unit; the monorepo is the only source tree for maintained family code.
 | --- | --- |
 | Decoder-independent format metadata | MetaMan |
 | Source discovery, inspection routing, and schema-25 catalog writes | ScanSong |
-| UAC manifest, seek table, and reversible wrapper | UACMan |
+| UAC manifest, seek table, and reversible wrapper | UAC Tags (sibling UACMAN family) |
 | Read-only catalog access and browser projections | CatalogReader |
 | Archive/member source preparation, playback admission, decoders, timing, transport, and audio output | VGMBoy |
 | Durable archive-cache policy, preferences, queue, and frontend transport coordination | FrontendCore |
@@ -23,7 +23,7 @@ unit; the monorepo is the only source tree for maintained family code.
 ## Format decisions
 
 - MetaMan reads native metadata from existing source formats. ScanSong adapts
-  those results to schema 25; UACMan can read and edit its own manifest without
+  those results to schema 25; UAC Tags can read and edit its own manifest without
   rewriting native source files.
 - UAC remains a reversible wrapper around original source members with separate
   rich metadata and seekable Zstandard payloads. It does not claim to improve
