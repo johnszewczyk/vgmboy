@@ -22,7 +22,7 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../VGMBoy"),
-        .package(name: "UACWrapper", path: "../UACMan/Wrapper")
+        .package(name: "UACWrapper", path: "../../UACMAN/UAC Tags/Wrapper")
     ],
     targets: [
         .target(name: "LocalFileBrowserCore"),

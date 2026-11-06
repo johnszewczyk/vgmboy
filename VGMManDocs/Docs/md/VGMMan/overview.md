@@ -11,7 +11,7 @@ playback.
   integration, timing, and audio output.
 - [MetaMan](../MetaMan/format-layouts.md) reads source metadata without
   depending on playback decoders.
-- UACMan browses and edits reversible `.uac` package manifests.
+- UAC Tags browses and edits reversible `.uac` package manifests.
 - CocoaSpice, SB2, and ViewBoy are maintained player applications. SPCBoyWK is
   retired; its source is preserved in Git history and a local recovery ZIP.
 - VGMManDocs presents this Markdown library from the local filesystem.

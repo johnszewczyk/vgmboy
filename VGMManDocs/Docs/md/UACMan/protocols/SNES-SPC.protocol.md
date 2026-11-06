@@ -8,6 +8,6 @@ This legacy protocol is superseded by the current procedure series:
   linkage, and set-specific builder requirements:
   [`../Profiles/Sets/SNESMusicOrg.md`](../Profiles/Sets/SNESMusicOrg.md)
 - Current tag and package proposal: see dated tag-preview evidence in
-  `UACMan/ai/reports/`.
+  `UACMAN/UAC Tags/ai/reports/`.
 
 Do not use older wording from this location as a competing metadata contract.

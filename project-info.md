@@ -14,7 +14,8 @@ history live in this repository.
   read and frontend policy boundaries.
 - SharedWebUI owns portable DOM control primitives used by WebKit clients;
   each frontend keeps its page structure and theme.
-- UACMan owns its package format and editor. CocoaSpice, SPCBOY SB2, and ViewBoy
+- UAC Tags, in the sibling UACMAN family, owns the UAC package contract,
+  editor, tagger CLI, and wrapper package. CocoaSpice, SPCBOY SB2, and ViewBoy
   are active separate player apps; SB2 is the current SPCBOY frontend under
   development. SPCBoyWK source is retired from the active tree and retained in
   a local ZIP documented by `LocalRecovery/README.md`; Git history remains the
@@ -42,7 +43,7 @@ crosses that ownership boundary.
 | Archive/member source preparation, format admission, decoding, timing, transport, and audio output | [VGMBoy/AGENTS.md](VGMBoy/AGENTS.md) |
 | Source discovery, inspection orchestration, and schema-25 catalog writes | [ScanSong/AGENTS.md](ScanSong/AGENTS.md) |
 | Decoder-independent native-format metadata | [MetaMan/AGENTS.md](MetaMan/AGENTS.md) |
-| UAC editing, wrapper format, and package consumers | [UACMan/AGENTS.md](UACMan/AGENTS.md) |
+| UAC wrapper consumers | [UAC Tags](../UACMAN/UAC%20Tags/AGENTS.md) owns the shared package API; VGMMan packages consume it from the sibling project. |
 | Read-only catalog access and browser projections | [CatalogReader/AGENTS.md](CatalogReader/AGENTS.md) |
 | Shared archive-cache, preferences, queue, and transport policy | [FrontendCore/AGENTS.md](FrontendCore/AGENTS.md) |
 | AppKit/SwiftUI presentation | [CocoaSpice/AGENTS.md](CocoaSpice/AGENTS.md) |
@@ -82,14 +83,16 @@ component task:
   commit.
 - Catalog writes belong to ScanSong; player frontends use read-only catalog
   access. Native-format metadata parsing belongs to MetaMan; UAC package parsing
-  belongs to UACMan; playback decoding belongs to VGMBoy.
+  belongs to UAC Tags; playback decoding belongs to VGMBoy.
 - Shared frontend policy belongs in CatalogReader or FrontendCore. VGMBoy owns
   playback/export preparation of archive and compressed-file sources. Keep
   AppKit, SwiftUI, WebKit, and renderer-specific behavior in each app.
 - Portable DOM control mechanics shared by WebKit clients belong in
   `SharedWebUI`; keep each app's layout, theme, and native renderer controls local.
-- UAC is a reversible wrapper around original format members. Native SPC
-  conversion was closed; do not add capture or repackaging work.
+- UAC Tags owns the reversible wrapper API. UAC BareSkin capture and its
+  canonical playback core belong to the sibling UACMAN family; player
+  integrations in VGMMan consume the shared wrapper and require their own
+  review.
 - Generated builds, app bundles, local archives, and fixture payloads are
   excluded from Git. `LocalRecovery/README.md` inventories retained local
   recovery assets.

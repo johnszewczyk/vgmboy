@@ -12,7 +12,7 @@ decoding, timing, transport, and audio output.
 | Component | Owns |
 | --- | --- |
 | ScanSong | Source discovery, inspection orchestration, and catalog publication. |
-| MetaMan | Decoder-independent metadata readers used by ScanSong and UACMan. |
+| MetaMan | Decoder-independent metadata readers used by ScanSong and UAC Tags. |
 | CatalogReader | Read-only catalog access and shared browser projections. |
 | FrontendCore | Shared archive-cache, preference, queue, and transport policy. |
 | VGMBoy | Playback-source preparation, playback admission, decoding, timing, and audio output. |

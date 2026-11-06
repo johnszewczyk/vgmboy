@@ -13,7 +13,7 @@ let package = Package(
     dependencies: [
         .package(path: "../VGMBoy"),
         .package(path: "../MetaMan"),
-        .package(name: "UACWrapper", path: "../UACMan/Wrapper")
+        .package(name: "UACWrapper", path: "../../UACMAN/UAC Tags/Wrapper")
     ],
     targets: [
         // Test-only decoder oracles for reader parity; production scanner targets do not depend on these cores.

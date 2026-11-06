@@ -13,7 +13,6 @@ ownership and preservation rules.
 | [VGMBoy](VGMBoy/README.md) | Archive/member preparation, decoder routing, timing, playback, audio output, and scanner helpers. |
 | [ScanSong](ScanSong/README.md) | Source discovery, format inspection, and schema-25 catalog writing. |
 | [MetaMan](MetaMan/README.md) | Decoder-independent metadata reading and typed source facts. |
-| [UACMan](UACMan/README.md) | UAC package metadata browser/editor and reversible wrapper tools. |
 | [CatalogReader](CatalogReader/README.md) | Read-only catalog access and shared browser projections. |
 | [FrontendCore](FrontendCore/README.md) | Shared archive-cache, preference, queue, and transport policy. |
 | [CocoaSpice](CocoaSpice/README.md) | Native AppKit/SwiftUI player frontend. |
@@ -23,6 +22,9 @@ ownership and preservation rules.
 | [ViewBoy](ViewBoy/README.md) | Native player with a screen-first, four-shade Yoga LCD interface. |
 | [LineBoy](LineBoy/README.md) | Monochrome DOS-style line-grid display experiment. |
 | [VGMManDocs](VGMManDocs/README.md) | Native viewer and editor for the family's published Markdown library. |
+
+UAC package editing and wrapper tools live in the sibling [UAC Tags](../UACMAN/UAC%20Tags/README.md)
+project. VGMMan packages consume its shared wrapper from the workspace.
 
 LaunchPad remains a sibling workspace tool because it launches projects beyond
 this family.
@@ -52,5 +54,3 @@ Family plans and evidence:
   — scanner routes and inspection boundaries.
 - [`VGMManDocs/Docs/md/MetaMan/format-layouts.md`](VGMManDocs/Docs/md/MetaMan/format-layouts.md)
   — native metadata layouts and bounded reader contracts.
-- [`UACMan/ai/subsystem-agent/container-boundary.md`](UACMan/ai/subsystem-agent/container-boundary.md)
-  — closed native SPC conversion decision and the supported wrapper boundary.
