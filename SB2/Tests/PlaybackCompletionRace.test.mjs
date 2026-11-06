@@ -175,6 +175,30 @@ test('a newer playing status still rejects a deferred stale end', async () => {
   assert.equal(claims, 0);
 });
 
+test('an older duplicate cannot replace a newer deferred end', async () => {
+  for (const staleSequence of [19, undefined]) {
+    const state = { currentTrackId: 'old', nativePlayback: { generation: 12, statusSequence: 20, transportState: 'playing' } };
+    let claims = 0;
+    const gate = makeIntentGate(state, async () => { claims++; });
+    const intent = gate.beginPlaybackIntent('new');
+    await gate.handleNativePlaybackEnded({ generation: 12, status_sequence: 21, transport_state: 'ended' });
+    await gate.handleNativePlaybackEnded({ generation: 12, status_sequence: staleSequence, transport_state: 'ended' });
+    await gate.finishPlaybackIntent(intent);
+    assert.equal(claims, 1, `stale sequence ${staleSequence}`);
+  }
+});
+
+test('a newer duplicate replaces a stale deferred end', async () => {
+  const state = { currentTrackId: 'old', nativePlayback: { generation: 12, statusSequence: 20, transportState: 'playing' } };
+  let claims = 0;
+  const gate = makeIntentGate(state, async () => { claims++; });
+  const intent = gate.beginPlaybackIntent('new');
+  await gate.handleNativePlaybackEnded({ generation: 12, status_sequence: 19, transport_state: 'ended' });
+  await gate.handleNativePlaybackEnded({ generation: 12, status_sequence: 21, transport_state: 'ended' });
+  await gate.finishPlaybackIntent(intent);
+  assert.equal(claims, 1);
+});
+
 test('superseded intent leaves completion to the newest intent and stop cancels it', async () => {
   const state = { currentTrackId: 'old', nativePlayback: { generation: 12 } };
   let claims = 0;
