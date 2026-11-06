@@ -49,6 +49,22 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Playlist XA export, 2026-11-05: an isolated SB2 release from `2717ef29` used
+separate identity and redirected catalog, favorites, history, tabs and cache.
+A setup-only overlay inserted the original SOTN XA UAC member as a playlist
+row and set an isolated export directory; playback and export were then
+started by double-clicking the actual row and choosing its `Export AAC` context
+menu. With a test-only 25-second export-progress delay, the ordinary Pause
+button returned while rendering was held; after export the native state was
+still paused at generation 1 and the renderer retained the same track. The
+four-second output had 175 stereo AAC frames at 44.1 kHz, SHA-256
+`074f4551ddaee01b1a3e175d7236ee425047db0f41f2d67174cec30316fdb70e`,
+matching the previous renderer-driven export. macOS logged a Downloads access
+prompt for the temporary identity, followed by a result; no prompt appeared in
+the observed app view. This test used muted output and an injected playlist
+row, so it does not prove audible continuity or catalog-to-playlist loading.
+The normal SB2 tabs file modification time remained unchanged.
+
 Original-path SB2 control retest, 2026-11-05: an isolated release built from
 `fba75b68` used the original SOTN UAC path, redirected catalog, favorites,
 history, tabs and cache, and the temporary
