@@ -16,6 +16,9 @@ const metadataRefreshTrackIds = new Set();
 let columnMenu = null;
 let autoSizedPlaylistSignature = null;
 let playlistRenderGeneration = 0;
+let playlistMarqueeGesture = null;
+let playlistMarqueeSuppressClick = false;
+let playlistMarqueeScrollFrame = 0;
 const displayedPathHintCache = new WeakMap();
 let columnMinimumWidths = new Map();
 let columnMinimumWidthsSignature = null;
@@ -33,6 +36,7 @@ let databaseGameButtonsByID = new Map();
 let databaseConsoleGroups = [];
 let collapsedDatabaseConsoles = new Set();
 let databaseRowRenderGeneration = 0;
+let treeRenderGeneration = 0;
 let databaseSearchVisibilityGeneration = 0;
 let databaseSearchVisibilityFrame = 0;
 let browserClickTimer = 0;
@@ -769,6 +773,7 @@ function applySidebarSearch(query, matchingIDs = null) {
 function updateSidebarSearch(query) {
   const requestedQuery = String(query || "");
   sidebarSearchGeneration += 1;
+  treeRenderGeneration += 1;
   const generation = sidebarSearchGeneration;
   window.clearTimeout(sidebarSearchTimer);
   sidebarSearchTimer = 0;
@@ -785,7 +790,7 @@ function updateSidebarSearch(query) {
     } else {
       applySidebarSearch(requestedQuery);
     }
-  }, 35);
+  }, 100);
 }
 
 async function syncSidebarView() {
@@ -1178,6 +1183,7 @@ function escapeHtml(value) {
 
 function resetSidebarContent() {
   databaseAlbumFavoriteButtons.clear();
+  treeRenderGeneration += 1;
   databaseRowRenderGeneration += 1;
   databaseSearchVisibilityGeneration += 1;
   if (databaseSearchVisibilityFrame) window.cancelAnimationFrame(databaseSearchVisibilityFrame);
@@ -1797,14 +1803,154 @@ function renderTreeNode(node, container) {
 
   wrapper.appendChild(button);
 
+  let childContainer = null;
   if (node.kind === "folder" && node.children.length && expanded) {
     const group = document.createElement("div");
     group.className = "tree-group";
-    node.children.forEach((child) => renderTreeNode(child, group));
     wrapper.appendChild(group);
+    childContainer = group;
   }
 
   container.appendChild(wrapper);
+  return childContainer;
+}
+
+function renderTreeNodes(tree) {
+  const stack = [{ nodes: tree, container: refs.treeRoot, index: 0 }];
+  while (stack.length) {
+    const frame = stack[stack.length - 1];
+    if (frame.index >= frame.nodes.length) {
+      stack.pop();
+      continue;
+    }
+    const node = frame.nodes[frame.index++];
+    const childContainer = renderTreeNode(node, frame.container);
+    if (childContainer) stack.push({ nodes: node.children, container: childContainer, index: 0 });
+  }
+}
+
+function nextTreeRenderFrame() {
+  return new Promise((resolve) => window.requestAnimationFrame(resolve));
+}
+
+async function yieldSidebarWorkIfNeeded(generation, budget) {
+  if (performance.now() - budget.startedAt < 8) return true;
+  await nextTreeRenderFrame();
+  budget.startedAt = performance.now();
+  return generation === treeRenderGeneration;
+}
+
+async function filteredTreeForSearch(generation) {
+  const candidateTree = currentSidebarView().contentMode === "tree" ? state.databaseFileTree : state.tree;
+  const baseTree = Array.isArray(candidateTree) ? candidateTree : [];
+  let sourceTree = baseTree;
+  const budget = { startedAt: performance.now() };
+
+  if (isGalleryActive() && currentSidebarView().contentMode === "tree") {
+    if (!state.galleryGamesLoaded) return [];
+    const artworkPaths = new Set(state.galleryGames.map((game) => game.sourcePath));
+    const filteredByNode = new Map();
+    const stack = [];
+    for (let index = baseTree.length - 1; index >= 0; index -= 1) stack.push({ node: baseTree[index], visited: false });
+    while (stack.length) {
+      const frame = stack.pop();
+      const node = frame.node;
+      if (!frame.visited && Array.isArray(node.children) && node.children.length) {
+        stack.push({ node, visited: true });
+        for (let index = node.children.length - 1; index >= 0; index -= 1) {
+          stack.push({ node: node.children[index], visited: false });
+        }
+      } else if ((Array.isArray(node.children) && node.children.length) || node.kind === "folder") {
+        const children = (node.children || []).map((child) => filteredByNode.get(child)).filter(Boolean);
+        filteredByNode.set(node, children.length ? { ...node, children } : null);
+      } else {
+        const sourcePath = node.catalogFile?.path || node.path;
+        filteredByNode.set(node, artworkPaths.has(sourcePath) ? node : null);
+      }
+      if (performance.now() - budget.startedAt >= 8
+          && !await yieldSidebarWorkIfNeeded(generation, budget)) return null;
+    }
+    sourceTree = baseTree.map((node) => filteredByNode.get(node)).filter(Boolean);
+  }
+
+  let records;
+  if (treeSearchSource === sourceTree) {
+    records = treeSearchRecords;
+  } else {
+    records = [];
+    const stack = [];
+    for (let index = sourceTree.length - 1; index >= 0; index -= 1) {
+      stack.push({ node: sourceTree[index], parent: null });
+    }
+    while (stack.length) {
+      const { node, parent } = stack.pop();
+      let searchText = treeSearchText.get(node);
+      if (searchText === undefined) {
+        searchText = `${node.name || ""} ${node.path || ""}`.toLowerCase();
+        treeSearchText.set(node, searchText);
+      }
+      const record = { node, parent, searchText };
+      records.push(record);
+      if (Array.isArray(node.children)) {
+        for (let index = node.children.length - 1; index >= 0; index -= 1) {
+          stack.push({ node: node.children[index], parent: record });
+        }
+      }
+      if (performance.now() - budget.startedAt >= 8
+          && !await yieldSidebarWorkIfNeeded(generation, budget)) return null;
+    }
+    treeSearchSource = sourceTree;
+    treeSearchRecords = records;
+  }
+
+  const terms = normalizedSidebarQuery(state.sidebarQuery).split(/\s+/).filter(Boolean);
+  const matches = [];
+  for (const record of records) {
+    if (terms.every((term) => record.searchText.includes(term))) matches.push(record);
+    if (performance.now() - budget.startedAt >= 8
+        && !await yieldSidebarWorkIfNeeded(generation, budget)) return null;
+  }
+  if (!matches.length) return [];
+
+  const included = new Set();
+  for (const match of matches) {
+    for (let record = match; record && !included.has(record); record = record.parent) included.add(record);
+    if (performance.now() - budget.startedAt >= 8
+        && !await yieldSidebarWorkIfNeeded(generation, budget)) return null;
+  }
+
+  const clones = new Map();
+  const roots = [];
+  for (const record of records) {
+    if (!included.has(record)) continue;
+    const clone = { ...record.node, children: [] };
+    clones.set(record, clone);
+    const parent = record.parent ? clones.get(record.parent) : null;
+    if (parent) parent.children.push(clone);
+    else roots.push(clone);
+    if (performance.now() - budget.startedAt >= 8
+        && !await yieldSidebarWorkIfNeeded(generation, budget)) return null;
+  }
+  return roots;
+}
+
+async function renderTreeNodesIncrementally(tree, generation) {
+  const stack = [{ nodes: tree, container: refs.treeRoot, index: 0 }];
+  const budget = { startedAt: performance.now() };
+  while (stack.length) {
+    if (generation !== treeRenderGeneration) return false;
+    const frame = stack[stack.length - 1];
+    if (frame.index >= frame.nodes.length) {
+      stack.pop();
+      continue;
+    }
+    const node = frame.nodes[frame.index++];
+    const childContainer = renderTreeNode(node, frame.container);
+    if (childContainer) stack.push({ nodes: node.children, container: childContainer, index: 0 });
+    if (performance.now() - budget.startedAt >= 8
+        && !await yieldSidebarWorkIfNeeded(generation, budget)) return false;
+  }
+  return true;
 }
 
 document.addEventListener("pointerdown", (event) => {
@@ -1895,6 +2041,40 @@ function renderTree() {
   databaseConsoleGroups = [];
   selectedBrowserButton = null;
   resetSidebarContent();
+  const query = state.sidebarQuery.trim();
+  if (query) {
+    const generation = treeRenderGeneration;
+    updateSidebarStats("Searching paths…");
+    void (async () => {
+      const visibleTree = await filteredTreeForSearch(generation);
+      if (generation !== treeRenderGeneration || !visibleTree) return;
+      if (visibleTree.length === 0) {
+        if (state.databaseSidebarError) {
+          updateSidebarStats(state.databaseSidebarError, { error: true });
+        } else if (isGalleryActive() && !state.galleryGamesLoaded) {
+          updateSidebarStats("Loading artwork index…");
+        } else if (isGalleryActive() && state.galleryGamesError) {
+          updateSidebarStats(state.galleryGamesError, { error: true });
+        } else if (isGalleryActive() && !state.galleryGames.length) {
+          updateSidebarStats("No Title Snap artwork is indexed.", {
+            title: "No Title Snap artwork is indexed. Scan the library with ScanSong."
+          });
+        } else {
+          updateSidebarStats("No catalog paths match this search.");
+        }
+        syncSidebarFoldButton();
+        return;
+      }
+
+      if (!await renderTreeNodesIncrementally(visibleTree, generation)) return;
+      if (generation !== treeRenderGeneration) return;
+      updateSidebarStats();
+      syncSidebarFoldButton();
+      syncTreeSelection();
+    })();
+    return;
+  }
+
   const visibleTree = filteredTree();
   if (visibleTree.length === 0) {
     if (state.databaseSidebarError) {
@@ -1917,7 +2097,7 @@ function renderTree() {
   }
 
   ensureExpandedToSelection(visibleTree);
-  visibleTree.forEach((node) => renderTreeNode(node, refs.treeRoot));
+  renderTreeNodes(visibleTree);
   updateSidebarStats();
   syncSidebarFoldButton();
 }
@@ -3953,6 +4133,137 @@ function playlistSelectedIDs() {
   return selected;
 }
 
+function updatePlaylistMarquee() {
+  const gesture = playlistMarqueeGesture;
+  if (!gesture?.active) return;
+  const wrapRect = refs.playlistBodyWrap.getBoundingClientRect();
+  const left = Math.min(gesture.startX, gesture.currentX);
+  const right = Math.max(gesture.startX, gesture.currentX);
+  const top = Math.min(gesture.startY, gesture.currentY);
+  const bottom = Math.max(gesture.startY, gesture.currentY);
+  const marquee = refs.playlistMarquee;
+  marquee.classList.remove("is-hidden");
+  marquee.style.left = `${left - wrapRect.left + refs.playlistBodyWrap.scrollLeft}px`;
+  marquee.style.top = `${top - wrapRect.top + refs.playlistBodyWrap.scrollTop}px`;
+  marquee.style.width = `${Math.max(1, right - left)}px`;
+  marquee.style.height = `${Math.max(1, bottom - top)}px`;
+
+  const rows = [...refs.playlistBody.querySelectorAll(".playlist-row")];
+  const selectedIDs = new Set(gesture.baseSelection);
+  const intersectingRows = [];
+  for (const row of rows) {
+    const rect = row.getBoundingClientRect();
+    const intersects = rect.right >= left && rect.left <= right && rect.bottom >= top && rect.top <= bottom;
+    if (!intersects) continue;
+    selectedIDs.add(row.dataset.trackId);
+    gesture.intersectedIDs.add(row.dataset.trackId);
+    intersectingRows.push(row);
+  }
+  if (gesture.didAutoScroll) {
+    for (const id of gesture.intersectedIDs) selectedIDs.add(id);
+  }
+  const orderedVisibleIDs = gesture.didAutoScroll
+    ? [...selectedIDs]
+    : rows.map((row) => row.dataset.trackId).filter((id) => selectedIDs.has(id));
+  const visibleIDSet = new Set(rows.map((row) => row.dataset.trackId));
+  const hiddenBaseIDs = [...selectedIDs].filter((id) => !visibleIDSet.has(id));
+  state.selectedTrackIds = [...hiddenBaseIDs, ...orderedVisibleIDs.filter((id) => visibleIDSet.has(id))];
+  state.selectedTrackId = intersectingRows.at(-1)?.dataset.trackId
+    || [...gesture.intersectedIDs].at(-1)
+    || orderedVisibleIDs.at(-1)
+    || hiddenBaseIDs.at(-1)
+    || null;
+  state.playlistSelectionAnchorId = gesture.anchorTrackId
+    || intersectingRows[0]?.dataset.trackId
+    || state.selectedTrackId;
+  lastPlaylistSelectionID = state.selectedTrackId;
+
+  for (const [id, row] of playlistRowsByTrackId) updatePlaylistRowState(row, id);
+  selectedPlaylistRow = state.selectedTrackId ? playlistRowsByTrackId.get(state.selectedTrackId) || null : null;
+  if (isAvailableInteractionTarget(selectedPlaylistRow)) selectInteractionTarget(selectedPlaylistRow);
+  if (selectedPlaylistRow) schedulePlaylistSelectionIndicator();
+  else hideSelectionIndicator(refs.playlistSelectionIndicator);
+}
+
+function startPlaylistMarquee(event) {
+  if (event.button !== 0 || !event.isPrimary || state.optionsOpen) return;
+  if (!refs.playlistBodyWrap.contains(event.target)) return;
+  if (event.target.closest("button, input, select, a, [contenteditable=true]")) return;
+  const row = event.target.closest(".playlist-row");
+  playlistMarqueeGesture = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    currentX: event.clientX,
+    currentY: event.clientY,
+    anchorTrackId: row?.dataset.trackId || null,
+    baseSelection: event.metaKey || event.ctrlKey ? new Set(state.selectedTrackIds) : new Set(),
+    intersectedIDs: new Set(),
+    didAutoScroll: false,
+    active: false
+  };
+}
+
+function schedulePlaylistMarqueeAutoScroll() {
+  playlistMarqueeScrollFrame = 0;
+  const gesture = playlistMarqueeGesture;
+  if (!gesture?.active) return;
+  const rect = refs.playlistBodyWrap.getBoundingClientRect();
+  const edge = Math.min(48, Math.max(24, rect.height * 0.12));
+  let delta = 0;
+  if (gesture.currentY < rect.top + edge) {
+    delta = -Math.max(3, Math.min(24, Math.round((rect.top + edge - gesture.currentY) * 0.45)));
+  } else if (gesture.currentY > rect.bottom - edge) {
+    delta = Math.max(3, Math.min(24, Math.round((gesture.currentY - (rect.bottom - edge)) * 0.45)));
+  }
+  if (delta) {
+    const previousScrollTop = refs.playlistBodyWrap.scrollTop;
+    refs.playlistBodyWrap.scrollTop += delta;
+    if (refs.playlistBodyWrap.scrollTop !== previousScrollTop) {
+      gesture.didAutoScroll = true;
+      updatePlaylistMarquee();
+    }
+  }
+  playlistMarqueeScrollFrame = window.requestAnimationFrame(schedulePlaylistMarqueeAutoScroll);
+}
+
+function movePlaylistMarquee(event) {
+  const gesture = playlistMarqueeGesture;
+  if (!gesture || gesture.pointerId !== event.pointerId) return;
+  gesture.currentX = event.clientX;
+  gesture.currentY = event.clientY;
+  if (!gesture.active && Math.hypot(gesture.currentX - gesture.startX, gesture.currentY - gesture.startY) < 4) return;
+  if (!gesture.active) {
+    gesture.active = true;
+    document.body.classList.add("is-playlist-marquee-selecting");
+    refs.playlistBodyWrap.setPointerCapture?.(event.pointerId);
+    playlistMarqueeScrollFrame = window.requestAnimationFrame(schedulePlaylistMarqueeAutoScroll);
+  }
+  event.preventDefault();
+  updatePlaylistMarquee();
+}
+
+function finishPlaylistMarquee(event) {
+  const gesture = playlistMarqueeGesture;
+  if (!gesture || gesture.pointerId !== event.pointerId) return;
+  playlistMarqueeGesture = null;
+  if (playlistMarqueeScrollFrame) window.cancelAnimationFrame(playlistMarqueeScrollFrame);
+  playlistMarqueeScrollFrame = 0;
+  document.body.classList.remove("is-playlist-marquee-selecting");
+  refs.playlistMarquee.classList.add("is-hidden");
+  if (!gesture.active) return;
+  playlistMarqueeSuppressClick = true;
+  window.setTimeout(() => { playlistMarqueeSuppressClick = false; }, 0);
+  persistPlaylistTabs();
+  uiApp.playback.updateTimingSummary();
+  event.preventDefault();
+}
+
+refs.playlistBodyWrap.addEventListener("pointerdown", startPlaylistMarquee);
+document.addEventListener("pointermove", movePlaylistMarquee, { passive: false });
+document.addEventListener("pointerup", finishPlaylistMarquee);
+document.addEventListener("pointercancel", finishPlaylistMarquee);
+
 function updatePlaylistRowState(row, trackId) {
   if (!row) return;
   row.classList.toggle("is-selected", playlistSelectedIDs().has(trackId));
@@ -4127,6 +4438,11 @@ function createPlaylistRow(track, rowIndex) {
 
   row.addEventListener("click", (event) => {
     if (!row.isConnected || row.dataset.trackId !== track.id) return;
+    if (playlistMarqueeSuppressClick) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (event.target?.closest?.("button, input, select, a, [contenteditable=true]")) return;
     const selectedTrack = selectPlaylistTrack(track.id, {
       extend: event.metaKey || event.ctrlKey,
@@ -4573,8 +4889,13 @@ function selectAllPlaylistTracks() {
   state.selectedTrackId = state.playlist[0].id;
   lastPlaylistSelectionID = state.selectedTrackId;
   state.playlistSelectionAnchorId = state.selectedTrackId;
-  persistSettings();
+  selectedPlaylistRow = playlistRowsByTrackId.get(state.selectedTrackId) || null;
+  if (isAvailableInteractionTarget(selectedPlaylistRow)) selectInteractionTarget(selectedPlaylistRow);
+  persistPlaylistTabs();
   refreshPlaylistPlaybackState();
+  if (selectedPlaylistRow) schedulePlaylistSelectionIndicator();
+  else hideSelectionIndicator(refs.playlistSelectionIndicator);
+  uiApp.playback.updateTimingSummary();
 }
 
 function playSelectedTrack() {
@@ -4695,8 +5016,13 @@ function persistEqualizerSettings() {
   }).catch?.((error) => console.error("[SPCBoy] native equalizer settings save failed", error));
 }
 
+function markEqualizerProfileModified() {
+  refs.equalizerProfileStatus.textContent = "Unsaved changes";
+}
+
 function syncEqualizerControls() {
   refs.equalizerEnabledCheckbox.checked = state.equalizerEnabled;
+  refs.equalizerProfileSelect.value = String(uiApp.normalizeEqualizerProfileIndex(state.activeEqualizerProfileIndex));
   refs.equalizerToolbarButton.classList.toggle("is-selected", state.equalizerEnabled);
   refs.equalizerToolbarButton.setAttribute("aria-pressed", state.equalizerEnabled ? "true" : "false");
   refs.equalizerToolbarButton.title = state.equalizerEnabled ? "Disable Equalizer" : "Enable Equalizer";
@@ -4708,8 +5034,32 @@ function syncEqualizerControls() {
   syncAnimatedRanges();
 }
 
+function selectEqualizerProfile(index) {
+  state.activeEqualizerProfileIndex = uiApp.normalizeEqualizerProfileIndex(index);
+  state.equalizerProfiles = uiApp.normalizeEqualizerProfiles(state.equalizerProfiles);
+  const profile = state.equalizerProfiles[state.activeEqualizerProfileIndex];
+  state.equalizerEnabled = profile.enabled;
+  state.equalizerBandGains = [...profile.bandGains];
+  refs.equalizerProfileStatus.textContent = `Loaded Profile ${state.activeEqualizerProfileIndex + 1}`;
+  persistSettings();
+  sendEqualizerSettings();
+  syncEqualizerControls();
+}
+
+function saveEqualizerProfile() {
+  state.activeEqualizerProfileIndex = uiApp.normalizeEqualizerProfileIndex(state.activeEqualizerProfileIndex);
+  state.equalizerProfiles = uiApp.normalizeEqualizerProfiles(state.equalizerProfiles);
+  state.equalizerProfiles[state.activeEqualizerProfileIndex] = {
+    enabled: Boolean(state.equalizerEnabled),
+    bandGains: [...state.equalizerBandGains]
+  };
+  refs.equalizerProfileStatus.textContent = `Saved Profile ${state.activeEqualizerProfileIndex + 1}`;
+  persistSettings();
+}
+
 function setEqualizerEnabled(enabled) {
   state.equalizerEnabled = Boolean(enabled);
+  markEqualizerProfileModified();
   persistEqualizerSettings();
   sendEqualizerSettings();
   syncEqualizerControls();
@@ -4718,6 +5068,7 @@ function setEqualizerEnabled(enabled) {
 function setEqualizerBandGain(index, gain) {
   if (!state.equalizerBandGains[index]) state.equalizerBandGains[index] = 0;
   state.equalizerBandGains[index] = uiApp.normalizeEqualizerGain(gain);
+  markEqualizerProfileModified();
   persistEqualizerSettings();
   sendEqualizerSettings();
   syncEqualizerControls();
@@ -4725,6 +5076,7 @@ function setEqualizerBandGain(index, gain) {
 
 function resetEqualizer() {
   state.equalizerBandGains = state.equalizerBandGains.map(() => 0);
+  markEqualizerProfileModified();
   persistEqualizerSettings();
   sendEqualizerSettings();
   syncEqualizerControls();
@@ -5454,6 +5806,8 @@ uiApp.ui = {
   setArchiveCacheLimit,
   setEqualizerEnabled,
   setEqualizerBandGain,
+  selectEqualizerProfile,
+  saveEqualizerProfile,
   resetEqualizer,
   setAppVolume,
   setToolbarVolumePopoverOpen,

@@ -93,6 +93,11 @@ The native bridge merges patches into the current typed snapshot under one
 recursive lock, shared with snapshot loads and EQ patch writes. Broadcast only
 the normalized fields that changed. Preserve explicit nulls when clearing an
 optional field. Consumers must not default absent fields in a patch.
+SB2 stores ten EQ profiles and the active profile index in that same snapshot.
+Each profile has an enabled flag and ten normalized half-decibel gains. When a
+snapshot predates profiles, seed Profile 1 from the legacy current EQ settings;
+initialize the other slots flat and disabled. Changing the active slot applies
+its saved EQ state, while Save copies the current EQ state into that slot.
 
 ## Workspace lifetime
 
@@ -115,6 +120,11 @@ visible range and retain overlapping rows, without rebuilding all playlist IDs
 or recomputing column visibility. Selection membership sets are cached by the
 immutable selected-ID array, so Select All does not add a full-list scan to each
 visible row update. Replace selected-ID arrays rather than mutating them.
+Playlist rows support drag-marquee selection using the accent selection surface.
+Keep pointer capture, virtual-row membership, optional modifier-add behavior,
+and the shared selection indicator in sync. Persist the final multi-selection
+to the active playlist tab when the gesture ends. Command-A (Control-A on
+Windows) selects all playlist rows when focus is in the playlist.
 
 Column sizing uses the complete CatalogReader content hints, mapping their
 projection field names (`fileText`, `titleText`, `authorText`, and related

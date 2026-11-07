@@ -897,8 +897,25 @@ body[data-playlist-link-mode="on"] .playlist-row > td * {
 }
 
 .playlist-row.is-selected {
-  background: transparent;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
+
+.playlist-row.is-selected td { color: color-mix(in srgb, var(--accent) 58%, white); }
+
+.playlist-marquee {
+  position: absolute;
+  z-index: 4;
+  border: 1px solid color-mix(in srgb, var(--accent) 88%, white);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 16%);
+  pointer-events: none;
+}
+
+.playlist-marquee.is-hidden { display: none; }
+
+body.is-playlist-marquee-selecting,
+body.is-playlist-marquee-selecting * { cursor: crosshair !important; }
 
 .playlist-virtual-spacer,
 .playlist-virtual-spacer td {
@@ -1305,6 +1322,10 @@ body[data-playlist-link-mode="on"] .playlist-row > td * {
 .equalizer-band output, #app-volume-value { min-width: 4.5rem; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
 .equalizer-bands .equalizer-band > span:first-child,
 .equalizer-bands .equalizer-band output { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.equalizer-profile-row { display: grid; grid-template-columns: 4rem minmax(0, 1fr) auto; align-items: center; gap: var(--space-1); color: var(--text); }
+.equalizer-profile-row select { width: 100%; min-width: 0; text-align: left; }
+.equalizer-profile-row .tool-button { white-space: nowrap; }
+.equalizer-profile-status:empty { display: none; }
 .options-inline-trailing .range-slider { width: 12rem; }
 
 .range-slider {

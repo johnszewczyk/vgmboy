@@ -124,6 +124,7 @@
               </div>
               <div class="playlist-body-wrap sb-scroll-fade">
                 <div id="playlist-selection-indicator" class="list-selection-indicator is-hidden" aria-hidden="true"></div>
+                <div id="playlist-marquee" class="playlist-marquee is-hidden" aria-hidden="true"></div>
                 <table class="playlist-table playlist-body-table">
                   <tbody id="playlist-body"></tbody>
                 </table>
@@ -305,6 +306,18 @@
                 <h2 class="options-subpanel-title">Equalizer</h2>
                 <div class="options-help-text">Equalizer gains apply to SPCBoy playback only.</div>
                 <label class="options-field options-inline-field"><span>Equalizer</span><input id="equalizer-enabled-checkbox" type="checkbox" /></label>
+                <div class="equalizer-profile-row">
+                  <label for="equalizer-profile-select">Profile</label>
+                  <select id="equalizer-profile-select" class="options-input" aria-label="Equalizer profile">
+                    <option value="0">Profile 1</option><option value="1">Profile 2</option>
+                    <option value="2">Profile 3</option><option value="3">Profile 4</option>
+                    <option value="4">Profile 5</option><option value="5">Profile 6</option>
+                    <option value="6">Profile 7</option><option value="7">Profile 8</option>
+                    <option value="8">Profile 9</option><option value="9">Profile 10</option>
+                  </select>
+                  <button id="equalizer-profile-save-button" class="tool-button" type="button">Save</button>
+                </div>
+                <output id="equalizer-profile-status" class="options-help-text equalizer-profile-status" aria-live="polite"></output>
                 <div class="equalizer-bands">
                   <label class="equalizer-band"><span>31 Hz</span><input data-vgm-range-slider data-equalizer-band="0" class="animated-range" type="range" min="-12" max="12" step="0.5" value="0" aria-label="31 Hz equalizer gain" /><output data-equalizer-value="0">0.0 dB</output></label>
                   <label class="equalizer-band"><span>62 Hz</span><input data-vgm-range-slider data-equalizer-band="1" class="animated-range" type="range" min="-12" max="12" step="0.5" value="0" aria-label="62 Hz equalizer gain" /><output data-equalizer-value="1">0.0 dB</output></label>

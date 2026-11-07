@@ -19,6 +19,7 @@ extension FrontendPreferencesKeySet {
 struct SB2PreferencesSnapshot: Codable, Sendable {
     enum SnapshotError: Error { case invalidJSON }
     struct PlaybackRate: Codable, Sendable { var numerator: Int?; var denominator: Int? }
+    struct EqualizerProfile: Codable, Sendable { var enabled: Bool?; var bandGains: [Double]? }
     enum RepeatMode: String, Codable, Sendable { case off, all, one }
     enum SidebarMode: String, Codable, Sendable { case paths, consoles, diskPath, favorites }
     enum FavoriteOrder: String, Codable, Sendable { case historical, alphabetical }
@@ -45,6 +46,8 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
     var fadeEnabled: Bool?
     var equalizerEnabled: Bool?
     var equalizerBandGains: [Double]?
+    var equalizerProfiles: [EqualizerProfile]?
+    var activeEqualizerProfileIndex: Int?
     var appVolume: Double?
     var monoEnabled: Bool?
     var spcFadeSeconds: Int?
@@ -215,6 +218,7 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
             playlistFontSizePt = sharedContentSize
         }
         normalizeSharedPlaybackPreferences()
+        normalizeEqualizerProfiles()
         normalizePlaylistColumnPreferences()
         autoResizeAnimationMilliseconds = FrontendAnimationTimings.clamp(
             autoResizeAnimationMilliseconds ?? FrontendAnimationTimings.defaultDurationMilliseconds
@@ -274,6 +278,39 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
         playbackSpeedEnabled = shared.playbackTempoEnabled
         libvgmPlaybackSpeed = nil
         libvgmPlaybackSpeedEnabled = nil
+    }
+
+    private mutating func normalizeEqualizerProfiles() {
+        let savedProfiles = equalizerProfiles
+        let hasSavedProfiles: Bool
+        if case .some = savedProfiles {
+            hasSavedProfiles = true
+        } else {
+            hasSavedProfiles = false
+        }
+        let legacyProfile = EqualizerProfile(
+            enabled: equalizerEnabled ?? false,
+            bandGains: equalizerBandGains ?? []
+        )
+        equalizerProfiles = (0..<10).map { profileIndex in
+            let profile: EqualizerProfile
+            if let savedProfiles, savedProfiles.indices.contains(profileIndex) {
+                profile = savedProfiles[profileIndex]
+            } else if !hasSavedProfiles && profileIndex == 0 {
+                profile = legacyProfile
+            } else {
+                profile = EqualizerProfile(enabled: false, bandGains: [])
+            }
+            let sourceGains = profile.bandGains ?? []
+            let gains = (0..<10).map { bandIndex -> Double in
+                guard sourceGains.indices.contains(bandIndex) else { return 0 }
+                let value = sourceGains[bandIndex]
+                guard value.isFinite else { return 0 }
+                return min(12, max(-12, (value * 2).rounded() / 2))
+            }
+            return EqualizerProfile(enabled: profile.enabled ?? false, bandGains: gains)
+        }
+        activeEqualizerProfileIndex = min(9, max(0, activeEqualizerProfileIndex ?? 0))
     }
 
     private mutating func normalizePlaylistColumnPreferences() {

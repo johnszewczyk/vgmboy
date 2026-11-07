@@ -12,6 +12,9 @@
 - SPCBOY owns Database, Gallery, UI Chrome, UI Fonts, and Windows settings.
   VGMBoy owns Audio, Diagnostics, Playback, and Routing settings; the
   navigation keeps these groups separate.
+- Audio > Equalizer has ten numbered profiles. Selecting a profile loads its
+  enabled state and ten band gains; Save stores the current curve in that slot.
+  Editing a curve marks it unsaved. Older settings migrate into Profile 1.
 - Pages stay alphabetical within their owner groups: Database, Gallery, UI
   Chrome, UI Fonts, Windows; then Audio, Diagnostics, Playback, Routing.
   Section groups within pages are alphabetical.
