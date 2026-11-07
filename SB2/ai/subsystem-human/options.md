@@ -9,23 +9,27 @@
   the app title and status bars visible.
 - Opening Options moves keyboard focus to Close Options; closing returns focus
   to the control that opened it.
-- SPCBOY owns Database, Gallery, UI Chrome, UI Fonts, and Windows settings.
-  VGMBoy owns Audio, Diagnostics, Playback, and Routing settings; the
-  navigation keeps these groups separate.
+- SPCBOY owns Database, Gallery, UI Chrome, UI Fonts, Windows, and Options
+  layout settings. VGMBoy owns Audio, Diagnostics, Playback, and Routing
+  settings. The four visible pages group these by use while keeping each
+  setting's existing persistence and owner logic intact: Gallery; Interface
+  (UI Chrome, UI Fonts, Windows, and layout); Sound (Audio and Playback); and
+  System (Database, Diagnostics, and Routing).
 - Audio > Equalizer has ten numbered profiles. Selecting a profile loads its
-  enabled state and ten band gains; Save stores the current curve in that slot.
-  Editing a curve marks it unsaved. Older settings migrate into Profile 1.
-- Pages stay alphabetical within their owner groups: Database, Gallery, UI
-  Chrome, UI Fonts, Windows; then Audio, Diagnostics, Playback, Routing.
-  Section groups within pages are alphabetical.
+  enabled state and ten band gains; the ten numbered profile slots select a
+  profile and Save stores the current curve in that slot. Editing a curve
+  marks it unsaved. Older settings migrate into Profile 1.
 - Command-W dismisses the in-page Options overlay before it closes a playlist
   tab. In the separate Options window, Command-W closes that window.
-- The options sidebar groups SPCBOY-owned frontend settings separately from
-  VGMBoy-owned playback-core settings. Keep that ownership split when adding
-  settings. Owner headings use the underlined text-heading style from the
-  Options pages; category items reuse the common toolbar button surface and
-  selected state. Navigation controls and owner groups use the same shared gap
-  and inset as the home toolbars, playlist tabs, and column headers.
+- Options uses four equal-width top tabs. Each page lays its setting cards out
+  left to right, then wraps to the next row. The minimum card width defaults to
+  60ch and is adjustable from Interface > Layout (40–100ch); that choice is
+  saved in native SB2 preferences. Keep the card order in source order and the
+  ownership split described above when adding settings. Card headings and the
+  Options header divider use the accent color.
+- Gallery artwork fit uses Crop/Pad buttons. Archive cache size is entered in
+  GB; the configured cache cap snaps to the nearest supported size (2, 4, 8,
+  or 16 GB).
 - Playback volume uses twenty 5% steps in Options and in the compact Volume
   popup on the home toolbar. The home popup stays behind the Options layer.
 - One playback speed setting applies to every format whose decoder supports
@@ -35,10 +39,13 @@
   that configured rate while preserving its saved value.
   AAC export captures the enabled speed when export begins and uses the same
   format-specific speed limits as playback.
-- Option pages use a readable system font and a 65-character content width.
-  Section headings are underlined; setting rows use whitespace without
-  divider lines. UI Chrome and UI Fonts are separate SPCBOY pages. UI Fonts
-  exposes playlist-header styling and titlebar font color and bold controls.
+- Option pages use the readable SB2 interface font and the available window
+  width. Cards in one grid row stretch to the same height. Setting rows use a
+  56/44 label/control split with controls centered vertically and dividers
+  between rows. The Equalizer card spans the full row and keeps all ten gain
+  sliders in one vertical column. UI Chrome and UI Fonts share the Interface
+  page; UI Fonts exposes playlist-header styling and titlebar font color and
+  bold controls.
   The Gallery page controls crop-to-square or pad-to-square artwork fit, frame
   size, gap, and corner radius. Each card keeps inset square artwork with a
   separate one-line title nametag. Titles use the Sidebar + Playlist font size
@@ -58,12 +65,10 @@
   Playlist Font Size setting; Row Gap likewise controls vertical spacing in
   both panes.
 - Action buttons across the home screen and Options use the same surface,
-  corner radius, hover colors, selected colors, and height. Text buttons keep
-  natural width except where a grouped action row gives them equal widths.
-  Setting fields share the control height and a fixed 24ch width, scaling
-  together to 16ch on narrow windows. CSS color fields are 20ch wide so
-  the longest named color fits without oversized controls. Database path
-  readouts keep that height and use the available row width.
+  corner radius, hover colors, selected colors, and height. Buttons in grouped
+  actions share their card width equally. Setting fields use the control half
+  of each row; CSS color fields and database path readouts can use their full
+  available control width.
 - Sidebar folders and console groups open and close immediately.
 - UI Chrome > Animations controls the shared selector motion across interface
   hovers, keyboard focus, and selected rows. Turning it off sets the transition

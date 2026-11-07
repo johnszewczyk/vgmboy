@@ -108,7 +108,11 @@ function applyGallerySettings() {
   if (refs.gallerySizeInput) refs.gallerySizeInput.value = String(state.gallerySizeScale);
   if (refs.galleryGapInput) refs.galleryGapInput.value = String(state.galleryGapRem);
   if (refs.galleryRadiusInput) refs.galleryRadiusInput.value = String(state.galleryRadiusRem);
-  if (refs.galleryFitModeSelect) refs.galleryFitModeSelect.value = state.galleryFitMode;
+  refs.galleryFitButtons?.forEach((button) => {
+    const selected = button.dataset.galleryFitMode === state.galleryFitMode;
+    button.classList.toggle("is-selected", selected);
+    button.setAttribute("aria-pressed", selected ? "true" : "false");
+  });
   if (refs.gallerySizeValue) refs.gallerySizeValue.value = `${state.gallerySizeScale.toFixed(2)}×`;
   if (refs.galleryGapValue) refs.galleryGapValue.value = `${Number(state.galleryGapRem.toFixed(2))}rem`;
   if (refs.galleryRadiusValue) refs.galleryRadiusValue.value = `${Number(state.galleryRadiusRem.toFixed(2))}rem`;
@@ -133,11 +137,11 @@ function bindGallerySetting(input, key, minimum, maximum) {
 bindGallerySetting(refs.gallerySizeInput, "gallerySizeScale", 0.65, 1.6);
 bindGallerySetting(refs.galleryGapInput, "galleryGapRem", 0, 1);
 bindGallerySetting(refs.galleryRadiusInput, "galleryRadiusRem", 0, 1);
-refs.galleryFitModeSelect?.addEventListener("change", () => {
-  state.galleryFitMode = refs.galleryFitModeSelect.value === "pad" ? "pad" : "crop";
+refs.galleryFitButtons?.forEach((button) => button.addEventListener("click", () => {
+  state.galleryFitMode = button.dataset.galleryFitMode === "pad" ? "pad" : "crop";
   applyGallerySettings();
   persistSettings();
-});
+}));
 applyGallerySettings();
 
 function makePlaylistTabID() {
@@ -887,9 +891,11 @@ const interactionTargetSelector = [
 const interactionScopeElement = isStandaloneOptionsWindow
   ? refs.optionsOverlay?.querySelector(".options-panel")
   : document.querySelector(".app-shell");
-const interactionIndicator = isStandaloneOptionsWindow
-  ? interactionScopeElement?.querySelector(".sb2-options-selection-indicator")
-  : document.getElementById("sb2-selection-indicator");
+const optionsInteractionScopeElement = isStandaloneOptionsWindow
+  ? interactionScopeElement
+  : refs.optionsOverlay?.querySelector(".options-panel");
+const mainInteractionIndicator = isStandaloneOptionsWindow ? null : document.getElementById("sb2-selection-indicator");
+const optionsInteractionIndicator = refs.optionsOverlay?.querySelector(".sb2-options-selection-indicator");
 let selectedInteractionTarget = null;
 let hoveredInteractionTarget = null;
 let interactionClassTarget = null;
@@ -900,18 +906,22 @@ function interactionTargetFrom(node) {
 }
 
 function isAvailableInteractionTarget(target) {
+  const activeScope = (isStandaloneOptionsWindow || state.optionsOpen)
+    ? optionsInteractionScopeElement || interactionScopeElement
+    : interactionScopeElement;
   return target instanceof HTMLElement
-    && interactionScopeElement?.contains(target)
+    && activeScope?.contains(target)
     && target.matches(interactionTargetSelector)
     && !target.disabled
     && target.getAttribute("aria-disabled") !== "true"
     && !target.closest("[hidden], .is-hidden")
+    && getComputedStyle(target).visibility !== "hidden"
     && target.getClientRects().length > 0;
 }
 
 function fallbackInteractionTarget() {
-  const activeOptionsTab = state.optionsOpen
-    ? interactionScopeElement?.querySelector(".options-nav-item.is-selected")
+  const activeOptionsTab = (state.optionsOpen || isStandaloneOptionsWindow)
+    ? optionsInteractionScopeElement?.querySelector(".options-nav-item.is-selected")
     : null;
   if (isAvailableInteractionTarget(activeOptionsTab)) return activeOptionsTab;
   const activeTab = refs.playlistTabs?.querySelector(".playlist-tab-select[aria-selected='true']");
@@ -928,17 +938,31 @@ function currentInteractionTarget() {
   return fallbackInteractionTarget();
 }
 
+function interactionPresentation() {
+  if (isStandaloneOptionsWindow || state.optionsOpen) {
+    return {
+      scope: optionsInteractionScopeElement || interactionScopeElement,
+      indicator: optionsInteractionIndicator || mainInteractionIndicator
+    };
+  }
+  return { scope: interactionScopeElement, indicator: mainInteractionIndicator };
+}
+
 function positionInteractionIndicator(target, { instant = false } = {}) {
-  if (!interactionIndicator || !interactionScopeElement) return false;
+  const { scope, indicator } = interactionPresentation();
+  if (!indicator || !scope) return false;
+  for (const otherIndicator of [mainInteractionIndicator, optionsInteractionIndicator]) {
+    if (otherIndicator && otherIndicator !== indicator) otherIndicator.classList.add("is-hidden");
+  }
   if (!isAvailableInteractionTarget(target)) {
-    interactionIndicator.classList.add("is-hidden");
-    interactionIndicator.classList.remove("is-clipped");
+    indicator.classList.add("is-hidden");
+    indicator.classList.remove("is-clipped");
     interactionClassTarget?.classList.remove("sb2-selection-current");
     interactionClassTarget = null;
     return false;
   }
 
-  const scopeRect = interactionScopeElement.getBoundingClientRect();
+  const scopeRect = scope.getBoundingClientRect();
   const bounds = target.getBoundingClientRect();
   let targetRect = { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom };
   let radius = getComputedStyle(target).borderRadius;
@@ -955,7 +979,7 @@ function positionInteractionIndicator(target, { instant = false } = {}) {
   }
 
   const clip = { left: scopeRect.left, top: scopeRect.top, right: scopeRect.right, bottom: scopeRect.bottom };
-  for (let ancestor = target.parentElement; ancestor && ancestor !== interactionScopeElement; ancestor = ancestor.parentElement) {
+  for (let ancestor = target.parentElement; ancestor && ancestor !== scope; ancestor = ancestor.parentElement) {
     const style = getComputedStyle(ancestor);
     const rect = ancestor.getBoundingClientRect();
     if (["auto", "scroll", "hidden", "clip"].includes(style.overflowX)) {
@@ -973,24 +997,24 @@ function positionInteractionIndicator(target, { instant = false } = {}) {
   const right = Math.min(targetRect.right, clip.right);
   const bottom = Math.min(targetRect.bottom, clip.bottom);
   if (right <= left || bottom <= top) {
-    interactionIndicator.classList.add("is-clipped");
-    interactionIndicator.classList.remove("is-hidden");
+    indicator.classList.add("is-clipped");
+    indicator.classList.remove("is-hidden");
     interactionClassTarget?.classList.remove("sb2-selection-current");
     interactionClassTarget = null;
     return false;
   }
 
-  const isFirstPosition = !interactionIndicator.classList.contains("is-ready");
+  const isFirstPosition = !indicator.classList.contains("is-ready");
   if (instant || isFirstPosition) {
     window.cancelAnimationFrame(interactionInstantFrame);
-    interactionIndicator.classList.add("is-instant");
+    indicator.classList.add("is-instant");
   }
-  interactionIndicator.style.width = `${right - left}px`;
-  interactionIndicator.style.height = `${bottom - top}px`;
-  interactionIndicator.style.borderRadius = radius;
-  interactionIndicator.style.transform = `translate3d(${left - scopeRect.left}px, ${top - scopeRect.top}px, 0)`;
-  interactionIndicator.classList.remove("is-hidden", "is-clipped");
-  interactionIndicator.classList.add("is-ready");
+  indicator.style.width = `${right - left}px`;
+  indicator.style.height = `${bottom - top}px`;
+  indicator.style.borderRadius = radius;
+  indicator.style.transform = `translate3d(${left - scopeRect.left}px, ${top - scopeRect.top}px, 0)`;
+  indicator.classList.remove("is-hidden", "is-clipped");
+  indicator.classList.add("is-ready");
   if (interactionClassTarget && interactionClassTarget !== target) {
     interactionClassTarget.classList.remove("sb2-selection-current");
   }
@@ -999,7 +1023,7 @@ function positionInteractionIndicator(target, { instant = false } = {}) {
   if (instant || isFirstPosition) {
     interactionInstantFrame = window.requestAnimationFrame(() => {
       interactionInstantFrame = 0;
-      interactionIndicator.classList.remove("is-instant");
+      indicator.classList.remove("is-instant");
     });
   }
   return true;
@@ -1022,13 +1046,13 @@ function syncInteractionSelectionTarget() {
   else positionInteractionIndicator(null);
 }
 
-interactionScopeElement?.addEventListener("pointerover", (event) => {
+document.addEventListener("pointerover", (event) => {
   const target = interactionTargetFrom(event.target);
   if (!isAvailableInteractionTarget(target) || target === interactionTargetFrom(event.relatedTarget)) return;
   hoveredInteractionTarget = target;
   positionInteractionIndicator(target);
 });
-interactionScopeElement?.addEventListener("pointerout", (event) => {
+document.addEventListener("pointerout", (event) => {
   const target = interactionTargetFrom(event.target);
   if (!target || target === interactionTargetFrom(event.relatedTarget)) return;
   if (!interactionTargetFrom(event.relatedTarget)) {
@@ -1036,15 +1060,15 @@ interactionScopeElement?.addEventListener("pointerout", (event) => {
     positionInteractionIndicator(currentInteractionTarget());
   }
 });
-interactionScopeElement?.addEventListener("focusin", (event) => {
+document.addEventListener("focusin", (event) => {
   const target = interactionTargetFrom(event.target);
   if (!isAvailableInteractionTarget(target)) return;
   selectInteractionTarget(target);
 });
-interactionScopeElement?.addEventListener("scroll", () => {
+document.addEventListener("scroll", () => {
   positionInteractionIndicator(currentInteractionTarget(), { instant: true });
 }, true);
-interactionScopeElement?.addEventListener("pointermove", (event) => {
+document.addEventListener("pointermove", (event) => {
   if (interactionTargetFrom(event.target)?.matches(".sidebar-resize-handle")) {
     positionInteractionIndicator(currentInteractionTarget(), { instant: true });
   }
@@ -4660,6 +4684,7 @@ function applyUISettings() {
   rootStyle.setProperty("--bg-hover", state.uiChromeHoverColor ?? "rgb(50 50 50)");
   rootStyle.setProperty("--line", state.uiChromeDividerColor ?? "rgb(40 40 40)");
   rootStyle.setProperty("--item-spacing-px", `${state.uiItemSpacingPx}px`);
+  rootStyle.setProperty("--sb-options-column-min-width", `${state.optionsColumnMinWidthCh}ch`);
   document.body.dataset.sbMotion = state.selectionAnimationEnabled ? "on" : "off";
   document.body.dataset.playlistLinkMode = state.playlistLinkMode ? "on" : "off";
   rootStyle.setProperty("--column-resize-duration", `${state.autoResizeAnimationEnabled ? state.autoResizeAnimationMilliseconds : 0}ms`);
@@ -4680,16 +4705,19 @@ function formatArchiveCacheSummary(summary) {
 function renderRoutingConflicts() {
   const conflicts = window.SB2PlaybackBackends?.conflicts || [];
   if (!conflicts.length) {
-    refs.routingConflictsList.innerHTML = '<div class="options-help-text">No overlapping decoder extensions are registered. New plugins that overlap an existing format will appear here before their routing policy is applied.</div>';
+    refs.routingConflictsList.innerHTML = '<div class="routing-conflict-empty">No conflicts</div>';
     return;
   }
   refs.routingConflictsList.innerHTML = conflicts.map(({ extension, candidates }) => {
-    const candidateNames = candidates.map((backend) => escapeHtml(backend.displayName || backend.id)).join(" → ");
     const preferredBackendId = state.routingPreferences[extension] || candidates[0]?.id;
-    return `<label class="routing-conflict"><span><strong>${escapeHtml(extension)}</strong><small>${candidateNames}</small></span><select class="options-input" data-routing-extension="${escapeHtml(extension)}" aria-label="Decoder for ${escapeHtml(extension)}">${candidates.map((backend) => `<option value="${escapeHtml(backend.id)}" ${backend.id === preferredBackendId ? "selected" : ""}>${escapeHtml(backend.displayName || backend.id)}</option>`).join("")}</select></label>`;
+    const choices = candidates.map((backend) => {
+      const selected = backend.id === preferredBackendId;
+      return `<button class="tool-button" type="button" data-routing-extension="${escapeHtml(extension)}" data-routing-backend="${escapeHtml(backend.id)}" aria-pressed="${selected ? "true" : "false"}">${escapeHtml(backend.displayName || backend.id)}</button>`;
+    }).join("");
+    return `<div class="routing-conflict"><span class="routing-conflict-format">${escapeHtml(extension)}</span><div class="option-toggle routing-conflict-choices" role="group" aria-label="Decoder for ${escapeHtml(extension)}">${choices}</div></div>`;
   }).join("");
-  refs.routingConflictsList.querySelectorAll("[data-routing-extension]").forEach((input) => {
-    input.addEventListener("change", () => setRoutingPreference(input.dataset.routingExtension, input.value));
+  refs.routingConflictsList.querySelectorAll("[data-routing-extension][data-routing-backend]").forEach((button) => {
+    button.addEventListener("click", () => setRoutingPreference(button.dataset.routingExtension, button.dataset.routingBackend));
   });
 }
 
@@ -4722,33 +4750,29 @@ function renderAll() {
   refs.optionsOverlay.setAttribute("aria-hidden", state.optionsOpen ? "false" : "true");
   refs.optionsOverlay.inert = !state.optionsOpen;
   refs.optionsToolbarButton.setAttribute("aria-expanded", state.optionsOpen ? "true" : "false");
-  const databaseSelected = state.optionsSection === "database";
-  const routingSelected = state.optionsSection === "routing";
-  const playbackSelected = state.optionsSection === "playback";
-  const diagnosticsSelected = state.optionsSection === "diagnostics";
-  const audioSelected = state.optionsSection === "audio";
-  const themeSelected = state.optionsSection === "theme";
-  const fontsSelected = state.optionsSection === "fonts";
-  const windowsSelected = state.optionsSection === "windows";
   const gallerySelected = state.optionsSection === "gallery";
-  refs.optionsDatabaseTab.classList.toggle("is-selected", databaseSelected);
-  refs.optionsRoutingTab.classList.toggle("is-selected", routingSelected);
-  refs.optionsPlaybackTab.classList.toggle("is-selected", playbackSelected);
-  refs.optionsDiagnosticsTab.classList.toggle("is-selected", diagnosticsSelected);
-  refs.optionsAudioTab.classList.toggle("is-selected", audioSelected);
-  refs.optionsThemeTab.classList.toggle("is-selected", themeSelected);
-  refs.optionsGalleryTab.classList.toggle("is-selected", gallerySelected);
-  refs.optionsFontsTab.classList.toggle("is-selected", fontsSelected);
-  refs.optionsWindowsTab.classList.toggle("is-selected", windowsSelected);
-  refs.optionsThemeSection.classList.toggle("is-hidden", !themeSelected);
-  refs.optionsGallerySection.classList.toggle("is-hidden", !gallerySelected);
-  refs.optionsFontsSection.classList.toggle("is-hidden", !fontsSelected);
-  refs.optionsWindowsSection.classList.toggle("is-hidden", !windowsSelected);
-  refs.optionsDatabaseSection.classList.toggle("is-hidden", !databaseSelected);
-  refs.optionsRoutingSection.classList.toggle("is-hidden", !routingSelected);
-  refs.optionsPlaybackSection.classList.toggle("is-hidden", !playbackSelected);
-  refs.optionsDiagnosticsSection.classList.toggle("is-hidden", !diagnosticsSelected);
-  refs.optionsAudioSection.classList.toggle("is-hidden", !audioSelected);
+  const interfaceSelected = state.optionsSection === "interface";
+  const soundSelected = state.optionsSection === "sound";
+  const systemSelected = state.optionsSection === "system";
+  for (const [button, selected] of [
+    [refs.optionsGalleryTab, gallerySelected],
+    [refs.optionsInterfaceTab, interfaceSelected],
+    [refs.optionsSoundTab, soundSelected],
+    [refs.optionsSystemTab, systemSelected]
+  ]) {
+    button.classList.toggle("is-selected", selected);
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+    button.tabIndex = selected ? 0 : -1;
+  }
+  for (const [view, selected] of [
+    [refs.optionsGalleryView, gallerySelected],
+    [refs.optionsInterfaceView, interfaceSelected],
+    [refs.optionsSoundView, soundSelected],
+    [refs.optionsSystemView, systemSelected]
+  ]) view.hidden = !selected;
+  if (refs.optionsColumnMinWidthInput && document.activeElement !== refs.optionsColumnMinWidthInput) {
+    refs.optionsColumnMinWidthInput.value = String(state.optionsColumnMinWidthCh);
+  }
   renderRoutingConflicts();
   if (refs.uiChromeFontSizeInput && document.activeElement !== refs.uiChromeFontSizeInput) refs.uiChromeFontSizeInput.value = String(state.uiChromeFontSizePt ?? state.uiFontSizePt);
   if (document.activeElement !== refs.sidebarFontSizeInput) refs.sidebarFontSizeInput.value = String(state.contentFontSizePt);
@@ -4781,8 +4805,8 @@ function renderAll() {
   refs.mainWindowAlwaysOnTopCheckbox.checked = state.mainWindowAlwaysOnTop;
   refs.settingsWindowAlwaysOnTopCheckbox.checked = state.settingsWindowAlwaysOnTop;
   refs.archiveCacheEnabledCheckbox.checked = state.archiveCacheEnabled;
-  refs.archiveCacheLimitSelect.value = String(state.archiveCacheLimitBytes);
-  refs.archiveCacheLimitSelect.disabled = !state.archiveCacheEnabled;
+  refs.archiveCacheLimitInput.value = String(Math.round(state.archiveCacheLimitBytes / (1024 * 1024 * 1024)));
+  refs.archiveCacheLimitInput.disabled = !state.archiveCacheEnabled;
   refs.favoriteHistoricalSortCheckbox.checked = state.favoriteSortOrder === "historical";
   refs.playbackSpeedEnabledCheckbox.checked = state.playbackSpeedEnabled;
   if (document.activeElement !== refs.playbackSpeedInput) refs.playbackSpeedInput.value = uiApp.formatPlaybackSpeed(state.playbackSpeed);
@@ -4832,8 +4856,10 @@ function renderAll() {
   renderPlaylist();
   if (state.optionsOpen) {
     if (!refs.optionsOverlay.contains(hoveredInteractionTarget)) hoveredInteractionTarget = null;
-    const activeOptionsTab = interactionScopeElement?.querySelector(".options-nav-item.is-selected");
-    const focusedOptionsTarget = interactionScopeElement?.contains(document.activeElement)
+    const activeOptionsTab = (state.optionsOpen || isStandaloneOptionsWindow)
+      ? optionsInteractionScopeElement?.querySelector(".options-nav-item.is-selected")
+      : null;
+    const focusedOptionsTarget = optionsInteractionScopeElement?.contains(document.activeElement)
       ? interactionTargetFrom(document.activeElement)
       : null;
     const preferredOptionsTarget = isAvailableInteractionTarget(focusedOptionsTarget)
@@ -4851,6 +4877,7 @@ function renderAll() {
   uiApp.playback.updateTimingSummary();
   uiApp.playback.updatePlaybackReadout();
   uiApp.playback.updateNativeDiagnostics();
+  window.SB2OptionsController?.syncToggleButtons?.();
 }
 
 function selectedTrackIndex() {
@@ -5022,7 +5049,11 @@ function markEqualizerProfileModified() {
 
 function syncEqualizerControls() {
   refs.equalizerEnabledCheckbox.checked = state.equalizerEnabled;
-  refs.equalizerProfileSelect.value = String(uiApp.normalizeEqualizerProfileIndex(state.activeEqualizerProfileIndex));
+  refs.equalizerProfileButtons.forEach((button, index) => {
+    const selected = index === state.activeEqualizerProfileIndex;
+    button.classList.toggle("is-selected", selected);
+    button.setAttribute("aria-pressed", selected ? "true" : "false");
+  });
   refs.equalizerToolbarButton.classList.toggle("is-selected", state.equalizerEnabled);
   refs.equalizerToolbarButton.setAttribute("aria-pressed", state.equalizerEnabled ? "true" : "false");
   refs.equalizerToolbarButton.title = state.equalizerEnabled ? "Disable Equalizer" : "Enable Equalizer";
@@ -5424,7 +5455,7 @@ function setOptionsOpen(nextOpen) {
   }
   state.optionsOpen = shouldOpen;
   if (shouldOpen) {
-    state.optionsSection = "database";
+    state.optionsSection = "gallery";
     uiApp.ui.refreshDatabaseLocation().catch((error) => console.error("[SPCBoy] database location refresh failed", error));
     uiApp.ui.refreshArchiveCacheSummary().catch((error) => console.error("[SPCBoy] archive cache refresh failed", error));
   }
@@ -5621,14 +5652,6 @@ async function bootstrap() {
   // Load persisted appearance before the first Options-window paint. The
   // window is native-sized and immediately visible; deferring this until
   // after catalog/cache requests produces a distracting default-style flash.
-  const optionsManifest = await window.spcBoySB2.frontendOptionsManifest();
-  const appSections = [...(optionsManifest?.appSections || [])];
-  const interfaceIndex = appSections.indexOf("interface");
-  if (interfaceIndex >= 0) appSections.splice(interfaceIndex, 0, "gallery");
-  else appSections.push("gallery");
-  const fontsIndex = appSections.indexOf("interface");
-  appSections.splice(fontsIndex >= 0 ? fontsIndex + 1 : appSections.length, 0, "fonts");
-  window.SB2OptionsController.applyManifest({ ...optionsManifest, appSections });
   setStartupStage(0, "Applying saved interface settings and reopening your last session.");
   await loadSettings();
   applyGallerySettings();

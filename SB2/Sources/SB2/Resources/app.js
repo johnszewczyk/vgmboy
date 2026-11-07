@@ -166,8 +166,8 @@ refs.playbackSpeedEnabledCheckbox.addEventListener("change", (event) => {
 refs.equalizerEnabledCheckbox.addEventListener("change", (event) => {
   app.ui.setEqualizerEnabled(event.target.checked);
 });
-refs.equalizerProfileSelect.addEventListener("change", (event) => {
-  app.ui.selectEqualizerProfile(event.target.value);
+refs.equalizerProfileButtons.forEach((button) => {
+  button.addEventListener("click", () => app.ui.selectEqualizerProfile(button.dataset.equalizerProfile));
 });
 refs.equalizerProfileSaveButton.addEventListener("click", () => app.ui.saveEqualizerProfile());
 refs.equalizerBandInputs.forEach((input, index) => {
@@ -391,30 +391,56 @@ refs.optionsCloseButton.addEventListener("click", () => {
   app.ui.setOptionsOpen(false);
 });
 
-refs.optionsThemeTab.addEventListener("click", () => {
-  state.optionsSection = "theme";
-  app.ui.renderAll();
-});
-
 refs.optionsGalleryTab.addEventListener("click", () => {
   state.optionsSection = "gallery";
   app.ui.renderAll();
 });
 
-refs.optionsFontsTab.addEventListener("click", () => {
-  state.optionsSection = "fonts";
+refs.optionsInterfaceTab.addEventListener("click", () => {
+  state.optionsSection = "interface";
   app.ui.renderAll();
 });
 
-refs.optionsWindowsTab.addEventListener("click", () => {
-  state.optionsSection = "windows";
+refs.optionsSoundTab.addEventListener("click", () => {
+  state.optionsSection = "sound";
   app.ui.renderAll();
 });
 
-refs.optionsDatabaseTab.addEventListener("click", () => {
-  state.optionsSection = "database";
+refs.optionsSystemTab.addEventListener("click", () => {
+  state.optionsSection = "system";
   app.ui.refreshDatabaseLocation().catch((error) => console.error(error));
   app.ui.refreshArchiveCacheSummary().catch((error) => console.error(error));
+  app.ui.renderAll();
+});
+
+const optionsTabs = [refs.optionsGalleryTab, refs.optionsInterfaceTab, refs.optionsSoundTab, refs.optionsSystemTab];
+document.querySelector(".options-nav")?.addEventListener("keydown", (event) => {
+  if (event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) return;
+  const currentIndex = optionsTabs.indexOf(event.target.closest?.(".options-nav-item"));
+  if (currentIndex < 0) return;
+  let nextIndex = currentIndex;
+  if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % optionsTabs.length;
+  else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + optionsTabs.length) % optionsTabs.length;
+  else if (event.key === "Home") nextIndex = 0;
+  else if (event.key === "End") nextIndex = optionsTabs.length - 1;
+  else return;
+  event.preventDefault();
+  const nextTab = optionsTabs[nextIndex];
+  nextTab.focus({ preventScroll: true });
+  nextTab.click();
+});
+
+refs.optionsColumnMinWidthInput.addEventListener("input", (event) => {
+  const requested = Number.parseInt(event.target.value, 10);
+  if (!Number.isFinite(requested)) return;
+  state.optionsColumnMinWidthCh = Math.max(40, Math.min(100, requested));
+  document.documentElement.style.setProperty("--sb-options-column-min-width", `${state.optionsColumnMinWidthCh}ch`);
+});
+refs.optionsColumnMinWidthInput.addEventListener("change", (event) => {
+  const requested = Number.parseInt(event.target.value, 10);
+  state.optionsColumnMinWidthCh = Number.isFinite(requested) ? Math.max(40, Math.min(100, requested)) : 60;
+  event.target.value = String(state.optionsColumnMinWidthCh);
+  app.persistSettings();
   app.ui.renderAll();
 });
 
@@ -457,26 +483,6 @@ refs.favoriteHistoricalSortCheckbox.addEventListener("change", (event) => {
     .catch((error) => console.error("[SPCBoy] favorites order failed", error));
 });
 
-refs.optionsRoutingTab.addEventListener("click", () => {
-  state.optionsSection = "routing";
-  app.ui.renderAll();
-});
-
-refs.optionsPlaybackTab.addEventListener("click", () => {
-  state.optionsSection = "playback";
-  app.ui.renderAll();
-});
-
-refs.optionsDiagnosticsTab.addEventListener("click", () => {
-  state.optionsSection = "diagnostics";
-  app.ui.renderAll();
-});
-
-refs.optionsAudioTab.addEventListener("click", () => {
-  state.optionsSection = "audio";
-  app.ui.renderAll();
-});
-
 refs.libraryClearCacheButton.addEventListener("click", () => {
   app.ui.clearLibraryArchiveCache().catch((error) => console.error(error));
 });
@@ -497,8 +503,10 @@ refs.archiveCacheEnabledCheckbox.addEventListener("change", (event) => {
   app.ui.setArchiveCacheEnabled(event.target.checked);
 });
 
-refs.archiveCacheLimitSelect.addEventListener("change", (event) => {
-  app.ui.setArchiveCacheLimit(event.target.value);
+refs.archiveCacheLimitInput.addEventListener("change", (event) => {
+  const gigabytes = Number(event.target.value);
+  const requestedBytes = Number.isFinite(gigabytes) ? gigabytes * 1024 * 1024 * 1024 : NaN;
+  app.ui.setArchiveCacheLimit(requestedBytes);
 });
 
 refs.optionsOverlay.addEventListener("click", (event) => {

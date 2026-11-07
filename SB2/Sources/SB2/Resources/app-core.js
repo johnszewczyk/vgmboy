@@ -152,7 +152,8 @@ const state = {
   mainWindowAlwaysOnTop: false,
   settingsWindowAlwaysOnTop: false,
   optionsOpen: false,
-  optionsSection: "database",
+  optionsSection: "gallery",
+  optionsColumnMinWidthCh: 60,
   libraryRoots: [],
   archiveCacheSummary: null,
   archiveCacheLocation: "",
@@ -201,7 +202,7 @@ const refs = {
   gallerySizeInput: document.getElementById("gallery-size-input"),
   galleryGapInput: document.getElementById("gallery-gap-input"),
   galleryRadiusInput: document.getElementById("gallery-radius-input"),
-  galleryFitModeSelect: document.getElementById("gallery-fit-mode-select"),
+  galleryFitButtons: [...document.querySelectorAll("[data-gallery-fit-mode]")],
   gallerySizeValue: document.getElementById("gallery-size-value"),
   galleryGapValue: document.getElementById("gallery-gap-value"),
   galleryRadiusValue: document.getElementById("gallery-radius-value"),
@@ -223,29 +224,20 @@ const refs = {
   playlistBody: document.getElementById("playlist-body"),
   optionsOverlay: document.getElementById("options-overlay"),
   optionsCloseButton: document.getElementById("options-close-button"),
-  optionsDatabaseTab: document.getElementById("options-database-tab"),
-  optionsRoutingTab: document.getElementById("options-routing-tab"),
-  optionsPlaybackTab: document.getElementById("options-playback-tab"),
-  optionsDiagnosticsTab: document.getElementById("options-diagnostics-tab"),
-  optionsAudioTab: document.getElementById("options-audio-tab"),
-  optionsThemeTab: document.getElementById("options-theme-tab"),
   optionsGalleryTab: document.getElementById("options-gallery-tab"),
-  optionsFontsTab: document.getElementById("options-fonts-tab"),
-  optionsWindowsTab: document.getElementById("options-windows-tab"),
-  optionsThemeSection: document.getElementById("options-theme-section"),
-  optionsGallerySection: document.getElementById("options-gallery-section"),
-  optionsFontsSection: document.getElementById("options-fonts-section"),
-  optionsWindowsSection: document.getElementById("options-windows-section"),
-  optionsDatabaseSection: document.getElementById("options-database-section"),
-  optionsRoutingSection: document.getElementById("options-routing-section"),
-  optionsPlaybackSection: document.getElementById("options-playback-section"),
-  optionsDiagnosticsSection: document.getElementById("options-diagnostics-section"),
-  optionsAudioSection: document.getElementById("options-audio-section"),
+  optionsInterfaceTab: document.getElementById("options-interface-tab"),
+  optionsSoundTab: document.getElementById("options-sound-tab"),
+  optionsSystemTab: document.getElementById("options-system-tab"),
+  optionsGalleryView: document.getElementById("options-gallery-view"),
+  optionsInterfaceView: document.getElementById("options-interface-view"),
+  optionsSoundView: document.getElementById("options-sound-view"),
+  optionsSystemView: document.getElementById("options-system-view"),
+  optionsColumnMinWidthInput: document.getElementById("options-column-min-width-input"),
   routingConflictsList: document.getElementById("routing-conflicts-list"),
   libraryClearCacheButton: document.getElementById("library-clear-cache-button"),
   libraryShowCacheButton: document.getElementById("library-show-cache-button"),
   archiveCacheEnabledCheckbox: document.getElementById("archive-cache-enabled-checkbox"),
-  archiveCacheLimitSelect: document.getElementById("archive-cache-limit-select"),
+  archiveCacheLimitInput: document.getElementById("archive-cache-limit-input"),
   databaseCacheSummary: document.getElementById("database-cache-summary"),
   libraryDatabasePath: document.getElementById("library-database-path"),
   libraryDatabaseLocationStatus: document.getElementById("library-database-location-status"),
@@ -281,7 +273,6 @@ const refs = {
   settingsWindowAlwaysOnTopCheckbox: document.getElementById("settings-window-always-on-top-checkbox"),
   sidebarWidthInput: document.getElementById("sidebar-width-input"),
   accentColorInput: document.getElementById("accent-color-input"),
-  uiChromeColorInput: document.getElementById("ui-chrome-color-input"),
   uiChromePrimaryColorInput: document.getElementById("ui-chrome-primary-color-input"),
   uiChromeSecondaryColorInput: document.getElementById("ui-chrome-secondary-color-input"),
   uiChromePaneColorInput: document.getElementById("ui-chrome-pane-color-input"),
@@ -295,7 +286,7 @@ const refs = {
   playbackSpeedInput: document.getElementById("playback-speed-input"),
   playbackSpeedEnabledCheckbox: document.getElementById("playback-speed-enabled-checkbox"),
   equalizerEnabledCheckbox: document.getElementById("equalizer-enabled-checkbox"),
-  equalizerProfileSelect: document.getElementById("equalizer-profile-select"),
+  equalizerProfileButtons: [...document.querySelectorAll("[data-equalizer-profile]")],
   equalizerProfileSaveButton: document.getElementById("equalizer-profile-save-button"),
   equalizerProfileStatus: document.getElementById("equalizer-profile-status"),
   equalizerResetButton: document.getElementById("equalizer-reset-button"),
@@ -388,6 +379,10 @@ async function loadSettings() {
     state.galleryGapRem = Math.max(0, Math.min(1, Number(parsed.galleryGapRem ?? 0)));
     state.galleryRadiusRem = Math.max(0, Math.min(1, Number(parsed.galleryRadiusRem ?? 0)));
     state.galleryFitMode = parsed.galleryFitMode === "pad" ? "pad" : "crop";
+    const optionsColumnMinWidth = Number.parseInt(parsed.optionsColumnMinWidthCh, 10);
+    state.optionsColumnMinWidthCh = Number.isFinite(optionsColumnMinWidth)
+      ? Math.max(40, Math.min(100, optionsColumnMinWidth))
+      : 60;
     state.favoriteSortOrder = parsed.favoriteSortOrder === "alphabetical" ? "alphabetical" : "historical";
     state.selectedDatabaseGameKey = parsed.selectedDatabaseGameKey || null;
     state.collapsedConsoleNames = Array.isArray(parsed.collapsedConsoleNames)
@@ -486,6 +481,7 @@ function settingsSnapshot() {
     galleryGapRem: state.galleryGapRem,
     galleryRadiusRem: state.galleryRadiusRem,
     galleryFitMode: state.galleryFitMode,
+    optionsColumnMinWidthCh: state.optionsColumnMinWidthCh,
     favoriteSortOrder: state.favoriteSortOrder,
     selectedDatabaseGameKey: state.selectedDatabaseGameKey,
     collapsedConsoleNames: state.collapsedConsoleNames,
@@ -617,7 +613,10 @@ function normalizeAppVolume(value) {
 
 function normalizeArchiveCacheLimit(value) {
   const numeric = Number(value);
-  return ARCHIVE_CACHE_LIMIT_CHOICES.includes(numeric) ? numeric : DEFAULT_ARCHIVE_CACHE_LIMIT_BYTES;
+  if (!Number.isFinite(numeric) || numeric <= 0) return DEFAULT_ARCHIVE_CACHE_LIMIT_BYTES;
+  return ARCHIVE_CACHE_LIMIT_CHOICES.reduce((nearest, choice) =>
+    Math.abs(choice - numeric) < Math.abs(nearest - numeric) ? choice : nearest,
+  DEFAULT_ARCHIVE_CACHE_LIMIT_BYTES);
 }
 
 function parseDurationSeconds(value) {

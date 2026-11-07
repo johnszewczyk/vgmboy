@@ -70,6 +70,7 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
     var galleryGapRem: Double?
     var galleryRadiusRem: Double?
     var galleryFitMode: String?
+    var optionsColumnMinWidthCh: Int?
     var uiFontSizePt: Double?
     var uiChromeFontSizePt: Double?
     var contentFontSizePt: Double?
@@ -209,6 +210,7 @@ struct SB2PreferencesSnapshot: Codable, Sendable {
         galleryGapRem = min(1, max(0, galleryGapRem ?? 0))
         galleryRadiusRem = min(1, max(0, galleryRadiusRem ?? 0))
         galleryFitMode = galleryFitMode == "pad" ? "pad" : "crop"
+        optionsColumnMinWidthCh = min(100, max(40, optionsColumnMinWidthCh ?? 60))
         if let savedContentSize = contentFontSizePt ?? sidebarFontSizePt ?? playlistFontSizePt {
             let sharedContentSize = savedContentSize.isFinite
                 ? min(18, max(8, savedContentSize.rounded()))
