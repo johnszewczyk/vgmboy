@@ -1149,7 +1149,6 @@ body.is-playlist-marquee-selecting * { cursor: crosshair !important; }
   gap: 1rem;
 }
 
-.options-header,
 .options-field,
 .options-inline-leading,
 .options-inline-trailing,
@@ -1158,24 +1157,8 @@ body.is-playlist-marquee-selecting * { cursor: crosshair !important; }
   align-items: center;
 }
 
-.options-header,
 .options-field {
   justify-content: space-between;
-}
-
-.options-header {
-  margin-bottom: var(--space-2);
-  justify-content: center;
-  position: relative;
-  font-weight: 700;
-  color: var(--accent);
-}
-
-.options-header .tool-button {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
 }
 
 .options-body {
@@ -1475,7 +1458,6 @@ button:not(.favorite-toggle):not(.tree-node):not(.database-game-row):not(.databa
 body.options-window .app-shell { display: none; }
 body.options-window .options-overlay { position: static; display: block !important; width: 100vw; height: 100vh; padding: 0; background: none; }
 body.options-window .options-panel { width: 100vw; height: 100vh; grid-template-rows: minmax(0, 1fr); border-radius: 0; box-shadow: none; }
-body.options-window .options-header { display: none; }
 .library-root-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; }
 .library-root-actions .tool-button { height: 22px; padding: 0 0.45rem; font-size: 0.9em; }
 
@@ -2493,44 +2475,6 @@ body.sb2-frontend .options-overlay.is-open .options-panel {
   opacity: 1;
   transform: translate3d(0, 0, 0);
 }
-body.sb2-frontend .options-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sb-space-075);
-  height: var(--sb-control-size);
-  min-height: 0;
-  margin: 0;
-  padding: 0 0 var(--sb-space-050);
-  border-bottom: 1px solid #2c3340;
-  color: #e0e1eb;
-  font-size: 1.1rem;
-  font-weight: 600;
-  letter-spacing: 0;
-}
-body.sb2-frontend .options-header .tool-button {
-  position: static;
-  display: inline-flex;
-  width: var(--sb-control-size);
-  min-width: var(--sb-control-size);
-  height: var(--sb-control-size);
-  min-height: var(--sb-control-size);
-  gap: 0;
-  margin-left: 0;
-  padding: 0;
-  transform: none;
-  border: 0;
-  border-radius: var(--sb-button-radius);
-  background: var(--sb-button-surface);
-  color: var(--sb-button-ink);
-  font-family: var(--ui-font-family);
-  font-size: var(--sb-control-font-size);
-  font-weight: 500;
-  line-height: 1;
-}
-body.sb2-frontend .options-header .tool-button .ui-icon { width: var(--sb-control-icon-size); height: var(--sb-control-icon-size); }
-body.sb2-frontend .options-header .tool-button:hover { background: var(--sb-button-hover-surface); color: var(--sb-button-hover-ink); }
-body.sb2-frontend .options-header .tool-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 body.sb2-frontend .options-field-copy { gap: .35rem; }
 body.sb2-frontend .options-field-copy small,
 body.sb2-frontend .options-checkbox-copy small { color: #9299ad; font-size: .9rem; line-height: 1.45; }
@@ -2681,7 +2625,7 @@ body.sb2-frontend button:not(.favorite-toggle):not(.tree-node):not(.database-gam
   color: var(--sb-button-selected-ink);
 }
 body.sb2-frontend button:not(.favorite-toggle):not(.tree-node):not(.database-game-row):not(.database-console-row):is(:active, [aria-pressed="true"], .is-selected) .ui-icon { color: inherit; }
-body.sb2-frontend :is(.database-tree-control, .options-header .tool-button, .options-subpanel .tool-button, .library-root-actions .tool-button) {
+body.sb2-frontend :is(.database-tree-control, .options-subpanel .tool-button, .library-root-actions .tool-button) {
   font-family: var(--mono-font-family);
   font-size: var(--sb-control-font-size);
   line-height: 1;
@@ -2736,14 +2680,31 @@ body.sb2-frontend .database-album-favorite.is-favorite { color: var(--accent); }
 /* SB2 Options follows the same control, spacing, radius, and color tokens as the player. */
 body.sb2-frontend .options-panel {
   --sb-options-gap: 1rem;
-  font-size: 1rem;
+  grid-template-rows: minmax(0, 1fr);
+  font-size: .9rem;
   gap: var(--sb-options-gap);
   padding: var(--sb-options-gap);
 }
-body.sb2-frontend .options-heading-row {
+body.sb2-frontend .options-nav {
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--sb-control-size);
+  grid-template-rows: minmax(0, 1fr);
   align-items: stretch;
+  height: var(--sb-control-size);
+  min-width: 0;
+  gap: var(--sb-options-gap, 1rem);
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+body.sb2-frontend .options-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+  height: 100%;
   min-width: 0;
   gap: var(--sb-options-gap, 1rem);
 }
@@ -2753,18 +2714,6 @@ body.sb2-frontend .options-body {
   grid-template-rows: var(--sb-control-size) minmax(0, 1fr);
   min-height: 0;
   gap: var(--sb-options-gap, 1rem);
-}
-body.sb2-frontend .options-header {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  height: 100%;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border-bottom: 1px solid var(--accent);
-  font-size: 1.25rem;
-  line-height: 1;
 }
 body.sb2-frontend .options-close-button {
   align-self: center;
@@ -2777,14 +2726,15 @@ body.sb2-frontend .options-close-button {
   padding: 0;
 }
 body.sb2-frontend .options-close-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-body.sb2-frontend .options-nav {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-rows: minmax(0, 1fr);
-  align-items: stretch;
+body.sb2-frontend .options-nav-item {
+  font-size: .9rem;
+}
+body.sb2-frontend .options-nav .options-close-button {
   height: var(--sb-control-size);
-  min-width: 0;
-  gap: var(--sb-options-gap, 1rem);
+  min-height: var(--sb-control-size);
+  justify-self: end;
+}
+body.sb2-frontend .options-tabs {
   overflow: visible;
   padding: 0;
   border: 0;
@@ -2796,7 +2746,7 @@ body.sb2-frontend .options-nav-item {
   width: 100%;
   min-width: 0;
   height: 100%;
-  font-size: 1rem;
+  font-size: .9rem;
   gap: var(--sb-space-050);
   padding-inline: var(--sb-space-050);
   border-radius: var(--sb-button-radius);
@@ -2837,7 +2787,7 @@ body.sb2-frontend .options-subpanel {
   align-self: stretch;
   min-width: 0;
   gap: 0;
-  padding: var(--sb-options-gap, 1rem);
+  padding: var(--sb-options-gap, 1rem) var(--sb-options-gap, 1rem) .5rem;
   border: 1px solid var(--line);
   border-radius: var(--sb-button-radius);
   background: var(--bg-panel);
@@ -2848,7 +2798,7 @@ body.sb2-frontend .options-subpanel-title {
   border-bottom: 1px solid var(--accent);
   color: var(--accent);
   font-family: var(--mono-font-family);
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 600;
   letter-spacing: .035em;
   line-height: 1.15;
@@ -2861,10 +2811,10 @@ body.sb2-frontend .options-field {
   min-width: 0;
   min-height: calc(var(--sb-control-size) + var(--sb-space-050));
   gap: var(--sb-options-gap, 1rem);
-  padding: 0;
+  padding: .5rem 0;
   border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
 }
-body.sb2-frontend .options-subpanel > .options-field:last-child { border-bottom: 0; }
+body.sb2-frontend .options-subpanel > .options-field:last-child { padding-bottom: 0; border-bottom: 0; }
 body.sb2-frontend .options-field-copy { align-self: center; min-width: 0; }
 body.sb2-frontend .options-inline-trailing,
 body.sb2-frontend .options-field > :is(.option-toggle, .options-choice-buttons, .options-inline-trailing) {
@@ -3009,7 +2959,7 @@ body.sb2-frontend .equalizer-profile-row {
   align-items: center;
   min-width: 0;
   gap: var(--sb-space-075);
-  padding-bottom: var(--sb-space-050);
+  padding-block: .5rem;
   border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
 }
 body.sb2-frontend .equalizer-profile-controls { display: grid; min-width: 0; gap: var(--sb-space-025); }
@@ -3020,12 +2970,12 @@ body.sb2-frontend .options-equalizer-panel > .options-field { max-width: none; w
 body.sb2-frontend .options-equalizer-panel > .equalizer-profile-status { color: var(--muted); }
 body.sb2-frontend .options-equalizer-panel > .equalizer-profile-status:empty { display: none; }
 body.sb2-frontend .equalizer-bands { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sb-space-010); padding-top: var(--sb-space-050); }
-body.sb2-frontend .equalizer-band { display: grid; grid-template-columns: 48px minmax(0, 1fr) 8ch; align-items: center; min-width: 0; min-height: var(--sb-control-size); gap: var(--sb-space-075); }
+body.sb2-frontend .equalizer-band { display: grid; grid-template-columns: 48px minmax(0, 1fr) 8ch; align-items: center; min-width: 0; min-height: var(--sb-control-size); gap: var(--sb-space-075); padding-block: .5rem; }
 body.sb2-frontend .equalizer-band output { color: var(--muted); text-align: right; font-family: var(--mono-font-family); font-variant-numeric: tabular-nums; }
 body.sb2-frontend .options-equalizer-panel > #equalizer-reset-button { width: 100%; margin-top: var(--sb-space-050); }
 body.sb2-frontend .diagnostics-list { display: grid; align-content: stretch; gap: 0; }
-body.sb2-frontend .diagnostics-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; min-height: calc(var(--sb-control-size) + var(--sb-space-050)); gap: var(--sb-space-075); border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
-body.sb2-frontend .diagnostics-row:last-child { border-bottom: 0; }
+body.sb2-frontend .diagnostics-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; min-height: calc(var(--sb-control-size) + var(--sb-space-050)); gap: var(--sb-space-075); padding-block: .5rem; border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+body.sb2-frontend .diagnostics-row:last-child { padding-bottom: 0; border-bottom: 0; }
 body.sb2-frontend .diagnostics-row > span { color: var(--muted); }
 body.sb2-frontend .diagnostics-row strong { max-width: 48ch; overflow-wrap: anywhere; text-align: right; font: var(--sb-control-font-size) var(--mono-font-family); font-weight: 500; }
 body.sb2-frontend .routing-conflicts-list { display: grid; gap: 0; }
@@ -3036,23 +2986,24 @@ body.sb2-frontend .routing-conflict {
   min-width: 0;
   min-height: calc(var(--sb-control-size) + var(--sb-space-050));
   gap: var(--sb-space-075);
+  padding-block: .5rem;
   border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
 }
-body.sb2-frontend .routing-conflict:last-child { border-bottom: 0; }
+body.sb2-frontend .routing-conflict:last-child { padding-bottom: 0; border-bottom: 0; }
 body.sb2-frontend .routing-conflict-format { min-width: 0; font-family: var(--mono-font-family); }
 body.sb2-frontend .routing-conflict-choices { grid-auto-flow: column; }
 body.sb2-frontend .routing-conflict-choices button { white-space: normal; }
 body.sb2-frontend .routing-conflict-empty { min-height: var(--sb-control-size); color: var(--muted); }
-body.sb2-frontend.options-window .options-panel { grid-template-rows: minmax(0, 1fr); padding-top: var(--sb-options-gap, 1rem); opacity: 1; transform: none; transition: none; }
-body.sb2-frontend.options-window .options-heading-row { display: none; }
-body.sb2-frontend .options-panel .tool-button { font-size: 1rem; }
-body.sb2-frontend .options-panel :is(.options-field-copy small, .options-checkbox-copy small, .options-help-text, .options-subpanel p, .options-path-control .options-path-readout, .gallery-option-control output, .diagnostics-row strong) { font-size: 1rem; }
+body.sb2-frontend.options-window .options-panel { padding-top: var(--sb-options-gap, 1rem); opacity: 1; transform: none; transition: none; }
+body.sb2-frontend .options-panel .tool-button { font-size: .9rem; }
+body.sb2-frontend .options-panel :is(.options-field-copy small, .options-checkbox-copy small, .options-help-text, .options-subpanel p, .options-path-control .options-path-readout, .gallery-option-control output, .diagnostics-row strong) { font-size: .9rem; }
 body.sb2-frontend .options-panel .diagnostics-row strong { font-family: var(--mono-font-family); }
-body.sb2-frontend .options-panel .options-subpanel-title { font-size: 1.25rem; }
+body.sb2-frontend .options-panel .options-subpanel-title { font-size: 1.1rem; }
 @media (max-width: 720px) {
   body.sb2-frontend .options-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: var(--sb-control-size) minmax(0, 1fr); }
-  body.sb2-frontend .options-nav { gap: var(--sb-space-025); }
-  body.sb2-frontend .options-nav-item { gap: var(--sb-space-025); padding-inline: 0; font-size: 1rem; }
+  body.sb2-frontend .options-nav { gap: var(--sb-space-050); }
+  body.sb2-frontend .options-tabs { gap: var(--sb-space-025); }
+  body.sb2-frontend .options-nav-item { gap: var(--sb-space-025); padding-inline: 0; font-size: .9rem; }
   body.sb2-frontend .options-nav-item .ui-icon { display: none; }
   body.sb2-frontend .equalizer-profile-row { grid-template-columns: minmax(0, 1fr); }
   body.sb2-frontend .equalizer-profile-label { display: none; }

@@ -25,8 +25,8 @@
   left to right, then wraps to the next row. The minimum card width defaults to
   60ch and is adjustable from Interface > Layout (40–100ch); that choice is
   saved in native SB2 preferences. Keep the card order in source order and the
-  ownership split described above when adding settings. Card headings and the
-  Options header divider use the accent color.
+  ownership split described above when adding settings. Card headings use the
+  accent color. The close button sits at the right edge of the tab bar.
 - Gallery artwork fit uses Crop/Pad buttons. Archive cache size is entered in
   GB; the configured cache cap snaps to the nearest supported size (2, 4, 8,
   or 16 GB).
@@ -40,14 +40,15 @@
   AAC export captures the enabled speed when export begins and uses the same
   format-specific speed limits as playback.
 - Option pages use the readable SB2 interface font and the available window
-  width. Body text and controls use a 1rem baseline; page and card headings use
-  1.25rem. The close button sits beside the underlined Options heading. Cards in
-  one grid row stretch to the same height. Setting rows use a 60/40 label/control
-  split with controls centered vertically and dividers
-  between rows. The Equalizer card spans the full row and keeps all ten gain
-  sliders in one vertical column. Options uses a shared 1rem spacing token for
-  the page inset, tab/content and card gutters, card padding, and label/control
-  split; keep gaps inside grouped controls compact and tab gaps compact on
+  width. Body text and controls use a .9rem baseline; card headings use 1.1rem.
+  The title row is removed, and the close button sits at the right edge of the
+  tab bar. Cards in one grid row stretch to the same height. Setting rows use a
+  60/40 label/control split with controls centered vertically, .5rem vertical
+  padding, and dividers between rows. Bottom padding at the final row matches
+  the spacing at a row divider. The Equalizer card spans the full row and keeps
+  all ten gain sliders in one vertical column. Options uses a shared 1rem
+  spacing token for the page inset, tab/content and card gutters, and card
+  padding; keep gaps inside grouped controls compact and tab gaps compact on
   narrow screens. UI Chrome and UI Fonts share the Interface
   page; UI Fonts exposes playlist-header styling and titlebar font color and
   bold controls.
