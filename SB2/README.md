@@ -10,8 +10,9 @@ sources, while FrontendCore retains durable archive-cache policy for Gallery
 artwork and browsing.
 
 The main window contains the approved dense home layout. Options open as a
-subpage and keep SPCBOY-owned interface/database settings separate from
-VGMBoy-owned playback settings.
+subpage with four responsive pages: Gallery, Interface, Sound, and System.
+The pages group SPCBOY and VGMBoy settings by use while preserving their
+existing owner-specific behavior and persistence.
 
 ## Build and run
 
