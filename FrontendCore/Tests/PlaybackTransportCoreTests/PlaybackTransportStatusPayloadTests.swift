@@ -31,12 +31,31 @@ func statusPayloadKeepsReplyAndEventFieldsIdentical() throws {
     let reply = PlaybackTransportStatusPayload(status: status).jsonObject()
     let event = PlaybackTransportStatusPayload(status: status).jsonObject()
 
+    #expect(reply["track_id"] as? String == "track-a")
     #expect(reply["transport_state"] as? String == "playing")
     #expect(reply["status_sequence"] as? UInt64 == 42)
     #expect(reply["position_ms"] as? Int == 12_346)
     #expect(reply["decoder_family"] as? String == "spc")
     #expect(reply["track_index"] as? Int == 3)
     #expect(NSDictionary(dictionary: reply).isEqual(to: NSDictionary(dictionary: event)))
+
+    let payload = PlaybackTransportStatusPayload(status: status)
+    let encoded = try JSONEncoder().encode(payload)
+    let decoded = try JSONDecoder().decode(PlaybackTransportStatusPayload.self, from: encoded)
+    #expect(decoded.trackID == "track-a")
+    let object = try JSONSerialization.jsonObject(with: encoded)
+    var legacy = try #require(object as? [String: Any])
+    legacy.removeValue(forKey: "trackID")
+    let oldData = try JSONSerialization.data(withJSONObject: legacy)
+    let decodedLegacy = try JSONDecoder().decode(PlaybackTransportStatusPayload.self, from: oldData)
+    #expect(decodedLegacy.trackID == nil)
+}
+
+@Test
+func statusPayloadExposesNullIdentityWithoutTrack() {
+    let status = PlaybackTransportStatus(currentTrackID: nil, isPlaying: false,
+        elapsedSeconds: 0, reachedEnd: false, trackLoaded: false)
+    #expect(PlaybackTransportStatusPayload(status: status).jsonObject()["track_id"] is NSNull)
 }
 
 @Test

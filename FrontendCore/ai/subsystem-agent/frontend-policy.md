@@ -109,7 +109,9 @@ startup contracts shared by the VGMMan player frontends.
 - Stable identity is based on catalog IDs and source/member paths, not display
   text or frontend row objects.
 - `PlaybackTransportStatusPayload` is the common reply/event projection;
+  `track_id` carries the coordinator's current stable track identity, while
   `status_sequence` lets a frontend reject delayed snapshots without polling.
+  A missing identity remains valid for older payloads and unloaded sessions.
 - `PlaybackContinuationRequest` and `PlaybackContinuationResponse` are the
   completion wire contract. Their explicit `playlistIds`, `currentTrackId`,
   and `trackId` coding prevents bridge-local aliases or lifecycle policy.

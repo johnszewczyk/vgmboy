@@ -697,8 +697,9 @@ async function handleNativePlaybackEnded(event) {
   const expectedNativeGeneration = Number(state.nativePlayback?.generation) || 0;
   const observedNativeGeneration = Number(event?.generation) || 0;
   if (pendingPlaybackIntent && observedNativeGeneration > 0 && event?.transport_state === "ended") {
-    const trackId = observedNativeGeneration === expectedNativeGeneration && state.currentTrackId
-      ? state.currentTrackId : pendingPlaybackIntent.trackId;
+    const trackId = typeof event.track_id === "string" && event.track_id
+      ? event.track_id : observedNativeGeneration === expectedNativeGeneration && state.currentTrackId
+        ? state.currentTrackId : pendingPlaybackIntent.trackId;
     if (trackId) {
       const previous = deferredNativeEnds.find(item => item.nativeGeneration === observedNativeGeneration);
       const sequence = Number(event.status_sequence) || 0;

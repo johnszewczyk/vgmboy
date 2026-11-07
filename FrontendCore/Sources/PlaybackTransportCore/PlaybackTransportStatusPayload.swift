@@ -6,6 +6,7 @@ import Foundation
 /// fields. Keeping this projection beside the transport status prevents a
 /// frontend bridge from silently dropping elapsed position or diagnostics.
 public struct PlaybackTransportStatusPayload: Equatable, Sendable, Codable {
+    public let trackID: String?
     public let transportState: String
     public let outputState: String
     public let generation: Int
@@ -33,6 +34,7 @@ public struct PlaybackTransportStatusPayload: Equatable, Sendable, Codable {
         forcedTransportState: String? = nil,
         forcedReachedEnd: Bool? = nil
     ) {
+        trackID = status.currentTrackID
         if let forcedTransportState {
             transportState = forcedTransportState
         } else if status.isPlaying {
@@ -69,6 +71,7 @@ public struct PlaybackTransportStatusPayload: Equatable, Sendable, Codable {
     /// Foundation object values suitable for `JSONSerialization`.
     public func jsonObject() -> [String: Any] {
         [
+            "track_id": trackID ?? NSNull(),
             "transport_state": transportState,
             "output_state": outputState,
             "generation": generation,
