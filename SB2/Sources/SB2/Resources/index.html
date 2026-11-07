@@ -168,20 +168,16 @@
     <div id="options-overlay" class="options-overlay" aria-hidden="true" inert>
       <div class="options-panel" role="dialog" aria-modal="true" aria-label="Options">
         <div class="sb2-selection-indicator sb2-options-selection-indicator is-hidden" aria-hidden="true"></div>
-        <div class="options-heading-row">
-          <div class="options-header">
-            <span>Options</span>
-          </div>
-          <button id="options-close-button" class="tool-button glyph-button ui-control options-close-button" type="button" title="Close Options" aria-label="Close Options"><svg class="ui-icon" aria-hidden="true"><use href="#icon-xmark"></use></svg></button>
-        </div>
-
         <div class="options-body">
-          <nav class="options-nav" role="tablist" aria-label="Option pages">
-            <button id="options-gallery-tab" class="tool-button options-nav-item is-selected" type="button" role="tab" aria-selected="true" aria-controls="options-gallery-view" tabindex="0"><svg class="ui-icon" aria-hidden="true"><use href="#icon-gallery"></use></svg><span>Gallery</span></button>
-            <button id="options-interface-tab" class="tool-button options-nav-item" type="button" role="tab" aria-selected="false" aria-controls="options-interface-view" tabindex="-1"><svg class="ui-icon" aria-hidden="true"><use href="#icon-palette"></use></svg><span>Interface</span></button>
-            <button id="options-sound-tab" class="tool-button options-nav-item" type="button" role="tab" aria-selected="false" aria-controls="options-sound-view" tabindex="-1"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sliders-horizontal"></use></svg><span>Sound</span></button>
-            <button id="options-system-tab" class="tool-button options-nav-item" type="button" role="tab" aria-selected="false" aria-controls="options-system-view" tabindex="-1"><svg class="ui-icon" aria-hidden="true"><use href="#icon-server"></use></svg><span>System</span></button>
-          </nav>
+          <div class="options-nav">
+            <nav class="options-tabs" role="tablist" aria-label="Option pages">
+              <button id="options-gallery-tab" class="tool-button options-nav-item is-selected" type="button" role="tab" aria-selected="true" aria-controls="options-gallery-view" tabindex="0"><svg class="ui-icon" aria-hidden="true"><use href="#icon-gallery"></use></svg><span>Gallery</span></button>
+              <button id="options-interface-tab" class="tool-button options-nav-item" type="button" role="tab" aria-selected="false" aria-controls="options-interface-view" tabindex="-1"><svg class="ui-icon" aria-hidden="true"><use href="#icon-palette"></use></svg><span>Interface</span></button>
+              <button id="options-sound-tab" class="tool-button options-nav-item" type="button" role="tab" aria-selected="false" aria-controls="options-sound-view" tabindex="-1"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sliders-horizontal"></use></svg><span>Sound</span></button>
+              <button id="options-system-tab" class="tool-button options-nav-item" type="button" role="tab" aria-selected="false" aria-controls="options-system-view" tabindex="-1"><svg class="ui-icon" aria-hidden="true"><use href="#icon-server"></use></svg><span>System</span></button>
+            </nav>
+            <button id="options-close-button" class="tool-button glyph-button ui-control options-close-button" type="button" title="Close Options" aria-label="Close Options"><svg class="ui-icon" aria-hidden="true"><use href="#icon-xmark"></use></svg></button>
+          </div>
           <div class="options-content">
             <div id="options-gallery-view" class="options-view options-card-grid" role="tabpanel" aria-labelledby="options-gallery-tab">
               <section class="options-subpanel"><h2 class="options-subpanel-title">Artwork</h2>
