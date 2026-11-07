@@ -49,6 +49,23 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Shared identity verification, 2026-11-07: an isolated tracked checkout at
+`26163f13` ran the full `PlaybackTransportCoreTests` filter with the read-only
+SOTN fixture and the clean sibling UAC wrapper at `77e3224`. All 135 discovered
+tests passed, with six fixture-dependent skips; both status-payload identity
+tests and the SOTN XA responsiveness test ran. Build jobs and test parallelism
+were limited to two. An isolated SB2 release built from that checkout used a
+generated one-second WAV (SHA-256
+`aff27015176703a16c26e683086be96053752ba908f9c4e86e75cdd27df6d533`),
+redirected its persistent stores, and used a test overlay to invoke the real
+native bridge. Both the start reply and actual natural-end event carried the
+same `identity-test` track ID and generation 1. This muted bridge check does
+not reproduce the overlapping-start race in a packaged UI or prove audible
+continuity. The disposable app did not stage the optional ares SNES runtime;
+the WAV check does not establish SNES playback. Existing macOS 26/27 linker
+warnings remained. The real SB2 tabs file's last modification preceded the
+test app build. Unrelated VGMBoy edits were not included or changed.
+
 Shared completion identity, 2026-11-07: the shared transport's reply/event
 payload now includes its existing stable current-track ID as `track_id`. SB2
 uses it for deferred end events instead of attributing a newly observed native
