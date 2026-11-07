@@ -43,7 +43,10 @@
   width. Cards in one grid row stretch to the same height. Setting rows use a
   56/44 label/control split with controls centered vertically and dividers
   between rows. The Equalizer card spans the full row and keeps all ten gain
-  sliders in one vertical column. UI Chrome and UI Fonts share the Interface
+  sliders in one vertical column. Options uses a shared 1rem spacing token for
+  the page inset, tab/content and card gutters, card padding, and label/control
+  split; keep gaps inside grouped controls compact and tab gaps compact on
+  narrow screens. UI Chrome and UI Fonts share the Interface
   page; UI Fonts exposes playlist-header styling and titlebar font color and
   bold controls.
   The Gallery page controls crop-to-square or pad-to-square artwork fit, frame
