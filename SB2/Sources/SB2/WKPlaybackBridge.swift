@@ -16,6 +16,23 @@ private struct SB2MonoSettingsRequest: Decodable {
     let enabled: Bool
 }
 
+enum SB2PlaybackAdmission {
+    private static let excludedBackendIDs: Set<String> = ["ares-snes", "uacngb"]
+    private static let bareSkinPayloadExtensions: Set<String> = ["snesstate", "ngbd"]
+
+    static func permits(_ descriptor: PlaybackFormatDescriptor) -> Bool {
+        !excludedBackendIDs.contains(descriptor.id)
+            && descriptor.extensions.isDisjoint(with: bareSkinPayloadExtensions)
+    }
+
+    static func rejectionMessage(sourcePath: String, archiveEntry: String?) -> String? {
+        let payloadPath = archiveEntry.flatMap { $0.isEmpty ? nil : $0 } ?? sourcePath
+        let fileExtension = URL(fileURLWithPath: payloadPath).pathExtension.lowercased()
+        guard bareSkinPayloadExtensions.contains(fileExtension) else { return nil }
+        return "SB2 does not play BareSkin native-state payloads. Open this file in UAC Play."
+    }
+}
+
 /// Thin WK adapter over the shared in-process VGMBoy control surface.
 /// Queue selection remains in the web frontend; completion claiming/decision,
 /// decoder transport, and audio configuration remain behind the shared native
@@ -160,6 +177,12 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 args,
                 errorMessage: "Playback start requires a complete track request."
             )
+            if let message = SB2PlaybackAdmission.rejectionMessage(
+                sourcePath: request.sourcePath,
+                archiveEntry: request.archiveEntry
+            ) {
+                throw PlaybackBridgeError.invalid(message)
+            }
             try transport.start(try request.continuationStart(
                 requestID: requestID ?? transport.reservePlaybackRequest()
             ))
@@ -203,6 +226,12 @@ final class WKPlaybackBridge: @unchecked Sendable {
                 args,
                 errorMessage: "AAC export requires a complete render request."
             )
+            if let message = SB2PlaybackAdmission.rejectionMessage(
+                sourcePath: request.sourcePath,
+                archiveEntry: request.archiveEntry
+            ) {
+                throw PlaybackBridgeError.invalid(message)
+            }
             return try bridgeResponse(try exportAAC(request))
         case "nativeExportAACCancel":
             let request: PlaybackTransportAACExportCancellationRequest = try bridgeRequest(

@@ -24,6 +24,7 @@ and renderer distinct.
 - Sidebar actions and Gallery projection lifecycle: `subsystem-agent/sidebar-actions.md`
 - Selection and hover motion: `subsystem-agent/selection-animation.md`
 - Archive playback and materialization: `subsystem-agent/archive-materialization.md`
+- SB2-specific playback admission: `subsystem-agent/playback-admission.md`
 - Options behavior: `subsystem-human/options.md`
 - Startup progress ownership: `subsystem-agent/startup-experience.md`
 - State persistence, virtual scrolling and WebKit trust: `subsystem-agent/state-and-webkit.md`

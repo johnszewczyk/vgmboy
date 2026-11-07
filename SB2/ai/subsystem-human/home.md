@@ -83,6 +83,8 @@
 - In Path View, a single click on a playable file loads its playlist preview
   without starting playback. Enter or double-click activates it; folder clicks
   continue to expand or collapse the folder.
+- SB2 does not play experimental BareSkin native-state payloads (`.ngbd` and
+  `.snesstate`). Open those packages in UAC Play.
 - The expand/collapse toggle collapses every console group or non-root folder
   if any is already open; it expands all only when those items are folded.
 - Non-expandable file and catalog-game rows have no bullet; each uses exactly a
