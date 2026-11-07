@@ -40,8 +40,10 @@
   AAC export captures the enabled speed when export begins and uses the same
   format-specific speed limits as playback.
 - Option pages use the readable SB2 interface font and the available window
-  width. Cards in one grid row stretch to the same height. Setting rows use a
-  56/44 label/control split with controls centered vertically and dividers
+  width. Body text and controls use a 1rem baseline; page and card headings use
+  1.25rem. The close button sits beside the underlined Options heading. Cards in
+  one grid row stretch to the same height. Setting rows use a 60/40 label/control
+  split with controls centered vertically and dividers
   between rows. The Equalizer card spans the full row and keeps all ten gain
   sliders in one vertical column. Options uses a shared 1rem spacing token for
   the page inset, tab/content and card gutters, card padding, and label/control
