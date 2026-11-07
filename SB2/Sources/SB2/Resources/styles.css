@@ -2681,7 +2681,7 @@ body.sb2-frontend .database-album-favorite.is-favorite { color: var(--accent); }
 body.sb2-frontend .options-panel {
   --sb-options-gap: 1rem;
   grid-template-rows: minmax(0, 1fr);
-  font-size: .9rem;
+  font-size: .75rem;
   gap: var(--sb-options-gap);
   padding: var(--sb-options-gap);
 }
@@ -2724,10 +2724,12 @@ body.sb2-frontend .options-close-button {
   min-height: var(--sb-control-size);
   margin: 0;
   padding: 0;
+  color: var(--accent);
 }
+body.sb2-frontend .options-close-button:hover { color: var(--accent); }
 body.sb2-frontend .options-close-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 body.sb2-frontend .options-nav-item {
-  font-size: .9rem;
+  font-size: .75rem;
 }
 body.sb2-frontend .options-nav .options-close-button {
   height: var(--sb-control-size);
@@ -2746,7 +2748,7 @@ body.sb2-frontend .options-nav-item {
   width: 100%;
   min-width: 0;
   height: 100%;
-  font-size: .9rem;
+  font-size: .75rem;
   gap: var(--sb-space-050);
   padding-inline: var(--sb-space-050);
   border-radius: var(--sb-button-radius);
@@ -2798,7 +2800,7 @@ body.sb2-frontend .options-subpanel-title {
   border-bottom: 1px solid var(--accent);
   color: var(--accent);
   font-family: var(--mono-font-family);
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 600;
   letter-spacing: .035em;
   line-height: 1.15;
@@ -2995,15 +2997,15 @@ body.sb2-frontend .routing-conflict-choices { grid-auto-flow: column; }
 body.sb2-frontend .routing-conflict-choices button { white-space: normal; }
 body.sb2-frontend .routing-conflict-empty { min-height: var(--sb-control-size); color: var(--muted); }
 body.sb2-frontend.options-window .options-panel { padding-top: var(--sb-options-gap, 1rem); opacity: 1; transform: none; transition: none; }
-body.sb2-frontend .options-panel .tool-button { font-size: .9rem; }
-body.sb2-frontend .options-panel :is(.options-field-copy small, .options-checkbox-copy small, .options-help-text, .options-subpanel p, .options-path-control .options-path-readout, .gallery-option-control output, .diagnostics-row strong) { font-size: .9rem; }
+body.sb2-frontend .options-panel .tool-button { font-size: .75rem; }
+body.sb2-frontend .options-panel :is(.options-field-copy small, .options-checkbox-copy small, .options-help-text, .options-subpanel p, .options-path-control .options-path-readout, .gallery-option-control output, .diagnostics-row, .diagnostics-row strong, .routing-conflict, .equalizer-band) { font-size: .75rem; }
 body.sb2-frontend .options-panel .diagnostics-row strong { font-family: var(--mono-font-family); }
-body.sb2-frontend .options-panel .options-subpanel-title { font-size: 1.1rem; }
+body.sb2-frontend .options-panel .options-subpanel-title { font-size: 1rem; }
 @media (max-width: 720px) {
   body.sb2-frontend .options-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: var(--sb-control-size) minmax(0, 1fr); }
   body.sb2-frontend .options-nav { gap: var(--sb-space-050); }
   body.sb2-frontend .options-tabs { gap: var(--sb-space-025); }
-  body.sb2-frontend .options-nav-item { gap: var(--sb-space-025); padding-inline: 0; font-size: .9rem; }
+  body.sb2-frontend .options-nav-item { gap: var(--sb-space-025); padding-inline: 0; font-size: .75rem; }
   body.sb2-frontend .options-nav-item .ui-icon { display: none; }
   body.sb2-frontend .equalizer-profile-row { grid-template-columns: minmax(0, 1fr); }
   body.sb2-frontend .equalizer-profile-label { display: none; }

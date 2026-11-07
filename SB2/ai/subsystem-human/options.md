@@ -26,7 +26,8 @@
   60ch and is adjustable from Interface > Layout (40–100ch); that choice is
   saved in native SB2 preferences. Keep the card order in source order and the
   ownership split described above when adding settings. Card headings use the
-  accent color. The close button sits at the right edge of the tab bar.
+  accent color. The close button sits at the right edge of the tab bar, with
+  its X in the accent color.
 - Gallery artwork fit uses Crop/Pad buttons. Archive cache size is entered in
   GB; the configured cache cap snaps to the nearest supported size (2, 4, 8,
   or 16 GB).
@@ -40,7 +41,7 @@
   AAC export captures the enabled speed when export begins and uses the same
   format-specific speed limits as playback.
 - Option pages use the readable SB2 interface font and the available window
-  width. Body text and controls use a .9rem baseline; card headings use 1.1rem.
+  width. Core text and controls use a .75rem baseline; card headings use 1rem.
   The title row is removed, and the close button sits at the right edge of the
   tab bar. Cards in one grid row stretch to the same height. Setting rows use a
   60/40 label/control split with controls centered vertically, .5rem vertical
