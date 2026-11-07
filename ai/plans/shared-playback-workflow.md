@@ -49,6 +49,19 @@ The remaining work is grouped by the current SB2-first scope:
 No reliable percentage is assigned: implementation is substantial, but the
 remaining live verification and deferred frontend work are not yet bounded.
 
+Shared completion identity, 2026-11-07: the shared transport's reply/event
+payload now includes its existing stable current-track ID as `track_id`. SB2
+uses it for deferred end events instead of attributing a newly observed native
+generation to whichever renderer intent happens to be newest. Older payloads
+without the field retain the prior fallback. A renderer regression reproduced
+the wrong attribution before the change and checks both correct replay and
+rejection of a mismatched track; all 74 SB2 renderer tests passed. The shared projection was compiled and run in
+a small standalone probe with a status stub, including null identity and legacy
+Codable decoding; the focused Swift test code was typechecked with that stub.
+This does not replace the full FrontendCore suite or a packaged SB2 race test.
+Those remain pending because free disk was below the 12 GiB build margin.
+Unrelated VGMBoy edits remain untouched.
+
 Deferred end ordering, 2026-11-06: SB2 now retains the highest status sequence
 when duplicate natural-end events for the same native generation arrive while
 a replacement intent is pending. Previously, a delayed older event could replace

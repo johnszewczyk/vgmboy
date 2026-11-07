@@ -152,6 +152,28 @@ test('an initial session ending before its start reply is not lost', async () =>
   assert.equal(claims, 1);
 });
 
+test('a deferred end uses shared track identity instead of the newest pending intent', async () => {
+  const state = { currentTrackId: 'old', nativePlayback: { generation: 12 } };
+  let claims = 0;
+  const gate = makeIntentGate(state, async () => { claims++; });
+  const intent = gate.beginPlaybackIntent('later');
+  await gate.handleNativePlaybackEnded({ generation: 13, track_id: 'started', transport_state: 'ended' });
+  state.currentTrackId = 'started'; state.nativePlayback.generation = 13;
+  await gate.finishPlaybackIntent(intent);
+  assert.equal(claims, 1);
+});
+
+test('a deferred end cannot be reassigned away from the shared track identity', async () => {
+  const state = { currentTrackId: 'old', nativePlayback: { generation: 12 } };
+  let claims = 0;
+  const gate = makeIntentGate(state, async () => { claims++; });
+  const intent = gate.beginPlaybackIntent('later');
+  await gate.handleNativePlaybackEnded({ generation: 13, track_id: 'started', transport_state: 'ended' });
+  state.currentTrackId = 'later'; state.nativePlayback.generation = 13;
+  await gate.finishPlaybackIntent(intent);
+  assert.equal(claims, 0);
+});
+
 test('an ended start reply can be newer than its deferred end event', async () => {
   const state = { currentTrackId: null, nativePlayback: { generation: 0 } };
   let claims = 0;
