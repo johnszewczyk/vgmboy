@@ -34,6 +34,7 @@ const DEFAULT_COLUMN_WIDTHS = Object.freeze({
 });
 const DEFAULT_COLUMN_VISIBILITY = Object.freeze(Object.fromEntries(COLUMN_DEFS.map((column) => [column.id, true])));
 const EQUALIZER_BAND_FREQUENCIES = Object.freeze([31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]);
+const EQUALIZER_PROFILE_COUNT = 10;
 const PLAYBACK_VOLUME_DETENT_COUNT = Math.max(1, Math.round(Number(window.spcBoySB2?.volumeDetentCount) || 20));
 const playbackSpeed = window.SB2PlaybackSpeed;
 
@@ -122,6 +123,8 @@ const state = {
   fadeEnabled: true,
   equalizerEnabled: false,
   equalizerBandGains: EQUALIZER_BAND_FREQUENCIES.map(() => 0),
+  equalizerProfiles: [],
+  activeEqualizerProfileIndex: 0,
   appVolume: 1,
   monoEnabled: false,
   aacExportDirectory: "",
@@ -213,6 +216,7 @@ const refs = {
   playlistHeaderWrap: document.querySelector(".playlist-header-wrap"),
   playlistBodyWrap: document.querySelector(".playlist-body-wrap"),
   playlistSelectionIndicator: document.getElementById("playlist-selection-indicator"),
+  playlistMarquee: document.getElementById("playlist-marquee"),
   playlistHeaderTable: document.querySelector(".playlist-header-table"),
   playlistHeaderRow: document.querySelector(".playlist-header-table thead tr"),
   playlistBodyTable: document.querySelector(".playlist-body-table"),
@@ -291,6 +295,9 @@ const refs = {
   playbackSpeedInput: document.getElementById("playback-speed-input"),
   playbackSpeedEnabledCheckbox: document.getElementById("playback-speed-enabled-checkbox"),
   equalizerEnabledCheckbox: document.getElementById("equalizer-enabled-checkbox"),
+  equalizerProfileSelect: document.getElementById("equalizer-profile-select"),
+  equalizerProfileSaveButton: document.getElementById("equalizer-profile-save-button"),
+  equalizerProfileStatus: document.getElementById("equalizer-profile-status"),
   equalizerResetButton: document.getElementById("equalizer-reset-button"),
   equalizerBandInputs: [...document.querySelectorAll("[data-equalizer-band]")],
   equalizerBandValues: [...document.querySelectorAll("[data-equalizer-value]")],
@@ -359,6 +366,11 @@ async function loadSettings() {
     state.playbackSpeedEnabled = Boolean(parsed.playbackSpeedEnabled);
     state.equalizerEnabled = Boolean(parsed.equalizerEnabled);
     state.equalizerBandGains = EQUALIZER_BAND_FREQUENCIES.map((_, index) => normalizeEqualizerGain(parsed.equalizerBandGains?.[index]));
+    state.equalizerProfiles = normalizeEqualizerProfiles(parsed.equalizerProfiles, {
+      enabled: state.equalizerEnabled,
+      bandGains: state.equalizerBandGains
+    });
+    state.activeEqualizerProfileIndex = normalizeEqualizerProfileIndex(parsed.activeEqualizerProfileIndex);
     state.appVolume = normalizeAppVolume(parsed.appVolume);
     state.monoEnabled = Boolean(parsed.monoEnabled);
     state.aacExportDirectory = typeof parsed.aacExportDirectory === "string" && parsed.aacExportDirectory
@@ -456,6 +468,8 @@ function settingsSnapshot() {
     fadeEnabled: state.fadeEnabled,
     equalizerEnabled: state.equalizerEnabled,
     equalizerBandGains: state.equalizerBandGains,
+    equalizerProfiles: state.equalizerProfiles,
+    activeEqualizerProfileIndex: state.activeEqualizerProfileIndex,
     appVolume: state.appVolume,
     monoEnabled: state.monoEnabled,
     aacExportDirectory: state.aacExportDirectory,
@@ -570,6 +584,28 @@ function normalizeAnimationMilliseconds(value) {
 function normalizeEqualizerGain(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? Math.max(-12, Math.min(12, Math.round(numeric * 2) / 2)) : 0;
+}
+
+function normalizeEqualizerProfiles(value, legacyProfile = {}) {
+  const saved = Array.isArray(value) ? value : [];
+  return Array.from({ length: EQUALIZER_PROFILE_COUNT }, (_, profileIndex) => {
+    const profile = saved[profileIndex];
+    const useLegacySettings = !Array.isArray(value) && profileIndex === 0;
+    return {
+      enabled: profile ? Boolean(profile.enabled) : useLegacySettings ? Boolean(legacyProfile.enabled) : false,
+      bandGains: EQUALIZER_BAND_FREQUENCIES.map((_, bandIndex) => normalizeEqualizerGain(
+        profile?.bandGains?.[bandIndex]
+          ?? (useLegacySettings ? legacyProfile.bandGains?.[bandIndex] : 0)
+      ))
+    };
+  });
+}
+
+function normalizeEqualizerProfileIndex(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric)
+    ? Math.max(0, Math.min(EQUALIZER_PROFILE_COUNT - 1, Math.round(numeric)))
+    : 0;
 }
 
 function normalizeAppVolume(value) {
@@ -754,7 +790,10 @@ window.SB2App = {
   normalizeAccentColor,
   normalizeUIColor,
   EQUALIZER_BAND_FREQUENCIES,
+  EQUALIZER_PROFILE_COUNT,
   normalizeEqualizerGain,
+  normalizeEqualizerProfiles,
+  normalizeEqualizerProfileIndex,
   normalizeAppVolume,
   normalizeArchiveCacheLimit,
   normalizeSidebarWidth,

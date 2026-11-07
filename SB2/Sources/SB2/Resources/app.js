@@ -166,6 +166,10 @@ refs.playbackSpeedEnabledCheckbox.addEventListener("change", (event) => {
 refs.equalizerEnabledCheckbox.addEventListener("change", (event) => {
   app.ui.setEqualizerEnabled(event.target.checked);
 });
+refs.equalizerProfileSelect.addEventListener("change", (event) => {
+  app.ui.selectEqualizerProfile(event.target.value);
+});
+refs.equalizerProfileSaveButton.addEventListener("click", () => app.ui.saveEqualizerProfile());
 refs.equalizerBandInputs.forEach((input, index) => {
   input.addEventListener("input", (event) => app.ui.setEqualizerBandGain(index, event.target.value));
 });
@@ -330,6 +334,12 @@ if (window.spcBoySB2?.onFrontendSettingsChanged) {
     if (settings.equalizerEnabled !== undefined) state.equalizerEnabled = Boolean(settings.equalizerEnabled);
     if (Array.isArray(settings.equalizerBandGains)) {
       state.equalizerBandGains = settings.equalizerBandGains.map(app.normalizeEqualizerGain);
+    }
+    if (Array.isArray(settings.equalizerProfiles)) {
+      state.equalizerProfiles = app.normalizeEqualizerProfiles(settings.equalizerProfiles);
+    }
+    if (settings.activeEqualizerProfileIndex !== undefined) {
+      state.activeEqualizerProfileIndex = app.normalizeEqualizerProfileIndex(settings.activeEqualizerProfileIndex);
     }
     if (settings.appVolume !== undefined) state.appVolume = app.normalizeAppVolume(settings.appVolume);
     if (settings.monoEnabled !== undefined) state.monoEnabled = Boolean(settings.monoEnabled);
@@ -631,7 +641,7 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
-  if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "a" && !state.optionsOpen && refs.playlistBody.contains(event.target)) {
+  if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "a" && !state.optionsOpen && app.ui.isPlaylistSelectionTarget(event.target)) {
     event.preventDefault();
     app.ui.selectAllPlaylistTracks();
     return;
