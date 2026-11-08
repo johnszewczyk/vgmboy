@@ -321,9 +321,11 @@
   body.sbonline-site.spcboy-body #spcboy-library .spcboy-gallery-console-picker { display:grid; width:100%; min-width:0; }
   body.sbonline-site.spcboy-body #spcboy-library .spcboy-gallery-console-picker select { width:100%; min-width:0; height:42px; padding:0 11px; border:1px solid var(--line); border-radius:8px; background:#15191b; color:var(--ink); font:13px/1 var(--sb-ui-font); }
   body.sbonline-site.spcboy-body #spcboy-library .spcboy-gallery-zoom { display:none; }
-  body.sbonline-site.spcboy-body #spcboy-library .spcboy-gallery-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:15px 12px; padding:0; }
-  body.sbonline-site.spcboy-body #spcboy-library .spcboy-gallery-card { border:0; border-radius:0; background:transparent; }
-  body.sbonline-site.spcboy-body #spcboy-library .spcboy-gallery-cover { border:0; border-radius:8px; background:#242a2c; }
+  body.sbonline-site.spcboy-body #spcboy-library .spcboy-gallery-grid { min-height:0; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:15px 12px; padding:0; }
+  body.sbonline-site.spcboy-body #spcboy-library .spcboy-gallery-card { padding:0; border:0; border-radius:0; background:transparent; }
+  body.sbonline-site.spcboy-body #spcboy-library .spcboy-gallery-open { position:relative; display:block; width:100%; min-height:0; aspect-ratio:1/1; overflow:hidden; padding:0; }
+  body.sbonline-site.spcboy-body #spcboy-library .spcboy-gallery-cover { position:absolute; inset:0; display:block; overflow:hidden; border:0; border-radius:8px; background:#242a2c; }
+  body.sbonline-site.spcboy-body #spcboy-library .spcboy-gallery-cover img { position:absolute; inset:0; display:block; width:100%; height:100%; aspect-ratio:auto; object-fit:cover !important; object-position:center; border-radius:inherit; }
   body.sbonline-site.spcboy-body #spcboy-library .spcboy-gallery-name { font:13px/1.25 var(--sb-ui-font); }
   body.sbonline-site.spcboy-body #spcboy-library .spcboy-gallery-panel.is-detail-open { gap:0; overflow:hidden; padding:0; }
   body.sbonline-site.spcboy-body #spcboy-library .spcboy-gallery-panel.is-detail-open > :is(.spcboy-gallery-toolbar,.spcboy-gallery-grid,#spcboy-gallery-empty,.spcboy-search-more) { display:none !important; }

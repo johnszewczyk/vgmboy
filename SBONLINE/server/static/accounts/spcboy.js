@@ -1230,11 +1230,14 @@
     image.height = 240;
     image.loading = "lazy";
     image.decoding = "async";
+    const cover = document.createElement("span");
+    cover.className = "spcboy-gallery-cover";
+    cover.append(image);
     const name = document.createElement("button");
     name.className = "spcboy-gallery-name";
     name.type = "button";
     name.textContent = entry.gameName;
-    open.append(image);
+    open.append(cover);
     open.addEventListener("click", () => openGalleryAlbum(entry));
     name.addEventListener("click", () => openGalleryAlbum(entry));
     const meta = document.createElement("div");
