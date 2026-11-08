@@ -311,8 +311,7 @@
   body.sbonline-site.spcboy-body #spcboy-library .spcboy-count { color:var(--muted); font:10px/1 var(--sb-ui-font); }
   body.sbonline-site.spcboy-body #spcboy-library .spcboy-track { min-height:40px; padding-block:5px; font-family:var(--sb-ui-font); }
   body.sbonline-site.spcboy-body #spcboy-library .spcboy-track-row { border-bottom:1px solid var(--line-subtle); }
-  body.sbonline-site.spcboy-body #spcboy-library.is-gallery .spcboy-tree,
-  body.sbonline-site.spcboy-body #spcboy-library.is-card-view .spcboy-tree { display:none; }
+  body.sbonline-site.spcboy-body #spcboy-library:is(.is-gallery,.is-card-view) .spcboy-tree { display:none !important; }
   body.sbonline-site.spcboy-body #spcboy-library:is(.is-gallery,.is-card-view) .spcboy-stage { display:grid; grid-area:2/1; grid-template: minmax(0,1fr) / minmax(0,1fr); }
   body.sbonline-site.spcboy-body #spcboy-library.is-gallery .spcboy-gallery-panel,
   body.sbonline-site.spcboy-body #spcboy-library.is-card-view .spcboy-card-panel { display:grid; grid-area:1/1; min-height:0; overflow:auto; }
