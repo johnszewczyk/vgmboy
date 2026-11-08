@@ -15,7 +15,7 @@
       --ink: #f3f0e8;
       --muted: #a5aaa7;
       --dim: #747d79;
-      --accent: deepskyblue;
+      --accent: #38aaff;
       --mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
       --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
@@ -135,6 +135,7 @@
     .option-control input[type="number"], .option-control input[type="text"] { width: 100%; min-width: 0; height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; outline: 0; background: #15191b; font: 12px/1 var(--mono); text-align: center; }
     .option-control :is(input[type="number"],input[type="text"]):focus { border-color: var(--accent); }
     .option-switch { width: 100%; height: 34px; border: 1px solid var(--line); border-radius: 7px; background: #15191b; color: var(--muted); font: 12px/1 var(--mono); }
+    .option-equalizer-toggle { min-height: 38px; }
     .option-switch[aria-checked="true"] { border-color: #16536c; background: #102b38; color: var(--accent); }
     .eq-band .option-copy strong { font: 11px/1 var(--mono); }
     .reset-flat { width: 100%; min-height: 38px; margin-top: 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--ink); font-size: 12px; }
@@ -255,10 +256,7 @@
               <span class="option-copy"><strong>Volume</strong><output id="option-volume-value">100</output></span>
               <span class="option-control"><input id="option-volume" type="range" min="0" max="20" step="1" value="20" aria-label="Volume"></span>
             </label>
-            <div class="option-row">
-              <span class="option-copy"><strong>Equalizer</strong></span>
-              <button class="option-switch" type="button" role="switch" aria-checked="true">Yes</button>
-            </div>
+            <button class="option-switch option-equalizer-toggle" id="option-equalizer" type="button" role="switch" aria-checked="true">Equalizer ON</button>
             <div class="option-bands" aria-label="Equalizer bands">
               <label class="option-row eq-band"><span class="option-copy"><strong>31 Hz</strong><output>0.0</output></span><span class="option-control"><input type="range" min="-12" max="12" step="0.5" value="0" data-eq-band aria-label="31 Hz equalizer gain"></span></label>
               <label class="option-row eq-band"><span class="option-copy"><strong>62 Hz</strong><output>0.0</output></span><span class="option-control"><input type="range" min="-12" max="12" step="0.5" value="0" data-eq-band aria-label="62 Hz equalizer gain"></span></label>
@@ -674,7 +672,9 @@
       button.addEventListener('click', function () {
         const enabled = button.getAttribute('aria-checked') !== 'true';
         button.setAttribute('aria-checked', String(enabled));
-        button.textContent = enabled ? 'Yes' : 'No';
+        button.textContent = button.id === 'option-equalizer'
+          ? 'Equalizer ' + (enabled ? 'ON' : 'OFF')
+          : (enabled ? 'Yes' : 'No');
       });
     });
     const volumeInput = document.getElementById('option-volume');

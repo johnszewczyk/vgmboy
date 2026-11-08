@@ -179,7 +179,10 @@
   }
   function updateEqualizerToggle(enabled) {
     equalizerToggle.setAttribute("aria-checked", String(enabled));
-    equalizerToggle.textContent = enabled ? "Yes" : "No";
+    const desktopLabel = equalizerToggle.querySelector(".spcboy-equalizer-toggle-desktop");
+    const mobileLabel = equalizerToggle.querySelector(".spcboy-equalizer-toggle-mobile");
+    if (desktopLabel) desktopLabel.textContent = enabled ? "Yes" : "No";
+    if (mobileLabel) mobileLabel.textContent = `Equalizer ${enabled ? "ON" : "OFF"}`;
     equalizerToggle.classList.toggle("is-enabled", enabled);
   }
   function syncEqualizerControls() {

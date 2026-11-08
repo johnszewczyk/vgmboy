@@ -118,6 +118,7 @@ body.sbonline-site .site-player-settings-panel .spcboy-speed-controls .spcboy-se
 .sbonline-site .spcboy-long-play-toggle:is(:hover,.is-enabled) { border-color: var(--blue); }
 .sbonline-site .spcboy-long-play-toggle.is-enabled { background: var(--blue-soft); color: var(--blue); }
 .sbonline-site .spcboy-equalizer-toggle { flex: 0 0 var(--sb-field-width); width: var(--sb-field-width); }
+.sbonline-site .spcboy-equalizer-toggle-mobile { display: none; }
 .sbonline-site .spcboy-volume-control { display: grid; grid-template-columns: 52px minmax(0,1fr) 56px; align-items: center; width: 100%; gap: 12px; min-height: 40px; }
 .sbonline-site .spcboy-volume-label { color: var(--ink); font: 12px/1.3 var(--sb-font); }
 .sbonline-site .spcboy-volume-label-stack, .sbonline-site .spcboy-equalizer-label-stack { display: contents; }

@@ -14,8 +14,10 @@ faded skips, and native-format playback speed. Options contains site interface
 preferences such as playlist and sidebar font size, row gap, and motion. Sound
 and Options use the same account-backed controls as the rest of the app, so
 their saved values follow the signed-in user across clients. Range sliders have
-large phone touch targets. Numeric controls have clear labels and no trailing
-unit text.
+large phone touch targets; mobile EQ and Volume values stack below their labels
+to leave more horizontal room for each slider. The mobile Equalizer toggle is a
+full-width “Equalizer ON/OFF” button and uses the existing SB2/SBO accent token.
+Numeric controls have clear labels and no trailing unit text.
 
 The persistent player keeps audio active while users change site pages. On
 mobile, the app pages provide the primary transport and the bottom status dock
