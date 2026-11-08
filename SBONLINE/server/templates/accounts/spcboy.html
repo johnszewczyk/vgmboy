@@ -2,7 +2,7 @@
 {% load static %}
 {% block title %}SPCBOY{% endblock %}
 {% block body_class %}spcboy-body{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/spcboy.css' %}?v=20261108-vgmmobile-2">{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/spcboy.css' %}?v=20261108-mobile-shell-3">{% endblock %}
 {% block content %}
 <section class="spcboy-page" aria-label="SPCBOY player" data-user-id="{{ request.user.pk }}" data-catalog-url="{% url 'spcboy_catalog' %}" data-search-url="{% url 'spcboy_search' %}" data-recents-url="{% url 'spcboy_recents' %}" data-now-playing-url="{% url 'spcboy_now_playing' %}" data-favorites-url="{% url 'spcboy_favorites' %}" data-favorite-playlist-url="{% url 'spcboy_favorite_playlist' %}" data-album-url="{% url 'spcboy_album_playlist' album_id='ALBUM_ID' %}" data-track-url="{% url 'spcboy_track_detail' track_id='TRACK_ID' %}" data-audio-url="{% url 'spcboy_audio' track_id='TRACK_ID' %}">
   <svg class="spcboy-icon-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -150,5 +150,5 @@
   </section>
 
 </section>
-<script src="{% static 'accounts/spcboy.js' %}?v=20261108-vgmmobile-2" defer></script>
+<script src="{% static 'accounts/spcboy.js' %}?v=20261108-mobile-shell-3" defer></script>
 {% endblock %}

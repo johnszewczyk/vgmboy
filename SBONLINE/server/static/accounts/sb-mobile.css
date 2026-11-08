@@ -246,9 +246,7 @@
 /* Compact app shell for SPCBOY. Desktop keeps the existing two-pane library. */
 @media (max-width:780px) {
   body.sbonline-site.spcboy-body {
-    --blue:#00bfff;
-    --blue-deep:#0098cc;
-    --blue-soft:#102b3a;
+    --blue:var(--blue-deep);
   }
   body.sbonline-site.spcboy-body .mobile-header-search { display:none; }
   body.sbonline-site.spcboy-body #site-player-transport-slot { display:none; }
@@ -466,8 +464,21 @@
   body.sbonline-site.spcboy-body .spcboy-mobile-settings .spcboy-volume-control { grid-template-columns:48px minmax(0,1fr); min-height:52px; gap:8px; }
   body.sbonline-site.spcboy-body .spcboy-mobile-settings .spcboy-volume-control .spcboy-equalizer-slider { height:44px; }
   body.sbonline-site.spcboy-body .spcboy-mobile-settings .spcboy-volume-control output { min-width:0; font-size:10px; text-align:left; }
-  body.sbonline-site.spcboy-body .spcboy-mobile-settings .spcboy-settings-group-heading > div { flex:1 1 50%; }
-  body.sbonline-site.spcboy-body .spcboy-mobile-settings .spcboy-equalizer-toggle { flex:0 0 50%; width:50%; min-height:38px; }
+  body.sbonline-site.spcboy-body .spcboy-mobile-settings .spcboy-equalizer-group .spcboy-settings-group-heading {
+    display:grid;
+    grid-template-columns:minmax(0,1fr);
+    min-height:0;
+    padding:0;
+    margin:0;
+    background:transparent;
+    color:inherit;
+    letter-spacing:0;
+    text-transform:none;
+  }
+  body.sbonline-site.spcboy-body .spcboy-mobile-settings .spcboy-equalizer-group .spcboy-settings-group-heading > div { display:none; }
+  body.sbonline-site.spcboy-body .spcboy-mobile-settings .spcboy-equalizer-toggle { flex:1 1 auto; width:100%; min-height:38px; }
+  body.sbonline-site.spcboy-body .spcboy-mobile-settings .spcboy-equalizer-toggle-desktop { display:none; }
+  body.sbonline-site.spcboy-body .spcboy-mobile-settings .spcboy-equalizer-toggle-mobile { display:inline; }
   body.sbonline-site.spcboy-body .spcboy-mobile-settings .spcboy-long-play-toggle { height:38px; min-height:38px; }
   body.sbonline-site.spcboy-body .spcboy-mobile-settings #spcboy-equalizer-reset { width:100%; min-height:40px; }
 }
