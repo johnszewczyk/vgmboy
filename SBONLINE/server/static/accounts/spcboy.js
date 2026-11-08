@@ -2551,7 +2551,7 @@
     if (mobileNowTitle) mobileNowTitle.textContent = activeTrack?.title || "Nothing playing";
     if (mobileNowAlbum) mobileNowAlbum.textContent = activeTrack?.game || matchingGroup?.gameName || activeTrack?.console || "";
     if (mobileNowArtwork) {
-      mobileNowArtwork.hidden = !artworkURL;
+      mobileNowArtwork.hidden = false;
       mobileNowArtwork.alt = artworkURL ? `${activeTrack.game || activeTrack.title} artwork` : "";
       mobileNowArtwork.dataset.fallbackArtwork = matchingGroup?.artworkUrl && artworkURL !== matchingGroup.artworkUrl
         ? matchingGroup.artworkUrl : "";
@@ -2642,7 +2642,7 @@
       mobileNowArtwork.src = fallback;
       return;
     }
-    mobileNowArtwork.hidden = true;
+    mobileNowArtwork.removeAttribute("src");
     mobileNowPlaying?.classList.remove("has-artwork");
   });
   recentMore.addEventListener("click", () => loadRecents());
