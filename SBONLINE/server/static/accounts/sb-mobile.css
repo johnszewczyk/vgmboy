@@ -321,6 +321,7 @@
   body.sbonline-site.spcboy-body .spcboy-mobile-now-artwork {
     display:block;
     width:min(68vw,300px);
+    height:min(68vw,300px);
     max-width:100%;
     aspect-ratio:1;
     align-self:center;
