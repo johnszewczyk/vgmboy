@@ -107,7 +107,9 @@
   resized through an even 50/50 split. Text bars
   use the same height and 0.25rem inline padding; glyph buttons center their icons.
   Playlist tabs are separate rounded blocks with a visible gap and the same
-  height as square buttons; their width follows the label. Column headers use
+  height as square buttons; they shrink as space tightens and ellipsize long
+  titles. Horizontal scrolling starts only when tabs reach their compact
+  minimum width. Column headers use
   that same block height and state colors. Column auto-size fits the complete
   playlist content and keeps each header aligned with its column, including in
   long virtualized playlists, reruns when columns are shown or hidden, and sizes
