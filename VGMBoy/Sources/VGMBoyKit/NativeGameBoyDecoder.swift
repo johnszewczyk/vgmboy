@@ -18,7 +18,7 @@ enum NativeGameBoyDecoderError: LocalizedError {
 }
 
 /// Runs a source-derived Game Boy driver payload in a pinned SameBoy host.
-/// The host accepts direct-ROM v3 and native-state v4, then streams stereo PCM16LE.
+/// The host accepts direct-ROM v3 and native-state v4/v5, then streams stereo PCM16LE.
 final class NativeGameBoyDecoder: AudioDecoder, @unchecked Sendable {
     let sampleRate: Int
     private let payloadPath: String
@@ -47,9 +47,8 @@ final class NativeGameBoyDecoder: AudioDecoder, @unchecked Sendable {
     var trackCount: Int { selectorIDs.count }
     var systemName: String { "Nintendo Game Boy" }
     var absolutePlayedFrames: Int64 { absoluteFrames }
-    // The v4 host runs source-native loops and restarts finite cues from the
-    // embedded checkpoint after 250 ms of exact digital silence. Transport
-    // caps and user stop own the playback window.
+    // Native-state UACNGB drivers run continuously; the playback client owns
+    // the playback window, repeat behavior, and stop action.
     var trackEnded: Bool { closed }
 
     func startTrack(_ index: Int) throws {
@@ -219,7 +218,7 @@ final class NativeGameBoyDecoder: AudioDecoder, @unchecked Sendable {
         let values = try url.resourceValues(forKeys: [.fileSizeKey])
         guard let fileSize = values.fileSize,
               fileSize >= 85,
-              fileSize <= 4 * 1024 * 1024 else {
+              fileSize <= 11 * 1024 * 1024 else {
             throw PlaybackControlError.invalidPayload("The UACNGB member has an unsupported file size.")
         }
         let data = try Data(contentsOf: url, options: .mappedIfSafe)
@@ -284,10 +283,11 @@ final class NativeGameBoyDecoder: AudioDecoder, @unchecked Sendable {
                 throw PlaybackControlError.invalidPayload("The UACNGB v5 member is shorter than its fixed header.")
             }
             let regionCount = littleEndian16(at: 158)
-            guard regionCount > 0, regionCount <= 32 else {
+            guard regionCount > 0, regionCount <= 64 else {
                 throw PlaybackControlError.invalidPayload("The UACNGB v5 member has an invalid region count.")
             }
-            guard headerBytes == 160 + trackCount + (regionCount * 8) else {
+            guard headerBytes <= data.count,
+                  headerBytes == 160 + trackCount + (regionCount * 8) else {
                 throw PlaybackControlError.invalidPayload("The UACNGB v5 member has an invalid header length.")
             }
             return Array(data[160..<(160 + trackCount)])
