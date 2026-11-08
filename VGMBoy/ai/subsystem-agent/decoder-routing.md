@@ -38,17 +38,30 @@ deliberately exclusive to one family.
   track end; the helper's exit status is read only after the process exits.
   The helper starts when the track starts; constructing the decoder does not
   launch a redundant emulator process.
-- Experimental `.ngbd` playback routes to `uacngb`. `NativeGameBoyDecoder`
-  launches the separately built SameBoy v1.0.3 DMG-B host and streams stereo
-  PCM16LE. UACNGB v1 members are single-cue ROM-driver slices; the host checks
-  the envelope and ROM-slice SHA-256 before running SameBoy. Runtime setup is
-  staged under `.build/dependencies/sameboy-uacngb` and copied into app
-  resources by `copy-sameboy-uacngb-runtime.sh`. This route has no natural
-  ending, tempo control, authored sample loop, or certified loop boundary.
-  The same host runs the game's selector shim through SameBoy's GBS execution
-  API using an in-memory adapter; it runs uncapped with frame skipping disabled
-  because VGMBoy's output device owns real-time pacing. No GBS file is written
-  or required in the UAC payload.
+- Experimental `.ngbd` and native UACNGB v4/v5 package playback route to
+  `uacngb`. `NativeGameBoyDecoder`
+  launches the separately built SameBoy v1.0.5 DMG-B host and streams stereo
+  PCM16LE. UACNGB v4 stores one verified source audio region; v5 stores an
+  ordered descriptor table for one to 64 verified source regions and supports
+  ROM-only, MBC1, MBC2, MBC3, and MBC5 profiles. Both native-state versions
+  store the exact source ROM header and a SameBoy BESS checkpoint captured
+  from the exact ROM; the full game ROM is not embedded. SameBoy reconstructs
+  a minimal image, restores the checkpoint, and runs the cartridge's original
+  audio routines. The host verifies the audio-data and checkpoint hashes,
+  enables SameBoy's accurate DMG high-pass filter, and retries partial or
+  interrupted PCM pipe writes. UACNGB v3's full-ROM payload remains readable
+  for historical comparison; retired v1/v2 slice payloads are not accepted
+  by the current runtime.
+  Runtime setup is staged under
+  `.build/dependencies/sameboy-uacngb` and copied into app resources by
+  `copy-sameboy-uacngb-runtime.sh`. This route has no natural ending, tempo
+  control, authored sample loop, or certified loop boundary. The current host
+  has no GBS loader or shim and runs uncapped with frame skipping disabled
+  because VGMBoy's output device owns real-time pacing. V4 and v5 checkpoints
+  are SameBoy-version-specific and pinned to v1.0.5. The host accepts payloads
+  up to 11 MiB, with v5 ROM regions capped at 8 MiB and checkpoints at 2 MiB.
+  Continuous driver execution and player Long Play do not assert a per-cue
+  sample loop boundary.
 - Frontends must project `FormatRegistry.playbackDescriptors` rather than rebuilding extension
   unions, backend IDs, Long Play support, tempo support, or natural-ending flags.
 - GameCube admission is fixture-backed and limited to primary playable DSP,
@@ -159,4 +172,5 @@ deliberately exclusive to one family.
 - [LazyUSFDecoder.swift](../../Sources/VGMBoyKit/LazyUSFDecoder.swift)
 - [PlayPSFDecoder.swift](../../Sources/VGMBoyKit/PlayPSFDecoder.swift)
 - [AresSNESDecoder.swift](../../Sources/VGMBoyKit/AresSNESDecoder.swift)
+- [NativeGameBoyDecoder.swift](../../Sources/VGMBoyKit/NativeGameBoyDecoder.swift)
 - [QSFDecoder.swift](../../Sources/VGMBoyKit/QSFDecoder.swift)

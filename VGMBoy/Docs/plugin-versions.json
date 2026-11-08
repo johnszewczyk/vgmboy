@@ -18,12 +18,12 @@
       "id": "sameboy-uacngb",
       "name": "SameBoy UACNGB native Game Boy runtime",
       "kind": "snapshot",
-      "current": "v1.0.3",
-      "sourceIdentity": "official SameBoy v1.0.3 release commit 208ba4afabffab9edde416f2dbb8ae459e34adb8; host built separately in the Game Rips pilot",
+      "current": "v1.0.5",
+      "sourceIdentity": "official SameBoy v1.0.5 release commit ea667ad79aa28409f034b1fd6da7304e1844750d; host built separately in the Game Rips pilot",
       "upstream": "https://github.com/LIJI32/SameBoy",
       "milestoneCheck": "release-or-tag",
       "license": "Expat",
-      "formats": ["UACNGB v1 (.ngbd)"]
+      "formats": ["UACNGB v3 (.ngbd)", "UACNGB v4 (.uac)", "UACNGB v5 (.uac)"]
     },
     {
       "id": "asap",
