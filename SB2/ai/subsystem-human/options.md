@@ -23,10 +23,11 @@
   tab. In the separate Options window, Command-W closes that window.
 - Options uses four equal-width top tabs. Each page lays its setting cards out
   left to right, then wraps to the next row. The minimum card width defaults to
-  60ch and is adjustable from Interface > Layout (40–100ch); that choice is
-  saved in native SB2 preferences. Keep the card order in source order and the
-  ownership split described above when adding settings. Card headings use the
-  accent color. The close button sits at the right edge of the tab bar, with
+  60ch and is adjustable from Interface > Layout (40–100ch); the field shows
+  its `ch` unit and that choice is saved in native SB2 preferences. The card
+  order follows source order, and each setting retains the ownership split
+  described above. Card headings use the accent color. The close button sits
+  at the right edge of the tab bar, with
   its X in the accent color.
 - Gallery artwork fit uses Crop/Pad buttons. Archive cache size is entered in
   GB; the configured cache cap snaps to the nearest supported size (2, 4, 8,
