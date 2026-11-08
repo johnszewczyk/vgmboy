@@ -4,10 +4,11 @@
 
 SBONLINE is the authenticated hosted SPCBOY player. Desktop keeps the
 wide-library layout with console/game browsing, aligned playlist columns,
-gallery, site navigation, and the persistent player. Mobile uses a compact app
-bar with Playing, Library, Gallery, Sound, and Options pages. Playing shows the
-current track and its album track list; Library and Gallery keep their existing
-catalog and album browsing behavior.
+gallery, site navigation, and the persistent player. Mobile uses one app shell
+with Playing, Library, Gallery, Sound, and Options pages. Playing keeps a
+centered square artwork area, track details, progress, a centered three-button
+transport row, and the current album track list. Library and Gallery keep their
+catalog and album browsing behavior inside the same shell.
 
 Sound groups volume, the ten-band equalizer and presets, long play, fade-out and
 faded skips, and native-format playback speed. Options contains site interface
