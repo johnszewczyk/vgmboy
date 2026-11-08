@@ -1,0 +1,36 @@
+{# Phone-only controls and views. The catalog section is a shared player component after this shell. #}
+<div class="spcboy-mobile-app" id="spcboy-mobile-app">
+  <nav class="spcboy-mobile-app-nav" id="spcboy-mobile-app-nav" aria-label="Player pages">
+    <button type="button" data-mobile-app-page="playing" aria-current="page">Playing</button>
+    <button type="button" data-mobile-app-page="library">Library</button>
+    <button type="button" data-mobile-app-page="gallery">Gallery</button>
+    <button type="button" data-mobile-app-page="sound">Sound</button>
+    <button type="button" data-mobile-app-page="options">Options</button>
+  </nav>
+  <section class="spcboy-mobile-now-playing" id="spcboy-mobile-now-playing" aria-label="Now playing" hidden>
+    <div class="spcboy-mobile-now-content">
+      <img class="spcboy-mobile-now-artwork" id="spcboy-mobile-now-artwork" alt="" decoding="async">
+      <div class="spcboy-mobile-now-copy">
+        <p class="spcboy-mobile-now-title" id="spcboy-mobile-now-title">Nothing playing</p>
+        <p class="spcboy-mobile-now-album" id="spcboy-mobile-now-album"></p>
+      </div>
+      <div class="spcboy-mobile-now-timeline">
+        <div class="spcboy-mobile-progress" id="spcboy-mobile-progress" role="progressbar" aria-label="Track progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="spcboy-mobile-progress-fill"></span></div>
+        <div class="spcboy-mobile-times"><time id="spcboy-mobile-elapsed">0:00</time><time id="spcboy-mobile-duration">0:00</time></div>
+      </div>
+      <div class="spcboy-mobile-now-controls" aria-label="Playback controls">
+        <button type="button" id="spcboy-mobile-previous" aria-label="Previous track" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4v12M15 5 7 10l8 5z"/></svg></button>
+        <button type="button" id="spcboy-mobile-play" aria-label="Play" disabled><svg class="mobile-play-glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 9 6-9 6z"/></svg><svg class="mobile-play-pause" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4h4v12H5zM11 4h4v12h-4z"/></svg></button>
+        <button type="button" id="spcboy-mobile-next" aria-label="Next track" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15 4v12M5 5l8 5-8 5z"/></svg></button>
+      </div>
+      <ol class="spcboy-mobile-up-next" id="spcboy-mobile-up-next" aria-label="Current album tracks"></ol>
+    </div>
+  </section>
+  <section class="spcboy-mobile-settings" id="spcboy-mobile-sound-settings" aria-label="Sound settings" hidden>
+    <div class="spcboy-settings-pages" id="spcboy-mobile-sound-pages"></div>
+  </section>
+  <section class="spcboy-mobile-settings" id="spcboy-mobile-options-settings" aria-label="Options" hidden>
+    <div class="spcboy-settings-pages" id="spcboy-mobile-options-pages"></div>
+  </section>
+  <form id="spcboy-csrf-form" hidden>{% csrf_token %}</form>
+</div>

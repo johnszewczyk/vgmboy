@@ -1,3 +1,4 @@
+/* Shared SPCBOY component styling. Layout belongs in spcboy-desktop.css or spcboy-mobile.css. */
 .spcboy-body { height: 100dvh; overflow: hidden; }
 .spcboy-body .site-foot { display: none; }
 .spcboy-body .messages { display: none; }
@@ -5,7 +6,6 @@
 .spcboy-page {
   --spc-quiet: color-mix(in srgb, var(--muted) 66%, transparent);
   display: grid;
-  grid-template-rows: minmax(0, 1fr);
   width: 100%;
   height: 100dvh;
   min-height: 0;
@@ -14,8 +14,6 @@
   background: var(--paper);
   color: var(--ink);
 }
-.spcboy-mobile-app-nav { display: none; }
-.spcboy-mobile-app { display: contents; }
 .spcboy-toolbar {
   position: relative;
   z-index: 3;
@@ -69,7 +67,6 @@
 .spcboy-library-state { flex: 0 0 auto; margin-left: auto; color: var(--spc-quiet); font: .64rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
 .spcboy-library {
   display: grid;
-  grid-template-columns: clamp(13rem, 22vw, 20rem) minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -77,7 +74,7 @@
 .spcboy-library.is-searching #spcboy-library-tracks > .spcboy-system,
 .spcboy-library.is-searching .spcboy-playlist-group,
 .spcboy-library.is-searching .spcboy-gallery-card { display: none; }
-.spcboy-tree { position: relative; min-width: 0; min-height: 0; overflow: auto; padding: .2rem .3rem .4rem max(.4rem, env(safe-area-inset-left)); border-right: 1px solid var(--line); overscroll-behavior: contain; scrollbar-color: var(--line) transparent; scrollbar-width: thin; }
+.spcboy-tree { position: relative; min-width: 0; min-height: 0; overflow: auto; padding: .2rem .3rem .4rem max(.4rem, env(safe-area-inset-left)); overscroll-behavior: contain; scrollbar-color: var(--line) transparent; scrollbar-width: thin; }
 .spcboy-sidebar-indicator { position: absolute; z-index: 1; top: 0; left: 0; width: 0; height: 0; border-radius: 2px; background: var(--blue-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--blue) 34%, transparent); opacity: 0; pointer-events: none; transform: translate3d(0, 0, 0); transition: transform var(--site-motion-duration) var(--site-motion-ease), width var(--site-motion-duration) var(--site-motion-ease), height var(--site-motion-duration) var(--site-motion-ease), opacity var(--site-motion-duration) var(--site-motion-ease); will-change: transform, width, height; }
 .spcboy-tree:empty::after { content: "No library"; display: block; padding: .75rem; color: var(--muted); font-size: .75rem; }
 .spcboy-system, .spcboy-game { min-width: 0; }
@@ -149,9 +146,7 @@
 .spcboy-playlist-pane { position: relative; display: grid; grid-template-rows: minmax(0, 1fr); min-width: 0; min-height: 0; height: 100%; }
 .spcboy-playlist-indicator { position: absolute; z-index: 1; top: 0; left: 0; width: 0; height: 0; border-radius: 2px; background: var(--blue-soft); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--blue) 34%, transparent); opacity: 0; pointer-events: none; transform: translate3d(0, 0, 0); transition: transform var(--site-motion-duration) var(--site-motion-ease), width var(--site-motion-duration) var(--site-motion-ease), height var(--site-motion-duration) var(--site-motion-ease), opacity var(--site-motion-duration) var(--site-motion-ease); will-change: transform, width, height; }
 @keyframes spcboy-playlist-select-fade { from { opacity: .35; } to { opacity: 1; } }
-@media (min-width: 781px) and (prefers-reduced-motion: no-preference) {
-  .spcboy-playlist-indicator.is-select-fading { animation: spcboy-playlist-select-fade var(--site-motion-duration) var(--site-motion-ease); }
-}
+
 .spcboy-playlist-content { min-width: 0; min-height: 0; overflow: auto; padding: .15rem .4rem .4rem max(.4rem, env(safe-area-inset-left)); padding-right: max(.4rem, env(safe-area-inset-right)); overscroll-behavior: contain; scrollbar-color: var(--line) transparent; scrollbar-width: thin; }
 .spcboy-playlist-group { min-width: 0; }
 .spcboy-playlist-group-title { margin: .25rem .3rem .1rem; color: var(--spc-quiet); font: .62rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -188,7 +183,7 @@
 .spcboy-gallery-detail-header button { min-height: 2.25rem; padding: 0 .75rem; border: 1px solid var(--line); border-radius: var(--sb-radius, 3px); background: var(--button-bg); color: var(--ink); font: inherit; cursor: pointer; }
 .spcboy-gallery-detail-header button:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }
 .spcboy-gallery-detail-header button:disabled { opacity: .55; cursor: wait; }
-.spcboy-gallery-detail-summary { display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); align-items: center; gap: 1rem; padding: .5rem 0 1rem; }
+.spcboy-gallery-detail-summary { display: grid; align-items: center; gap: 1rem; padding: .5rem 0 1rem; }
 .spcboy-gallery-detail-summary img { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; border: 1px solid var(--line); border-radius: var(--sb-radius, 3px); background: var(--paper); }
 .spcboy-gallery-detail-summary h2 { margin: 0; color: var(--ink); font-size: 1.2rem; line-height: 1.2; }
 .spcboy-gallery-detail-summary p { margin: .4rem 0 0; color: var(--muted); font-size: .78rem; }
@@ -197,460 +192,17 @@
 .spcboy-gallery-detail-retry { min-height: 2rem; margin-left: .5rem; padding: 0 .6rem; border: 1px solid var(--line); border-radius: var(--sb-radius, 3px); background: var(--button-bg); color: var(--ink); cursor: pointer; }
 .visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; clip-path: inset(50%) !important; }
 .spcboy-page [hidden] { display: none !important; }
-@media (min-width: 781px) {
-  .spcboy-page { height: 100%; border: 1px solid var(--line); box-shadow: 0 18px 64px rgb(0 0 0 / 14%); }
-  .spcboy-toolbar { min-height: 3rem; gap: .65rem; padding: .45rem .85rem; background: linear-gradient(110deg, var(--white), color-mix(in srgb, var(--blue-soft) 24%, var(--white))); }
-  .spcboy-tabs { gap: .25rem; }
-  .spcboy-tabs button { min-width: 2.2rem; min-height: 2rem; padding-inline: .7rem; font-size: .77rem; }
-  .spcboy-search-wrap { flex-basis: 24rem; }
-  .spcboy-search-wrap input { height: 2rem; font-size: .8rem; }
-  .spcboy-library { grid-template-columns: clamp(18rem, 24vw, 25rem) minmax(0, 1fr); }
-  .spcboy-tree { padding: .45rem .6rem .75rem; }
-  .spcboy-system > summary, .spcboy-game > summary { min-height: 1.75rem; }
-  .spcboy-track { min-height: 1.75rem; }
-  .spcboy-playlist-content { padding: .45rem 1rem .8rem; }
-  .spcboy-library.is-gallery .spcboy-system-content { display: none !important; }
-  .spcboy-library.is-gallery .spcboy-system > summary { cursor: pointer; }
-  .spcboy-library.is-gallery .spcboy-system.is-gallery-selected > summary { border-radius: 2px; background: var(--blue-soft); color: var(--blue); }
-  .spcboy-playlist-content .spcboy-track { min-height: 1.9rem; }
-  .spcboy-playlist-content .spcboy-track-title { font-size: .8rem; }
-}
-@media (max-width: 780px) {
-  .spcboy-toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .25rem; min-height: 2.15rem; padding-block: .2rem; }
-  .spcboy-tabs { gap: 0; }
-  .spcboy-tabs button { min-width: 1.65rem; min-height: 1.55rem; padding-inline: .34rem; font-size: .68rem; }
-  .spcboy-search-wrap { width: 100%; min-width: 0; }
-  .spcboy-search-wrap input { height: 1.6rem; font-size: .7rem; }
-  .spcboy-library-state { display: none; }
-  .spcboy-library { display: block; overflow: auto; overscroll-behavior: contain; }
-  .spcboy-tree { min-height: 100%; overflow: visible; padding: .15rem max(.25rem, env(safe-area-inset-right)) .4rem max(.25rem, env(safe-area-inset-left)); border: 0; }
-  .spcboy-system > summary { min-height: 1.45rem; }
-  .spcboy-system-content { margin-left: .35rem; padding-left: .2rem; }
-  .spcboy-game > summary { min-height: 1.35rem; gap: .3rem; padding-inline: .25rem; }
-  .spcboy-game-name { font-size: .67rem; }
-  .spcboy-count { font-size: .58rem; }
-  .spcboy-tracks { margin: 0 0 .1rem .2rem; }
-  .spcboy-track-row { grid-template-columns: minmax(0, 1fr) 1.55rem; }
-  .spcboy-track { min-height: 1.35rem; grid-template-columns: 1.45rem minmax(0, 1fr) 2.2rem; gap: .25rem; padding-inline: .25rem; }
-  .spcboy-track-number, .spcboy-track-length { font-size: .58rem; }
-  .spcboy-track-title { font-size: .68rem; }
-  .spcboy-favorite { width: 1.45rem; height: 1.3rem; }
-  .spcboy-playlist-pane { display: none; }
-  .spcboy-stage { display: contents; }
-  .spcboy-toolbar { grid-template-columns: auto auto minmax(0, 1fr); }
-  .spcboy-shuffle-favorites { width: 1.65rem; min-height: 1.55rem; padding: 0; }
-  .spcboy-shuffle-favorites span { display: none; }
-  .spcboy-shuffle-favorites svg { width: .82rem; height: .82rem; }
-  .spcboy-library.is-gallery .spcboy-gallery-panel { padding: .35rem; }
-  .spcboy-gallery-toolbar { gap: .2rem; }
-  .spcboy-gallery-zoom { gap: .12rem; }
-  .spcboy-gallery-zoom > span { display: none; }
-  .spcboy-gallery-zoom-step { width: 1.5rem; height: 1.5rem; }
-  .spcboy-gallery-zoom input { width: 3.2rem; }
-  .spcboy-gallery-zoom output { min-width: 2.1rem; font-size: .56rem; }
-  .spcboy-gallery-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--spcboy-gallery-tile-min, 6.6rem)), 1fr)); gap: .45rem; }
-  .spcboy-gallery-card { border-radius: 2px; }
-  .spcboy-gallery-open { gap: .22rem; padding: .2rem; }
-  .spcboy-gallery-name { padding-inline: .1rem; font-size: .65rem; }
-}
+
+
 
 @media (prefers-reduced-motion: reduce) {
   .spcboy-tabs-indicator, .spcboy-sidebar-indicator, .spcboy-playlist-indicator,
   .spcboy-track-row .spcboy-track, .spcboy-track-row .spcboy-favorite { transition: none; }
   .spcboy-playlist-indicator.is-select-fading { animation: none; }
 }
-@media (max-height: 650px) and (max-width: 780px) {
-  .spcboy-toolbar { min-height: 1.9rem; }
-  .spcboy-system > summary { min-height: 1.3rem; }
-  .spcboy-game > summary { min-height: 1.2rem; }
-  .spcboy-track { min-height: 1.2rem; }
-}
-
-/* Gallery metadata presentation. */
-@media (min-width: 781px) {
-  .spcboy-body .spcboy-gallery-meta { display: grid; grid-template-columns: minmax(0, 1fr) 1.55rem; align-items: center; gap: .2rem; padding: .1rem .3rem .2rem; }
-  .spcboy-body .spcboy-gallery-name { display: block; min-width: 0; overflow: hidden; padding: .08rem 0; border: 0; background: transparent; color: var(--ink); font: 400 .7rem/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-  .spcboy-body .spcboy-gallery-name:hover { color: var(--blue); }
-  .spcboy-body .spcboy-gallery-meta .spcboy-album-favorite { position: static; display: grid; width: 1.5rem; height: 1.5rem; place-items: center; border: 1px solid var(--line); border-radius: 2px; background: var(--input-bg); color: var(--muted); }
-  .spcboy-body .spcboy-gallery-meta .spcboy-album-favorite:hover, .spcboy-body .spcboy-gallery-meta .spcboy-album-favorite.is-favorite { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); }
-  .spcboy-body .spcboy-album-favorite svg { width: .82rem; height: .82rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
-  .spcboy-body .spcboy-album-favorite.is-favorite svg { fill: currentColor; }
-}
-
-/* Search and library views share the sidebar's aligned header row. */
-.spcboy-body .spcboy-page { grid-template-rows: minmax(0, 1fr); }
-.spcboy-body .spcboy-library {
-  grid-row: 1;
-  grid-template-columns: clamp(18rem, 21vw, 24rem) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
-}
-.spcboy-body .spcboy-sidebar {
-  display: grid;
-  grid-template-rows: 1.75rem minmax(0, 1fr);
-  min-width: 0;
-  min-height: 0;
-}
-.spcboy-body .spcboy-toolbar {
-  grid-row: 1;
-  grid-column: 1;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-rows: 1.7rem;
-  align-items: center;
-  gap: .15rem;
-  min-width: 0;
-  min-height: 0;
-  height: 1.75rem;
-  padding: 0 .2rem;
-  border-bottom: 1px solid var(--line);
-  background: var(--white);
-}
-.spcboy-body .spcboy-search-wrap { grid-column: 1; min-width: 0; width: 100%; }
-.spcboy-body .spcboy-search-wrap input { height: 1.55rem; padding-left: 1.25rem; font-size: .64rem; }
-.spcboy-body .spcboy-search-wrap svg { left: .32rem; width: .7rem; height: .7rem; }
-.spcboy-body .spcboy-view-row { grid-column: 2; display: flex; min-width: 0; align-items: stretch; gap: .08rem; padding: 0; border: 0; background: transparent; }
-.spcboy-body .spcboy-tabs { flex: 0 0 auto; gap: 0; }
-.spcboy-body .spcboy-tabs button,
-.spcboy-body .spcboy-shuffle-favorites,
-.spcboy-body .spcboy-fold-all {
-  display: inline-grid;
-  width: 1.55rem;
-  min-width: 1.55rem;
-  height: 1.55rem;
-  min-height: 1.55rem;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 2px;
-  background: transparent;
-}
-.spcboy-body .spcboy-tabs button { position: relative; }
-.spcboy-body .spcboy-tabs button span,
-.spcboy-body .spcboy-shuffle-favorites span,
-.spcboy-body .spcboy-fold-all span { display: none; }
-.spcboy-body .spcboy-tabs button svg,
-.spcboy-body .spcboy-shuffle-favorites svg,
-.spcboy-body .spcboy-fold-all svg { width: .76rem; height: .76rem; }
-.spcboy-body .spcboy-fold-all { color: var(--muted); cursor: pointer; }
-.spcboy-body .spcboy-fold-all:hover,
-.spcboy-body .spcboy-shuffle-favorites:hover { background: var(--button-hover); color: var(--blue); }
-.spcboy-body .spcboy-fold-all:focus-visible { outline: 1px solid var(--blue); outline-offset: 1px; }
-.spcboy-body .spcboy-library-state { display: none; }
-.spcboy-body .spcboy-tree-heading { display: none; }
-.spcboy-body .spcboy-tree { grid-row: 2; grid-column: 1; border-right: 1px solid var(--line); }
-.spcboy-body .spcboy-stage { grid-row: 1; grid-column: 2; display: grid; grid-template-rows: minmax(0, 1fr); }
-.spcboy-body .spcboy-playlist-pane { grid-row: 1; grid-template-rows: 1.7rem minmax(0, 1fr); }
-
-@media (max-width: 780px) {
-  .spcboy-body .spcboy-library {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 1.75rem minmax(0, 1fr);
-  }
-  .spcboy-body .spcboy-sidebar { display: contents; }
-  .spcboy-body .spcboy-toolbar {
-    grid-row: 1;
-    grid-column: 1;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-rows: 1.7rem;
-    height: 1.75rem;
-    padding-inline: max(.2rem, env(safe-area-inset-left)) max(.2rem, env(safe-area-inset-right));
-  }
-  .spcboy-body .spcboy-tree { grid-row: 2; grid-column: 1; border: 0; }
-  .spcboy-body .spcboy-stage { display: contents; }
-  .spcboy-body .spcboy-playlist-pane { display: none; }
-  .spcboy-body .spcboy-library.is-mobile-results .spcboy-tree { display: none; }
-  .spcboy-body .spcboy-library.is-mobile-results .spcboy-stage {
-    display: grid;
-    grid-row: 2;
-    grid-column: 1;
-    grid-template-rows: minmax(0, 1fr);
-    min-width: 0;
-    min-height: 0;
-  }
-  .spcboy-body .spcboy-library.is-mobile-results .spcboy-playlist-pane {
-    display: grid;
-    grid-row: 1;
-    grid-template-rows: minmax(0, 1fr);
-    min-height: 0;
-  }
-  .spcboy-body .spcboy-library.is-mobile-results .spcboy-playlist-content { min-height: 0; }
-
-  .spcboy-body .spcboy-page { grid-template-rows: auto minmax(0, 1fr); }
-  .spcboy-body .spcboy-toolbar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(6rem, .58fr);
-    grid-template-rows: 1.8rem;
-    align-items: center;
-    gap: .2rem;
-    min-height: 0;
-    padding: .15rem max(.3rem, env(safe-area-inset-right)) .15rem max(.3rem, env(safe-area-inset-left));
-  }
-  .spcboy-body .spcboy-toolbar .spcboy-view-row { grid-column: 1; min-width: 0; padding: 0; border: 0; background: transparent; }
-  .spcboy-body .spcboy-toolbar .spcboy-tabs { min-width: 0; gap: 0; }
-  .spcboy-body .spcboy-toolbar .spcboy-tabs button { min-width: 0; min-height: 1.55rem; gap: .18rem; padding: 0 .25rem; font-size: .57rem; }
-  .spcboy-body .spcboy-toolbar .spcboy-tabs button svg { width: .68rem; height: .68rem; }
-  .spcboy-body .spcboy-toolbar .spcboy-search-wrap { grid-column: 2; width: 100%; min-width: 0; }
-  .spcboy-body .spcboy-toolbar .spcboy-search-wrap input { height: 1.55rem; padding-left: 1.25rem; font-size: .65rem; }
-  .spcboy-body .spcboy-library { grid-row: 2; grid-template-rows: minmax(0, 1fr); }
-  .spcboy-body .spcboy-sidebar { display: contents; }
-  .spcboy-body .spcboy-tree-heading { display: none; }
-  .spcboy-body .spcboy-tree { grid-row: 1; grid-column: 1; }
-  .spcboy-body .spcboy-stage { display: contents; }
-  /* Card internals and thumbnail sizing are shared with the wider phone layout. */
-  .spcboy-body .spcboy-gallery-meta { display: grid; grid-template-columns: minmax(0, 1fr) 1.4rem; align-items: center; gap: .12rem; padding: .08rem .22rem .15rem; }
-  .spcboy-body .spcboy-gallery-name { min-width: 0; overflow: hidden; padding: .08rem 0; border: 0; background: transparent; color: var(--ink); font: 400 .63rem/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-  .spcboy-body .spcboy-gallery-name:hover { color: var(--blue); }
-  .spcboy-body .spcboy-gallery-meta .spcboy-album-favorite { position: static; width: 1.35rem; height: 1.35rem; border: 1px solid var(--line); border-radius: 2px; background: var(--input-bg); color: var(--muted); }
-  .spcboy-body .spcboy-gallery-meta .spcboy-album-favorite:hover, .spcboy-body .spcboy-gallery-meta .spcboy-album-favorite.is-favorite { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); }
-  .spcboy-body .spcboy-album-favorite svg { width: .75rem; height: .75rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linejoin: round; }
-  .spcboy-body .spcboy-album-favorite.is-favorite svg { fill: currentColor; }
-}
-
-/* Dense SB2-inspired desktop shell; phone layout remains a compact tree. */
-@media (min-width: 781px) {
-  .spcboy-body { --site-player-height: 2.65rem; }
-  .spcboy-body .spcboy-library.is-favorites .spcboy-track-slot { display: none; }
-  .spcboy-body .spcboy-page {
-    grid-template-rows: minmax(0, 1fr);
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: .72rem;
-  }
-  .spcboy-body .spcboy-library {
-    grid-template-columns: clamp(18rem, 21vw, 24rem) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-    min-height: 0;
-  }
-  .spcboy-sidebar {
-    display: grid;
-    grid-template-rows: 1.7rem minmax(0, 1fr);
-    min-width: 0;
-    min-height: 0;
-    background: var(--paper);
-  }
-  .spcboy-toolbar {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-rows: 1.75rem;
-    gap: .15rem;
-    min-height: 0;
-    padding: 0 .3rem;
-    border: 0;
-    background: transparent;
-  }
-  .spcboy-tabs { display: flex; align-self: stretch; gap: .1rem; }
-  .spcboy-tabs button {
-    width: auto;
-    min-width: 1.75rem;
-    min-height: 1.75rem;
-    padding: 0 .5rem;
-    border-radius: 2px;
-    font: 650 .62rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-  }
-  .spcboy-tabs button:hover { background: var(--button-hover); }
-  .spcboy-tabs-indicator { height: 1px; }
-  .spcboy-view-row { display: flex; min-width: 0; align-items: stretch; gap: .15rem; padding: 0 .3rem; border-bottom: 1px solid var(--line); background: var(--white); }
-  .spcboy-view-row .spcboy-tabs { flex: 1 1 auto; }
-  .spcboy-view-row .spcboy-tabs button { min-width: 1.75rem; }
-  .spcboy-view-row .spcboy-shuffle-favorites { width: 1.75rem; min-width: 1.75rem; min-height: 1.75rem; padding: 0; border-radius: 2px; }
-  .spcboy-view-row .spcboy-shuffle-favorites span { display: none; }
-  .spcboy-view-row .spcboy-shuffle-favorites svg { width: .78rem; height: .78rem; }
-  .spcboy-shuffle-favorites { width: 1.75rem; min-width: 1.75rem; min-height: 1.75rem; padding: 0; border-radius: 2px; }
-  .spcboy-shuffle-favorites span { display: none; }
-  .spcboy-shuffle-favorites svg { width: .78rem; height: .78rem; }
-  .spcboy-search-wrap { width: 100%; min-width: 0; }
-  .spcboy-search-wrap input { height: 1.75rem; padding-left: 1.35rem; border-radius: 2px; font: .64rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .spcboy-search-wrap svg { left: .35rem; width: .72rem; height: .72rem; }
-  .spcboy-tree-heading {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 .4rem;
-    border-bottom: 1px solid var(--line);
-    color: var(--muted);
-    font: .57rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-    letter-spacing: .04em;
-    text-transform: uppercase;
-  }
-  .spcboy-tree-heading-tools { display: flex; min-width: 0; align-items: center; gap: .4rem; }
-  .spcboy-tree-heading .spcboy-library-state { margin: 0; font: inherit; letter-spacing: 0; text-transform: none; }
-  .spcboy-fold-all { display: inline-flex; align-items: center; gap: .16rem; padding: .12rem .25rem; border: 1px solid var(--line); border-radius: 2px; background: var(--input-bg); color: var(--muted); font: inherit; letter-spacing: 0; text-transform: none; cursor: pointer; }
-  .spcboy-fold-all:hover { border-color: var(--blue); color: var(--blue); }
-  .spcboy-fold-all svg { width: .72rem; height: .72rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-  .spcboy-fold-all:focus-visible { outline: 1px solid var(--blue); outline-offset: 1px; }
-  .spcboy-body .spcboy-tree {
-    min-height: 0;
-    padding: .12rem .25rem .3rem;
-    border-right: 1px solid var(--line);
-  }
-  .spcboy-body .spcboy-stage { display: grid; grid-template-rows: 1.75rem 1.7rem minmax(0, 1fr); }
-  .spcboy-system > summary, .spcboy-game > summary { min-height: 1.3rem; gap: .32rem; padding-inline: .3rem; }
-  .spcboy-system-name { font-size: .66rem; }
-  .spcboy-game-name { font-size: .63rem; }
-  .spcboy-count { font-size: .56rem; }
-  .spcboy-system-content { margin-left: .38rem; padding-left: .2rem; }
-  .spcboy-game.is-selected > summary { background: transparent; color: var(--blue); }
-  .spcboy-track { min-height: 1.3rem; gap: .3rem; padding-inline: .2rem; }
-  .spcboy-track-title { font-size: .64rem; }
-  .spcboy-track-number, .spcboy-track-length { font-size: .56rem; }
-  .spcboy-favorite, .spcboy-album-favorite { height: 1.3rem; }
-  .spcboy-stage { min-height: 0; }
-  .spcboy-playlist-pane { grid-row: 2 / 4; grid-template-rows: 1.7rem minmax(0, 1fr); }
-  .spcboy-column-head { display: grid; grid-template-columns: 1.65rem minmax(0, 1fr); align-items: center; min-width: 0; padding: 0 .35rem 0 .15rem; border-bottom: 1px solid var(--line); background: var(--white); color: var(--muted); font: .57rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .spcboy-column-head > span { display: grid; place-items: center; }
-  .spcboy-column-head > span > svg { width: .9rem; height: .9rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-  .spcboy-column-head > div { display: grid; grid-template-columns: 1.6rem minmax(5rem, 1.35fr) minmax(4rem, .8fr) 2.8rem; align-items: center; gap: .3rem; }
-  .spcboy-column-head > div > span:last-child { text-align: right; }
-  .spcboy-art-column { display: none; }
-  .spcboy-playlist-content { padding: 0 .35rem .35rem; }
-  .spcboy-playlist-group-title { margin: 0; padding: .24rem .4rem; border-bottom: 1px solid var(--line-subtle); color: var(--muted); font: .58rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .spcboy-playlist-content .spcboy-track-row { grid-template-columns: 1.65rem minmax(0, 1fr); }
-  .spcboy-playlist-content .spcboy-track { grid-column: 2; min-height: 1.3rem; grid-template-columns: 1.6rem minmax(5rem, 1.35fr) minmax(4rem, .8fr) 2.8rem; gap: .3rem; padding-inline: .15rem; border-radius: 0; line-height: 1; }
-  .spcboy-playlist-content .spcboy-track-title { font-size: .68rem; }
-  .spcboy-playlist-content .spcboy-track-artist { display: block; font-size: .62rem; }
-  .spcboy-playlist-content .spcboy-favorite { grid-column: 1; grid-row: 1; width: 1.65rem; min-width: 1.65rem; justify-self: center; }
-  .spcboy-playlist-content .spcboy-track-row:has(.spcboy-track[aria-current="true"]) { background: transparent; }
-  .spcboy-playlist-content .spcboy-track[aria-current="true"] { background: transparent; color: var(--blue); }
-}
-
-/* The site navigation owns the row above SPCBOY; keep one player toolbar below it. */
-.spcboy-body .page-shell {
-  width: 100%;
-  max-width: none;
-  height: calc(100dvh - var(--site-navigation-height) - env(safe-area-inset-top));
-  min-height: 0;
-  margin: 0;
-  overflow: hidden;
-}
-.spcboy-body .spcboy-page { height: 100%; }
-
-@media (max-width: 780px) {
-  .spcboy-body .spcboy-library {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    overflow: hidden;
-  }
-  .spcboy-toolbar .spcboy-view-row .spcboy-tabs button { width: auto; min-width: 1.65rem; min-height: 1.55rem; padding: 0 .35rem; font-size: .58rem; }
-  .spcboy-toolbar .spcboy-view-row .spcboy-tabs button svg { width: .72rem; height: .72rem; }
-  .spcboy-toolbar .spcboy-view-row .spcboy-shuffle-favorites { width: 1.65rem; min-height: 1.55rem; }
-  .spcboy-body .spcboy-tree { min-height: 0; overflow: auto; }
-  .spcboy-column-head { display: none; }
-  .spcboy-track-artist { display: none !important; }
-  .spcboy-playlist-content .spcboy-track-row { grid-template-columns: minmax(0, 1fr) 1.55rem; }
-  .spcboy-playlist-content .spcboy-track { grid-column: 1; }
-  .spcboy-playlist-content .spcboy-favorite { grid-column: 2; grid-row: 1; }
-  .spcboy-body .spcboy-page { grid-template-rows: minmax(0, 1fr); }
-  .spcboy-body .spcboy-toolbar {
-    grid-row: 1;
-    grid-column: 1;
-    grid-template-columns: auto minmax(4.5rem, 1fr);
-    grid-template-rows: 1.8rem;
-    gap: .15rem;
-    height: 1.8rem;
-    padding-block: 0;
-  }
-  .spcboy-body .spcboy-toolbar .spcboy-view-row { grid-row: 1; grid-column: 1; }
-  .spcboy-body .spcboy-toolbar .spcboy-tabs { gap: 0; }
-  .spcboy-body .spcboy-toolbar .spcboy-tabs button { min-width: 1.7rem; padding-inline: .32rem; }
-  .spcboy-body .spcboy-toolbar .spcboy-tabs button span { display: none; }
-  .spcboy-body .spcboy-toolbar .spcboy-search-wrap { grid-row: 1; grid-column: 2; }
-  .spcboy-body .spcboy-library {
-    grid-row: 1;
-    grid-template-rows: 1.8rem minmax(0, 1fr);
-    height: auto;
-    min-height: 0;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .spcboy-tabs-indicator, .spcboy-sidebar-indicator, .spcboy-playlist-indicator,
   .spcboy-system > summary, .spcboy-game > summary, .spcboy-track { transition: none !important; }
-}
-
-/* Keep the pane headers and the dock on one shared two-column grid on desktop. */
-@media (min-width: 781px) {
-  .spcboy-body {
-    --spcboy-sidebar-width: clamp(18rem, 21vw, 24rem);
-    --spcboy-toolbar-height: 1.75rem;
-    --site-player-height: var(--spcboy-toolbar-height);
-  }
-  .spcboy-body .spcboy-page { grid-template-rows: minmax(0, 1fr); }
-  .spcboy-body .spcboy-library {
-    grid-row: 1;
-    grid-template-columns: var(--spcboy-sidebar-width) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-  }
-  .spcboy-body .spcboy-sidebar {
-    grid-template-rows: var(--spcboy-toolbar-height) minmax(0, 1fr);
-    border-right: 1px solid var(--line);
-  }
-  .spcboy-body .spcboy-toolbar {
-    box-sizing: border-box;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-rows: minmax(0, 1fr);
-    gap: .15rem;
-    width: 100%;
-    height: var(--spcboy-toolbar-height);
-    min-width: 0;
-    padding: 0 .2rem;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-  }
-  .spcboy-body .spcboy-search-wrap {
-    box-sizing: border-box;
-    grid-column: 1;
-    width: 100%;
-    min-width: 0;
-  }
-  .spcboy-body .spcboy-search-wrap input {
-    box-sizing: border-box;
-    width: 100%;
-    min-width: 0;
-    height: 1.5rem;
-    border: 0;
-  }
-  .spcboy-body .spcboy-search-wrap input:focus-visible { border: 0; outline: 1px solid var(--blue); outline-offset: -1px; }
-  .spcboy-body .spcboy-view-row {
-    grid-column: 2;
-    flex: 0 0 auto;
-    flex-wrap: nowrap;
-    gap: .08rem;
-    white-space: nowrap;
-  }
-  .spcboy-body .spcboy-tabs { flex: 0 0 auto; }
-  .spcboy-body .spcboy-tabs button,
-  .spcboy-body .spcboy-shuffle-favorites,
-  .spcboy-body .spcboy-fold-all {
-    box-sizing: border-box;
-    flex: 0 0 1.55rem;
-    width: 1.55rem;
-    min-width: 1.55rem;
-    height: 1.55rem;
-    min-height: 1.55rem;
-  }
-  .spcboy-body .spcboy-tree { border-right: 0; }
-  .spcboy-body .spcboy-stage { grid-template-rows: minmax(0, 1fr); }
-  .spcboy-body .spcboy-playlist-pane { grid-template-rows: var(--spcboy-toolbar-height) minmax(0, 1fr); }
-  .spcboy-body .spcboy-column-head {
-    box-sizing: border-box;
-    height: var(--spcboy-toolbar-height);
-    border-bottom: 1px solid var(--line);
-  }
-  .spcboy-body .spcboy-player.site-player-dock {
-    box-sizing: border-box;
-    grid-template-columns: minmax(0, 1fr) minmax(7.5rem, min(28vw, 20rem)) auto;
-    grid-template-areas: "main status clock";
-    gap: 0 .75rem;
-    padding: 0 .55rem;
-    border-top: 1px solid var(--line);
-    background: var(--white);
-    font-family: inherit;
-    font-size: .66rem;
-  }
-  .spcboy-body .spcboy-current-copy strong { font-size: .66rem; font-weight: 500; }
-  .spcboy-body .spcboy-player-status { max-width: none; min-height: 1rem; padding: 0; font-size: .62rem; }
-  .spcboy-body .spcboy-player-status > span:last-child { max-width: 100%; }
-  .spcboy-body .spcboy-playback-clock { font-size: .62rem; }
 }
 
 .spcboy-library { position: relative; }
@@ -704,179 +256,6 @@
   .spcboy-load-spinner { animation: none; border-top-color: var(--line); }
 }
 
-@media (max-width: 600px) {
-  .spcboy-library-loading-card { min-width: 0; width: min(100%, 27rem); flex-wrap: wrap; padding: .9rem 1rem; }
-  .spcboy-library-loading progress { width: 100%; flex-basis: 100%; margin-left: 1.75rem; }
-}
-
-/* Favorites and Recent use one collection pane; Gallery keeps the same shell. */
-@media (min-width: 781px) {
-  .spcboy-body .spcboy-library.is-card-view {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: var(--spcboy-toolbar-height) minmax(0, 1fr);
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
-  }
-  .spcboy-body .spcboy-library.is-card-view .spcboy-sidebar { display: contents; }
-  .spcboy-body .spcboy-library.is-card-view .spcboy-toolbar { grid-row: 1; grid-column: 1; }
-  .spcboy-body .spcboy-library.is-card-view .spcboy-tree { display: none; }
-  .spcboy-body .spcboy-library.is-card-view .spcboy-stage {
-    display: grid;
-    grid-row: 2;
-    grid-column: 1;
-    grid-template-rows: minmax(0, 1fr);
-    min-height: 0;
-    overflow: hidden;
-  }
-  .spcboy-body .spcboy-library.is-card-view .spcboy-card-panel {
-    grid-row: 1;
-    grid-column: 1;
-    min-height: 0;
-    height: 100%;
-  }
-}
-@media (max-width: 780px) {
-  .spcboy-body .spcboy-library:is(.is-card-view, .is-gallery) {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 1.8rem minmax(0, 1fr);
-    height: 100%;
-    overflow: hidden;
-  }
-  .spcboy-body .spcboy-library:is(.is-card-view, .is-gallery) .spcboy-sidebar { display: contents; }
-  .spcboy-body .spcboy-library:is(.is-card-view, .is-gallery) .spcboy-toolbar { grid-row: 1; grid-column: 1; }
-  .spcboy-body .spcboy-library:is(.is-card-view, .is-gallery) .spcboy-tree { display: none; }
-  .spcboy-body .spcboy-library:is(.is-card-view, .is-gallery) .spcboy-stage { display: contents; }
-  .spcboy-body .spcboy-library.is-card-view .spcboy-card-panel,
-  .spcboy-body .spcboy-library.is-gallery .spcboy-gallery-panel {
-    grid-row: 2;
-    grid-column: 1;
-    min-height: 0;
-    height: 100%;
-  }
-}
-
-.spcboy-body .spcboy-search-wrap input { border: 0; }
-.spcboy-body .spcboy-search-wrap input:focus-visible { border: 0; outline: 1px solid var(--blue); outline-offset: -1px; }
-
-/* Phone selection is pinned to the chosen rows; it never follows a hover pointer. */
-@media (max-width: 780px) {
-  .spcboy-body .spcboy-sidebar-indicator,
-  .spcboy-body .spcboy-playlist-indicator { display: none; }
-  .spcboy-body .spcboy-tree .spcboy-game.is-selected > summary {
-    border-radius: .2rem;
-    background: var(--blue-soft);
-    box-shadow: inset 2px 0 var(--blue);
-    color: var(--blue);
-  }
-  .spcboy-body .spcboy-tree .spcboy-track-row:has(.spcboy-track[aria-current="true"]),
-  .spcboy-body .spcboy-playlist-content .spcboy-track-row:has(.spcboy-track[aria-current="true"]) {
-    border-radius: .2rem;
-    background: var(--blue-soft);
-    box-shadow: inset 2px 0 var(--blue);
-  }
-  .spcboy-body .spcboy-tree .spcboy-track[aria-current="true"],
-  .spcboy-body .spcboy-playlist-content .spcboy-track[aria-current="true"] {
-    background: transparent;
-    color: var(--blue);
-  }
-}
-
-/* Desktop playlist metadata columns share one measured grid across header and rows. */
-@media (min-width: 781px) {
-  .spcboy-body .spcboy-column-head { grid-template-columns: 1.65rem minmax(0, 1fr); }
-  .spcboy-body .spcboy-column-head > div { min-width: 0; gap: .3rem; }
-  .spcboy-body .spcboy-column-head [data-column] {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .spcboy-body .spcboy-column-head .spcboy-column-length { text-align: right; }
-  .spcboy-body .spcboy-playlist-content .spcboy-track > [data-column] {
-    box-sizing: border-box;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .spcboy-body .spcboy-playlist-content .spcboy-track-number,
-  .spcboy-body .spcboy-playlist-content .spcboy-track-length,
-  .spcboy-body .spcboy-playlist-content .spcboy-track-title { display: block; }
-  .spcboy-body .spcboy-playlist-content .spcboy-track-game,
-  .spcboy-body .spcboy-playlist-content .spcboy-track-system {
-    display: block;
-    color: var(--spc-quiet);
-    font-size: .66rem;
-    line-height: 1;
-  }
-  .spcboy-body .spcboy-playlist-content .spcboy-track-length { text-align: right; }
-  .spcboy-body .spcboy-library.is-column-hidden-favorite .spcboy-column-head { grid-template-columns: 0 minmax(0, 1fr); }
-  .spcboy-body .spcboy-library.is-column-hidden-favorite .spcboy-playlist-content .spcboy-track-row { grid-template-columns: 0 minmax(0, 1fr); }
-  .spcboy-body .spcboy-library.is-column-hidden-favorite .spcboy-playlist-content .spcboy-favorite { display: none; }
-
-
-}
-
-/* Mobile library: one toolbar row and one scrollable content pane. */
-@media (max-width: 780px) {
-  body.spcboy-body .spcboy-page {
-    grid-template-rows: minmax(0, 1fr);
-    min-height: 0;
-  }
-  body.spcboy-body .spcboy-library {
-    display: grid;
-    grid-row: 1;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 1.8rem minmax(0, 1fr);
-    width: 100%;
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
-  }
-  body.spcboy-body .spcboy-sidebar { display: contents; }
-  body.spcboy-body .spcboy-toolbar {
-    grid-row: 1;
-    grid-column: 1;
-    height: 1.8rem;
-    min-height: 0;
-  }
-  body.spcboy-body .spcboy-tree {
-    display: block;
-    grid-row: 2;
-    grid-column: 1;
-    width: 100%;
-    height: 100%;
-    min-height: 0;
-    overflow: auto;
-    padding-bottom: .5rem;
-  }
-  body.spcboy-body .spcboy-library.is-mobile-results .spcboy-tree { display: none; }
-  body.spcboy-body .spcboy-library.is-mobile-results .spcboy-stage {
-    display: grid;
-    grid-row: 2;
-    grid-column: 1;
-    grid-template-rows: minmax(0, 1fr);
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-  }
-  body.spcboy-body .spcboy-library.is-mobile-results .spcboy-playlist-pane {
-    display: grid;
-    grid-row: 1;
-    grid-template-rows: minmax(0, 1fr);
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
-  }
-  body.spcboy-body .spcboy-library.is-mobile-results .spcboy-playlist-content {
-    min-height: 0;
-    overflow: auto;
-    padding: .45rem .5rem .65rem;
-  }
-  body.spcboy-body .spcboy-toolbar .spcboy-tabs { display: none; }
-
-}
 
 
 /* Shared Favorites/Recent track cards. These classes are deliberately isolated from library rows. */
@@ -1009,97 +388,7 @@
 .spcboy-media-card-favorite.is-favorite { color: var(--blue); }
 .spcboy-media-card-favorite.is-favorite svg { fill: currentColor; }
 .spcboy-card-remove { display: none; }
-@media (max-width: 780px) {
-  .spcboy-card-list { gap: .5rem; padding: .5rem max(.5rem, env(safe-area-inset-right)) .75rem max(.5rem, env(safe-area-inset-left)); }
-  .spcboy-media-card { min-height: 4.5rem; padding: .4rem; }
-  .spcboy-media-card-play {
-    display: grid;
-    flex: 1 1 0%;
-    grid-template-columns: 3.5rem minmax(0, 1fr) auto;
-    grid-template-rows: minmax(0, auto) minmax(0, auto);
-    gap: .18rem .5rem;
-    min-height: 3.5rem;
-    padding-right: .2rem;
-  }
-  .spcboy-media-card-cover { flex-basis: 3.5rem; width: 3.5rem; height: 3.5rem; }
-  .spcboy-media-card-cover,
-  .spcboy-media-card-number,
-  .spcboy-media-card-copy,
-  .spcboy-media-card-artist,
-  .spcboy-media-card-meta {
-    grid-column: auto;
-    grid-row: auto;
-  }
-  .spcboy-media-card-cover {
-    grid-column: 1;
-    grid-row: 1 / span 2;
-  }
-  .spcboy-media-card-copy {
-    display: grid;
-    flex: initial;
-    grid-column: 2;
-    grid-row: 1;
-    gap: .15rem;
-  }
-  .spcboy-media-card-artist {
-    flex: initial;
-    grid-column: 2;
-    grid-row: 2;
-    font-size: .64rem;
-  }
-  .spcboy-media-card-meta {
-    display: flex;
-    grid-column: 3;
-    grid-row: 1 / span 2;
-    gap: .3rem;
-  }
-  .spcboy-media-card-number { display: none; }
-  .spcboy-media-card-title { font-size: .8rem; }
-  .spcboy-media-card-detail { font-size: .59rem; }
-  .spcboy-media-card-time { max-width: 6.5rem; font-size: .55rem; }
-  .spcboy-media-card-favorite { flex-basis: 2.25rem; width: 2.25rem; min-height: 2.25rem; }
-  .spcboy-media-card-favorite svg { width: 1rem; height: 1rem; }
-  .spcboy-media-card.is-favorite-removable { padding: 0; }
-  .spcboy-media-card.is-favorite-removable .spcboy-media-card-play {
-    padding: .4rem .6rem .4rem .4rem;
-    background: var(--paper);
-  }
-  .spcboy-media-card.is-favorite-removable .spcboy-media-card-favorite {
-    position: absolute;
-    z-index: 1;
-    inset: 0 0 0 auto;
-    width: 4rem;
-    height: auto;
-    min-height: 0;
-    flex-basis: 4rem;
-    border-radius: 0;
-    background: color-mix(in srgb, var(--blue) 13%, var(--paper));
-  }
-  .spcboy-card-remove {
-    position: absolute;
-    z-index: 3;
-    inset: 0 0 0 auto;
-    display: grid;
-    width: 4rem;
-    place-items: center;
-    padding: 0 .25rem;
-    border: 0;
-    background: color-mix(in srgb, var(--red, #a43d47) 16%, var(--white));
-    color: var(--red, #a43d47);
-    cursor: pointer;
-  }
-  .spcboy-card-remove svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  .spcboy-card-remove:disabled { opacity: .55; cursor: wait; }
-  .spcboy-card-remove:hover { background: color-mix(in srgb, var(--red, #a43d47) 24%, var(--white)); }
-  .spcboy-media-card.is-swipe-revealed .spcboy-media-card-play,
-  .spcboy-media-card.is-swipe-revealed:not(.is-favorite-removable) .spcboy-media-card-favorite,
-  .spcboy-media-card:has(.spcboy-card-remove:focus-visible) .spcboy-media-card-play,
-  .spcboy-media-card:has(.spcboy-card-remove:focus-visible) .spcboy-media-card-favorite,
-  .spcboy-media-card.is-favorite-removable:has(.spcboy-media-card-favorite:focus-visible) .spcboy-media-card-play { transform: translateX(-4rem); }
-  .spcboy-media-card-play,
-  .spcboy-media-card-favorite { transition: transform var(--site-motion-duration) var(--site-motion-ease), color var(--site-motion-duration) var(--site-motion-ease); }
-  .spcboy-media-card { touch-action: pan-y; }
-}
+
 @media (prefers-reduced-motion: reduce) {
   .spcboy-media-card,
   .spcboy-media-card-play,
