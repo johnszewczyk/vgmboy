@@ -1,6 +1,7 @@
 # Home
 
-- The top title strip shows SPCBOY, the current console and album, and CPU use.
+- The top title strip shows SPCBOY, the current console and album, and SB2
+  process CPU use, refreshed once per second.
 - Window controls are rendered in the title strip; AppKit's native stoplights
   are hidden, and the strip remains draggable.
 - Ten playback, audio, and Options controls share the first sidebar toolbar at
