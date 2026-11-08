@@ -1,0 +1,18 @@
+{% extends "accounts/base.html" %}
+{% block title %}Join{% endblock %}
+{% block content %}
+<section class="login-shell panel enrollment-panel">
+  <p class="eyebrow">Private invitation</p>
+  <h1>Join the site</h1>
+  <p class="muted">Enter the one-time code shared with you. You will register a passkey to finish setup.</p>
+  {% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" class="stack-form" autocomplete="on">
+    {% csrf_token %}
+    <label for="id_invitation_code">Invite code</label>
+    <input id="id_invitation_code" name="invitation_code" type="text" maxlength="64" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" required>
+    {% if form.invitation_code.errors %}<span class="field-error">{{ form.invitation_code.errors|join:", " }}</span>{% endif %}
+    <p class="security-note">Each code is private, expires after 24 hours, and can create one account.</p>
+    <button class="primary-button" type="submit">Continue to passkey setup</button>
+  </form>
+</section>
+{% endblock %}

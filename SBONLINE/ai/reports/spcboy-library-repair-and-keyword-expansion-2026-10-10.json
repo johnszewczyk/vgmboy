@@ -1,0 +1,216 @@
+{
+  "baseCatalogSHA256": "60bafda6f07f4abbf6077c43098777d9310ed140d0da1e817c8f64071499e226",
+  "catalogSHA256": "8df66f98eebf38cbb6b01aee75f319c7f26bed8e14552df1e992af3941483bf7",
+  "catalogBytes": 2317007,
+  "baseTracks": 4530,
+  "newTracks": 4734,
+  "games": 149,
+  "systems": [
+    [
+      "Nintendo Game Boy",
+      32
+    ],
+    [
+      "Nintendo NES",
+      32
+    ],
+    [
+      "Nintendo SNES",
+      66
+    ],
+    [
+      "Sega Genesis",
+      19
+    ]
+  ],
+  "restoredExistingPackages": {
+    "count": 111,
+    "bytes": 39377456,
+    "source": "retained server staging tree; exact package files moved to their already-cataloged archive paths"
+  },
+  "newPackages": [
+    {
+      "id": "01",
+      "sourcePath": "Audio/JohnS/SNESMusicOrg/Nintendo SNES/Top Gear.uac",
+      "sourceBytes": 48230,
+      "sourceSHA256": "7f735ea943e43d1caca161f0964702ee678377656b79725740b1bcd64e26a015",
+      "outputBytes": 48230,
+      "outputSHA256": "7f735ea943e43d1caca161f0964702ee678377656b79725740b1bcd64e26a015",
+      "targetArchive": "Super Nintendo/Added 2026-10/Top Gear.uac",
+      "console": "Nintendo SNES",
+      "game": "Top Gear",
+      "tracks": 7,
+      "format": "spc"
+    },
+    {
+      "id": "02",
+      "sourcePath": "Audio/JohnS/SNESMusicOrg/Nintendo SNES/Top Gear 2.uac",
+      "sourceBytes": 104181,
+      "sourceSHA256": "1bb22a29e0188764edddfcde9cd90fe11a73d872d905655a7cd9e20d9666cbf0",
+      "outputBytes": 104181,
+      "outputSHA256": "1bb22a29e0188764edddfcde9cd90fe11a73d872d905655a7cd9e20d9666cbf0",
+      "targetArchive": "Super Nintendo/Added 2026-10/Top Gear 2.uac",
+      "console": "Nintendo SNES",
+      "game": "Top Gear 2",
+      "tracks": 6,
+      "format": "spc"
+    },
+    {
+      "id": "03",
+      "sourcePath": "Audio/JohnS/SNESMusicOrg/Nintendo SNES/Top Gear 3000.uac",
+      "sourceBytes": 93242,
+      "sourceSHA256": "956b1ca3316c364e9d139d1309c0a63bd8a16a6459df8c67f62744a8ed660463",
+      "outputBytes": 93242,
+      "outputSHA256": "956b1ca3316c364e9d139d1309c0a63bd8a16a6459df8c67f62744a8ed660463",
+      "targetArchive": "Super Nintendo/Added 2026-10/Top Gear 3000.uac",
+      "console": "Nintendo SNES",
+      "game": "Top Gear 3000",
+      "tracks": 7,
+      "format": "spc"
+    },
+    {
+      "id": "04",
+      "sourcePath": "Audio/JohnS/SNESMusicOrg/Nintendo SNES/Super Metroid.uac",
+      "sourceBytes": 322989,
+      "sourceSHA256": "3526d71ae51a6a8eded96338fe3392fe97b3324c080824b5ff47a515215a5998",
+      "outputBytes": 322989,
+      "outputSHA256": "3526d71ae51a6a8eded96338fe3392fe97b3324c080824b5ff47a515215a5998",
+      "targetArchive": "Super Nintendo/Added 2026-10/Super Metroid.uac",
+      "console": "Nintendo SNES",
+      "game": "Super Metroid",
+      "tracks": 38,
+      "format": "spc"
+    },
+    {
+      "id": "05",
+      "sourcePath": "Audio/JohnS/JoshW/Nintendo SNES/Tetris 2.uac",
+      "sourceBytes": 80409,
+      "sourceSHA256": "bb997a0c07d77ec7b5c72edca8062b43211260b1eaea30db0a1f8a2d626cb5d5",
+      "outputBytes": 80409,
+      "outputSHA256": "bb997a0c07d77ec7b5c72edca8062b43211260b1eaea30db0a1f8a2d626cb5d5",
+      "targetArchive": "Super Nintendo/Added 2026-10/Tetris 2.uac",
+      "console": "Nintendo SNES",
+      "game": "Tetris 2",
+      "tracks": 27,
+      "format": "spc"
+    },
+    {
+      "id": "06",
+      "sourcePath": "Audio/JohnS/Nintendo SNES/Super Tetris 3.uac",
+      "sourceBytes": 211194,
+      "sourceSHA256": "7de5e07577bc9d68e6678b89fb2c41c7c75d0af9899d8bca8dc9005fddc5d891",
+      "outputBytes": 211194,
+      "outputSHA256": "7de5e07577bc9d68e6678b89fb2c41c7c75d0af9899d8bca8dc9005fddc5d891",
+      "targetArchive": "Super Nintendo/Added 2026-10/Super Tetris 3.uac",
+      "console": "Nintendo SNES",
+      "game": "Super Tetris 3",
+      "tracks": 33,
+      "format": "spc"
+    },
+    {
+      "id": "07",
+      "sourcePath": "Audio/JohnS/VGMRIPS/Sega Genesis/Top Gear 2.uac",
+      "sourceBytes": 677454,
+      "sourceSHA256": "6da8408e239b02f92caa4fe7eef66e1eba67b3ef6a3be8b929e7f68eee5eac12",
+      "outputBytes": 677454,
+      "outputSHA256": "6da8408e239b02f92caa4fe7eef66e1eba67b3ef6a3be8b929e7f68eee5eac12",
+      "targetArchive": "Sega Genesis/Added 2026-10/Top Gear 2.uac",
+      "console": "Sega Genesis",
+      "game": "Top Gear 2",
+      "tracks": 4,
+      "format": "vgm"
+    },
+    {
+      "id": "08",
+      "sourcePath": "Audio/JohnS/VGMRIPS/Sega Genesis/Tetris.uac",
+      "sourceBytes": 45187,
+      "sourceSHA256": "1bf143d40e957c41fe5db3530f4539eafd88e98b36c160d46bede40da725ed0f",
+      "outputBytes": 45187,
+      "outputSHA256": "1bf143d40e957c41fe5db3530f4539eafd88e98b36c160d46bede40da725ed0f",
+      "targetArchive": "Sega Genesis/Added 2026-10/Tetris.uac",
+      "console": "Sega Genesis",
+      "game": "Tetris",
+      "tracks": 9,
+      "format": "vgm"
+    },
+    {
+      "id": "09",
+      "sourcePath": "Audio/JohnS/VGMRIPS/Nintendo NES/Metroid.uac",
+      "sourceBytes": 26137,
+      "sourceSHA256": "d6cef6e1f2bd2062fffe11ae89d30f73e04a4e1ef20597167cb31ff6fcef23a4",
+      "outputBytes": 26137,
+      "outputSHA256": "d6cef6e1f2bd2062fffe11ae89d30f73e04a4e1ef20597167cb31ff6fcef23a4",
+      "targetArchive": "Nintendo Entertainment System/Added 2026-10/Metroid.uac",
+      "console": "Nintendo NES",
+      "game": "Metroid",
+      "tracks": 12,
+      "format": "vgm"
+    },
+    {
+      "id": "10",
+      "sourcePath": "Audio/JohnS/VGMRIPS/Nintendo NES/Tetris.uac",
+      "sourceBytes": 32320,
+      "sourceSHA256": "69e186795915b4394795563618c5b6d16ddeb618c83a667b7f88334de563fa0f",
+      "outputBytes": 32320,
+      "outputSHA256": "69e186795915b4394795563618c5b6d16ddeb618c83a667b7f88334de563fa0f",
+      "targetArchive": "Nintendo Entertainment System/Added 2026-10/Tetris.uac",
+      "console": "Nintendo NES",
+      "game": "Tetris",
+      "tracks": 7,
+      "format": "vgm"
+    },
+    {
+      "id": "11",
+      "sourcePath": "Audio/JohnS/VGMRIPS/Nintendo Game Boy/Metroid II - Return of Samus.uac",
+      "sourceBytes": 83856,
+      "sourceSHA256": "31d861532603a11485af3ea3953dd8308f1c75c8d34379338f2af66c947746f9",
+      "outputBytes": 83856,
+      "outputSHA256": "31d861532603a11485af3ea3953dd8308f1c75c8d34379338f2af66c947746f9",
+      "targetArchive": "Game Boy Mono/Added 2026-10/Metroid II - Return of Samus.uac",
+      "console": "Nintendo Game Boy",
+      "game": "Metroid II: Return of Samus",
+      "tracks": 19,
+      "format": "vgm"
+    },
+    {
+      "id": "12",
+      "sourcePath": "Audio/JohnS/VGMRIPS/Nintendo Game Boy/Tetris Plus.uac",
+      "sourceBytes": 175012,
+      "sourceSHA256": "886dcfbe5ce7cfccf86231a027ddaed3b3d6389080a7caef80fac45c98a5113d",
+      "outputBytes": 175012,
+      "outputSHA256": "886dcfbe5ce7cfccf86231a027ddaed3b3d6389080a7caef80fac45c98a5113d",
+      "targetArchive": "Game Boy Mono/Added 2026-10/Tetris Plus.uac",
+      "console": "Nintendo Game Boy",
+      "game": "Tetris Plus",
+      "tracks": 23,
+      "format": "vgm"
+    },
+    {
+      "id": "13",
+      "sourcePath": "Audio/Mr Norbert/source-docs/!NSFE!/Adventures of Bayou Billy, The.nsfe",
+      "sourceBytes": 34478,
+      "sourceSHA256": "2c7b5bb3b137f3c3111fc4b71e95628cbc223b57f0c9fd05b2bd806011a25fc5",
+      "outputBytes": 25962,
+      "outputSHA256": "aebe37482673c0a3097f3d3b9010c273ea6ac51a857c2bca49232f18d3c73509",
+      "targetArchive": "Nintendo Entertainment System/Added 2026-10/The Adventures of Bayou Billy.uac",
+      "console": "Nintendo NES",
+      "game": "The Adventures of Bayou Billy",
+      "tracks": 12,
+      "format": "NSFE wrapped in UAC",
+      "timingOrigin": "MetaMan NSFE play/fade fields; remapped source playlist order to libgme decoder order"
+    }
+  ],
+  "addedTracksBySystem": {
+    "Nintendo Game Boy": 42,
+    "Nintendo NES": 31,
+    "Nintendo SNES": 118,
+    "Sega Genesis": 13
+  },
+  "runtimeChecks": {
+    "GBS": "Hosted ZIP member: 352800 PCM bytes for 2 seconds; FFmpeg produced AAC ADTS.",
+    "VGM": "Hosted UAC member: 352800 PCM bytes for 2 seconds; FFmpeg produced AAC ADTS.",
+    "SPC": "Hosted UAC member: 352800 PCM bytes for 2 seconds; FFmpeg produced AAC ADTS.",
+    "NSF": "VGMBoy bundled NSF sample: 176400 PCM bytes for 1 second; FFmpeg produced AAC ADTS.",
+    "NSFE": "All 12 Bayou Billy playlist entries decoded with libgme using zero-based decoder order; FFmpeg produced AAC ADTS."
+  }
+}

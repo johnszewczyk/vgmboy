@@ -1,0 +1,36 @@
+[Unit]
+Description=Pre-Calc private-space web application
+After=network.target vnstat.service
+Requires=vnstat.service
+
+[Service]
+Type=simple
+User=precalc-admin
+Group=precalc-admin
+SupplementaryGroups=vnstat
+WorkingDirectory=/opt/precalc-admin/app
+EnvironmentFile=/etc/precalc-admin.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/precalc-admin/venv/bin/gunicorn --workers 1 --worker-class gthread --threads 4 --bind 127.0.0.1:8765 --access-logfile - --error-logfile - --timeout 60 precalc_admin.wsgi:application
+Restart=on-failure
+RestartSec=3
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/precalc-admin
+ReadOnlyPaths=/var/lib/vnstat
+
+[Install]
+WantedBy=multi-user.target

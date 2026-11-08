@@ -1,0 +1,21 @@
+{% extends "accounts/base.html" %}
+{% block title %}{% if is_recovery %}Recover passkey{% else %}Create passkey{% endif %}{% endblock %}
+{% block content %}
+<section class="login-shell panel enrollment-panel">
+  <p class="eyebrow">{% if is_recovery %}Account recovery{% else %}One-time invitation{% endif %}</p>
+  <h1>{% if is_recovery %}Create a replacement passkey{% else %}Create your passkey{% endif %}</h1>
+  <p class="muted">{% if is_recovery %}Register a new passkey to restore sign-in. Existing passkeys will be removed when the new one is ready.{% else %}Register a passkey to finish joining. Your account name is assigned automatically; you can change your display name later in Profile.{% endif %}</p>
+</section>
+<section class="passkey-controls panel enrollment-passkey-controls"
+  data-passkey-controls
+  data-passkey-options="{% url 'passkey_registration_options' %}"
+  data-passkey-verify="{% url 'passkey_registration_verify' %}">
+  <form class="passkey-setup-form" onsubmit="return false">
+    {% csrf_token %}
+    <label for="passkey-name">Name this passkey <span class="muted">(optional)</span></label>
+    <input id="passkey-name" data-passkey-name type="text" maxlength="80" autocomplete="off" placeholder="iPhone, Mac, or security key">
+    <button class="primary-button" type="button" data-passkey-register>{% if is_recovery %}Register replacement passkey{% else %}Register passkey{% endif %}</button>
+  </form>
+  <p class="passkey-status" data-passkey-status role="status" aria-live="polite">Your device will ask you to confirm the new passkey.</p>
+</section>
+{% endblock %}

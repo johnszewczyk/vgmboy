@@ -1,0 +1,4 @@
+<div class="site-track-display">
+  {% include "accounts/partials/play_track_controls.html" with track_id=track_id track_title=track_title track_game=track_game track_console=track_console track_duration=track_duration %}
+  <span class="site-track-metadata">{{ track_game }} · {{ track_console }}{% if track_artist %} · {{ track_artist }}{% endif %}</span>
+</div>

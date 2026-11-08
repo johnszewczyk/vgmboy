@@ -1,0 +1,23 @@
+{% extends "accounts/base.html" %}
+{% block title %}Invitation created{% endblock %}
+{% block content %}
+<section class="panel invite-result">
+  <p class="eyebrow">One-time access</p>
+  {% if member_invite %}
+  <h1>Member invite code ready</h1>
+  <p class="muted">An internal account name is assigned automatically. The member can choose a public display name later in Profile. This code expires {% include "accounts/partials/record_time.html" with record_time=expires_at time_class="site-record-time--inline" %} and can be used once.</p>
+  <div class="secret-field"><label for="join-url">Invite page</label><input id="join-url" type="text" value="{{ join_url }}" readonly><button class="quiet-button" type="button" data-copy-target="join-url">Copy page link</button></div>
+  <div class="secret-field"><label for="invite-code">One-time invite code</label><input id="invite-code" type="text" value="{{ code }}" readonly autocomplete="off" spellcheck="false"><button class="quiet-button" type="button" data-copy-target="invite-code">Copy code</button></div>
+  <p class="notice notice-warning">Share the code privately with one person. Anyone with the code can claim this invitation. A passkey is required to finish setup. While this invitation is open, its code remains visible on Accounts.</p>
+  {% else %}
+  <h1>Passkey recovery invitation created</h1>
+  <p class="muted">For account <strong>{{ username }}</strong>. This expires {% include "accounts/partials/record_time.html" with record_time=expires_at time_class="site-record-time--inline" %} and can be completed once.</p>
+  <div class="secret-field"><label for="invite-url">Enrollment link</label><textarea id="invite-url" readonly rows="2">{{ invitation_url }}</textarea><button class="quiet-button" type="button" data-copy-target="invite-url">Copy link</button></div>
+  <div class="secret-field"><label for="invite-code">One-time recovery code</label><input id="invite-code" type="text" value="{{ code }}" readonly autocomplete="off" spellcheck="false"><button class="quiet-button" type="button" data-copy-target="invite-code">Copy code</button></div>
+  <p class="notice notice-warning">Verify the recipient separately, then send the link and recovery code through different channels.</p>
+  {% endif %}
+  <p class="muted">This result page is available for ten minutes. Open invitations and their codes remain on Accounts until they are used, canceled, or expire.</p>
+  <p class="copy-status" aria-live="polite"></p>
+  <a class="primary-link" href="{% url 'accounts' %}">Return to account manager</a>
+</section>
+{% endblock %}

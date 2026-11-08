@@ -1,0 +1,26 @@
+[Unit]
+Description=Create a private admin recovery archive
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+ExecStart=/usr/local/sbin/precalc-admin-backup
+TimeoutStartSec=20min
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_CHOWN CAP_FOWNER
+ReadWritePaths=/var/backups/precalc-admin /var/lib/precalc-admin/backup-status

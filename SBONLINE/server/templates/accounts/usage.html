@@ -1,0 +1,72 @@
+{% extends "accounts/base.html" %}
+{% block title %}Usage{% endblock %}
+{% block content %}
+<div class="usage-page">
+<div class="page-heading usage-heading">
+  <div><h1>Usage</h1><p class="muted">Monthly account traffic and server status.</p></div>
+  <form class="month-picker" method="get"><label class="visually-hidden" for="month-choice">Usage month</label><select id="month-choice" name="month" aria-label="Usage month">{% for period in periods %}<option value="{{ period.value }}"{% if period.value == selected_period %} selected{% endif %}>{{ period.label }}</option>{% endfor %}</select><noscript><button class="quiet-button" type="submit">Show</button></noscript></form>
+</div>
+
+<section class="metric-grid" aria-label="Private-section data transfer">
+  <article class="metric-card metric-primary"><span>Responses · {{ selected_period }}</span><strong class="metric-value">{{ total }}</strong><p class="metric-detail">All signed-in accounts{% if is_current_period %} · month in progress{% endif %}</p></article>
+  <article class="metric-card"><span>Site</span><strong class="metric-value">{{ site_total }}</strong><p class="metric-detail">Authenticated private pages</p></article>
+  <article class="metric-card"><span>Audio / media</span><strong class="metric-value">{{ media_total }}</strong><p class="metric-detail">Private audio and media routes</p></article>
+</section>
+
+<details class="panel usage-methods">
+  <summary id="site-guide-title">How totals are counted</summary>
+  <p>Compressed source tracks are decoded to AAC when requested; converted copies are not saved.</p>
+  <p><strong>Audio cap:</strong> 10,000,000,000 bytes per account per UTC month. It resets on the first.</p>
+  <p><strong>Site and media:</strong> authenticated response-body bytes. These exclude headers, TLS overhead, public pages, and Nginx static assets. Droplet transfer covers the whole server and is not a provider billing total.</p>
+</details>
+
+<section class="panel">
+  <div class="section-heading"><div><p class="eyebrow">By account</p><h2>Private-site usage</h2><p class="muted">Response-body bytes measured by the site.</p></div></div>
+  <div class="site-log-table-wrap"><table class="site-log-table account-table">
+    <thead><tr><th scope="col">Account</th><th scope="col">Site</th><th scope="col">Audio streamed / 10 GB cap</th><th scope="col">Total</th><th scope="col">Status</th></tr></thead>
+    <tbody>
+      {% for row in rows %}<tr>
+        <td data-label="Account"><strong>{{ row.username }}</strong><span class="table-subline">{{ row.role_label }}</span></td>
+        <td data-label="Site">{{ row.site_bytes }}</td><td data-label="Audio streamed / 10 GB cap">{{ row.audio_quota }}</td><td data-label="Total"><strong>{{ row.total_bytes }}</strong></td>
+        <td data-label="Status"><span class="status-pill {% if row.is_active %}status-active{% else %}status-paused{% endif %}">{% if row.is_active %}Active{% else %}Suspended{% endif %}</span></td>
+      </tr>{% endfor %}
+    </tbody>
+  </table></div>
+  {% if not rows %}<p class="empty-state">No accounts are available.</p>{% endif %}
+</section>
+
+{% if is_owner %}
+<section class="panel">
+  <div class="section-heading"><div><p class="eyebrow">Owner view</p><h2>Droplet status</h2><p class="muted">Whole-server readings for capacity and network transfer.</p></div></div>
+  <div class="metric-grid" aria-label="Current server status">
+    <article class="metric-card metric-primary"><span>Droplet transfer this month</span>{% if bandwidth.current %}<strong class="metric-value">{{ bandwidth.current.total }}</strong><p class="metric-detail">{{ bandwidth.current.label }} · {{ bandwidth.interface }}</p>{% else %}<strong class="metric-value">Collecting</strong><p class="metric-detail">{{ bandwidth.message }}</p>{% endif %}</article>
+    <article class="metric-card"><span>Memory</span><strong class="metric-value">{{ server.memory_used }}</strong><p class="metric-detail">of {{ server.memory_total }} · {{ server.memory_percent }}% used</p></article>
+    <article class="metric-card"><span>Disk</span><strong class="metric-value">{{ server.disk_used }}</strong><p class="metric-detail">of {{ server.disk_total }} · {{ server.disk_percent }}% used</p></article>
+    <article class="metric-card"><span>Load average</span><strong class="metric-value metric-mono">{{ server.load }}</strong><p class="metric-detail">1, 5, and 15 minutes</p></article>
+    <article class="metric-card"><span>Uptime</span><strong class="metric-value">{{ server.uptime_days }}d {{ server.uptime_hours }}h</strong><p class="metric-detail">Since the last reboot</p></article>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="section-heading"><div><p class="eyebrow">Recovery</p><h2>Private admin backups</h2><p class="muted">Daily recovery archives, retained for up to 3 successful runs.</p></div></div>
+  <div class="metric-grid" aria-label="Private admin backup status">
+    <article class="metric-card metric-primary"><span>Latest backup</span><strong class="metric-value">{{ backup.label }}</strong><p class="metric-detail">{{ backup.last_success }}</p></article>
+    <article class="metric-card"><span>Restore points</span><strong class="metric-value">{{ backup.retained_count }}</strong><p class="metric-detail">Available on this droplet</p></article>
+    <article class="metric-card"><span>Latest archive</span><strong class="metric-value">{{ backup.size }}</strong><p class="metric-detail">Database, private media, and app configuration</p></article>
+  </div>
+  <p class="footnote">Archives are readable only by the droplet administrator and stay on this droplet. They can help recover from application or data mistakes, but do not protect against loss of the droplet itself.</p>
+</section>
+
+<section class="panel usage-panel">
+  <div class="section-heading"><div><p class="eyebrow">Network</p><h2>Monthly transfer</h2><p class="muted">Received and sent on {{ bandwidth.interface|default:"eth0" }}.</p></div><div class="legend"><span><i class="legend-in"></i>Received</span><span><i class="legend-out"></i>Sent</span></div></div>
+  {% if bandwidth.months %}<div class="month-chart" role="list" aria-label="Monthly network transfer history">
+    {% for month in bandwidth.months %}<div class="month-row" role="listitem"><span class="month-label">{{ month.label }}</span><svg class="transfer-bar" viewBox="0 0 1000 18" preserveAspectRatio="none" role="img" aria-label="{{ month.label }}: {{ month.rx }} received, {{ month.tx }} sent"><rect class="bar-received" x="0" y="0" width="{{ month.rx_units }}" height="18" rx="4"></rect><rect class="bar-sent" x="{{ month.rx_units }}" y="0" width="{{ month.tx_units }}" height="18" rx="4"></rect></svg><span class="month-total">{{ month.total }}</span></div>{% endfor %}
+  </div><p class="chart-caption">Decimal units · current month is incomplete{% if bandwidth.since %} · tracking since {{ bandwidth.since }}{% endif %}.</p>
+  {% else %}<p class="notice">{{ bandwidth.message }}</p>{% endif %}
+</section>
+<p class="footnote">Account totals exclude public pages and static assets; droplet totals cover the whole server.</p>
+{% else %}
+<p class="footnote">These are authenticated Django response-body bytes, not a provider billing meter. Public pre-calc.com pages, Nginx-served static files, headers, and TLS overhead are excluded.</p>
+{% endif %}
+</div>
+{% endblock %}

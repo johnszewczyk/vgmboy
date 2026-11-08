@@ -1,0 +1,4 @@
+<span class="play-track-controls">
+  <a class="play-track-now" data-site-play-track href="{% url 'spcboy' %}?play={{ track_id|urlencode }}" data-track-id="{{ track_id }}" data-track-title="{{ track_title }}" data-track-game="{{ track_game }}" data-track-console="{{ track_console }}" data-track-duration="{{ track_duration|default:0 }}" aria-label="Play {{ track_title }} now" title="Play now"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11L13 8z"/></svg></a>
+  <a class="play-track-link" data-site-play-track href="{% url 'spcboy' %}?play={{ track_id|urlencode }}" data-track-id="{{ track_id }}" data-track-title="{{ track_title }}" data-track-game="{{ track_game }}" data-track-console="{{ track_console }}" data-track-duration="{{ track_duration|default:0 }}">{{ track_title }}</a>
+</span>

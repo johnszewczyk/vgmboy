@@ -1,0 +1,12 @@
+<article class="session-detail">
+  <div class="session-detail-heading"><strong>{% if active_login.pre_audit %}Session predates sign-in logging{% elif active_login.is_current %}This browser{% else %}Active browser session{% endif %}</strong><span class="status-pill status-active">Active</span></div>
+  <dl class="session-facts">
+    <div class="session-id-fact"><dt>Session fingerprint</dt><dd><code>{{ active_login.session_id }}</code></dd></div>
+    <div><dt>IP at sign-in</dt><dd>{% if active_login.ip_address %}{{ active_login.ip_address }}{% else %}Unavailable{% endif %}</dd></div>
+    <div><dt>Signed in</dt><dd>{% if active_login.login_at %}{% include "accounts/partials/record_time.html" with record_time=active_login.login_at time_class="site-record-time--inline" %}{% else %}Before sign-in logging{% endif %}</dd></div>
+    <div><dt>Last activity</dt><dd>{% if active_login.last_seen_at %}{% include "accounts/partials/record_time.html" with record_time=active_login.last_seen_at time_class="site-record-time--inline" %}{% elif active_login.observed_at %}{% include "accounts/partials/record_time.html" with record_time=active_login.observed_at time_class="site-record-time--inline" %}{% else %}Not recorded{% endif %}</dd></div>
+    <div class="session-wide"><dt>Browser at sign-in</dt><dd>{{ active_login.user_agent|default:"Unavailable" }}</dd></div>
+    {% if active_login.observed_ip %}<div><dt>IP on this request</dt><dd>{{ active_login.observed_ip }}</dd></div>{% endif %}
+    {% if active_login.observed_user_agent %}<div class="session-wide"><dt>Browser on this request</dt><dd>{{ active_login.observed_user_agent }}</dd></div>{% endif %}
+  </dl>
+</article>

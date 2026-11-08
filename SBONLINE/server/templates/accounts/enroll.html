@@ -1,0 +1,19 @@
+{% extends "accounts/base.html" %}
+{% block title %}Recover passkey{% endblock %}
+{% block content %}
+<section class="login-shell panel enrollment-panel">
+  <p class="eyebrow">Passkey recovery</p>
+  <h1>Recover your passkey</h1>
+  <p class="muted">For account <strong>{{ invitation.username }}</strong>. This recovery invitation expires {% include "accounts/partials/record_time.html" with record_time=invitation.expires_at time_class="site-record-time--inline" %}.</p>
+  {% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" class="stack-form" autocomplete="on">
+    {% csrf_token %}
+    <label for="id_invitation_code">One-time recovery code</label>
+    <input id="id_invitation_code" name="invitation_code" type="text" maxlength="64" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" required>
+    {% if form.invitation_code.errors %}<span class="field-error">{{ form.invitation_code.errors|join:", " }}</span>{% endif %}
+    <p class="security-note">After the code is verified, register a new passkey to finish recovery. The code can be used once.</p>
+    <button class="primary-button" type="submit">Verify and continue</button>
+  </form>
+  <p class="copy-status" aria-live="polite"></p>
+</section>
+{% endblock %}

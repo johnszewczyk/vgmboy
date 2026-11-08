@@ -1,0 +1,3 @@
+<span class="member-avatar {{ avatar_variant|default:'' }}"{% if avatar_id %} id="{{ avatar_id }}"{% endif %} aria-hidden="true">
+  {% include "accounts/partials/member_avatar_content.html" with avatar_profile=avatar_profile %}
+</span>

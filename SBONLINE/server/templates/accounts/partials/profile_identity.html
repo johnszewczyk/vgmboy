@@ -1,0 +1,12 @@
+<header class="community-heading profile-identity-card">
+  <div class="profile-identity-main">
+    {% include "accounts/partials/member_avatar.html" with avatar_profile=member_profile avatar_variant="member-avatar--profile" avatar_id=identity_avatar_id %}
+    <div class="profile-identity-copy">
+      <p class="eyebrow">{{ identity_heading }}</p>
+      <h1>{{ member_profile.display_name }}</h1>
+      <p class="muted">Joined {% include "accounts/partials/record_date.html" with record_date=joined_at time_class="site-record-time--inline" %}</p>
+    </div>
+  </div>
+  <a class="quiet-link profile-identity-link" href="{{ identity_action_url }}">{{ identity_action_label }}</a>
+  <div class="profile-card-stats" role="group" aria-label="{{ favorite_tracks.paginator.count|add:favorite_albums.paginator.count }} favorites, {{ recent_plays.paginator.count }} plays"><span><strong>{{ favorite_tracks.paginator.count|add:favorite_albums.paginator.count }}</strong> favorites</span><span><strong>{{ recent_plays.paginator.count }}</strong> plays</span></div>
+</header>

@@ -1,0 +1,17 @@
+<details class="profile-usage-section" aria-label="Tracked bandwidth usage">
+  <summary>Bandwidth <span>{{ bandwidth.total }} tracked</span></summary>
+  <div class="profile-usage-totals" aria-label="Tracked totals">
+    <div><strong>{{ bandwidth.total }}</strong><span>Combined</span></div>
+    <div><strong>{{ bandwidth.site_total }}</strong><span>Site</span></div>
+    <div><strong>{{ bandwidth.audio_total }}</strong><span>AAC streamed</span></div>
+  </div>
+  {% if bandwidth.rows %}
+  <div class="profile-usage-table-wrap">
+    <table class="profile-usage-table">
+      <thead><tr><th scope="col">Month</th><th scope="col">Site</th><th scope="col">AAC streamed / cap</th><th scope="col">Total</th></tr></thead>
+      <tbody>{% for row in bandwidth.rows %}<tr><th scope="row">{{ row.period|date:"M Y" }}</th><td>{{ row.site_bytes }}</td><td>{{ row.audio_bytes }} / {{ row.audio_allowance }}</td><td>{{ row.total_bytes }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  {% else %}<p class="empty-state profile-usage-empty">No bandwidth has been recorded for this account yet.</p>{% endif %}
+  <p class="profile-usage-note">The AAC allowance is 10,000,000,000 bytes per UTC calendar month. These tracked response-byte totals exclude static files, headers, and TLS overhead; they are not provider billing totals.</p>
+</details>

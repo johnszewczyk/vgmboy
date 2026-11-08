@@ -3,214 +3,199 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#090d13">
-  <title>SBOnline · Mobile player concept</title>
+  <meta name="color-scheme" content="dark">
+  <title>Mobile player · local preview</title>
   <style>
     :root {
       color-scheme: dark;
-      --bg: #090d13;
-      --panel: #111821;
-      --panel-raised: #17212c;
-      --line: #263341;
-      --ink: #e8f0f7;
-      --muted: #8c9bab;
-      --quiet: #5e6d7c;
-      --accent: #58d4ff;
-      --accent-deep: #173c4d;
-      --green: #85e2bd;
-      --radius: 12px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      font-synthesis: none;
-      text-rendering: optimizeLegibility;
-      -webkit-font-smoothing: antialiased;
+      --night: #101316;
+      --panel: #191d20;
+      --panel-raised: #22272a;
+      --line: #303639;
+      --ink: #f3f0e8;
+      --muted: #a5aaa7;
+      --dim: #747d79;
+      --accent: deepskyblue;
+      --mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
     * { box-sizing: border-box; }
-    html, body { width: 100%; min-height: 100%; margin: 0; background: var(--bg); color: var(--ink); }
-    body { min-height: 100svh; }
-    button, input { font: inherit; }
-    button { color: inherit; -webkit-tap-highlight-color: transparent; }
-
-    .app {
-      display: grid;
-      grid-template-rows: 58px auto minmax(0, 1fr) auto;
-      width: min(100%, 460px);
-      height: 100svh;
-      min-height: 540px;
-      margin: 0 auto;
+    html, body { min-height: 100%; margin: 0; }
+    body { background: #292d2e; color: var(--ink); font: 14px/1.4 var(--sans); }
+    button, select, input { color: inherit; font: inherit; }
+    button { cursor: pointer; }
+    .stage { display: grid; min-height: 100svh; place-items: center; padding: 22px; }
+    .device {
+      display: flex;
+      width: min(100%, 430px);
+      height: min(900px, calc(100svh - 44px));
+      min-height: 640px;
+      flex-direction: column;
       overflow: hidden;
-      background: var(--bg);
-      border-inline: 1px solid #151d26;
+      border: 1px solid #464b4b;
+      border-radius: 28px;
+      background: var(--night);
+      box-shadow: 0 24px 80px #0008;
     }
-
-    .topbar {
+    .status {
       display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 0 16px;
-      border-bottom: 1px solid var(--line);
-    }
-    .brand-mark {
-      display: grid;
-      width: 29px;
-      height: 29px;
-      place-items: center;
-      border-radius: 8px;
-      background: var(--accent);
-      color: #08131a;
-      font: 800 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-      letter-spacing: -.08em;
-    }
-    .brand { min-width: 0; }
-    .brand-name { display: block; font-size: 15px; font-weight: 720; letter-spacing: -.025em; }
-    .brand-context { display: block; margin-top: 2px; color: var(--muted); font: 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .11em; text-transform: uppercase; }
-    .topbar-spacer { flex: 1; }
-    .account-button {
-      display: grid;
-      width: 34px;
       height: 34px;
-      place-items: center;
-      border: 1px solid var(--line);
-      border-radius: 50%;
-      background: transparent;
-      color: var(--muted);
-      font: 650 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+      flex: 0 0 34px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 22px;
+      color: #d7dad4;
+      font: 11px/1 var(--mono);
+      letter-spacing: .02em;
     }
-
-    .library-head { padding: 16px 16px 12px; }
-    .library-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-    h1 { margin: 0; font-size: 20px; line-height: 1.1; letter-spacing: -.035em; }
-    .library-count { color: var(--muted); font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
-    .search-wrap { position: relative; }
-    .search-icon { position: absolute; top: 50%; left: 13px; width: 15px; height: 15px; color: var(--muted); transform: translateY(-50%); pointer-events: none; }
-    .search {
-      width: 100%;
-      height: 42px;
-      padding: 0 13px 0 38px;
-      border: 1px solid var(--line);
-      border-radius: 10px;
+    .status-icons { color: var(--muted); letter-spacing: .18em; }
+    .app-tabs { display: grid; height: 38px; flex: 0 0 38px; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: stretch; padding: 0 8px; border-bottom: 1px solid var(--line); }
+    .app-tabs button { min-width: 0; padding: 0 2px; border: 0; border-bottom: 1px solid transparent; background: transparent; color: var(--muted); font: 11px/1 var(--sans); }
+    .app-tabs button[aria-current="page"] { border-bottom-color: var(--accent); color: var(--accent); }
+    .screen { min-height: 0; flex: 1; overflow: auto; overscroll-behavior: contain; padding: 12px 16px 16px; scrollbar-color: #47504c transparent; }
+    .picker-wrap { position: relative; margin-bottom: 9px; }
+    .picker-wrap::after { position: absolute; top: 50%; right: 11px; color: var(--muted); content: '⌄'; font-size: 16px; pointer-events: none; transform: translateY(-53%); }
+    .search-row, .console-picker { width: 100%; height: 42px; border: 1px solid var(--line); border-radius: 8px; background: #15191b; color: var(--ink); }
+    .search-row { display: flex; align-items: center; margin: 0 0 9px; padding: 0 11px; }
+    .search-row input { width: 100%; height: 40px; padding: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 13px; }
+    .search-row input::placeholder { color: var(--dim); }
+    .console-picker {
+      appearance: none;
+      padding: 0 36px 0 11px;
       outline: 0;
-      background: var(--panel);
-      color: var(--ink);
-      font-size: 14px;
+      font-size: 13px;
+      font-weight: 450;
     }
-    .search::placeholder { color: var(--quiet); }
-    .search:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 2px rgb(88 212 255 / 14%); }
+    .console-picker:focus { border-color: var(--accent); }
+    .album-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px 12px; }
+    .album-card { min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; }
+    .cover-wrap { position: relative; display: block; aspect-ratio: 1; overflow: hidden; border-radius: 8px; background: #242a2c; }
+    .cover-wrap img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 220ms ease; }
+    .album-card:active .cover-wrap img { transform: scale(.97); }
+    .album-name { display: block; overflow: hidden; margin-top: 6px; font-size: 13px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+    .album-meta { display: block; margin-top: 2px; color: var(--muted); font: 10px/1.25 var(--sans); }
+    .album-meta span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    .library-tree {
-      min-height: 0;
-      overflow: auto;
-      overscroll-behavior: contain;
-      padding: 0 10px 18px;
-      scrollbar-color: #344454 transparent;
-      scrollbar-width: thin;
-    }
-    details { min-width: 0; }
-    .system { margin: 0 0 4px; }
-    .system > summary, .game > summary {
+    .library-tree { display: grid; }
+    .console-group { border-bottom: 1px solid var(--line); }
+    .console-toggle { display: grid; width: 100%; min-height: 50px; grid-template-columns: minmax(0,1fr) auto 16px; align-items: center; gap: 9px; padding: 0 2px; border: 0; background: transparent; color: var(--ink); text-align: left; }
+    .console-name { font-size: 13px; font-weight: 550; }
+    .console-count { color: var(--muted); font: 10px/1 var(--sans); }
+    .console-chevron { color: var(--muted); font-size: 16px; }
+    .console-albums { padding: 0 0 6px 12px; }
+    .library-album-entry { border-top: 1px solid #ffffff0d; }
+    .library-album { display: grid; width: 100%; min-height: 42px; grid-template-columns: minmax(0,1fr) auto 17px; align-items: center; gap: 8px; padding: 0 3px; border: 0; background: transparent; color: var(--ink); text-align: left; }
+    .library-album-title { overflow: hidden; font-size: 12px; font-weight: 450; text-overflow: ellipsis; white-space: nowrap; }
+    .library-album-count { color: var(--muted); font: 10px/1 var(--sans); }
+    .library-album-chevron { color: var(--muted); font-size: 15px; }
+    .inline-tracks { display: grid; padding: 0 0 6px 8px; }
+    .library-track { display: grid; min-height: 31px; grid-template-columns: 22px minmax(0,1fr); align-items: center; gap: 7px; padding: 0 5px; border: 0; background: transparent; color: var(--muted); text-align: left; }
+    .library-track span:first-child { color: var(--dim); font: 9px/1 var(--mono); }
+    .library-track span:last-child { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+    .library-track.is-playing { color: var(--accent); }
+    .album-detail-link { min-height: 30px; margin: 4px 0 0 25px; padding: 0; border: 0; background: transparent; color: var(--accent); font: 11px/1 var(--sans); text-align: left; }
+    .empty-message { margin: 10px 2px; color: var(--muted); font-size: 13px; }
+
+    .now-layout { display: flex; min-height: 100%; flex-direction: column; }
+    .now-art { display: block; width: min(100%, 260px); aspect-ratio: 1; align-self: center; border-radius: 7px; object-fit: cover; }
+    .now-track-title { margin-top: 15px; font-size: 21px; font-weight: 600; letter-spacing: -.025em; line-height: 1.15; }
+    .now-album-title { margin-top: 4px; color: var(--muted); font-size: 13px; }
+    .now-progress { height: 2px; margin: 19px 0 7px; overflow: hidden; background: #3b4243; }
+    .now-progress span { display: block; width: 34%; height: 100%; background: var(--accent); }
+    .now-times { display: flex; justify-content: space-between; color: var(--muted); font: 10px/1 var(--sans); }
+    .now-controls { display: grid; height: 66px; grid-template-columns: 1fr 58px 1fr; align-items: center; justify-items: center; }
+    .now-controls button { display: grid; width: 44px; height: 44px; place-items: center; border: 0; background: transparent; color: var(--ink); font-size: 20px; }
+    .now-controls .now-toggle { width: 48px; height: 48px; border-radius: 50%; background: var(--accent); color: #081317; font-size: 17px; }
+    .up-next-list { margin-top: 10px; }
+    .up-next-list { display: grid; }
+    .up-next-row { min-height: 35px; padding: 0 2px; border: 0; border-bottom: 1px solid #ffffff0d; background: transparent; color: var(--ink); font-size: 12px; text-align: left; }
+    .up-next-row:hover { color: var(--accent); }
+    .device.is-now-playing .player-dock { display: none; }
+    .device.is-now-playing .toast { bottom: 18px; }
+
+    .options-layout { display: grid; gap: 17px; }
+    .option-section { min-width: 0; }
+    .option-section h2 { margin: 0 0 2px; padding: 0 0 7px; border-bottom: 1px solid var(--accent); color: var(--accent); font-size: 14px; font-weight: 650; line-height: 1.2; }
+    .option-row { display: grid; min-height: 48px; grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items: center; gap: 10px; padding: 5px 0; border-bottom: 1px solid #ffffff0d; }
+    .option-volume-row { grid-template-columns: 48px minmax(0,1fr); }
+    .option-copy { display: grid; min-width: 0; gap: 2px; }
+    .option-copy strong { overflow: hidden; font-size: 12px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+    .option-copy small { color: var(--muted); font-size: 10px; line-height: 1.2; }
+    .option-control { display: flex; min-width: 0; align-items: center; gap: 8px; }
+    .option-control input[type="range"] { width: 100%; min-width: 0; height: 44px; margin: 0; appearance: none; accent-color: var(--accent); background: transparent; touch-action: pan-y; }
+    .option-control input[type="range"]::-webkit-slider-runnable-track { height: 8px; border: 1px solid var(--line); border-radius: 2px; background: #15191b; }
+    .option-control input[type="range"]::-webkit-slider-thumb { width: 20px; height: 24px; margin-top: -9px; appearance: none; border: 1px solid var(--ink); border-radius: 2px; background: var(--accent); }
+    .option-control input[type="range"]::-moz-range-track { height: 8px; border: 1px solid var(--line); border-radius: 2px; background: #15191b; }
+    .option-control input[type="range"]::-moz-range-thumb { width: 18px; height: 22px; border: 1px solid var(--ink); border-radius: 2px; background: var(--accent); }
+    .eq-band { min-height: 58px; }
+    .eq-band { grid-template-columns: 48px minmax(0,1fr); }
+    .eq-band .option-control input[type="range"] { height: 48px; }
+    .option-copy output { min-width: 0; color: var(--muted); font: 10px/1 var(--mono); text-align: left; }
+    .option-control input[type="number"], .option-control input[type="text"] { width: 100%; min-width: 0; height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; outline: 0; background: #15191b; font: 12px/1 var(--mono); text-align: center; }
+    .option-control :is(input[type="number"],input[type="text"]):focus { border-color: var(--accent); }
+    .option-switch { width: 100%; height: 34px; border: 1px solid var(--line); border-radius: 7px; background: #15191b; color: var(--muted); font: 12px/1 var(--mono); }
+    .option-switch[aria-checked="true"] { border-color: #16536c; background: #102b38; color: var(--accent); }
+    .eq-band .option-copy strong { font: 11px/1 var(--mono); }
+    .reset-flat { width: 100%; min-height: 38px; margin-top: 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--ink); font-size: 12px; }
+    .reset-flat:hover { border-color: var(--accent); color: var(--accent); }
+
+    .detail-top { display: flex; align-items: center; justify-content: space-between; margin: -5px 0 16px; }
+    .back-button { display: inline-flex; min-height: 38px; align-items: center; gap: 7px; padding: 0 11px 0 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); font-size: 12px; font-weight: 600; }
+    .back-button span { color: var(--accent); font-size: 17px; }
+    .album-hero { display: grid; grid-template-columns: 132px minmax(0, 1fr); align-items: center; gap: 15px; }
+    .hero-art { display: block; width: 132px; aspect-ratio: 1; border: 1px solid #ffffff20; border-radius: 14px; object-fit: cover; box-shadow: 0 12px 24px #0005; }
+    .hero-copy h1 { margin: 0; font-size: 23px; line-height: 1.08; }
+    .hero-copy p { margin: 7px 0 0; color: var(--muted); font-size: 12px; }
+    .hero-copy .tracks-total { color: var(--dim); font: 10px/1.2 var(--mono); }
+    .play-album {
       display: flex;
-      min-height: 46px;
-      align-items: center;
-      gap: 9px;
-      padding: 0 9px;
-      border-radius: 9px;
-      cursor: pointer;
-      list-style: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-    summary::-webkit-details-marker { display: none; }
-    .system > summary:hover, .game > summary:hover { background: #ffffff08; }
-    summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-    .chevron {
-      width: 8px;
-      height: 8px;
-      flex: 0 0 8px;
-      border-top: 1.5px solid var(--muted);
-      border-right: 1.5px solid var(--muted);
-      transform: rotate(45deg);
-      transition: transform 120ms ease;
-    }
-    details[open] > summary .chevron { transform: rotate(135deg); }
-    .system-name { min-width: 0; overflow: hidden; font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
-    .format { padding: 3px 5px; border-radius: 4px; background: #ffffff09; color: var(--muted); font: 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; }
-    .item-count { margin-left: auto; color: var(--quiet); font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
-    .system-content { margin: 1px 0 7px 16px; padding-left: 8px; border-left: 1px solid var(--line); }
-    .game { margin: 0; }
-    .game > summary { min-height: 40px; gap: 8px; padding-inline: 7px; }
-    .game-name { min-width: 0; overflow: hidden; color: #c5d1dd; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-    .game-count { margin-left: auto; color: var(--quiet); font: 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
-    .track-list { display: grid; gap: 1px; margin: 0 0 5px 15px; padding: 0; list-style: none; }
-    .track {
-      display: grid;
-      grid-template-columns: 25px minmax(0, 1fr) auto;
-      min-height: 37px;
-      align-items: center;
-      gap: 8px;
       width: 100%;
-      padding: 0 9px;
+      height: 48px;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      margin: 19px 0 23px;
       border: 0;
-      border-radius: 7px;
-      background: transparent;
-      color: var(--muted);
-      text-align: left;
-      cursor: pointer;
+      border-radius: 12px;
+      background: var(--accent);
+      color: #081317;
+      font-size: 14px;
+      font-weight: 750;
     }
-    .track:hover { background: #ffffff08; color: var(--ink); }
-    .track-number, .track-length { color: var(--quiet); font: 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .track-title { min-width: 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-    .track[aria-current="true"] { background: var(--accent-deep); color: var(--accent); }
-    .track[aria-current="true"] .track-number, .track[aria-current="true"] .track-length { color: #83bfd3; }
-    .track[hidden], .system[hidden], .game[hidden] { display: none; }
-    .no-results { display: none; padding: 20px 10px; color: var(--muted); font-size: 13px; text-align: center; }
-    .no-results.visible { display: block; }
+    .play-album span { font-size: 16px; }
+    .track-list { margin: 0; padding: 0; list-style: none; }
+    .track-row { display: grid; width: 100%; min-height: 54px; grid-template-columns: 26px minmax(0,1fr) 38px; align-items: center; gap: 9px; padding: 0 3px; border: 0; border-bottom: 1px solid #ffffff0d; background: transparent; color: var(--ink); text-align: left; }
+    .track-row:active, .track-row.is-playing { color: var(--accent); }
+    .track-number, .track-length { color: var(--dim); font: 10px/1 var(--mono); }
+    .track-row.is-playing .track-number { color: var(--accent); }
+    .track-title { overflow: hidden; font-size: 13px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+    .track-length { text-align: right; }
 
-    .player {
-      z-index: 2;
-      padding: 11px 16px calc(12px + env(safe-area-inset-bottom));
-      border-top: 1px solid var(--line);
-      background: #0e141c;
-      box-shadow: 0 -10px 30px rgb(0 0 0 / 22%);
+    .player-dock { z-index: 1; padding: 10px 13px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: #171b1d; }
+    .dock-main { display: grid; grid-template-columns: 38px minmax(0,1fr) 38px; align-items: center; gap: 10px; }
+    .dock-art { width: 38px; height: 38px; border-radius: 7px; object-fit: cover; background: radial-gradient(circle at 72% 28%, var(--accent), transparent 28%), linear-gradient(135deg, #24404b, #22272a 70%); }
+    .dock-title { overflow: hidden; font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+    .dock-subtitle { overflow: hidden; margin-top: 2px; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+    .dock-play { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid var(--line); border-radius: 50%; background: var(--panel-raised); color: var(--accent); font-size: 15px; }
+    .dock-progress { height: 2px; margin-top: 9px; overflow: hidden; border-radius: 2px; background: #414847; }
+    .dock-progress span { display: block; width: 0; height: 100%; background: var(--accent); transition: width 200ms ease; }
+    .dock-progress.has-track span { width: 28%; }
+    .toast { position: absolute; right: 15px; bottom: 82px; left: 15px; z-index: 2; padding: 10px 13px; border: 1px solid #15536a; border-radius: 10px; background: #10232b; color: var(--accent); font: 11px/1.3 var(--mono); text-align: center; opacity: 0; pointer-events: none; transform: translateY(6px); transition: opacity 150ms ease, transform 150ms ease; }
+    .toast.is-visible { opacity: 1; transform: translateY(0); }
+    .hidden { display: none !important; }
+    .prototype-label { position: fixed; bottom: 15px; left: 50%; color: #b4b9b5; font: 10px/1 var(--mono); letter-spacing: .07em; text-transform: uppercase; transform: translateX(-50%); white-space: nowrap; }
+    @media (max-width: 500px) {
+      body { background: var(--night); }
+      .stage { display: block; min-height: 100svh; padding: 0; }
+      .device { width: 100%; height: 100svh; min-height: 560px; border: 0; border-radius: 0; box-shadow: none; }
+      .status { padding-top: env(safe-area-inset-top); height: calc(34px + env(safe-area-inset-top)); flex-basis: calc(34px + env(safe-area-inset-top)); }
+      .screen { padding-top: 10px; }
+      .prototype-label { display: none; }
     }
-    .player-current { display: flex; min-width: 0; align-items: center; gap: 10px; margin-bottom: 7px; }
-    .current-copy { min-width: 0; flex: 1; }
-    .current-label { margin-bottom: 3px; color: var(--quiet); font: 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .1em; text-transform: uppercase; }
-    .current-title { overflow: hidden; font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
-    .current-game { overflow: hidden; margin-top: 3px; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-    .quality-tag { flex: 0 0 auto; color: var(--quiet); font: 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .seek-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) 34px; align-items: center; gap: 8px; margin-bottom: 5px; color: var(--muted); font: 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
-    input[type="range"] { width: 100%; height: 18px; margin: 0; accent-color: var(--accent); cursor: pointer; }
-    .seek-row span:last-child { text-align: right; }
-    .transport-row { display: flex; height: 42px; align-items: center; justify-content: center; gap: 22px; }
-    .transport {
-      display: grid;
-      width: 42px;
-      height: 42px;
-      place-items: center;
-      padding: 0;
-      border: 0;
-      border-radius: 50%;
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-    }
-    .transport:hover { color: var(--ink); background: #ffffff0a; }
-    .transport svg { width: 19px; height: 19px; }
-    .transport.primary { width: 42px; height: 42px; background: var(--accent); color: #07121a; }
-    .transport.primary:hover { filter: brightness(1.08); }
-    .transport:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    .statusline { display: flex; justify-content: center; gap: 6px; margin-top: 7px; color: var(--quiet); font: 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .status-dot { width: 5px; height: 5px; align-self: center; border-radius: 50%; background: var(--green); }
-
-    @media (min-width: 700px) {
-      body { display: grid; min-height: 100svh; place-items: center; padding: 24px; background: radial-gradient(ellipse at 50% 30%, #172332 0, #090d13 64%); }
-      .app { height: min(900px, calc(100svh - 48px)); min-height: 600px; border: 1px solid #2a3643; border-radius: 20px; box-shadow: 0 32px 100px #0009; }
-    }
-    @media (max-height: 670px) and (max-width: 699px) {
-      .app { grid-template-rows: 52px auto minmax(0, 1fr) auto; }
-      .library-head { padding-block: 12px 8px; }
-      .player { padding-top: 8px; }
-      .player-current { margin-bottom: 3px; }
-      .statusline { margin-top: 3px; }
+    @media (max-height: 720px) and (min-width: 501px) {
+      .stage { padding-block: 10px; }
+      .device { height: calc(100svh - 20px); min-height: 0; }
     }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
@@ -218,154 +203,509 @@
   </style>
 </head>
 <body>
-  <main class="app" aria-label="SBOnline mobile music player concept">
-    <header class="topbar">
-      <span class="brand-mark" aria-hidden="true">SB</span>
-      <span class="brand"><span class="brand-name">SBOnline</span><span class="brand-context">Private library</span></span>
-      <span class="topbar-spacer"></span>
-      <button class="account-button" type="button" aria-label="Account">JD</button>
-    </header>
+  <main class="stage">
+    <section class="device" aria-label="Mobile music player concept">
+      <div class="status"><span>9:41</span><span class="status-icons">● ◖ 100%</span></div>
+      <nav class="app-tabs" aria-label="Player pages">
+        <button type="button" data-page="now-playing" aria-current="page">Playing</button>
+        <button type="button" data-page="library">Library</button>
+        <button type="button" data-page="gallery">Gallery</button>
+        <button type="button" data-page="sound">Sound</button>
+        <button type="button" data-page="options">Options</button>
+      </nav>
 
-    <section class="library-head" aria-labelledby="library-heading">
-      <div class="library-title-row">
-        <h1 id="library-heading">Library</h1>
-        <span class="library-count">9,284 tracks</span>
-      </div>
-      <label class="search-wrap">
-        <svg class="search-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.7" cy="8.7" r="5.7" stroke="currentColor" stroke-width="1.6"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-        <input class="search" id="library-search" type="search" placeholder="Find a game or track" autocomplete="off" aria-label="Find a game or track">
-      </label>
+      <section class="screen" id="now-playing-screen" aria-label="Now Playing">
+        <div class="now-layout">
+          <img class="now-art" id="now-art" alt="">
+          <div class="now-track-title" id="now-track-title"></div>
+          <div class="now-album-title" id="now-album-title"></div>
+          <div class="now-progress" aria-hidden="true"><span></span></div>
+          <div class="now-times"><span id="now-elapsed">0:48</span><span id="now-duration"></span></div>
+          <div class="now-controls" aria-label="Playback controls">
+            <button id="now-previous" type="button" aria-label="Previous track">|◀</button>
+            <button class="now-toggle" id="now-toggle" type="button" aria-label="Pause">Ⅱ</button>
+            <button id="now-next" type="button" aria-label="Next track">▶|</button>
+          </div>
+          <div class="up-next-list" id="up-next-list"></div>
+        </div>
+      </section>
+
+      <section class="screen hidden" id="library-screen" aria-label="Library">
+        <label class="search-row"><input id="library-search" type="search" placeholder="Search tracks or albums" autocomplete="off"></label>
+        <div class="library-tree" id="library-tree"></div>
+      </section>
+
+      <section class="screen hidden" id="gallery-screen" aria-label="Gallery">
+        <label class="search-row"><input id="album-search" type="search" placeholder="Search albums" autocomplete="off"></label>
+        <div class="picker-wrap">
+          <select class="console-picker" id="console-picker" aria-label="Console">
+            <option>Super Nintendo</option>
+            <option>Nintendo Entertainment System</option>
+            <option>Sega Genesis</option>
+          </select>
+        </div>
+        <div class="album-grid" id="album-grid" aria-live="polite"></div>
+      </section>
+
+      <section class="screen hidden" id="sound-screen" aria-label="Sound">
+        <div class="options-layout">
+          <section class="option-section" aria-labelledby="options-sound-heading">
+            <h2 id="options-sound-heading">Sound</h2>
+            <label class="option-row option-volume-row">
+              <span class="option-copy"><strong>Volume</strong><output id="option-volume-value">100</output></span>
+              <span class="option-control"><input id="option-volume" type="range" min="0" max="20" step="1" value="20" aria-label="Volume"></span>
+            </label>
+            <div class="option-row">
+              <span class="option-copy"><strong>Equalizer</strong></span>
+              <button class="option-switch" type="button" role="switch" aria-checked="true">Yes</button>
+            </div>
+            <div class="option-bands" aria-label="Equalizer bands">
+              <label class="option-row eq-band"><span class="option-copy"><strong>31 Hz</strong><output>0.0</output></span><span class="option-control"><input type="range" min="-12" max="12" step="0.5" value="0" data-eq-band aria-label="31 Hz equalizer gain"></span></label>
+              <label class="option-row eq-band"><span class="option-copy"><strong>62 Hz</strong><output>0.0</output></span><span class="option-control"><input type="range" min="-12" max="12" step="0.5" value="0" data-eq-band aria-label="62 Hz equalizer gain"></span></label>
+              <label class="option-row eq-band"><span class="option-copy"><strong>125 Hz</strong><output>0.0</output></span><span class="option-control"><input type="range" min="-12" max="12" step="0.5" value="0" data-eq-band aria-label="125 Hz equalizer gain"></span></label>
+              <label class="option-row eq-band"><span class="option-copy"><strong>250 Hz</strong><output>0.0</output></span><span class="option-control"><input type="range" min="-12" max="12" step="0.5" value="0" data-eq-band aria-label="250 Hz equalizer gain"></span></label>
+              <label class="option-row eq-band"><span class="option-copy"><strong>500 Hz</strong><output>0.0</output></span><span class="option-control"><input type="range" min="-12" max="12" step="0.5" value="0" data-eq-band aria-label="500 Hz equalizer gain"></span></label>
+              <label class="option-row eq-band"><span class="option-copy"><strong>1 kHz</strong><output>0.0</output></span><span class="option-control"><input type="range" min="-12" max="12" step="0.5" value="0" data-eq-band aria-label="1 kHz equalizer gain"></span></label>
+              <label class="option-row eq-band"><span class="option-copy"><strong>2 kHz</strong><output>0.0</output></span><span class="option-control"><input type="range" min="-12" max="12" step="0.5" value="0" data-eq-band aria-label="2 kHz equalizer gain"></span></label>
+              <label class="option-row eq-band"><span class="option-copy"><strong>4 kHz</strong><output>0.0</output></span><span class="option-control"><input type="range" min="-12" max="12" step="0.5" value="0" data-eq-band aria-label="4 kHz equalizer gain"></span></label>
+              <label class="option-row eq-band"><span class="option-copy"><strong>8 kHz</strong><output>0.0</output></span><span class="option-control"><input type="range" min="-12" max="12" step="0.5" value="0" data-eq-band aria-label="8 kHz equalizer gain"></span></label>
+              <label class="option-row eq-band"><span class="option-copy"><strong>16 kHz</strong><output>0.0</output></span><span class="option-control"><input type="range" min="-12" max="12" step="0.5" value="0" data-eq-band aria-label="16 kHz equalizer gain"></span></label>
+            </div>
+            <button class="reset-flat" id="reset-flat" type="button">Reset to Flat</button>
+          </section>
+
+          <section class="option-section" aria-labelledby="options-fade-heading">
+            <h2 id="options-fade-heading">Fade Out</h2>
+            <div class="option-row"><span class="option-copy"><strong>Faded Skips</strong><small>Fade on track changes.</small></span><button class="option-switch" type="button" role="switch" aria-checked="true">Yes</button></div>
+              <label class="option-row"><span class="option-copy"><strong>Fade duration</strong></span><span class="option-control"><input type="number" min="0" max="30" step="1" value="5" aria-label="Fade out duration"></span></label>
+          </section>
+
+          <section class="option-section" aria-labelledby="options-speed-heading">
+            <h2 id="options-speed-heading">Play Speed</h2>
+            <div class="option-row"><span class="option-copy"><strong>Native format speed</strong><small>Source decoder rate.</small></span><button class="option-switch" type="button" role="switch" aria-checked="false">No</button></div>
+            <label class="option-row"><span class="option-copy"><strong>Speed fraction</strong></span><span class="option-control"><input type="text" value="1/1" aria-label="Native format speed fraction"></span></label>
+          </section>
+
+          <section class="option-section" aria-labelledby="options-playback-heading">
+            <h2 id="options-playback-heading">Playback</h2>
+            <div class="option-row"><span class="option-copy"><strong>Long Play</strong><small>Override normal track ending.</small></span><button class="option-switch" type="button" role="switch" aria-checked="false">No</button></div>
+            <label class="option-row"><span class="option-copy"><strong>Duration</strong><small>0 = unlimited.</small></span><span class="option-control"><input type="text" value="3:00" aria-label="Long Play duration"></span></label>
+          </section>
+
+        </div>
+      </section>
+
+      <section class="screen hidden" id="options-screen" aria-label="Options">
+        <div class="options-layout">
+          <section class="option-section" aria-labelledby="options-interface-heading">
+            <h2 id="options-interface-heading">Interface</h2>
+            <label class="option-row"><span class="option-copy"><strong>Playlist font size</strong></span><span class="option-control"><input type="number" min="10" max="20" value="13" aria-label="Playlist font size"></span></label>
+            <label class="option-row"><span class="option-copy"><strong>Sidebar font size</strong></span><span class="option-control"><input type="number" min="10" max="20" value="13" aria-label="Sidebar font size"></span></label>
+            <label class="option-row"><span class="option-copy"><strong>Row gap</strong></span><span class="option-control"><input type="number" min="0" max="32" value="0" aria-label="Row gap"></span></label>
+          </section>
+        </div>
+      </section>
+
+      <section class="screen hidden" id="detail-screen" aria-label="Album details">
+        <div class="detail-top">
+          <button class="back-button" id="back-button" type="button"><span aria-hidden="true">‹</span><span id="back-label">Gallery</span></button>
+        </div>
+        <div class="album-hero">
+          <img class="hero-art" id="hero-art" alt="">
+          <div class="hero-copy">
+            <h1 id="hero-title"></h1>
+          </div>
+        </div>
+        <button class="play-album" id="play-album" type="button"><span aria-hidden="true">▶</span> Play album</button>
+        <ol class="track-list" id="track-list"></ol>
+      </section>
+
+      <footer class="player-dock" aria-label="Player">
+        <div class="dock-main">
+          <img class="dock-art" id="dock-art" alt="">
+          <div><div class="dock-title" id="dock-title"></div><div class="dock-subtitle" id="dock-subtitle"></div></div>
+          <button class="dock-play" id="dock-play" type="button" aria-label="Pause">Ⅱ</button>
+        </div>
+        <div class="dock-progress" id="dock-progress" aria-hidden="true"><span></span></div>
+      </footer>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
     </section>
-
-    <section class="library-tree" id="library-tree" aria-label="Music library">
-      <details class="system" open>
-        <summary><span class="chevron" aria-hidden="true"></span><span class="system-name">Super Nintendo</span><span class="format">SPC</span><span class="item-count">1,482</span></summary>
-        <div class="system-content">
-          <details class="game" open>
-            <summary><span class="chevron" aria-hidden="true"></span><span class="game-name">Chrono Trigger (USA)</span><span class="game-count">64</span></summary>
-            <ol class="track-list">
-              <li><button class="track" type="button" data-title="Memories of Green" data-game="Chrono Trigger · Super Nintendo" data-length="2:16"><span class="track-number">01</span><span class="track-title">Memories of Green</span><span class="track-length">2:16</span></button></li>
-              <li><button class="track" type="button" data-title="Peaceful Days" data-game="Chrono Trigger · Super Nintendo" data-length="1:48"><span class="track-number">02</span><span class="track-title">Peaceful Days</span><span class="track-length">1:48</span></button></li>
-              <li><button class="track" type="button" data-title="Corridors of Time" data-game="Chrono Trigger · Super Nintendo" data-length="4:37" aria-current="true"><span class="track-number">03</span><span class="track-title">Corridors of Time</span><span class="track-length">4:37</span></button></li>
-              <li><button class="track" type="button" data-title="Frog's Theme" data-game="Chrono Trigger · Super Nintendo" data-length="2:10"><span class="track-number">04</span><span class="track-title">Frog's Theme</span><span class="track-length">2:10</span></button></li>
-              <li><button class="track" type="button" data-title="The Brink of Time" data-game="Chrono Trigger · Super Nintendo" data-length="2:44"><span class="track-number">05</span><span class="track-title">The Brink of Time</span><span class="track-length">2:44</span></button></li>
-            </ol>
-          </details>
-          <details class="game"><summary><span class="chevron" aria-hidden="true"></span><span class="game-name">Final Fantasy VI (USA)</span><span class="game-count">71</span></summary><ol class="track-list"><li><button class="track" type="button" data-title="Terra's Theme" data-game="Final Fantasy VI · Super Nintendo" data-length="3:54"><span class="track-number">01</span><span class="track-title">Terra's Theme</span><span class="track-length">3:54</span></button></li><li><button class="track" type="button" data-title="Awakening" data-game="Final Fantasy VI · Super Nintendo" data-length="2:12"><span class="track-number">02</span><span class="track-title">Awakening</span><span class="track-length">2:12</span></button></li></ol></details>
-          <details class="game"><summary><span class="chevron" aria-hidden="true"></span><span class="game-name">Super Metroid (USA)</span><span class="game-count">31</span></summary><ol class="track-list"><li><button class="track" type="button" data-title="Opening Theme" data-game="Super Metroid · Super Nintendo" data-length="1:42"><span class="track-number">01</span><span class="track-title">Opening Theme</span><span class="track-length">1:42</span></button></li></ol></details>
-          <details class="game"><summary><span class="chevron" aria-hidden="true"></span><span class="game-name">The Legend of Zelda: A Link to the Past</span><span class="game-count">48</span></summary></details>
-        </div>
-      </details>
-
-      <details class="system">
-        <summary><span class="chevron" aria-hidden="true"></span><span class="system-name">Nintendo Entertainment System</span><span class="format">NSF</span><span class="item-count">3,106</span></summary>
-        <div class="system-content">
-          <details class="game"><summary><span class="chevron" aria-hidden="true"></span><span class="game-name">Castlevania (USA)</span><span class="game-count">18</span></summary><ol class="track-list"><li><button class="track" type="button" data-title="Vampire Killer" data-game="Castlevania · Nintendo Entertainment System" data-length="1:41"><span class="track-number">01</span><span class="track-title">Vampire Killer</span><span class="track-length">1:41</span></button></li></ol></details>
-          <details class="game"><summary><span class="chevron" aria-hidden="true"></span><span class="game-name">Mega Man 2 (USA)</span><span class="game-count">14</span></summary></details>
-          <details class="game"><summary><span class="chevron" aria-hidden="true"></span><span class="game-name">Super Mario Bros. 3 (USA)</span><span class="game-count">11</span></summary></details>
-        </div>
-      </details>
-
-      <details class="system">
-        <summary><span class="chevron" aria-hidden="true"></span><span class="system-name">Sega &amp; Arcade</span><span class="format">VGM</span><span class="item-count">4,696</span></summary>
-        <div class="system-content">
-          <details class="game"><summary><span class="chevron" aria-hidden="true"></span><span class="game-name">Sonic the Hedgehog 2 (World)</span><span class="game-count">16</span></summary><ol class="track-list"><li><button class="track" type="button" data-title="Chemical Plant Zone" data-game="Sonic the Hedgehog 2 · Mega Drive" data-length="2:38"><span class="track-number">05</span><span class="track-title">Chemical Plant Zone</span><span class="track-length">2:38</span></button></li></ol></details>
-          <details class="game"><summary><span class="chevron" aria-hidden="true"></span><span class="game-name">Streets of Rage 2 (World)</span><span class="game-count">24</span></summary></details>
-          <details class="game"><summary><span class="chevron" aria-hidden="true"></span><span class="game-name">Darkstalkers: The Night Warriors</span><span class="game-count">48</span></summary></details>
-        </div>
-      </details>
-      <p class="no-results" id="no-results">No matches in this library.</p>
-    </section>
-
-    <footer class="player" aria-label="Playback controls">
-      <div class="player-current">
-        <div class="current-copy"><div class="current-label">Now playing</div><div class="current-title" id="current-title">Corridors of Time</div><div class="current-game" id="current-game">Chrono Trigger · Super Nintendo</div></div>
-        <span class="quality-tag" id="current-format">SPC</span>
-      </div>
-      <div class="seek-row"><span id="elapsed">0:00</span><input id="seek" type="range" min="0" max="277" value="0" aria-label="Seek within track"><span id="duration">4:37</span></div>
-      <div class="transport-row">
-        <button class="transport" type="button" id="previous" aria-label="Previous track"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 5v14M19 6 9 12l10 6V6Z" fill="currentColor"/></svg></button>
-        <button class="transport primary" type="button" id="play" aria-label="Play"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z" fill="currentColor"/></svg></button>
-        <button class="transport" type="button" id="next" aria-label="Next track"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 5v14M5 6l10 6-10 6V6Z" fill="currentColor"/></svg></button>
-      </div>
-      <div class="statusline"><span class="status-dot" aria-hidden="true"></span><span>SBOnline interface trial</span><span>·</span><span>sample library</span></div>
-    </footer>
   </main>
+  <p class="prototype-label">Mobile UI concept · local preview</p>
 
   <script>
-    (() => {
-      const search = document.getElementById("library-search");
-      const tree = document.getElementById("library-tree");
-      const noResults = document.getElementById("no-results");
-      const trackButtons = [...tree.querySelectorAll(".track")];
-      const currentTitle = document.getElementById("current-title");
-      const currentGame = document.getElementById("current-game");
-      const duration = document.getElementById("duration");
-      const seek = document.getElementById("seek");
-      const elapsed = document.getElementById("elapsed");
-      const play = document.getElementById("play");
-      let activeTrack = trackButtons.find((track) => track.getAttribute("aria-current") === "true");
+    const albums = [
+      { id: 'hyrule', title: 'A Link to the Past', console: 'Super Nintendo', tracks: ['Title Theme', 'Hyrule Castle', 'Light World', 'Kakariko Village', 'Dark World', 'Dungeon Theme', 'Boss Theme', 'Ending'], palette: ['#253e4c','#efb95f','#e96e4e'] },
+      { id: 'mana', title: 'Secret of Mana', console: 'Super Nintendo', tracks: ['Into the Thick of It', 'A Bell Is Tolling', 'The Little Spirit', 'Danger', 'The Oracle', 'Meridian Dance', 'Now Flight Time'], palette: ['#273d35','#c7dc77','#ed8557'] },
+      { id: 'metroid', title: 'Super Metroid', console: 'Super Nintendo', tracks: ['Prologue', 'Planet Zebes', 'Crateria', 'Lower Brinstar', 'Norfair', 'Maridia', 'Tourian', 'Escape'], palette: ['#252b49','#99a7f6','#f18b50'] },
+      { id: 'fzero', title: 'F-Zero', console: 'Super Nintendo', tracks: ['Mute City', 'Big Blue', 'Sand Ocean', 'Death Wind', 'Port Town', 'White Land', 'Silence'], palette: ['#283b46','#54d2c0','#f7d562'] },
+      { id: 'earthbound', title: 'EarthBound', console: 'Super Nintendo', tracks: ['Onett Theme', 'Home Sweet Home', 'Buy Somethin’ Will Ya!', 'Battle Against a Weird Opponent', 'Saturn Valley', 'Pokey Means Business'], palette: ['#533c40','#f49a7a','#f4cd72'] },
+      { id: 'ff6', title: 'Final Fantasy III', console: 'Super Nintendo', tracks: ['Terra', 'Opening Theme', 'Awakening', 'The Mines of Narshe', 'Locke', 'The Returners', 'Phantom Forest'], palette: ['#303546','#b8a5ef','#e7c16f'] },
+      { id: 'mario', title: 'Super Mario Bros. 3', console: 'Nintendo Entertainment System', tracks: ['Ground Theme', 'Overworld', 'Athletic Theme', 'Underwater', 'Fortress', 'Airship'], palette: ['#39452d','#f5ca68','#e86753'] },
+      { id: 'kirby', title: 'Kirby’s Adventure', console: 'Nintendo Entertainment System', tracks: ['Rainbow Resort', 'Vegetable Valley', 'Butter Building', 'Grape Garden', 'Yogurt Yard'], palette: ['#57374a','#f59bcb','#f0db70'] },
+      { id: 'sonic', title: 'Sonic the Hedgehog 2', console: 'Sega Genesis', tracks: ['Emerald Hill', 'Chemical Plant', 'Aquatic Ruin', 'Casino Night', 'Hill Top', 'Mystic Cave'], palette: ['#263f5c','#73c9ef','#fac75f'] },
+      { id: 'streets', title: 'Streets of Rage 2', console: 'Sega Genesis', tracks: ['Go Straight', 'In the Bar', 'Never Return Alive', 'Dreamer', 'Expander', 'Slow Moon'], palette: ['#563840','#fb9862','#e6c475'] }
+    ];
+    const consoleNames = {
+      'Super Nintendo': 'Super Nintendo',
+      'Nintendo Entertainment System': 'Nintendo Entertainment System',
+      'Sega Genesis': 'Sega Genesis'
+    };
+    const durations = ['1:42','2:08','1:56','2:34','1:48','2:13','1:59','2:27'];
+    const grid = document.getElementById('album-grid');
+    const consolePicker = document.getElementById('console-picker');
+    const searchInput = document.getElementById('album-search');
+    const librarySearchInput = document.getElementById('library-search');
+    const libraryTree = document.getElementById('library-tree');
+    const nowPlayingScreen = document.getElementById('now-playing-screen');
+    const libraryScreen = document.getElementById('library-screen');
+    const galleryScreen = document.getElementById('gallery-screen');
+    const soundScreen = document.getElementById('sound-screen');
+    const optionsScreen = document.getElementById('options-screen');
+    const detailScreen = document.getElementById('detail-screen');
+    const device = document.querySelector('.device');
+    const toast = document.getElementById('toast');
+    let activeAlbum = albums.find(function (album) { return album.id === 'mana'; });
+    let selectedAlbum = null;
+    let activeTrackIndex = 0;
+    let isPlaying = true;
+    let openConsole = '';
+    let openLibraryAlbum = '';
+    let previousPage = 'gallery';
+    let toastTimer;
 
-      const formatTime = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+    function svgCover(album) {
+      const a = album.palette[0], b = album.palette[1], c = album.palette[2];
+      const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480"><defs><linearGradient id="g" x2="0" y2="1"><stop stop-color="' + a + '"/><stop offset="1" stop-color="#121819"/></linearGradient><pattern id="p" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M0 28V0h28" fill="none" stroke="#fff" stroke-opacity=".045" stroke-width="1"/></pattern></defs><rect width="480" height="480" fill="url(#g)"/><rect width="480" height="480" fill="url(#p)"/><circle cx="350" cy="126" r="84" fill="' + c + '" opacity=".94"/><path d="M0 310 118 198l92 80 99-115 171 151v166H0Z" fill="' + b + '"/><path d="M0 364 130 270l102 77 113-89 135 97v125H0Z" fill="#111718" opacity=".78"/></svg>';
+      return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    }
 
-      function selectTrack(track) {
-        if (!track) return;
-        trackButtons.forEach((button) => button.removeAttribute("aria-current"));
-        track.setAttribute("aria-current", "true");
-        activeTrack = track;
-        currentTitle.textContent = track.dataset.title;
-        currentGame.textContent = track.dataset.game;
-        const length = track.dataset.length || "0:00";
-        duration.textContent = length;
-        seek.max = String(Number(length.split(":")[0]) * 60 + Number(length.split(":")[1]));
-        seek.value = "0";
-        elapsed.textContent = "0:00";
-        play.setAttribute("aria-label", "Play");
-        play.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z" fill="currentColor"/></svg>';
-      }
+    function durationFor(index) { return durations[index % durations.length]; }
 
-      trackButtons.forEach((track) => track.addEventListener("click", () => selectTrack(track)));
-      search.addEventListener("input", () => {
-        const query = search.value.trim().toLocaleLowerCase();
-        let visibleTracks = 0;
-        tree.querySelectorAll(".game").forEach((game) => {
-          const summaryMatch = game.querySelector("summary").textContent.toLocaleLowerCase().includes(query);
-          let visibleInGame = 0;
-          game.querySelectorAll(".track").forEach((track) => {
-            const match = !query || summaryMatch || track.textContent.toLocaleLowerCase().includes(query);
-            track.hidden = !match;
-            if (match) visibleInGame++;
+    function albumMatches(album, query) {
+      if (!query) return true;
+      return album.title.toLowerCase().includes(query)
+        || album.tracks.some(function (track) { return track.toLowerCase().includes(query); });
+    }
+
+    function renderLibrary() {
+      const query = librarySearchInput.value.trim().toLowerCase();
+      const consoles = Object.keys(consoleNames);
+      libraryTree.replaceChildren();
+      consoles.forEach(function (consoleName) {
+        const consoleAlbums = albums.filter(function (album) {
+          return album.console === consoleName && albumMatches(album, query);
+        });
+        if (!consoleAlbums.length) return;
+        const isOpen = openConsole === consoleName || Boolean(query);
+        const group = document.createElement('section');
+        group.className = 'console-group' + (isOpen ? ' is-open' : '');
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'console-toggle';
+        toggle.setAttribute('aria-expanded', String(isOpen));
+        const name = document.createElement('span');
+        name.className = 'console-name';
+        name.textContent = consoleName;
+        const count = document.createElement('span');
+        count.className = 'console-count';
+        count.textContent = String(consoleAlbums.length) + ' albums';
+        const chevron = document.createElement('span');
+        chevron.className = 'console-chevron';
+        chevron.setAttribute('aria-hidden', 'true');
+        chevron.textContent = '›';
+        toggle.append(name, count, chevron);
+        toggle.addEventListener('click', function () {
+          openConsole = openConsole === consoleName ? '' : consoleName;
+          openLibraryAlbum = '';
+          renderLibrary();
+        });
+        group.append(toggle);
+
+        if (isOpen) {
+          const albumContainer = document.createElement('div');
+          albumContainer.className = 'console-albums';
+          consoleAlbums.forEach(function (album) {
+            const entry = document.createElement('div');
+            entry.className = 'library-album-entry';
+            const albumButton = document.createElement('button');
+            albumButton.type = 'button';
+            albumButton.className = 'library-album';
+            albumButton.setAttribute('aria-expanded', String(openLibraryAlbum === album.id));
+            const albumTitle = document.createElement('span');
+            albumTitle.className = 'library-album-title';
+            albumTitle.textContent = album.title;
+            const albumCount = document.createElement('span');
+            albumCount.className = 'library-album-count';
+            albumCount.textContent = String(album.tracks.length) + ' tracks';
+            const albumChevron = document.createElement('span');
+            albumChevron.className = 'library-album-chevron';
+            albumChevron.textContent = openLibraryAlbum === album.id ? '⌄' : '›';
+            albumButton.append(albumTitle, albumCount, albumChevron);
+            albumButton.addEventListener('click', function () {
+              openLibraryAlbum = openLibraryAlbum === album.id ? '' : album.id;
+              renderLibrary();
+            });
+            entry.append(albumButton);
+            if (openLibraryAlbum === album.id || query) {
+              const inlineTracks = document.createElement('div');
+              inlineTracks.className = 'inline-tracks';
+              album.tracks.forEach(function (title, index) {
+                if (query && !title.toLowerCase().includes(query) && !album.title.toLowerCase().includes(query)) return;
+                const track = document.createElement('button');
+                track.type = 'button';
+                track.className = 'library-track';
+                track.dataset.albumId = album.id;
+                const number = document.createElement('span');
+                number.textContent = String(index + 1).padStart(2, '0');
+                const trackTitle = document.createElement('span');
+                trackTitle.textContent = title;
+                track.append(number, trackTitle);
+                track.addEventListener('click', function () { playTrack(album, title, index); });
+                inlineTracks.append(track);
+              });
+              const detailsLink = document.createElement('button');
+              detailsLink.type = 'button';
+              detailsLink.className = 'album-detail-link';
+              detailsLink.textContent = 'Album artwork';
+              detailsLink.addEventListener('click', function () { openAlbum(album, 'library'); });
+              inlineTracks.append(detailsLink);
+              entry.append(inlineTracks);
+            }
+            albumContainer.append(entry);
           });
-          const gameMatch = !query || summaryMatch || visibleInGame > 0;
-          game.hidden = !gameMatch;
-          if (query && gameMatch) game.open = true;
-          visibleTracks += visibleInGame;
-        });
-        tree.querySelectorAll(".system").forEach((system) => {
-          const hasGame = [...system.querySelectorAll(":scope > .system-content > .game")].some((game) => !game.hidden);
-          system.hidden = !hasGame;
-          if (query && hasGame) system.open = true;
-        });
-        noResults.classList.toggle("visible", Boolean(query) && visibleTracks === 0);
+          group.append(albumContainer);
+        }
+        libraryTree.append(group);
       });
+      if (!libraryTree.childElementCount) {
+        const empty = document.createElement('p');
+        empty.className = 'empty-message';
+        empty.textContent = 'No matching albums.';
+        libraryTree.append(empty);
+      }
+    }
 
-      seek.addEventListener("input", () => { elapsed.textContent = formatTime(Number(seek.value)); });
-      play.addEventListener("click", () => {
-        const isPlaying = play.getAttribute("aria-label") === "Play";
-        play.setAttribute("aria-label", isPlaying ? "Pause" : "Play");
-        play.innerHTML = isPlaying
-          ? '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 5h4v14H7zM15 5h4v14h-4z" fill="currentColor"/></svg>'
-          : '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z" fill="currentColor"/></svg>';
+    function renderNowPlaying() {
+      if (!activeAlbum) return;
+      const title = activeAlbum.tracks[activeTrackIndex];
+      const artwork = svgCover(activeAlbum);
+      document.getElementById('now-art').src = artwork;
+      document.getElementById('now-art').alt = activeAlbum.title + ' artwork';
+      document.getElementById('now-track-title').textContent = title;
+      document.getElementById('now-album-title').textContent = activeAlbum.title;
+      document.getElementById('now-duration').textContent = durationFor(activeTrackIndex);
+      const nowToggle = document.getElementById('now-toggle');
+      nowToggle.textContent = isPlaying ? 'Ⅱ' : '▶';
+      nowToggle.setAttribute('aria-label', isPlaying ? 'Pause' : 'Play');
+      const dockToggle = document.getElementById('dock-play');
+      dockToggle.textContent = isPlaying ? 'Ⅱ' : '▶';
+      dockToggle.setAttribute('aria-label', isPlaying ? 'Pause' : 'Play');
+      document.getElementById('dock-art').src = artwork;
+      document.getElementById('dock-title').textContent = title;
+      document.getElementById('dock-subtitle').textContent = activeAlbum.title;
+      document.getElementById('dock-progress').classList.add('has-track');
+      const upNext = document.getElementById('up-next-list');
+      upNext.replaceChildren();
+      for (let offset = 1; offset <= Math.min(3, activeAlbum.tracks.length - 1); offset += 1) {
+        const nextIndex = (activeTrackIndex + offset) % activeAlbum.tracks.length;
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'up-next-row';
+        row.textContent = activeAlbum.tracks[nextIndex];
+        row.addEventListener('click', function () {
+          playTrack(activeAlbum, activeAlbum.tracks[nextIndex], nextIndex);
+        });
+        upNext.append(row);
+      }
+    }
+
+    function setPage(page) {
+      nowPlayingScreen.classList.toggle('hidden', page !== 'now-playing');
+      libraryScreen.classList.toggle('hidden', page !== 'library');
+      galleryScreen.classList.toggle('hidden', page !== 'gallery');
+      soundScreen.classList.toggle('hidden', page !== 'sound');
+      optionsScreen.classList.toggle('hidden', page !== 'options');
+      detailScreen.classList.add('hidden');
+      device.classList.toggle('is-now-playing', page === 'now-playing');
+      document.querySelectorAll('.app-tabs button').forEach(function (button) {
+        if (button.dataset.page === page) button.setAttribute('aria-current', 'page');
+        else button.removeAttribute('aria-current');
       });
-      document.getElementById("previous").addEventListener("click", () => {
-        const index = trackButtons.indexOf(activeTrack);
-        selectTrack(trackButtons[Math.max(0, index - 1)]);
+      if (page === 'gallery') renderAlbums();
+      else if (page === 'library') renderLibrary();
+      else if (page === 'now-playing') renderNowPlaying();
+    }
+
+    function renderAlbums() {
+      const selectedConsole = consolePicker.value;
+      const query = searchInput.value.trim().toLowerCase();
+      const matches = albums.filter(function (album) {
+        return album.console === selectedConsole && album.title.toLowerCase().includes(query);
       });
-      document.getElementById("next").addEventListener("click", () => {
-        const index = trackButtons.indexOf(activeTrack);
-        selectTrack(trackButtons[Math.min(trackButtons.length - 1, index + 1)]);
+      grid.replaceChildren();
+      matches.forEach(function (album) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'album-card';
+        button.setAttribute('aria-label', 'Open ' + album.title);
+        const art = document.createElement('span');
+        art.className = 'cover-wrap';
+        const image = document.createElement('img');
+        image.src = svgCover(album);
+        image.alt = '';
+        image.loading = 'lazy';
+        art.append(image);
+        const name = document.createElement('span');
+        name.className = 'album-name';
+        name.textContent = album.title;
+        const meta = document.createElement('span');
+        meta.className = 'album-meta';
+        const count = document.createElement('span');
+        count.textContent = String(album.tracks.length) + ' tracks';
+        meta.append(count);
+        button.append(art, name, meta);
+        button.addEventListener('click', function () { openAlbum(album, 'gallery'); });
+        grid.append(button);
       });
-    })();
+      if (!matches.length) {
+        const empty = document.createElement('p');
+        empty.className = 'empty-message';
+        empty.style.gridColumn = '1 / -1';
+        empty.textContent = 'No albums found.';
+        grid.append(empty);
+      }
+    }
+
+    function openAlbum(album, sourcePage) {
+      selectedAlbum = album;
+      previousPage = sourcePage || 'gallery';
+      document.querySelectorAll('.app-tabs button').forEach(function (button) {
+        if (button.dataset.page === previousPage) button.setAttribute('aria-current', 'page');
+        else button.removeAttribute('aria-current');
+      });
+      document.getElementById('back-label').textContent = previousPage === 'library' ? 'Library' : 'Gallery';
+      document.getElementById('hero-art').src = svgCover(album);
+      document.getElementById('hero-art').alt = 'Original artwork concept for ' + album.title;
+      document.getElementById('hero-title').textContent = album.title;
+      nowPlayingScreen.classList.add('hidden');
+      device.classList.remove('is-now-playing');
+      const list = document.getElementById('track-list');
+      list.replaceChildren();
+      album.tracks.forEach(function (title, index) {
+        const item = document.createElement('li');
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'track-row';
+        row.addEventListener('click', function () { playTrack(album, title, index); });
+        const number = document.createElement('span');
+        number.className = 'track-number';
+        number.textContent = String(index + 1).padStart(2, '0');
+        const name = document.createElement('span');
+        name.className = 'track-title';
+        name.textContent = title;
+        const length = document.createElement('span');
+        length.className = 'track-length';
+        length.textContent = durationFor(index);
+        row.append(number, name, length);
+        item.append(row);
+        list.append(item);
+      });
+      libraryScreen.classList.add('hidden');
+      galleryScreen.classList.add('hidden');
+      detailScreen.classList.remove('hidden');
+      detailScreen.scrollTop = 0;
+    }
+
+    function returnFromAlbum() {
+      setPage(previousPage);
+      document.getElementById(previousPage === 'library' ? 'library-screen' : 'gallery-screen').scrollTop = 0;
+      document.getElementById('back-button').focus();
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('is-visible');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toast.classList.remove('is-visible'); }, 1500);
+    }
+
+    function playTrack(album, title, index) {
+      activeAlbum = album;
+      activeTrackIndex = index;
+      isPlaying = true;
+      document.getElementById('dock-art').src = svgCover(album);
+      document.getElementById('dock-title').textContent = title;
+      document.getElementById('dock-subtitle').textContent = album.title + ' · ' + album.console;
+      document.getElementById('dock-progress').classList.add('has-track');
+      renderNowPlaying();
+      document.querySelectorAll('.track-row,.library-track').forEach(function (row) { row.classList.remove('is-playing'); });
+      const activeRow = document.querySelectorAll('.track-row')[index];
+      if (activeRow) activeRow.classList.add('is-playing');
+      const matchingLibraryTrack = Array.from(document.querySelectorAll('.library-track')).find(function (row) {
+        return row.dataset.albumId === album.id && row.lastElementChild.textContent === title;
+      });
+      if (matchingLibraryTrack) matchingLibraryTrack.classList.add('is-playing');
+      showToast('Preview only · playback is not connected');
+    }
+
+    document.getElementById('back-button').addEventListener('click', returnFromAlbum);
+    document.getElementById('play-album').addEventListener('click', function () {
+      if (selectedAlbum) playTrack(selectedAlbum, selectedAlbum.tracks[0], 0);
+    });
+    document.getElementById('dock-play').addEventListener('click', function () {
+      isPlaying = !isPlaying;
+      renderNowPlaying();
+      showToast(isPlaying ? 'Preview only · playback is not connected' : 'Preview paused');
+    });
+    document.getElementById('now-toggle').addEventListener('click', function () {
+      isPlaying = !isPlaying;
+      renderNowPlaying();
+      showToast(isPlaying ? 'Preview only · playback is not connected' : 'Preview paused');
+    });
+    document.getElementById('now-previous').addEventListener('click', function () {
+      playTrack(activeAlbum, activeAlbum.tracks[(activeTrackIndex + activeAlbum.tracks.length - 1) % activeAlbum.tracks.length], (activeTrackIndex + activeAlbum.tracks.length - 1) % activeAlbum.tracks.length);
+    });
+    document.getElementById('now-next').addEventListener('click', function () {
+      const nextIndex = (activeTrackIndex + 1) % activeAlbum.tracks.length;
+      playTrack(activeAlbum, activeAlbum.tracks[nextIndex], nextIndex);
+    });
+    document.querySelectorAll('.option-switch').forEach(function (button) {
+      button.addEventListener('click', function () {
+        const enabled = button.getAttribute('aria-checked') !== 'true';
+        button.setAttribute('aria-checked', String(enabled));
+        button.textContent = enabled ? 'Yes' : 'No';
+      });
+    });
+    const volumeInput = document.getElementById('option-volume');
+    const volumeValue = document.getElementById('option-volume-value');
+    volumeInput.addEventListener('input', function () {
+      volumeValue.textContent = String(Math.round(Number(volumeInput.value) * 5));
+    });
+    document.querySelectorAll('[data-eq-band]').forEach(function (input) {
+      const output = input.closest('.eq-band').querySelector('output');
+      input.addEventListener('input', function () { output.textContent = Number(input.value).toFixed(1); });
+    });
+    document.getElementById('reset-flat').addEventListener('click', function () {
+      document.querySelectorAll('[data-eq-band]').forEach(function (input) {
+        input.value = '0';
+        input.closest('.eq-band').querySelector('output').textContent = '0.0';
+      });
+      showToast('Equalizer reset');
+    });
+    consolePicker.addEventListener('change', renderAlbums);
+    searchInput.addEventListener('input', renderAlbums);
+    librarySearchInput.addEventListener('input', function () {
+      if (librarySearchInput.value.trim()) openConsole = '';
+      renderLibrary();
+    });
+    document.querySelectorAll('.app-tabs button').forEach(function (button) {
+      button.addEventListener('click', function () { setPage(button.dataset.page); });
+    });
+    renderNowPlaying();
+    renderLibrary();
+    renderAlbums();
+    setPage('now-playing');
   </script>
 </body>
 </html>

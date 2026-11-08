@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily private admin recovery archive
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=30min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target
