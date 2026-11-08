@@ -2973,7 +2973,7 @@ body.sb2-frontend .options-equalizer-panel > .equalizer-profile-status { color: 
 body.sb2-frontend .options-equalizer-panel > .equalizer-profile-status:empty { display: none; }
 body.sb2-frontend .equalizer-bands { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sb-space-010); padding-top: var(--sb-space-050); }
 body.sb2-frontend .equalizer-band { display: grid; grid-template-columns: 48px minmax(0, 1fr) 8ch; align-items: center; min-width: 0; min-height: var(--sb-control-size); gap: var(--sb-space-075); padding-block: .5rem; }
-body.sb2-frontend .equalizer-band output { color: var(--muted); text-align: right; font-family: var(--mono-font-family); font-variant-numeric: tabular-nums; }
+body.sb2-frontend .equalizer-band output { padding-inline-end: var(--sb-space-050); color: var(--muted); text-align: right; font-family: var(--mono-font-family); font-variant-numeric: tabular-nums; }
 body.sb2-frontend .options-equalizer-panel > #equalizer-reset-button { width: 100%; margin-top: var(--sb-space-050); }
 body.sb2-frontend .diagnostics-list { display: grid; align-content: stretch; gap: 0; }
 body.sb2-frontend .diagnostics-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; min-height: calc(var(--sb-control-size) + var(--sb-space-050)); gap: var(--sb-space-075); padding-block: .5rem; border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
