@@ -1,0 +1,103 @@
+{# Shared catalog interaction markup. Phone and desktop shells own their layout styles. #}
+  <section class="spcboy-library" id="spcboy-library" aria-label="Music library" aria-busy="true">
+    <div class="spcboy-library-loading" id="spcboy-library-loading" role="status" aria-live="polite" aria-atomic="true">
+      <div class="spcboy-library-loading-card">
+        <span class="spcboy-load-spinner" aria-hidden="true"></span>
+        <span id="spcboy-loading-message">Connecting to library…</span>
+        <progress id="spcboy-loading-progress" aria-label="Library build progress" hidden></progress>
+      </div>
+    </div>
+    <aside class="spcboy-sidebar" aria-label="Library sidebar">
+      <div class="sbonline-transport-toolbar sb-toolbar" id="sbonline-transport-toolbar" aria-label="Playback toolbar">
+        <div class="sbonline-playback-options">
+          <button type="button" data-sbonline-command="equalizer" aria-label="Enable Equalizer" title="Equalizer" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16M9 4v6M15 14v6"/></svg></button>
+          <button type="button" data-sbonline-command="long-play" aria-label="Long Play" title="Long Play" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12c-3-7-9-6-9 0s6 7 9 0 9-6 9 0-6 7-9 0Z"/></svg></button>
+          <button type="button" data-sbonline-command="playback-speed" aria-label="Native format speed disabled" title="Native format speed disabled" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.8 18a9 9 0 1 1 14.4 0"/><path d="m12 13 4-4"/><circle cx="12" cy="13" r="1.5"/></svg></button>
+          <div class="sbonline-volume">
+            <button type="button" data-sbonline-command="volume" aria-label="Volume 100%" title="Volume" aria-expanded="false" aria-controls="sbonline-volume-panel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-6 5H2v4h3l6 5ZM15 8c3 2 3 6 0 8m3-11c5 4 5 10 0 14"/></svg></button>
+            <div id="sbonline-volume-panel" class="sbonline-volume-panel" hidden><label for="sbonline-volume-input">Volume</label><input id="sbonline-volume-input" type="range" min="0" max="20" step="1" value="20" aria-label="Toolbar volume"><output id="sbonline-volume-value" for="sbonline-volume-input">100</output></div>
+          </div>
+        </div>
+      </div>
+      <header class="spcboy-toolbar sb-toolbar">
+        <label class="spcboy-search-wrap">
+          <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.7" cy="8.7" r="5.7" stroke="currentColor" stroke-width="1.6"/><path d="m13 13 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <input id="spcboy-search" type="search" placeholder="Search" autocomplete="off" aria-label="Search games and tracks">
+        </label>
+        <div class="spcboy-view-row" id="spcboy-view-row">
+          <nav class="spcboy-tabs" aria-label="Library views">
+            <span class="spcboy-tabs-indicator" aria-hidden="true"></span>
+            <button type="button" class="is-active" data-view="all" aria-label="Library" title="Library" aria-pressed="true"><svg aria-hidden="true"><use href="#icon-sidebar-views"/></svg><span>Library</span></button>
+            <button type="button" data-view="gallery" aria-label="Album gallery" title="Album gallery" aria-pressed="false"><svg aria-hidden="true"><use href="#icon-gallery"/></svg><span>Gallery</span></button>
+            <button type="button" data-view="recent" aria-label="Recent plays" title="Recent plays" aria-pressed="false"><svg aria-hidden="true"><use href="#icon-history"/></svg><span>Recent</span></button>
+            <button type="button" data-view="favorites" aria-label="Favorites" title="Favorites" aria-pressed="false"><svg aria-hidden="true"><use href="#icon-star"/></svg><span>Favorites</span></button>
+          </nav>
+          <button class="spcboy-shuffle-favorites" id="spcboy-shuffle-favorites" type="button" aria-label="Shuffle your Favorites" title="Shuffle Favorites" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-shuffle"/></svg><span>Shuffle</span></button>
+          <button class="spcboy-fold-all" id="spcboy-fold-all" type="button" aria-label="Fold all library sections" title="Fold all"><svg aria-hidden="true"><use href="#icon-fold-all"/></svg><span>Fold all</span></button>
+        </div>
+        <span id="spcboy-library-state" role="status" class="spcboy-library-state">Loading…</span>
+      </header>
+      <nav class="spcboy-tree sb-scroll-fade" aria-label="Console and game tree">
+        <span class="spcboy-sidebar-indicator" aria-hidden="true"></span>
+        <div id="spcboy-library-tracks"><p class="spcboy-empty" id="spcboy-empty" role="status">Loading library index…</p></div>
+      </nav>
+    </aside>
+    <div class="spcboy-stage" id="spcboy-stage">
+      <header class="sbonline-playlist-heading sb-toolbar">
+        <div class="sbonline-workspace-tabs" id="sbonline-workspace-tabs" role="tablist" aria-label="Open playlists"></div>
+        <button class="sb-icon-button" id="sbonline-add-tab" type="button" aria-label="New tab" title="New tab"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></button>
+      </header>
+      <div class="sbonline-context-menu" id="sbonline-context-menu" role="menu" aria-label="Playlist actions" hidden>
+        <button type="button" role="menuitem" data-tab-action="open">Open in New Tab</button>
+        <button type="button" role="menuitem" data-tab-action="background">Open in Background Tab</button>
+      </div>
+      <section class="spcboy-playlist-pane" id="spcboy-playlist-pane" aria-label="Selected playlist">
+        <span class="spcboy-playlist-indicator" aria-hidden="true"></span>
+        <div class="spcboy-column-head sb-toolbar"><span data-column="favorite" aria-label="Favorites"><svg class="sb-favorite-heading" aria-hidden="true"><use href="#icon-star"/></svg></span><div><span data-column="index">#</span><span data-column="title">TITLE</span><span data-column="game">GAME</span><span data-column="artist">ARTIST</span><span data-column="system">SYSTEM</span><span data-column="year">YEAR</span><span data-column="dumper">DUMPER</span><span data-column="timestamp">DATE/TIME</span><span class="spcboy-column-length" data-column="length">LENGTH</span></div></div>
+        <div class="spcboy-playlist-content sb-scroll-fade" id="spcboy-playlist-content" tabindex="0" role="region" aria-label="Playlist tracks">
+          <p class="spcboy-empty" id="spcboy-playlist-empty">Loading…</p>
+          <button class="spcboy-search-more" id="spcboy-search-more" type="button" hidden>Load more results</button>
+        </div>
+      </section>
+      <section class="spcboy-card-panel" id="spcboy-card-panel" aria-label="Track collection" hidden>
+        <ol class="spcboy-card-list" id="spcboy-card-list" aria-label="Tracks"></ol>
+        <div class="spcboy-card-footer">
+          <p class="spcboy-card-empty" id="spcboy-card-empty" role="status" hidden></p>
+          <button class="spcboy-card-more" id="spcboy-favorite-more" type="button" hidden>Load more favorites</button>
+          <button class="spcboy-card-more" id="spcboy-recent-more" type="button" hidden>Load older</button>
+        </div>
+      </section>
+      <section class="spcboy-gallery-panel" id="spcboy-gallery-panel" aria-label="Album gallery" hidden>
+        <div class="spcboy-gallery-toolbar sb-toolbar">
+          <label class="spcboy-gallery-console-picker"><span class="visually-hidden">Gallery console</span><select id="spcboy-gallery-console-select" aria-label="Gallery console"></select></label>
+          <div class="spcboy-gallery-zoom" aria-label="Gallery tile zoom">
+            <span aria-hidden="true">Zoom</span>
+            <button class="spcboy-gallery-zoom-step" id="spcboy-gallery-zoom-out" type="button" aria-label="Zoom gallery tiles out">−</button>
+            <label class="visually-hidden" for="spcboy-gallery-zoom">Gallery tile zoom</label>
+            <input id="spcboy-gallery-zoom" type="range" min="50" max="150" step="10" value="100" aria-valuetext="100 percent">
+            <output id="spcboy-gallery-zoom-value" for="spcboy-gallery-zoom">100%</output>
+            <button class="spcboy-gallery-zoom-step" id="spcboy-gallery-zoom-in" type="button" aria-label="Zoom gallery tiles in">+</button>
+          </div>
+        </div>
+        <div class="spcboy-gallery-grid" id="spcboy-gallery-grid"></div>
+        <p class="spcboy-empty" id="spcboy-gallery-empty" role="status" hidden></p>
+        <button class="spcboy-search-more" id="spcboy-gallery-more" type="button" hidden>Load more albums</button>
+        <section class="spcboy-gallery-detail" id="spcboy-gallery-detail" aria-label="Album details" hidden>
+          <header class="spcboy-gallery-detail-header">
+            <button class="spcboy-gallery-detail-back" id="spcboy-gallery-detail-back" type="button">‹ Gallery</button>
+            <button class="spcboy-gallery-detail-play" id="spcboy-gallery-detail-play" type="button">Play album</button>
+          </header>
+          <div class="spcboy-gallery-detail-summary">
+            <img id="spcboy-gallery-detail-artwork" alt="" width="240" height="240" decoding="async">
+            <div>
+              <h2 id="spcboy-gallery-detail-title"></h2>
+              <p id="spcboy-gallery-detail-console"></p>
+              <p id="spcboy-gallery-detail-count"></p>
+            </div>
+          </div>
+          <ol class="spcboy-gallery-detail-tracks" id="spcboy-gallery-detail-tracks" aria-label="Album tracks"></ol>
+          <p class="spcboy-gallery-detail-status" id="spcboy-gallery-detail-status" role="status" aria-live="polite" hidden></p>
+        </section>
+      </section>
+    </div>
+  </section>
