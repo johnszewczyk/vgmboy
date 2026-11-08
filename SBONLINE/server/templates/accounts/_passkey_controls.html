@@ -1,0 +1,20 @@
+<section class="passkey-controls panel"
+  data-passkey-controls
+  data-passkey-options="{% url 'passkey_registration_options' %}"
+  data-passkey-verify="{% url 'passkey_registration_verify' %}">
+  <div class="section-heading">
+    <div><p class="eyebrow">Required sign-in</p><h2>Your passkeys</h2><p class="muted">Use Face ID, Touch ID, or a compatible security key. Keep at least one passkey registered.</p></div>
+  </div>
+  {% if passkeys %}<ul class="passkey-list">
+    {% for passkey in passkeys %}
+    <li><div><strong>{{ passkey.name|default:"Passkey" }}</strong><span class="table-subline">Added {% include "accounts/partials/record_date.html" with record_date=passkey.created_at time_class="site-record-time--inline" %}{% if passkey.last_used_at %} · last used {% include "accounts/partials/record_time.html" with record_time=passkey.last_used_at time_class="site-record-time--inline" %}{% endif %}</span></div>{% if passkeys|length > 1 %}<form method="post" action="{% url 'remove_passkey' passkey.pk %}">{% csrf_token %}<button class="text-button" type="submit">Remove</button></form>{% else %}<span class="muted">Last passkey</span>{% endif %}</li>
+    {% endfor %}
+  </ul>{% else %}<p class="empty-state">No passkeys are registered.</p>{% endif %}
+  <form class="passkey-setup-form" onsubmit="return false">
+    {% csrf_token %}
+    <label for="passkey-name">Name this passkey <span class="muted">(optional)</span></label>
+    <input id="passkey-name" data-passkey-name type="text" maxlength="80" autocomplete="off" placeholder="iPhone, Mac, or security key">
+    <button class="quiet-button" type="button" data-passkey-register>Add passkey</button>
+  </form>
+  <p class="passkey-status" data-passkey-status role="status" aria-live="polite"></p>
+</section>

@@ -21,8 +21,8 @@ history live in this repository.
   a local ZIP documented by `LocalRecovery/README.md`; Git history remains the
   source of record.
 - SBONLINE is the hosted SPCBOY web-player project, separate from the SB2 macOS
-  frontend. Its production site integration and deployment currently live in
-  MathBook's `private-admin/` app.
+  frontend. VGMMan owns the complete production app and deployment source under
+  `SBONLINE/`; the rented webspace is a hosting target only.
 - APPBOY is the iOS player package under `APPBOY/`, maintaining its own Swift
   package and sideload release boundary. It translates SB2's pixel-style theme
   and native WebKit bridge to responsive mobile and tablet viewports without

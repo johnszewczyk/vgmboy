@@ -1,0 +1,26 @@
+<section id="drawer-navigation" class="drawer-navigation" role="tabpanel" aria-label="Site navigation" aria-labelledby="spcboy-mobile-tab-navigation" tabindex="0" hidden>
+  <nav aria-label="Site and account">
+    <a href="{% url 'spcboy' %}" data-site-player-home aria-label="Back to player" title="Back to player"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-home"></use></svg><span>Back to player</span></a>
+    <a href="{% url 'playback_history' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-recent"></use></svg><span>Listening</span></a>
+    <button type="button" data-spcboy-view-shortcut="favorites"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-star"></use></svg><span>Favorites</span></button>
+    <button type="button" data-spcboy-view-shortcut="recent"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-recent"></use></svg><span>Recent plays</span></button>
+    <a href="{% url 'member_profile' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-user-round"></use></svg><span>Profile</span></a>
+    <a href="{% url 'member_profile' %}?tab=security"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-log-in"></use></svg><span>Sign-in</span></a>
+  </nav>
+  {% if request.user.is_superuser %}
+  <section class="drawer-navigation-category" aria-labelledby="drawer-admin-heading">
+    <h2 id="drawer-admin-heading">Admin</h2>
+    <nav aria-label="Admin">
+      <a href="{% url 'accounts' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-settings"></use></svg><span>Admin</span></a>
+      <a href="{% url 'usage' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-database"></use></svg><span>Site details</span></a>
+      <a href="{% url 'site_log' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-scroll-text"></use></svg><span>Log</span></a>
+    </nav>
+  </section>
+  <section class="drawer-navigation-category" aria-labelledby="drawer-new-sites-heading">
+    <h2 id="drawer-new-sites-heading">Other sites</h2>
+    <nav aria-label="Other sites">
+      <a href="{% url 'bom_home' %}" target="_blank" rel="noopener noreferrer" data-full-navigation aria-label="Book of Mormon, opens in a new tab"><svg class="site-ui-icon" aria-hidden="true" viewBox="0 0 20 20"><path d="M11 3h6v6M17 3l-8 8M15 11v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Book of Mormon</span></a>
+    </nav>
+  </section>
+  {% endif %}
+</section>

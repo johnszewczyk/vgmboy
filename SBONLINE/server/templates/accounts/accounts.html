@@ -1,0 +1,97 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/community.css' %}?v=20261104-favorites-reveal-1">{% endblock %}
+{% block title %}Admin{% endblock %}
+{% block content %}
+<div class="accounts-page">
+  <header class="page-heading accounts-heading">
+    <div><h1>Admin</h1></div>
+    <span class="account-count">{{ account_rows|length }} account{{ account_rows|length|pluralize }}</span>
+  </header>
+
+  <section class="accounts-section" id="site-settings" aria-label="Site settings">
+    <section class="profile-library-section" aria-labelledby="site-streaming-heading">
+      <header class="community-section-heading"><h2 id="site-streaming-heading">Audio streaming</h2></header>
+      <form method="post" action="{% url 'accounts' %}" class="profile-form">
+        {% csrf_token %}<input type="hidden" name="action" value="site-settings">
+        <div class="profile-fields">
+          <label for="{{ site_settings_form.aac_bitrate.id_for_label }}">Global AAC bitrate</label>{{ site_settings_form.aac_bitrate }}
+          {{ site_settings_form.aac_bitrate.errors }}
+          <span class="security-note">AAC-LC audio for every listener. Applies when a new stream starts.</span>
+          <label for="{{ site_settings_form.player_session_limit_minutes.id_for_label }}">Playback session limit (minutes)</label>{{ site_settings_form.player_session_limit_minutes }}
+          {{ site_settings_form.player_session_limit_minutes.errors }}
+          <span class="security-note">Enter 1–1,440 whole minutes. Stops playback this long after a full page load for all listeners.</span>
+          <button class="primary-button" type="submit">Save site settings</button>
+        </div>
+      </form>
+    </section>
+  </section>
+
+  <section class="accounts-section" aria-label="Site accounts">
+    {% if account_rows %}
+    <div class="account-card-grid">
+      {% for member in account_rows %}
+      <article class="account-card">
+        <header class="account-card-heading">
+          <a class="account-avatar-link" href="{% url 'member_public_profile' member.pk %}" aria-label="{{ member.display_name }}’s profile">{% include "accounts/partials/member_avatar.html" with avatar_profile=member.account_profile avatar_variant="member-avatar--account" %}</a>
+          <div class="account-card-identity">
+            <div class="account-card-name-line">
+              <h3><a href="{% url 'member_public_profile' member.pk %}">{{ member.display_name }}</a></h3>
+              <span class="status-pill {% if not member.is_active or member.setup_pending %}status-paused{% else %}status-active{% endif %}">{% if not member.is_active %}Suspended{% elif member.is_site_persona %}Persona{% elif member.setup_pending %}Setup pending{% else %}Active{% endif %}</span>
+            </div>
+            <p class="account-card-meta"><span>{{ member.role_label }}</span><span aria-hidden="true">·</span><span>{% if member.last_login %}{% include "accounts/partials/record_time.html" with record_time=member.last_login record_label="Last sign-in " time_class="site-record-time--inline" %}{% else %}No sign-in recorded{% endif %}</span></p>
+          </div>
+        </header>
+        {% if member.device_count %}
+        <details class="account-sessions">
+          <summary><span>Active browser sessions</span><span class="account-session-count">{{ member.device_count }}</span></summary>
+          <div class="account-session-list">
+            {% for active_login in member.active_sessions %}{% include "accounts/_session_details.html" %}{% endfor %}
+          </div>
+        </details>
+        {% else %}<p class="account-no-sessions"><span>Active browser sessions</span><span>0</span></p>{% endif %}
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}<p class="accounts-empty">No accounts are available.</p>{% endif %}
+  </section>
+
+  {% if is_owner %}
+  <section class="accounts-section accounts-invitations" aria-labelledby="invitations-heading">
+    <header class="accounts-section-heading">
+      <h2 id="invitations-heading">Invitations</h2>
+      <form method="post" action="{% url 'create_invite' %}">
+        {% csrf_token %}<button class="accounts-button accounts-button-primary" type="submit">Create invite</button>
+      </form>
+    </header>
+    {% if unrecoverable_invitation_count %}<p class="notice notice-warning invitation-legacy-note">{{ unrecoverable_invitation_count }} older invitation{{ unrecoverable_invitation_count|pluralize }} {{ unrecoverable_invitation_count|pluralize:"has,have" }} no stored code. Cancel and replace one if needed.</p>{% endif %}
+    {% if invitations %}
+    <div class="invitation-card-grid">
+      {% for invitation in invitations %}
+      <article class="invitation-card">
+        <header class="invitation-card-heading">
+          <div class="invitation-card-title"><h3>Member invitation</h3><p>Single use · passkey setup</p></div>
+          <span class="status-pill status-active">Open</span>
+        </header>
+        <div class="invitation-secret">
+          <span class="invitation-label">8-character code</span>
+          {% if invitation.visible_code %}
+          <div class="invitation-code-control"><input id="invitation-code-{{ invitation.selector }}" type="text" value="{{ invitation.visible_code }}" readonly autocomplete="off" spellcheck="false" aria-label="Invitation code"><button class="accounts-button" type="button" data-copy-target="invitation-code-{{ invitation.selector }}">Copy</button></div>
+          {% else %}<p class="invitation-code-missing">Unavailable for this older invitation</p>{% endif %}
+        </div>
+        <dl class="invitation-dates">
+          <div><dt>Created</dt><dd>{% include "accounts/partials/record_time.html" with record_time=invitation.created_at time_class="site-record-time--inline" %}</dd></div>
+          <div><dt>Expires</dt><dd>{% include "accounts/partials/record_time.html" with record_time=invitation.expires_at time_class="site-record-time--inline" %}</dd></div>
+        </dl>
+        <form class="invitation-card-actions" method="post" action="{% url 'revoke_invite' invitation.selector %}">
+          {% csrf_token %}<input type="hidden" name="return_to" value="accounts"><button class="accounts-button accounts-button-muted" type="submit">Cancel invitation</button>
+        </form>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}<p class="accounts-empty">No open invitations.</p>{% endif %}
+    <p class="copy-status" role="status" aria-live="polite"></p>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

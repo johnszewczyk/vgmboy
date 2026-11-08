@@ -25,3 +25,6 @@ APPBOY/DataPack/
 
 # macOS metadata.
 .DS_Store
+# Python bytecode caches.
+__pycache__/
+*.py[cod]

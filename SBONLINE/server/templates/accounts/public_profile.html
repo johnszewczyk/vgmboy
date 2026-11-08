@@ -1,0 +1,43 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+{% block title %}{{ member_profile.display_name }}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/community.css' %}?v=20261104-favorites-reveal-1">{% endblock %}
+{% block content %}
+<section class="community-page profile-page public-profile-page">
+  {% if profile_user.pk == request.user.pk %}
+    {% url 'member_profile' as identity_action_url %}
+    {% include "accounts/partials/profile_identity.html" with identity_heading="Member profile" identity_action_url=identity_action_url identity_action_label="Edit profile" %}
+  {% else %}
+    {% url 'playback_history' as identity_action_url %}
+    {% include "accounts/partials/profile_identity.html" with identity_heading="Member profile" identity_action_url=identity_action_url identity_action_label="Listening" %}
+  {% endif %}
+  {% include "accounts/partials/profile_bandwidth.html" %}
+  <nav class="profile-tabs" data-profile-tabs data-active-tab="{{ profile_tab }}" role="tablist" aria-label="{{ member_profile.display_name }}’s listening">
+    <a role="tab" data-profile-tab="favorites" aria-controls="member-favorites" aria-selected="{% if profile_tab == 'favorites' %}true{% else %}false{% endif %}" href="?tab=favorites">Favorites <span>{{ favorite_tracks.paginator.count|add:favorite_albums.paginator.count }}</span></a>
+    <a role="tab" data-profile-tab="recents" aria-controls="member-recents" aria-selected="{% if profile_tab == 'recents' %}true{% else %}false{% endif %}" href="?tab=recents">Recents <span>{{ recent_plays.paginator.count }}</span></a>
+  </nav>
+  <section class="profile-tab-panel" id="member-favorites" role="tabpanel" tabindex="0"{% if profile_tab != 'favorites' %} hidden{% endif %}>
+    <section class="profile-library-section" aria-labelledby="member-favorites-heading">
+      <header class="community-section-heading"><div><p class="eyebrow">SPCBOY library</p><h2 id="member-favorites-heading">Favorites</h2></div><span class="muted">{{ favorite_tracks.paginator.count }} tracks · {{ favorite_albums.paginator.count }} albums</span></header>
+      {% if favorite_tracks.object_list %}<ol class="track-card-list profile-track-list">
+        {% for item in favorite_tracks %}<li>{% include "accounts/partials/track_card.html" with track_id=item.track.id track_title=item.track.title track_game=item.track.game track_console=item.track.console track_artist=item.track.artist track_duration=item.track.durationSeconds artwork_url=item.track.artwork_url card_album_url=item.album_playlist_url card_time=item.added_at card_time_label="" %}</li>{% endfor %}
+      </ol>{% elif not favorite_albums.object_list %}<p class="empty-state">No favorites yet.</p>{% endif %}
+      {% if favorite_tracks.paginator.num_pages > 1 %}<nav class="site-log-pagination" aria-label="Favorite pages">{% if favorite_tracks.has_previous %}<a class="quiet-link" href="?tab=favorites&amp;favorite_page={{ favorite_tracks.previous_page_number }}">Newer</a>{% endif %}<span>Page {{ favorite_tracks.number }} of {{ favorite_tracks.paginator.num_pages }}</span>{% if favorite_tracks.has_next %}<a class="quiet-link" href="?tab=favorites&amp;favorite_page={{ favorite_tracks.next_page_number }}">Older</a>{% endif %}</nav>{% endif %}
+      {% if favorite_albums.object_list %}<h3 class="favorite-albums-heading">Albums</h3><ol class="favorite-album-list">
+        {% for album in favorite_albums %}<li><div><strong>{{ album.name }}</strong><span>{{ album.console }} · {{ album.track_count }} tracks</span></div><a class="favorite-album-play" data-site-play-album-url="{{ album.play_url }}" href="{% url 'spcboy' %}?album={{ album.id|urlencode }}" aria-label="Play {{ album.name }} album">▶ Play album</a>{% include "accounts/partials/record_time.html" with record_time=album.added_at record_label="Added " %}</li>{% endfor %}
+      </ol>{% endif %}
+      {% if favorite_albums.paginator.num_pages > 1 %}<nav class="site-log-pagination" aria-label="Favorite album pages">{% if favorite_albums.has_previous %}<a class="quiet-link" href="?tab=favorites&amp;album_page={{ favorite_albums.previous_page_number }}">Newer</a>{% endif %}<span>Page {{ favorite_albums.number }} of {{ favorite_albums.paginator.num_pages }}</span>{% if favorite_albums.has_next %}<a class="quiet-link" href="?tab=favorites&amp;album_page={{ favorite_albums.next_page_number }}">Older</a>{% endif %}</nav>{% endif %}
+    </section>
+  </section>
+  <section class="profile-tab-panel" id="member-recents" role="tabpanel" tabindex="0"{% if profile_tab != 'recents' %} hidden{% endif %}>
+    <section class="profile-library-section" aria-labelledby="member-recents-heading">
+      <header class="community-section-heading"><div><p class="eyebrow">Listening history</p><h2 id="member-recents-heading">Recents</h2></div><span class="muted">{{ recent_plays.paginator.count }} plays</span></header>
+      {% if recent_plays.object_list %}<ol class="track-card-list profile-track-list">
+        {% for play in recent_plays %}<li>{% include "accounts/partials/track_card.html" with track_id=play.track_id track_title=play.title track_game=play.game track_console=play.console track_artist=play.artist track_duration=play.duration_seconds artwork_url=play.artwork_url card_album_url=play.album_playlist_url card_time=play.played_at card_time_label="" %}</li>{% endfor %}
+      </ol>{% else %}<p class="empty-state">No plays yet.</p>{% endif %}
+      {% if recent_plays.paginator.num_pages > 1 %}<nav class="site-log-pagination" aria-label="Recent play pages">{% if recent_plays.has_previous %}<a class="quiet-link" href="?tab=recents&amp;recent_page={{ recent_plays.previous_page_number }}">Newer</a>{% endif %}<span>Page {{ recent_plays.number }} of {{ recent_plays.paginator.num_pages }}</span>{% if recent_plays.has_next %}<a class="quiet-link" href="?tab=recents&amp;recent_page={{ recent_plays.next_page_number }}">Older</a>{% endif %}</nav>{% endif %}
+    </section>
+  </section>
+</section>
+<script src="{% static 'accounts/profile.js' %}?v=20261028-heic-avatar-1" defer></script>
+{% endblock %}

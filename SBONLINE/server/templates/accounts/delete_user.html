@@ -1,0 +1,15 @@
+{% extends "accounts/base.html" %}
+{% block title %}Delete account{% endblock %}
+{% block content %}
+<section class="panel delete-account-panel">
+  <div class="page-heading"><div><p class="eyebrow">Owner action</p><h1>Delete account</h1><p class="muted">Review the effects before permanently removing this member.</p></div><a class="quiet-link" href="{% url 'accounts' %}">Back to accounts</a></div>
+  <div class="notice notice-warning">
+    <strong>This cannot be undone.</strong> Deleting <strong>{{ member_label }}</strong> permanently removes the web account, ends all of its active sessions, and cancels its open invitations. Sign-in events remain in the Log; that account's playback history is deleted.
+  </div>
+  <form method="post" class="delete-confirm-form">
+    {% csrf_token %}
+    <button class="danger-button danger-button-solid" type="submit">Permanently delete {{ member_label }}</button>
+    <a class="quiet-link" href="{% url 'accounts' %}">Cancel</a>
+  </form>
+</section>
+{% endblock %}

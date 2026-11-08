@@ -1,0 +1,57 @@
+{% extends "accounts/base.html" %}
+{% block title %}Log{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">Account security</p><h1>Log</h1><p class="muted">Active browser sessions and sign-in events. Music history has its own site page.</p></div></div>
+
+<section class="metric-grid site-log-summary" aria-label="Sign-in summary for the last 24 hours">
+  <article class="metric-card"><span>Active sessions</span><strong class="metric-value">{{ active_device_count }}</strong><p class="metric-detail">Signed-in browsers</p></article>
+  <article class="metric-card"><span>Successful sign-ins</span><strong class="metric-value">{{ successful_signins_24h }}</strong><p class="metric-detail">Last 24 hours</p></article>
+  <article class="metric-card"><span>Failed attempts</span><strong class="metric-value">{{ failed_signins_24h }}</strong><p class="metric-detail">Last 24 hours</p></article>
+</section>
+<p class="notice">Owner-only sign-in and session activity. Sessions that started before sign-in logging have no original sign-in details.</p>
+
+<section class="panel site-log-panel" aria-labelledby="active-heading">
+  <div class="section-heading"><div><p class="eyebrow">Now</p><h2 id="active-heading">Active sessions</h2><p class="muted">Expand a count for the session fingerprint, sign-in IP, browser, and activity time.</p></div><a class="quiet-link" href="{% url 'accounts' %}">Account directory</a></div>
+  {% if active_accounts %}
+  <div class="site-log-table-wrap account-disclosure-wrap"><table class="site-log-table account-table">
+    <thead><tr><th scope="col">Account</th><th scope="col">Active devices</th><th scope="col">Most recent activity</th></tr></thead>
+    <tbody>
+      {% for account in active_accounts %}
+      <tr>
+        <td data-label="Account"><strong>{{ account.username }}</strong><span class="table-subline">{{ account.role_label }}</span></td>
+        <td data-label="Active devices"><details class="row-disclosure"><summary>{{ account.device_count }} session{{ account.device_count|pluralize }}</summary><div class="disclosure-body">{% for active_login in account.active_sessions %}{% include "accounts/_session_details.html" %}{% endfor %}</div></details></td>
+        <td data-label="Most recent activity">{% with latest=account.active_sessions.0 %}{% if latest.last_seen_at %}{% include "accounts/partials/record_time.html" with record_time=latest.last_seen_at time_class="site-record-time--inline" %}{% elif latest.login_at %}{% include "accounts/partials/record_time.html" with record_time=latest.login_at time_class="site-record-time--inline" %}{% else %}Before sign-in logging{% endif %}{% endwith %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}<p class="empty-state">No active browser sessions.</p>{% endif %}
+</section>
+
+<section class="panel" id="sign-ins">
+  <div class="section-heading"><div><p class="eyebrow">Security activity</p><h2>Sign-in events</h2><p class="muted">{{ history.paginator.count }} recorded event{{ history.paginator.count|pluralize }} · timestamps shown in Detroit time.</p></div></div>
+  {% if history.object_list %}
+  <div class="site-log-table-wrap"><table class="site-log-table events-table">
+    <thead><tr><th scope="col">Time</th><th scope="col">Account</th><th scope="col">Result</th><th scope="col">Details</th></tr></thead>
+    <tbody>
+      {% for event in history %}
+      <tr>
+        <td data-label="Time">{% include "accounts/partials/record_time.html" with record_time=event.occurred_at time_class="site-record-time--inline" %}</td>
+        <td data-label="Account">{{ event.display_username|default:"Unknown account" }}</td>
+        <td data-label="Result"><span class="status-pill {{ event.display_status_class }}">{% if event.event_type == "success" %}Successful{% else %}Failed{% endif %}{% if event.event_type == "success" %} · {{ event.display_status }}{% endif %}</span></td>
+        <td data-label="Details"><details class="event-details"><summary>Inspect</summary><dl>
+          <div><dt>IP address</dt><dd>{{ event.ip_address|default:"Unavailable" }}</dd></div>
+          {% if event.event_type == "success" %}<div><dt>Session state</dt><dd>{{ event.display_status }}</dd></div>{% endif %}
+          {% if event.session_key_digest %}<div class="event-wide"><dt>Session fingerprint</dt><dd><code>{{ event.session_key_digest }}</code></dd></div>{% endif %}
+          <div class="event-wide"><dt>Browser / device</dt><dd>{{ event.user_agent|default:"Unavailable" }}</dd></div>
+        </dl></details></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% if history.paginator.num_pages > 1 %}<nav class="site-log-pagination" aria-label="Sign-in history pages">
+    {% if history.has_previous %}<a class="quiet-link" href="?log_page={{ history.previous_page_number }}#sign-ins">Newer</a>{% endif %}<span>Page {{ history.number }} of {{ history.paginator.num_pages }}</span>{% if history.has_next %}<a class="quiet-link" href="?log_page={{ history.next_page_number }}#sign-ins">Older</a>{% endif %}
+  </nav>{% endif %}
+  {% else %}<p class="empty-state">No sign-in events have been recorded yet.</p>{% endif %}
+</section>
+{% endblock %}

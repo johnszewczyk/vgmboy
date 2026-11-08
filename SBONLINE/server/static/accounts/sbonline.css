@@ -1,0 +1,205 @@
+/* Player geometry. Shared site chrome, controls, and motion live in sb-theme.css. */
+body.spcboy-body {
+  --site-navigation-height: 24px;
+  --site-player-height: 24px;
+  --sb-sidebar-width: clamp(260px, 27vw, 360px);
+  overflow: hidden;
+}
+body.spcboy-body .page-shell { width: 100%; height: calc(100dvh - var(--site-navigation-height) - var(--site-player-height) - env(safe-area-inset-top)); margin: 0; }
+body.spcboy-body .spcboy-page { height: 100%; background: var(--paper); }
+.sbonline-transport-toolbar, .sbonline-playlist-heading { display: none; }
+.sbonline-context { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; color: var(--muted); }
+body.spcboy-body .spcboy-tree { background: var(--paper); scrollbar-color: var(--input-line) transparent; }
+body.spcboy-body .spcboy-system > summary,
+body.spcboy-body .spcboy-game > summary {
+  min-height: 0; padding: 1px 3px; gap: 4px;
+  color: var(--muted); font: var(--sb-sidebar-font-size)/1.15 var(--sb-font);
+  cursor: pointer;
+  transition: color var(--site-motion-duration) var(--site-motion-ease);
+}
+body.spcboy-body .spcboy-system-name, body.spcboy-body .spcboy-game-name { font: inherit; color: inherit; }
+body.spcboy-body .spcboy-system > summary:hover,
+body.spcboy-body .spcboy-game > summary:hover { color: var(--blue); }
+body.spcboy-body .spcboy-system > .spcboy-system-content { margin-left: 1ch; padding-left: 0; border: 0; }
+body.spcboy-body .spcboy-game-row { gap: 0; }
+body.spcboy-body .spcboy-count { font: 10px/1 var(--sb-font); }
+body.spcboy-body .spcboy-sidebar-indicator, body.spcboy-body .spcboy-playlist-indicator { display: none; }
+body.spcboy-body .spcboy-game.is-selected > summary,
+body.spcboy-body .spcboy-track[aria-current="true"] { color: var(--blue); box-shadow: inset 0 -1px rgb(103 199 255 / 50%); }
+body.spcboy-body .spcboy-game.is-selected > summary .spcboy-game-name { color: var(--blue); }
+body.spcboy-body .spcboy-search-wrap { min-width: 0; }
+body.spcboy-body .spcboy-search-wrap input { height: var(--sb-control); min-height: 0; padding: 0 7px; border: 0; border-radius: var(--sb-radius); background: var(--input-bg); color: var(--ink); font: 12px/1 var(--sb-font); }
+body.spcboy-body .spcboy-search-wrap svg { display: none; }
+body.spcboy-body .spcboy-tabs, body.spcboy-body .spcboy-view-row { gap: var(--sb-gap); }
+body.spcboy-body .spcboy-tabs-indicator { display: none; }
+body.spcboy-body .spcboy-empty { color: var(--muted); font: 12px/1.6 var(--sb-font); padding: 16px; }
+body.spcboy-body .spcboy-gallery-card { padding: 4px; background: var(--surface-raised); border: 1px solid var(--line); border-radius: var(--sb-radius); box-shadow: none; }
+body.spcboy-body .spcboy-gallery-card img { border-radius: 3px; }
+body.spcboy-body .spcboy-gallery-name { color: var(--ink); font: var(--sb-playlist-font-size)/1.25 var(--sb-font); }
+body.spcboy-body .spcboy-gallery-toolbar { background: var(--paper); border-bottom: 0; padding: var(--sb-inset); gap: var(--sb-gap); }
+body.spcboy-body .spcboy-gallery-consoles button { border: 0; border-radius: var(--sb-radius); background: var(--sb-button-surface); color: var(--sb-button-ink); font: 12px/1.2 var(--sb-font); }
+body.spcboy-body .spcboy-gallery-consoles button:hover { color: var(--sb-button-hover-ink); background: var(--sb-button-hover-surface); }
+body.spcboy-body .spcboy-gallery-consoles button[aria-selected="true"] { color: var(--sb-button-selected-ink); background: var(--sb-button-selected-surface); }
+body.sbonline-site .spcboy-gallery-console-picker { display: none; flex: 0 1 20rem; min-width: min(100%,14rem); }
+body.sbonline-site .spcboy-gallery-console-picker select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 34px; padding: 6px 10px; border: 1px solid var(--input-line); border-radius: var(--sb-radius); background-color: var(--input-bg); color: var(--ink); font: 12px/1.2 var(--sb-font); }
+body.sbonline-site .spcboy-gallery-toolbar .spcboy-gallery-consoles { display: none; }
+body.spcboy-body .spcboy-library-loading { background: var(--scrim); backdrop-filter: blur(5px); }
+body.spcboy-body .spcboy-library-loading-card { padding: 16px 24px; border: 1px solid var(--line); border-radius: var(--sb-radius); background: var(--surface-heading); color: var(--ink); box-shadow: 0 16px 70px var(--shadow-strong); font-family: var(--sb-font); }
+body.spcboy-body .spcboy-media-card { border-color: var(--line); background: var(--white); border-radius: var(--sb-radius); }
+body.spcboy-body .spcboy-media-card-title { color: var(--ink); }
+.sbonline-workspace-tabs { display: flex; flex: 1; min-width: 0; height: 100%; gap: var(--sb-gap); overflow-x: auto; scrollbar-width: none; }
+.sbonline-workspace-tabs::-webkit-scrollbar { display: none; }
+.sbonline-workspace-tab { display: flex; flex: 1 1 160px; min-width: 90px; max-width: 240px; overflow: hidden; background: var(--sb-button-surface); border-radius: var(--sb-radius); }
+.sbonline-workspace-tab.is-active { background: var(--sb-button-selected-surface); }
+.sbonline-workspace-tab button { height: 100%; min-height: 0; border: 0; background: transparent; color: var(--sb-button-ink); padding: 0; font: 11px/1 var(--sb-font); }
+.sbonline-workspace-tab [role="tab"] { flex: 1; min-width: 0; padding-inline: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.sbonline-workspace-tab [aria-selected="true"] { color: var(--sb-button-selected-ink); }
+.sbonline-workspace-tab .sbonline-tab-close { display: grid; place-items: center; flex: 0 0 var(--sb-control); width: var(--sb-control); border-radius: var(--sb-radius); }
+.sbonline-tab-close svg { width: 11px; height: 11px; }
+.sbonline-context-menu { position: fixed; z-index: 130; display: grid; min-width: 205px; padding: var(--sb-inset); gap: var(--sb-gap); border: 1px solid var(--line); border-radius: var(--sb-radius); background: var(--surface-raised); box-shadow: 0 12px 32px var(--shadow-strong); }
+.sbonline-context-menu[hidden] { display: none; }
+.sbonline-context-menu button { padding: 7px 10px; border: 0; border-radius: 3px; background: transparent; color: var(--sb-button-ink); font: 12px/1.3 var(--sb-font); text-align: left; }
+.sbonline-context-menu button:hover, .sbonline-context-menu button:focus-visible { background: var(--sb-button-hover-surface); color: var(--sb-button-hover-ink); }
+.sbonline-volume { position: relative; }
+.sbonline-volume-panel { position: absolute; z-index: 60; top: calc(100% + var(--sb-gap)); right: 0; width: 210px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--sb-radius); background: var(--surface-raised); box-shadow: 0 12px 40px var(--shadow-strong); }
+.sbonline-volume-panel[hidden] { display: none; }
+.sbonline-volume-panel label { grid-column: 1/-1; color: var(--muted); font-size: 11px; }
+.sbonline-volume-panel input { min-width: 0; width: 100%; margin: 0; }
+.sbonline-volume-panel output { color: var(--blue); font-size: 11px; }
+@media (min-width: 781px) {
+  body.spcboy-body #spcboy-library { grid-template: minmax(0,1fr) / var(--sb-sidebar-width) minmax(0,1fr); height: 100%; gap: 1px; background: var(--line); }
+  body.spcboy-body #spcboy-library .spcboy-sidebar { display: grid; grid-area: 1/1; grid-template-rows: var(--sb-toolbar-height) var(--sb-toolbar-height) minmax(0,1fr); border: 0; min-height: 0; background: var(--paper); }
+  body.spcboy-body #spcboy-library .spcboy-toolbar { display: flex; grid-area: 2/1; height: var(--sb-toolbar-height); min-height: 0; border: 0; background: var(--paper); }
+  body.spcboy-body .sbonline-transport-toolbar { position: relative; display: flex; grid-area: 1/1; background: var(--paper); }
+  body.spcboy-body .sbonline-transport-toolbar :is(.spcboy-transport,.sbonline-playback-options,.site-player-actions-slot) { display: contents; }
+  body.spcboy-body .sbonline-transport-toolbar > .sbonline-playback-options .sbonline-volume,
+  body.spcboy-body .sbonline-transport-toolbar button { flex: 1 1 0; min-width: 0; width: 100%; }
+  body.spcboy-body .sbonline-transport-toolbar .sbonline-volume button { width: 100%; }
+  body.spcboy-body .spcboy-tabs :is(button), body.spcboy-body .spcboy-fold-all, body.spcboy-body .spcboy-shuffle-favorites { width: var(--sb-control); min-width: var(--sb-control); height: var(--sb-control); min-height: var(--sb-control); }
+  body.spcboy-body .spcboy-tabs button svg, body.spcboy-body .spcboy-fold-all svg { width: 14px; height: 14px; }
+  body.spcboy-body #spcboy-library .spcboy-tree { display: block; grid-area: 3/1; padding: 0 var(--sb-inset) var(--sb-inset); border: 0; }
+  body.spcboy-body #spcboy-library .spcboy-stage { display: grid; grid-area: 1/2; grid-template-rows: var(--sb-toolbar-height) minmax(0,1fr); height: 100%; min-height: 0; background: var(--paper); }
+  body.spcboy-body #spcboy-stage > .sbonline-playlist-heading { display: flex; grid-area: 1/1; height: var(--sb-toolbar-height); min-width: 0; background: var(--paper); }
+  body.spcboy-body #spcboy-stage > :is(.spcboy-playlist-pane,.spcboy-card-panel,.spcboy-gallery-panel) { grid-area: 2/1; height: 100%; min-height: 0; }
+  body.spcboy-body .spcboy-playlist-pane { grid-template-rows: var(--sb-toolbar-height) minmax(0,1fr); }
+  body.spcboy-body .spcboy-column-head { height: var(--sb-toolbar-height); min-height: 0; border: 0; background: var(--paper); color: var(--muted); font: 11px/1 var(--sb-font); }
+  body.spcboy-body .spcboy-column-head > div { gap: var(--sb-gap); }
+  body.spcboy-body .spcboy-column-head > div > span, body.spcboy-body .spcboy-column-head > span { display: flex; align-items: center; height: var(--sb-control); min-height: 0; padding: 0 var(--sb-gap); border-radius: var(--sb-radius); background: var(--button-bg); }
+  body.spcboy-body .spcboy-column-head > span { justify-content: center; padding: 0; }
+  body.spcboy-body .spcboy-playlist-content { padding: 0 var(--sb-inset) var(--sb-inset); background: var(--paper); }
+  body.spcboy-body .spcboy-playlist-content .spcboy-track { min-height: 0; height: auto; gap: var(--sb-gap); padding: 0 var(--sb-gap); font: var(--sb-playlist-font-size)/1.15 var(--sb-font); }
+  body.spcboy-body .spcboy-playlist-content :is(.spcboy-track-title,.spcboy-track-artist,.spcboy-track-game,.spcboy-track-system,.spcboy-track-length,.spcboy-track-number) { font: inherit; }
+  body.spcboy-body .spcboy-playlist-content .spcboy-favorite,
+  body.spcboy-body .spcboy-tree .spcboy-album-favorite { min-height: 0; height: 1.15em; width: 100%; padding: 0; border: 0; background: transparent; font-size: var(--sb-playlist-font-size); }
+  body.spcboy-body .spcboy-playlist-content .spcboy-favorite svg { width: 11px; height: 11px; }
+  body.spcboy-body .spcboy-playlist-group-title { margin: var(--sb-gap) 0; padding: 3px 5px; border-radius: var(--sb-radius); background: var(--surface-raised); color: var(--muted); font: 11px/1.3 var(--sb-font); }
+  body.spcboy-body .spcboy-tree > .spcboy-gallery-consoles { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 0; overflow: visible; border: 0; background: transparent; }
+  body.spcboy-body .spcboy-tree > .spcboy-gallery-consoles button { width: 100%; min-height: 0; padding: 2px 4px; border-radius: 0; background: transparent; text-align: left; font: var(--sb-sidebar-font-size)/1.15 var(--sb-font); }
+  body.spcboy-body .spcboy-gallery-panel, body.spcboy-body .spcboy-card-panel { overflow: auto; }
+  body.spcboy-body .spcboy-library-state { position: static; grid-area: library; display: flex; align-items: center; width: auto; height: 100%; min-width: 0; clip: auto; clip-path: none; margin: 0; padding: 0 6px; overflow: hidden; white-space: nowrap; border-right: 1px solid var(--line); color: var(--muted); font: 10px/1 var(--sb-font); text-transform: uppercase; }
+  body.spcboy-body .spcboy-player.site-player-dock { grid-template-columns: calc(var(--sb-sidebar-width) + 1px) auto minmax(0,1fr) auto; grid-template-areas: "library status main clock"; padding: 0; column-gap: 0; }
+  body.spcboy-body .spcboy-player-main { padding-inline: 8px; }
+  body.spcboy-body .spcboy-player-status { padding-left: 12px; }
+  body.spcboy-body .spcboy-playback-clock { padding-right: 8px; }
+  body.spcboy-body #site-player-transport-slot { display: none; }
+}
+@media (max-width: 780px) {
+  body.spcboy-body { --site-navigation-height: 48px; --site-player-height: calc(46px + env(safe-area-inset-bottom)); }
+  body.spcboy-body .topbar { padding-inline: 5px; gap: 4px; }
+  body.spcboy-body .sbonline-context { display: none; }
+  body.spcboy-body .spcboy-system > summary, body.spcboy-body .spcboy-game > summary { min-height: 36px; margin-bottom: var(--sb-gap); padding: 0 8px; font-size: var(--sb-sidebar-font-size); }
+  body.spcboy-body .spcboy-track-title { font-size: var(--sb-playlist-font-size); }
+  body.spcboy-body .spcboy-library-state { display: none; }
+  body.spcboy-body .spcboy-toolbar { padding: 4px; gap: 4px; }
+  body.spcboy-body .spcboy-search-wrap input { height: 36px; }
+  body.spcboy-body .spcboy-tabs button, body.spcboy-body .spcboy-fold-all { min-height: 36px; }
+  body.spcboy-body #spcboy-library .spcboy-stage > .sbonline-playlist-heading { display: flex; grid-row: 1; height: 36px; }
+  body.spcboy-body .spcboy-stage { display: flex; flex-direction: column; }
+  body.spcboy-body .spcboy-stage > :is(.spcboy-card-panel,.spcboy-gallery-panel,.spcboy-playlist-pane) { flex: 1; min-height: 0; }
+  body.spcboy-body .spcboy-stage:has(.spcboy-playlist-pane[hidden]):has(.spcboy-card-panel[hidden]):has(.spcboy-gallery-panel[hidden]) { display: none; }
+  body.spcboy-body .spcboy-card-list { gap: 6px; padding: 6px; }
+}
+@media (max-width: 780px) {
+  body.spcboy-body #spcboy-library { grid-template: 40px 36px minmax(0,1fr) / minmax(0,1fr); }
+  body.spcboy-body #spcboy-library .spcboy-sidebar { display: contents; }
+  body.spcboy-body #spcboy-library .spcboy-toolbar { grid-area: 1/1; height: 40px; min-height: 0; }
+  body.spcboy-body #spcboy-library > .sbonline-playlist-heading { display: flex; grid-area: 2/1; height: 36px; }
+  body.spcboy-body #spcboy-library .spcboy-tree { grid-area: 3/1; }
+  body.spcboy-body #spcboy-library .spcboy-stage { display: contents; }
+  body.spcboy-body #spcboy-stage > :is(.spcboy-playlist-pane,.spcboy-card-panel,.spcboy-gallery-panel) { grid-area: 3/1; height: 100%; min-height: 0; padding-top: 0; overflow: auto; }
+  body.spcboy-body .spcboy-tree .spcboy-track { min-height: 40px; padding-block: 6px; }
+  body.spcboy-body .spcboy-tree .spcboy-favorite { min-height: 36px; }
+  body.spcboy-body .sbonline-workspace-tab .sbonline-tab-close { flex-basis: 30px; width: 30px; }
+}
+@media (min-width: 781px) {
+  body.spcboy-body .spcboy-system > summary,
+  body.spcboy-body .spcboy-game > summary { padding-block: 0 var(--sb-row-gap, 0px); line-height: 1.1; }
+  body.spcboy-body .spcboy-playlist-content .spcboy-track { padding-block: 0 var(--sb-row-gap, 0px); line-height: 1.1; }
+  body.spcboy-body .spcboy-playlist-content .spcboy-favorite { height: calc(var(--sb-playlist-font-size) + var(--sb-row-gap, 0px)); }
+  body.spcboy-body .spcboy-tree .spcboy-album-favorite { height: calc(var(--sb-sidebar-font-size) + var(--sb-row-gap, 0px)); }
+  body.spcboy-body .spcboy-column-head [data-column] { position: relative; justify-content: center; text-align: center; cursor: grab; }
+  body.spcboy-body .spcboy-column-head [data-column="favorite"] { cursor: default; }
+  body.spcboy-body .spcboy-column-head .sb-favorite-heading { width: 14px; height: 14px; fill: none; stroke: currentColor; }
+  body.spcboy-body .spcboy-playlist-pane { grid-template-columns: minmax(0,1fr); overflow: hidden; }
+  body.spcboy-body .spcboy-column-head { width: var(--sb-playlist-width,100%); will-change: transform; }
+  body.spcboy-body .spcboy-column-head > div,
+  body.spcboy-body .spcboy-playlist-content .spcboy-track { grid-template-columns: var(--sb-column-template); }
+  body.spcboy-body .spcboy-playlist-content > .spcboy-playlist-group { width: calc(var(--sb-playlist-width,100%) - 2 * var(--sb-inset)); min-width: 0; }
+}
+
+@media (max-width: 780px) {
+  body.spcboy-body .spcboy-track > [data-column] { order: initial !important; }
+}
+@media (min-width: 781px) {
+  body.spcboy-body .spcboy-playlist-content .spcboy-track-row { grid-template-columns: var(--sb-control) minmax(0,1fr); }
+  body.spcboy-body .is-column-hidden-favorite .spcboy-playlist-content .spcboy-track-row { grid-template-columns: 0 minmax(0,1fr); }
+}
+
+.sbonline-site .site-player-dock :is(.spcboy-library-state,.spcboy-player-main,.spcboy-player-status,.spcboy-playback-clock) { color: var(--muted); font: 10px/1 var(--sb-font); letter-spacing: .06em; text-transform: uppercase; }
+
+/* Logical tree depth is one character, including Favorites' normal library. */
+body.spcboy-body .spcboy-system-content { display: block; margin: 0 0 0 1ch; padding: 0; border: 0; font-size: var(--sb-sidebar-font-size); }
+body.spcboy-body .spcboy-game.is-leaf > summary { pointer-events: none; }
+/* Compact account forms; the account portrait lives in the identity header. */
+.sbonline-site .community-page { width: min(1200px,calc(100% - 32px)); margin: 16px auto 24px; }
+.sbonline-site .community-heading { margin-bottom: 12px; padding-bottom: 8px; }
+.sbonline-site .community-heading .eyebrow, .sbonline-site .community-section-heading .eyebrow { display: none; }
+.sbonline-site .community-heading h1 { margin: 0 0 4px; }
+.sbonline-site .profile-editor { display: block; padding: 16px; }
+.sbonline-site .profile-form { display: block; width: min(100%,700px); }
+.sbonline-site #profile-form { display: grid; grid-template-columns: minmax(0,1fr); gap: 20px; }
+.sbonline-site .member-avatar--profile { --member-avatar-size: 96px; }
+.sbonline-site .profile-fields { gap: 8px; }
+.sbonline-site .profile-fields > label { margin: 0; font-weight: 500; }
+.sbonline-site .profile-fields input[type="text"], .sbonline-site .profile-fields select { min-height: 32px; padding: 6px 10px; }
+.sbonline-site .profile-side-note { margin: 8px 0 0 116px; font-size: 12px; color: var(--muted); }
+.sbonline-site .profile-library-section { margin-top: 12px; }
+body.sbonline-site.spcboy-body select { appearance: none; background-image: none; padding-right: 10px !important; }
+
+.sbonline-site .profile-usage-section > summary { display: flex; justify-content: space-between; gap: 16px; padding: 10px 8px; border: 1px solid var(--line); border-radius: var(--sb-radius); color: var(--sb-button-ink); background: var(--sb-button-surface); cursor: pointer; font: 12px/1.3 var(--sb-font); }
+.sbonline-site .profile-usage-section > summary:hover { color: var(--sb-button-hover-ink); background: var(--sb-button-hover-surface); border-color: var(--input-line); }
+.sbonline-site .profile-usage-section[open] > summary { color: var(--sb-button-selected-ink); background: var(--sb-button-selected-surface); border-color: var(--blue-deep); }
+.sbonline-site .profile-usage-section > summary > span { margin-left: auto; }
+
+/* Header and body share the same insets and column geometry. Keep handles
+   outside label clipping and apply column preferences only on desktop. */
+@media (min-width: 781px) {
+  body.spcboy-body .spcboy-column-head { box-sizing: border-box; column-gap: 0; padding-inline: var(--sb-inset); }
+  body.spcboy-body .spcboy-column-head > div { box-sizing: border-box; padding-inline: var(--sb-gap); }
+  body.spcboy-body .spcboy-column-head [data-column] { overflow: visible; box-sizing: border-box; }
+  body.spcboy-body .spcboy-column-head [data-column][hidden],
+  body.spcboy-body .spcboy-track [data-column][hidden] { display: none; }
+  body.spcboy-body .spcboy-playlist-content :is(.spcboy-track-year,.spcboy-track-dumper) { font: inherit; }
+}
+@media (max-width: 780px) {
+  .spcboy-track :is([data-column="year"],[data-column="dumper"]) { display: none; }
+}
+
+/* Ordinary playlist text has one shade; playing/hover states inherit as a row. */
+@media (min-width: 781px) {
+  body.spcboy-body .spcboy-playlist-content .spcboy-track > [data-column] { color: inherit; }
+  body.spcboy-body .spcboy-playlist-content .spcboy-track-timestamp { font: inherit; }
+}
+@media (max-width: 780px) {
+  .spcboy-track [data-column="timestamp"] { display: none; }
+}

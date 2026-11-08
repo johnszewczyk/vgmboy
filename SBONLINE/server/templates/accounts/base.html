@@ -1,0 +1,208 @@
+{% load static %}
+<!doctype html>
+<html lang="en" data-theme-mode="{% if request.user.is_authenticated %}{{ request.user.member_profile.theme_preference }}{% else %}system{% endif %}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#090d13">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>{% block title %}Admin{% endblock %} | Pre-Calc</title>
+  <script>
+    (() => {
+      const root = document.documentElement;
+      root.dataset.theme = "dark";
+      const themeColor = document.querySelector('meta[name="theme-color"]');
+      if (themeColor) themeColor.content = "#090b0f";
+    })();
+  </script>
+  <link rel="stylesheet" href="{% static 'accounts/admin.css' %}?v=20261031-shared-desktop-toolbar-1">
+  {% if request.user.is_authenticated %}<link rel="stylesheet" href="{% static 'accounts/site-components.css' %}?v=20261104-sbo-cleanup-1">{% endif %}
+  {% if request.user.is_authenticated %}
+  {{ request.user.member_profile.spcboy_preferences|json_script:"spcboy-profile-preferences" }}
+  <script src="{% static 'accounts/activity-badges.js' %}?v=20261104-sbo-cleanup-1" data-site-global defer></script>
+  <script src="{% static 'accounts/site-components.js' %}?v=20261023-refine-3" data-site-global defer></script>
+  <script src="{% static 'accounts/sb-presentation.js' %}?v=20261026-collections-1" data-site-global defer></script>
+  <script src="{% static 'accounts/aac-stream.js' %}?v=20261107-aac-adts-1" data-site-global defer></script>
+  <script src="{% static 'accounts/site-preferences.js' %}?v=20261031-profile-cloud-1" data-preferences-url="{% url 'spcboy_preferences' %}" data-site-global defer></script>
+  <script src="{% static 'accounts/site-player.js' %}?v=20261108-vgmmobile-2" data-site-global defer></script>
+  <script src="{% static 'accounts/site-favorites.js' %}?v=20261101-favorite-swipe-cue-1" data-site-global defer></script>
+  <script src="{% static 'accounts/site-navigation.js' %}?v=20261104-sbo-cleanup-1" data-site-global defer></script>
+  {% endif %}
+  {% block extra_head %}{% endblock %}
+  {% if request.user.is_authenticated %}<link rel="stylesheet" href="{% static 'accounts/player.css' %}?v=20261103-gallery-ux-1">{% endif %}
+  <link rel="stylesheet" href="{% static 'accounts/sbonline.css' %}?v=20261103-gallery-ux-1">
+  <link rel="stylesheet" href="{% static 'accounts/sb-theme.css' %}?v=20261108-slider-width-1">
+  <script src="{% static 'accounts/sb-interface.js' %}?v=20261108-vgmmobile-2" data-site-global defer></script>
+<link rel="stylesheet" href="{% static 'accounts/sb-presentation.css' %}?v=20261026-collections-1">
+  <link rel="stylesheet" href="{% static 'accounts/sb-mobile.css' %}?v=20261108-slider-width-1" media="(max-width: 780px)">
+</head>
+<body class="sbonline-site {% block body_class %}{% endblock %}{% if request.user.is_authenticated %} has-site-player{% endif %}">
+  {% if request.user.is_authenticated %}
+  <svg class="site-icon-sprite" aria-hidden="true" focusable="false">
+    <symbol id="site-icon-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7"/><path d="M5 9v12h14V9M9 21v-7h6v7"/></symbol>
+    <symbol id="site-icon-recent" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l3 2" /></symbol>
+    <symbol id="site-icon-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z" /></symbol>
+    <symbol id="site-icon-scan-search" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><circle cx="12" cy="12" r="3" /><path d="m16 16-1.9-1.9" /></symbol>
+    <symbol id="site-icon-user-round" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5" /><path d="M20 21a8 8 0 0 0-16 0" /></symbol>
+    <symbol id="site-icon-list-music" viewBox="0 0 24 24"><path d="M16 8V5l5-1v12" /><circle cx="14" cy="17" r="2" /><circle cx="19" cy="16" r="2" /><path d="M3 7h9M3 11h9M3 15h5" /></symbol>
+    <symbol id="site-icon-log-in" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="m10 17 5-5-5-5" /><path d="M15 12H3" /></symbol>
+    <symbol id="site-icon-settings" viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" /><path d="m19.4 15 .1.1a1.8 1.8 0 1 1-2.5 2.5l-.1-.1a1.8 1.8 0 0 0-3 .9v.2a1.8 1.8 0 1 1-3.6 0v-.2a1.8 1.8 0 0 0-3-.9l-.1.1a1.8 1.8 0 1 1-2.5-2.5l.1-.1a1.8 1.8 0 0 0-.9-3H3.8a1.8 1.8 0 1 1 0-3.6H4a1.8 1.8 0 0 0 .9-3l-.1-.1a1.8 1.8 0 1 1 2.5-2.5l.1.1a1.8 1.8 0 0 0 .9 3h.2a1.8 1.8 0 1 1 3.6 0V4a1.8 1.8 0 0 0 3 .9l.1-.1a1.8 1.8 0 1 1 2.5 2.5l-.1.1a1.8 1.8 0 0 0 .9 3h.2a1.8 1.8 0 1 1 0 3.6H21a1.8 1.8 0 0 0-1.6 1Z" /></symbol>
+    <symbol id="site-icon-folder-plus" viewBox="0 0 24 24"><path d="M12 10v6" /><path d="M9 13h6" /><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></symbol>
+    <symbol id="site-icon-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5V19A9 3 0 0 0 21 19V5" /><path d="M3 12A9 3 0 0 0 21 12" /></symbol>
+    <symbol id="site-icon-scroll-text" viewBox="0 0 24 24"><path d="M15 12h-5" /><path d="M15 8h-5" /><path d="M19 17V5a2 2 0 0 0-2-2H4" /><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" /></symbol>
+  </svg>
+  {% endif %}
+  <header class="topbar">
+    {% if request.user.is_authenticated %}
+    <a class="mobile-player-link" id="mobile-player-link" href="{% url 'spcboy' %}" data-site-player-home aria-label="Back to player" title="Back to player"{% if request.resolver_match.url_name == 'spcboy' %} aria-current="page"{% endif %}><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-home"></use></svg></a>
+    {% include "accounts/partials/desktop_site_navigation.html" %}
+    {% endif %}
+    <span class="sbonline-context" hidden id="sbonline-context">LIBRARY</span>
+    <div class="topbar-actions">
+      {% if request.user.is_authenticated %}
+      <span class="site-player-transport-slot" id="site-player-transport-slot"></span><form class="mobile-header-search" id="mobile-header-search" role="search" action="{% url 'spcboy' %}" method="get"><input id="mobile-header-search-input" type="search" name="q" placeholder="Search" aria-label="Search music" autocomplete="off"></form>
+      <span class="site-player-actions-slot" id="site-player-actions-slot">
+        <button class="site-player-queue-toggle" id="site-player-queue-toggle" type="button" aria-expanded="false" aria-controls="site-player-queue-panel" aria-label="Queue, 0 tracks" title="Queue"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h9M3 15h6"/><path d="m14 12 3 3-3 3"/></svg><span id="site-player-queue-count">0</span></button>
+        <button class="spcboy-settings-toggle" id="spcboy-settings-toggle" type="button" aria-expanded="false" aria-controls="spcboy-settings-panel" aria-label="Menu" title="Menu"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14"/></svg></button>
+      </span>
+      {% endif %}
+    </div>
+  </header>
+  <main class="page-shell">
+    {% if messages %}<div class="messages" aria-live="polite">{% for message in messages %}<p class="message message-{{ message.tags }}">{{ message }}</p>{% endfor %}</div>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+  {% if request.user.is_authenticated %}
+  <footer class="spcboy-player site-player-dock" id="site-player" data-audio-url="{% url 'spcboy_audio' track_id='TRACK_ID' %}" data-library-url="{% url 'spcboy' %}" data-now-playing-url="{% url 'spcboy_now_playing' %}" data-stream-quota-url="{% url 'spcboy_stream_quota' %}" data-navigation-url="{% url 'spcboy_navigation' %}" data-favorites-url="{% url 'spcboy_favorites' %}" data-page-load-token="{{ request.spcboy_page_load_token }}" data-session-limit-seconds="{{ request.spcboy_session_limit_seconds }}" data-user-id="{{ request.user.pk }}" aria-label="Site music player">
+    <div class="spcboy-transport" id="spcboy-transport" aria-label="Playback controls">
+      <button type="button" id="spcboy-previous" disabled aria-label="Previous track"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4v12M15 5 7 10l8 5z"/></svg></button>
+      <button type="button" id="spcboy-stop" disabled aria-label="Stop" title="Stop"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5h10v10H5z"/></svg></button>
+      <button type="button" id="spcboy-play" class="spcboy-play" disabled aria-label="Play" aria-busy="false"><svg class="spcboy-play-icon sb-play-glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 9 6-9 6z"/></svg><svg class="spcboy-eq-icon sb-playing-bars" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="2" height="12"/><rect x="7" y="4" width="2" height="12"/><rect x="11" y="4" width="2" height="12"/><rect x="15" y="4" width="2" height="12"/></svg><svg class="spcboy-reload-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 7a6 6 0 1 0 .4 5M16 3v5h-5"/></svg></button>
+      <button type="button" id="spcboy-next" disabled aria-label="Next track"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15 4v12M5 5l8 5-8 5z"/></svg></button>
+    </div>
+    <div class="spcboy-player-readout">
+      <div class="spcboy-player-main">
+        <div class="spcboy-current-copy"><a id="spcboy-current-album" hidden></a><span id="spcboy-current-separator" hidden> - </span><strong id="spcboy-current-title"></strong></div>
+      </div>
+      <div class="spcboy-player-status" id="spcboy-player-status" aria-live="off" aria-busy="false" hidden><span id="spcboy-player-status-text">Ready</span><button type="button" id="spcboy-reload" hidden>Reload player</button></div>
+      <output class="spcboy-playback-clock" id="spcboy-playback-clock" aria-label="Elapsed time / track length / playlist length" title="Elapsed / track / current track plus Up Next" hidden></output>
+    </div>
+    <p class="visually-hidden" id="spcboy-player-state" role="status" aria-live="polite">Ready when you are</p>
+    <p class="visually-hidden" id="site-favorites-status" role="status" aria-live="polite"></p>
+    <form id="site-player-csrf" hidden>{% csrf_token %}</form>
+    <audio id="spcboy-audio" preload="none"></audio>
+    <button class="site-player-drawer-scrim" id="site-player-drawer-scrim" type="button" aria-label="Close playback drawer" hidden></button>
+    <section class="site-player-settings-panel" id="spcboy-settings-panel" hidden role="dialog" aria-modal="true" aria-labelledby="spcboy-settings-heading" tabindex="-1">
+      <header class="spcboy-settings-header">
+        <div><span class="spcboy-settings-kicker">SPCBOY · PLAYER</span><strong id="spcboy-settings-heading">Menu</strong></div>
+        <button class="spcboy-settings-close" id="spcboy-settings-close" type="button" aria-label="Close menu"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
+      </header>
+      {% with profile=request.user.member_profile %}
+      <header class="drawer-identity">
+        <a class="drawer-identity-avatar" href="{% url 'member_profile' %}" aria-label="Your profile">{% include "accounts/partials/member_avatar_content.html" with avatar_profile=profile %}</a>
+        <div class="drawer-identity-content">
+          <div class="drawer-identity-heading">
+            <span class="drawer-identity-kicker">PROFILE</span>
+            <a class="drawer-identity-name" href="{% url 'member_profile' %}">{{ profile.display_name }}</a>
+          </div>
+          <div class="drawer-identity-stats" role="group" aria-label="Site activity">
+            <span class="drawer-identity-stat"><strong>{{ player_total_plays }}</strong><span>Total plays</span></span>
+            <span class="drawer-identity-stat drawer-identity-stat--online"><strong>{{ player_online_users }}</strong><span>Online now</span></span>
+          </div>
+        </div>
+      </header>
+      {% endwith %}
+      <nav class="spcboy-mobile-settings-nav" role="tablist" aria-label="Navigation and options">
+        <span class="spcboy-settings-tab-indicator" aria-hidden="true"></span>
+        <button type="button" id="spcboy-mobile-tab-navigation" role="tab" aria-selected="false" aria-controls="drawer-navigation" tabindex="-1" data-mobile-settings-page="navigation">Navigation</button>
+        <button type="button" id="spcboy-mobile-tab-audio" role="tab" aria-selected="false" aria-controls="spcboy-settings-page-audio" tabindex="-1" data-mobile-settings-page="audio" data-settings-page-target="audio">Sound</button>
+        <button type="button" id="spcboy-mobile-tab-interface" role="tab" aria-selected="false" aria-controls="spcboy-settings-page-interface" tabindex="-1" data-mobile-settings-page="interface" data-settings-page-target="interface">Interface</button>
+        <button type="button" id="spcboy-mobile-tab-playback" role="tab" aria-selected="true" aria-controls="spcboy-settings-page-playback" tabindex="0" data-mobile-settings-page="playback" data-settings-page-target="playback">Playback</button>
+      </nav>
+      {% include "accounts/partials/drawer_navigation.html" %}
+      <div class="spcboy-settings-layout" id="drawer-options" role="region" aria-label="Player options">
+        <div class="spcboy-settings-pages">
+          <section class="spcboy-settings-page" id="spcboy-settings-page-playback" role="tabpanel" tabindex="0" data-settings-page="playback" aria-labelledby="spcboy-mobile-tab-playback">
+            <div class="spcboy-settings-page-heading"><h2 id="spcboy-playback-heading">Playback</h2></div>
+            <section class="spcboy-settings-group" aria-labelledby="spcboy-long-play-heading">
+              <h3 id="spcboy-long-play-heading">Long Play</h3>
+              <div class="spcboy-settings-field-row spcboy-long-play-row">
+                <div class="spcboy-settings-copy"><strong>Extend track playback</strong><span>Override normal track ending.</span></div>
+                <button class="spcboy-long-play-toggle" id="spcboy-long-play" type="button" role="switch" aria-checked="false" aria-label="Long Play · No · 3:00" title="Long Play · 3:00">No</button>
+              </div>
+              <label class="spcboy-settings-field-row spcboy-settings-duration"><span class="spcboy-settings-copy"><strong>Duration</strong><span class="spcboy-settings-helper" id="spcboy-long-play-policy">M:SS · 0 = unlimited · 60-minute page limit.</span><span class="spcboy-setting-error" id="spcboy-long-play-error" aria-live="polite"></span></span><input class="spcboy-settings-input" id="spcboy-long-play-duration" type="text" inputmode="text" maxlength="12" value="3:00" aria-label="Long Play duration" aria-describedby="spcboy-long-play-policy spcboy-long-play-error" autocomplete="off" spellcheck="false"></label>
+            </section>
+            <section class="spcboy-settings-group" aria-labelledby="spcboy-fade-out-heading">
+              <h3 id="spcboy-fade-out-heading">Fade Out</h3>
+              <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Duration (seconds)</strong></span><input class="spcboy-settings-input" id="spcboy-spc-fade-seconds" type="number" inputmode="numeric" min="0" max="30" step="1" value="5" aria-label="Fade-out duration in seconds" aria-describedby="spcboy-spc-fade-error"></label>
+              <span class="spcboy-setting-error" id="spcboy-spc-fade-error" aria-live="polite"></span>
+              <div class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Faded Skip</strong><span>Fade on each track change.</span></span><button class="spcboy-long-play-toggle spcboy-boolean-toggle" id="spcboy-faded-skip" type="button" role="switch" aria-checked="false" aria-label="Faded Skip · No">No</button></div>
+            </section>
+            <section class="spcboy-settings-group" aria-labelledby="spcboy-play-speed-heading">
+              <h3 id="spcboy-play-speed-heading">Play Speed</h3>
+              <div class="spcboy-settings-field-row spcboy-speed-field" id="spcboy-speed-setting"><span class="spcboy-settings-copy"><strong>Native format speed</strong><span>Source decoder rate.</span></span><button class="spcboy-long-play-toggle spcboy-boolean-toggle" id="spcboy-speed-enabled" type="button" role="switch" aria-checked="false" aria-label="Native format speed · No">No</button></div>
+              <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Speed fraction</strong><span id="spcboy-speed-help">Fractions down to 1/64 (64th-note steps), from 1/2× to 2×.</span></span><div class="spcboy-speed-controls"><input class="spcboy-settings-input" id="spcboy-speed" type="text" inputmode="text" size="6" maxlength="15" value="1/1" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Native format speed fraction" aria-describedby="spcboy-speed-help spcboy-speed-error" pattern="[0-9]+/[0-9]+"><span class="visually-hidden" id="spcboy-speed-error" aria-live="polite"></span></div></label>
+            </section>
+          </section>
+          <section class="spcboy-settings-page" id="spcboy-settings-page-audio" role="tabpanel" tabindex="0" data-settings-page="audio" aria-labelledby="spcboy-mobile-tab-audio" hidden>
+            <div class="spcboy-settings-page-heading"><h2 id="spcboy-audio-heading">Sound</h2></div>
+            <section class="spcboy-settings-group spcboy-volume-group" aria-labelledby="spcboy-volume-heading">
+              <label class="spcboy-volume-control"><span class="spcboy-volume-label-stack"><span class="spcboy-volume-label" id="spcboy-volume-heading">Volume</span><output id="site-player-volume-value" for="site-player-volume">100</output></span><span class="spcboy-equalizer-slider"><input id="site-player-volume" type="range" min="0" max="20" step="1" value="20" aria-valuetext="100 percent" aria-label="Playback volume"><span class="spcboy-equalizer-slider-track" aria-hidden="true"><span class="spcboy-equalizer-slider-fill"></span></span><span class="spcboy-equalizer-slider-thumb" aria-hidden="true"></span></span></label>
+            </section>
+            <section class="spcboy-settings-group spcboy-equalizer-group" aria-labelledby="spcboy-equalizer-heading">
+              <div class="spcboy-settings-group-heading"><div><h3 id="spcboy-equalizer-heading">Equalizer</h3></div><button class="spcboy-long-play-toggle spcboy-boolean-toggle spcboy-equalizer-toggle" id="spcboy-equalizer-enabled" type="button" role="switch" aria-checked="false" aria-label="Equalizer">No</button></div>
+              <div class="spcboy-equalizer-presets" role="group" aria-label="Equalizer presets">
+                {% for preset in "123" %}<div class="spcboy-equalizer-preset"><button type="button" data-equalizer-preset-apply="{{ forloop.counter0 }}" disabled>Preset {{ forloop.counter }}</button><span data-equalizer-preset-state="{{ forloop.counter0 }}">Empty</span><button type="button" data-equalizer-preset-save="{{ forloop.counter0 }}">Save</button></div>{% endfor %}
+              </div>
+              <p class="spcboy-equalizer-preset-status" id="spcboy-equalizer-preset-status" role="status" aria-live="polite"></p>
+              <div class="spcboy-equalizer-bands" id="spcboy-equalizer-bands">
+                <label class="spcboy-equalizer-band"><span class="spcboy-equalizer-label-stack"><span>31 Hz</span><output data-equalizer-value="0">0.0</output></span><span class="spcboy-equalizer-slider"><input type="range" min="-12" max="12" step="0.5" value="0" data-equalizer-band="0" aria-label="31 Hz equalizer gain"><span class="spcboy-equalizer-slider-track" aria-hidden="true"><span class="spcboy-equalizer-slider-fill"></span></span><span class="spcboy-equalizer-slider-thumb" aria-hidden="true"></span></span></label>
+                <label class="spcboy-equalizer-band"><span class="spcboy-equalizer-label-stack"><span>62 Hz</span><output data-equalizer-value="1">0.0</output></span><span class="spcboy-equalizer-slider"><input type="range" min="-12" max="12" step="0.5" value="0" data-equalizer-band="1" aria-label="62 Hz equalizer gain"><span class="spcboy-equalizer-slider-track" aria-hidden="true"><span class="spcboy-equalizer-slider-fill"></span></span><span class="spcboy-equalizer-slider-thumb" aria-hidden="true"></span></span></label>
+                <label class="spcboy-equalizer-band"><span class="spcboy-equalizer-label-stack"><span>125 Hz</span><output data-equalizer-value="2">0.0</output></span><span class="spcboy-equalizer-slider"><input type="range" min="-12" max="12" step="0.5" value="0" data-equalizer-band="2" aria-label="125 Hz equalizer gain"><span class="spcboy-equalizer-slider-track" aria-hidden="true"><span class="spcboy-equalizer-slider-fill"></span></span><span class="spcboy-equalizer-slider-thumb" aria-hidden="true"></span></span></label>
+                <label class="spcboy-equalizer-band"><span class="spcboy-equalizer-label-stack"><span>250 Hz</span><output data-equalizer-value="3">0.0</output></span><span class="spcboy-equalizer-slider"><input type="range" min="-12" max="12" step="0.5" value="0" data-equalizer-band="3" aria-label="250 Hz equalizer gain"><span class="spcboy-equalizer-slider-track" aria-hidden="true"><span class="spcboy-equalizer-slider-fill"></span></span><span class="spcboy-equalizer-slider-thumb" aria-hidden="true"></span></span></label>
+                <label class="spcboy-equalizer-band"><span class="spcboy-equalizer-label-stack"><span>500 Hz</span><output data-equalizer-value="4">0.0</output></span><span class="spcboy-equalizer-slider"><input type="range" min="-12" max="12" step="0.5" value="0" data-equalizer-band="4" aria-label="500 Hz equalizer gain"><span class="spcboy-equalizer-slider-track" aria-hidden="true"><span class="spcboy-equalizer-slider-fill"></span></span><span class="spcboy-equalizer-slider-thumb" aria-hidden="true"></span></span></label>
+                <label class="spcboy-equalizer-band"><span class="spcboy-equalizer-label-stack"><span>1 kHz</span><output data-equalizer-value="5">0.0</output></span><span class="spcboy-equalizer-slider"><input type="range" min="-12" max="12" step="0.5" value="0" data-equalizer-band="5" aria-label="1 kHz equalizer gain"><span class="spcboy-equalizer-slider-track" aria-hidden="true"><span class="spcboy-equalizer-slider-fill"></span></span><span class="spcboy-equalizer-slider-thumb" aria-hidden="true"></span></span></label>
+                <label class="spcboy-equalizer-band"><span class="spcboy-equalizer-label-stack"><span>2 kHz</span><output data-equalizer-value="6">0.0</output></span><span class="spcboy-equalizer-slider"><input type="range" min="-12" max="12" step="0.5" value="0" data-equalizer-band="6" aria-label="2 kHz equalizer gain"><span class="spcboy-equalizer-slider-track" aria-hidden="true"><span class="spcboy-equalizer-slider-fill"></span></span><span class="spcboy-equalizer-slider-thumb" aria-hidden="true"></span></span></label>
+                <label class="spcboy-equalizer-band"><span class="spcboy-equalizer-label-stack"><span>4 kHz</span><output data-equalizer-value="7">0.0</output></span><span class="spcboy-equalizer-slider"><input type="range" min="-12" max="12" step="0.5" value="0" data-equalizer-band="7" aria-label="4 kHz equalizer gain"><span class="spcboy-equalizer-slider-track" aria-hidden="true"><span class="spcboy-equalizer-slider-fill"></span></span><span class="spcboy-equalizer-slider-thumb" aria-hidden="true"></span></span></label>
+                <label class="spcboy-equalizer-band"><span class="spcboy-equalizer-label-stack"><span>8 kHz</span><output data-equalizer-value="8">0.0</output></span><span class="spcboy-equalizer-slider"><input type="range" min="-12" max="12" step="0.5" value="0" data-equalizer-band="8" aria-label="8 kHz equalizer gain"><span class="spcboy-equalizer-slider-track" aria-hidden="true"><span class="spcboy-equalizer-slider-fill"></span></span><span class="spcboy-equalizer-slider-thumb" aria-hidden="true"></span></span></label>
+                <label class="spcboy-equalizer-band"><span class="spcboy-equalizer-label-stack"><span>16 kHz</span><output data-equalizer-value="9">0.0</output></span><span class="spcboy-equalizer-slider"><input type="range" min="-12" max="12" step="0.5" value="0" data-equalizer-band="9" aria-label="16 kHz equalizer gain"><span class="spcboy-equalizer-slider-track" aria-hidden="true"><span class="spcboy-equalizer-slider-fill"></span></span><span class="spcboy-equalizer-slider-thumb" aria-hidden="true"></span></span></label>
+              </div>
+              <div class="spcboy-equalizer-footer"><button type="button" id="spcboy-equalizer-reset">Reset to Flat</button><span id="spcboy-equalizer-error" role="status" aria-live="polite"></span></div>
+            </section>
+          </section>
+          <section class="spcboy-settings-page" id="spcboy-settings-page-interface" role="tabpanel" tabindex="0" data-settings-page="interface" aria-labelledby="spcboy-mobile-tab-interface" hidden>
+            <div class="spcboy-settings-page-heading"><h2 id="sb-interface-heading">Interface</h2></div>
+            <section class="spcboy-settings-group"><h3>Fonts</h3>
+              <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Playlist font size</strong></span><input class="spcboy-settings-input" type="number" min="10" max="20" step="1" value="13" data-sb-preference="playlistFontSize" aria-label="Playlist font size"></label>
+              <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Sidebar font size</strong></span><input class="spcboy-settings-input" type="number" min="10" max="20" step="1" value="13" data-sb-preference="sidebarFontSize" aria-label="Sidebar font size"></label>
+              <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Row gap</strong></span><input class="spcboy-settings-input" type="number" min="0" max="32" step="1" value="0" data-sb-preference="rowGap" aria-label="Row gap"></label>
+            </section>
+            <section class="spcboy-settings-group"><h3>Motion</h3>
+              <div class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Animate interface</strong></span><button class="spcboy-long-play-toggle spcboy-boolean-toggle" type="button" role="switch" aria-checked="true" aria-label="Animate interface" data-sb-preference="motionEnabled">Yes</button></div>
+              <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Duration (ms)</strong></span><input class="spcboy-settings-input" type="number" min="0" max="600" step="10" value="200" data-sb-preference="motionDuration" aria-label="Animation duration in milliseconds"></label>
+            </section>
+            <section class="spcboy-settings-group spcboy-column-options" aria-label="Desktop playlist columns">
+              <h3>Playlist</h3>
+              <div class="spcboy-column-options-list">
+                <label><input type="checkbox" data-spcboy-column="favorite" checked><span>Favorite</span></label>
+                <label><input type="checkbox" data-spcboy-column="index" checked><span>Track #</span></label>
+                <label><input type="checkbox" data-spcboy-column="game" checked><span>Game</span></label>
+                <label><input type="checkbox" data-spcboy-column="artist" checked><span>Artist</span></label>
+                <label><input type="checkbox" data-spcboy-column="system" checked><span>System</span></label>
+                <label><input type="checkbox" data-spcboy-column="year" checked><span>Year</span></label>
+                <label><input type="checkbox" data-spcboy-column="dumper" checked><span>Dumper</span></label>
+                <label><input type="checkbox" data-spcboy-column="timestamp" checked><span>Date/time</span></label>
+                <label><input type="checkbox" data-spcboy-column="length" checked><span>Length</span></label>
+              </div>
+            </section>
+          </section>
+        </div>
+      </div>
+    </section>
+    <section class="site-player-queue-panel" id="site-player-queue-panel" hidden role="dialog" aria-modal="true" aria-labelledby="site-player-queue-heading" tabindex="-1"><header><strong id="site-player-queue-heading">Queue</strong><div class="site-player-queue-header-actions"><button type="button" id="site-player-clear-queue">Clear up next</button><button class="spcboy-settings-close" type="button" id="site-player-queue-close" aria-label="Close queue"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button></div></header><div class="site-player-queue-current" id="site-player-queue-current" hidden><span>PLAYING</span><strong id="site-player-queue-current-title"></strong><small id="site-player-queue-current-game"></small></div><h2>Up Next</h2><div class="site-player-queue-columns" id="site-player-queue-columns" aria-hidden="true" hidden><span>#</span><span>Title</span><span>Game</span><span>Artist</span><span>System</span><span>Length</span></div><ol id="site-player-queue"></ol><p id="site-player-queue-empty">Nothing up next.</p></section>
+  </footer>
+  {% endif %}
+  <footer class="site-foot">Private access · HTTPS only</footer>
+  <script src="{% static 'accounts/admin.js' %}?v=20261031-shared-desktop-toolbar-1" data-site-global defer></script>
+</body>
+</html>

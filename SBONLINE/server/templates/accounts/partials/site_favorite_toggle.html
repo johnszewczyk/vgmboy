@@ -1,0 +1,3 @@
+<button class="site-favorite-toggle {{ favorite_button_class|default:'' }}{% if favorite_active %} is-active is-favorite{% endif %}" type="button" data-site-favorite-toggle data-favorite-kind="{{ favorite_kind }}" data-favorite-id="{{ favorite_id }}" data-favorite-title="{{ favorite_title }}" aria-pressed="{{ favorite_active|yesno:'true,false' }}"{% if favorite_active %} aria-label="Remove {{ favorite_title }} from favorites" title="Remove from favorites"{% else %} aria-label="Add {{ favorite_title }} to favorites" title="Add to favorites"{% endif %}>
+  <svg aria-hidden="true" viewBox="0 0 24 24"><use href="#site-icon-star"/></svg>
+</button>

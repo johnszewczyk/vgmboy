@@ -2,42 +2,44 @@
 
 ## Product
 
-SBONLINE is the hosted SPCBOY web player associated with the private
-`admin.pre-calc.com` site. It is a browser product and does not share SB2's
-macOS app bundle or local presentation state.
+SBONLINE is VGMMan's authenticated hosted SPCBOY web player at
+`admin.pre-calc.com`. It is separate from SB2's macOS bundle and local player
+state.
 
 ## Major Components
 
-- `prototypes/mobile/` contains the standalone mobile interface concept.
-- MathBook `private-admin/` contains the current production site integration,
-  including the browser player, account/social pages, AAC stream endpoint, and
-  deployment setup.
-- VGMBoy owns the authoritative playback decoder sources; ScanSong owns catalog
-  writing and publication.
+- `server/` owns the Django site, accounts, browser UI, player adapter, and AAC
+  endpoint.
+- `ops/server/` owns the deploy bundle and service setup for the rented host.
+- `prototypes/mobile/` holds sample-only design concepts.
+- VGMBoy owns shared playback admission, source preparation, and decoder source.
+- ScanSong owns catalog writes and publication; SBONLINE reads the published
+  catalog.
 
 ## Task Routing
 
-- SBONLINE identity and project intake: `AGENTS.md` and this file.
-- Standalone interface concept: `prototypes/mobile/index.html`.
-- Current production site behavior: [MathBook private-admin human note](../../../MathBook/ai/subsystem-human/private-admin.md).
-- Current production source ownership and deployment: [MathBook private-admin agent note](../../../MathBook/ai/subsystem-agent/private-admin.md).
-- Shared decoding and playback: [VGMBoy](../../VGMBoy/AGENTS.md) and its routed notes.
-- Catalog creation and publication: [ScanSong](../../ScanSong/AGENTS.md).
-- Cross-family ownership: [VGMMan family boundary](../../VGMBoy/ai/subsystem-agent/app-family-boundary.md).
+- Product and route: `AGENTS.md` and this file.
+- Hosted UI, app APIs, and account behavior: `server/` and
+  [site-player.md](subsystem-human/site-player.md).
+- Server/source boundaries, state, and deployment: [integration boundaries](subsystem-agent/integration-boundaries.md).
+- Hosted release: `ops/server/sbonline-deploy.sh`.
+- Shared archive preparation and decoding: [VGMBoy](../../VGMBoy/AGENTS.md).
+- Catalog publication: [ScanSong](../../ScanSong/AGENTS.md).
+- Family ownership: [family boundary](../../VGMBoy/ai/subsystem-agent/app-family-boundary.md).
 
 ## Local Rules
 
-- Keep the prototype clearly identified as sample-only; it is not the hosted
-  player or a playback test.
-- The browser receives a stream for a selected hosted track. Do not export a
-  collection of pre-encoded songs or expand source archives in advance.
-- Catalog reads are read-only in the player; catalog writes belong to ScanSong.
-- Do not create a second copy of the production Django implementation here.
-  Until its integration and deployment source move together, production changes
-  follow MathBook's private-admin route.
-- Do not add site accounts, passkeys, private catalogs, or user media to Git.
+- Keep the app source and deploy package in this repository. The rented
+  webspace is a hosting target only; do not source production files from
+  MathBook or maintain an app copy there.
+- Keep user accounts, passkeys, preferences, and media outside Git.
+- Keep source music compressed on the host. Materialize only the selected
+  member during a playback request and stream AAC directly.
+- Catalog reads are read-only in SBONLINE; catalog writes belong to ScanSong.
+- Do not recreate archive extraction or decoder policy inside the Django
+  adapter; those boundaries belong to VGMBoy.
+- `prototypes/mobile/` remains sample-only and is not playback evidence.
 
 ## Human Docs
 
-- `subsystem-human/site-player.md` describes the current hosted player workflow
-  and identifies the standalone concept's limits.
+- `subsystem-human/site-player.md` describes current hosted player behavior.

@@ -1,0 +1,24 @@
+{% extends "accounts/base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<section class="login-shell panel">
+  <p class="eyebrow">Private access</p>
+  <h1>Sign in</h1>
+  <p class="muted">Sign in with a passkey or a site-generated login password. No username is needed.</p>
+  <form class="stack-form" onsubmit="return false">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <button class="primary-button passkey-login-button" type="button" data-passkey-login data-passkey-options="{% url 'passkey_login_options' %}" data-passkey-verify="{% url 'passkey_login_verify' %}">Sign in with a passkey</button>
+    <p class="passkey-status" data-passkey-login-status role="status" aria-live="polite">Waiting for a passkey sign-in.</p>
+  </form>
+  <form class="stack-form access-key-login-form" method="post" action="{% url 'login' %}" autocomplete="on">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <label for="access-key">Generated login password</label>
+    <input id="access-key" name="access_key" type="password" minlength="43" maxlength="128" required autocomplete="current-password" autocapitalize="off" spellcheck="false" inputmode="text">
+    <button class="quiet-button" type="submit">Sign in with password</button>
+    {% if access_key_error %}<p class="field-error" role="alert">{{ access_key_error }}</p>{% endif %}
+  </form>
+  <noscript><p class="security-note">Passkey sign-in requires JavaScript. Use your generated login password if JavaScript or passkeys are unavailable.</p></noscript>
+</section>
+{% endblock %}

@@ -2,53 +2,52 @@
 
 ## Player
 
-SBONLINE's authenticated SPCBOY page follows SB2's dark desktop presentation:
-a compact title strip, left transport and search toolbars, console/game sidebar,
-dense aligned track columns, Gallery, and a narrow status footer. Options uses
-a full-width top drawer with a section sidebar and shaded headers. Playlist tabs
-remember each account's browsing contexts in the current browser; plus adds a
-fresh tab, and album/track context menus can open foreground or background tabs.
-Phones retain the top playback bar, saved-tab strip, larger track targets, and
-responsive drawers. Desktop and phone site navigation retain the shared player.
-Interface options adjust playlist/sidebar font sizes and SB2-style motion timing.
-Site Favorites uses dense desktop rows and phone cards.
-On desktop, Favorites and Recent share the SB2 collection layout: the sidebar
-shows only albums represented in the collection, grouped by console; selecting
-an album scopes the playlist to its matching titles. Favorites are ordered by
-when items were added and expose an Added column. Recent remains newest-played
-first and labels the date column Played. The collection shortcut clears the
-album scope; pagination remains bounded.
+SBONLINE is the authenticated hosted SPCBOY player. Desktop keeps the
+wide-library layout with console/game browsing, aligned playlist columns,
+gallery, site navigation, and the persistent player. Mobile uses a compact app
+bar with Playing, Library, Gallery, Sound, and Options pages. Playing shows the
+current track and its album track list; Library and Gallery keep their existing
+catalog and album browsing behavior.
 
-The toolbar uses the existing hosted player for previous/next, Play/Pause, Stop,
-EQ, Long Play, Speed, volume, queue, and Options. Speed enables or disables the
-configured client playback rate without changing its saved value. Stop resets
-the selected track to the beginning and retains its queue. The entire site uses
-the same charcoal/cyan theme;
-Profile, Listening, Favorites, Spotlight, and owner tools remain in the account
-menu.
+Sound groups volume, the ten-band equalizer and presets, long play, fade-out and
+faded skips, and native-format playback speed. Options contains site interface
+preferences such as playlist and sidebar font size, row gap, and motion. Sound
+and Options use the same account-backed controls as the rest of the app, so
+their saved values follow the signed-in user across clients. Range sliders have
+large phone touch targets. Numeric controls have clear labels and no trailing
+unit text.
+
+The persistent player keeps audio active while users change site pages. On
+mobile, the app pages provide the primary transport and the bottom status dock
+remains visible. The navigation drawer remains available for account, site,
+and administrative links.
+
+## Audio and account behavior
 
 Selected tracks stream as 128 kbps AAC. Source packages stay compressed on the
 server; only the requested member is materialized for playback. Browser EQ and
-fractional playback speed use the existing audio engine. A saved non-1× rate
-remains enabled when upgrading; new default 1× settings start disabled. Long
-Play supports seconds or M:SS/H:MM:SS durations; zero means unlimited,
-within the hosted 60-minute session limit. Existing saved durations migrate. Favorites, album favorites, Recent,
-Gallery, and the shared player retain their hosted API and account contracts.
-The retired Chat and generic Feed do not appear in the player.
+fractional playback speed use the hosted audio engine. A saved non-1× rate
+remains enabled when upgrading; new 1× settings start disabled. Long Play
+supports seconds or M:SS/H:MM:SS durations; zero means unlimited within the
+hosted session limit. Favorites, Recent, Gallery, and playback history use the
+authenticated account APIs.
 
-The web UI is a hosted adaptation, not the macOS host: native window controls,
-local filesystem browsing, catalog maintenance, and native decoder routing are
-not browser controls. Production behavior and deployment remain owned by the
-[MathBook private-admin notes](../../../../MathBook/ai/subsystem-human/private-admin.md).
+The web UI is a hosted browser application, not the SB2 macOS host: native
+window controls, local filesystem browsing, catalog maintenance, and native
+decoder routing are not browser controls.
 
-## Standalone Concept
+## Prototype
 
-[`prototypes/mobile/index.html`](../../prototypes/mobile/index.html) is an older
-sample-only visual concept. It is not the hosted player or a playback test.
+[`prototypes/mobile/index.html`](../../prototypes/mobile/index.html) remains a
+sample-data design fixture. It is not connected to the hosted catalog, account,
+or audio stream and is not playback evidence.
 
-## Files
+## Production source
 
-- [Hosted player template](../../../../MathBook/private-admin/templates/accounts/spcboy.html)
-- [SB2-style hosted skin](../../../../MathBook/private-admin/static/accounts/sbonline.css)
-- [Hosted player adapter](../../../../MathBook/private-admin/static/accounts/site-player.js)
-- [Hosted library UI](../../../../MathBook/private-admin/static/accounts/spcboy.js)
+- [Player template](../../server/templates/accounts/spcboy.html)
+- [Base account template and shared settings](../../server/templates/accounts/base.html)
+- [Hosted theme](../../server/static/accounts/sb-theme.css)
+- [Hosted mobile layout](../../server/static/accounts/sb-mobile.css)
+- [Player page adapter](../../server/static/accounts/spcboy.js)
+- [Audio engine](../../server/static/accounts/site-player.js)
+- [Account and site administration](site-admin.md)

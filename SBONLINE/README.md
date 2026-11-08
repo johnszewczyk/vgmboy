@@ -1,31 +1,22 @@
 # SBONLINE
 
-SBONLINE is the hosted SPCBOY web player for the private `admin.pre-calc.com`
-site. It is a separate product surface from the SB2 macOS application and uses
-the VGMMan catalog and playback family.
+SBONLINE is VGMMan's hosted SPCBOY web player for the private
+`admin.pre-calc.com` address. It is a separate browser product from SB2.
 
-## Current source layout
+## Source and release
 
-- [`prototypes/mobile/index.html`](prototypes/mobile/index.html) is the
-  standalone mobile UI concept. It uses sample entries and does not load the
-  hosted catalog or play audio.
-- The production Django pages, persistent browser player, social and account
-  features, stream endpoint, and deployment source currently live in
-  [MathBook's private-admin app](../../MathBook/private-admin/). Its current
-  behavior is documented in
-  [the private-admin human note](../../MathBook/ai/subsystem-human/private-admin.md).
-- The production stream adapter currently builds from a deployment copy of
-  VGMBoy sources. The authoritative decoder implementation remains in
-  [`../VGMBoy/`](../VGMBoy/); provenance is recorded in MathBook's
-  [`UPSTREAM.md`](../../MathBook/private-admin/streaming/UPSTREAM.md).
+- `server/` contains the complete Django app: player UI, accounts, profiles,
+  catalog adapters, and AAC streaming endpoint.
+- `ops/server/` contains the webspace release, service setup, and recovery
+  tooling. Deploy from the VGMMan repository with
+  `bash SBONLINE/ops/server/sbonline-deploy.sh`.
+- `prototypes/mobile/` is a sample-only design fixture. It is not connected to
+  the hosted catalog, account, or playback services.
 
-## Ownership boundaries
+The rented webspace and its credentials are deployment targets. The SBO Nginx
+virtual host, Django source, build, and release steps are owned here. MathBook
+contains only its math site and its own virtual host. Persistent account state,
+media, and credentials remain on the host and are never copied into Git.
 
-SBONLINE owns the hosted web-player product route and its standalone interface
-work. MathBook currently owns the live Django host integration and deployment.
-Catalog publication remains with ScanSong, and playback decoding remains with
-VGMBoy. Read `AGENTS.md` and `ai/project-info.md` before making changes.
-
-There is no independent SBONLINE build or deployment command yet. Use the
-MathBook deployment route for production changes while the live implementation
-remains in that repository.
+Catalog publication remains with ScanSong. Playback admission, source
+preparation, and decoder sources remain with VGMBoy.

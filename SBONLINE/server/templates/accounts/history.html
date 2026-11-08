@@ -1,0 +1,44 @@
+{% extends "accounts/base.html" %}
+{% load static %}
+{% block title %}Listening{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/community.css' %}?v=20261104-favorites-reveal-1">{% endblock %}
+{% block content %}
+<section class="community-page listening-page" data-now-playing-url="{% url 'listening_now_playing' %}" data-player-url="{% url 'spcboy' %}">
+  <header class="community-heading"><h1>Listening</h1><span id="now-playing-live-count" aria-live="polite">{{ now_playing|length }} playing</span></header>
+  <nav class="profile-tabs listening-page-nav" role="tablist" aria-label="Listening sections">
+    <button type="button" role="tab" id="listening-tab-now-playing" aria-controls="now-playing" aria-selected="true" data-listening-tab="now-playing">Now playing <span>{{ now_playing|length }}</span></button>
+    <button type="button" role="tab" id="listening-tab-played" aria-controls="played" aria-selected="false" data-listening-tab="played">Played <span>{{ all_play_count }}</span></button>
+  </nav>
+  <section class="community-section listening-now-playing" id="now-playing" role="tabpanel" tabindex="0" aria-labelledby="listening-tab-now-playing">
+    <ol class="track-card-list" id="listening-now-playing-list" aria-live="polite">
+      {% for item in now_playing %}<li data-user-id="{{ item.user_id }}">{% include "accounts/partials/track_card.html" with track_id=item.track_id track_title=item.title track_game=item.game track_console=item.console track_artist=item.artist track_duration=item.duration_seconds artwork_url=item.artwork_url card_profile=item.profile card_album_url=item.album_playlist_url card_profile_url=item.profile_url card_time=item.started_at card_time_label="Since " %}</li>
+      {% empty %}<li class="listening-empty" data-now-playing-empty><p class="empty-state">Nothing is playing right now.</p></li>{% endfor %}
+    </ol>
+  </section>
+
+  <section class="community-section listening-played" id="played" role="tabpanel" tabindex="0" aria-labelledby="listening-tab-played">
+
+    <nav class="played-day-summary" aria-label="Daily play totals">
+      <a{% if day_filter == "today" %} aria-current="page"{% endif %} href="?day=today#played"><span>Today</span> <strong>{{ today_play_count }}</strong></a>
+      <a{% if day_filter == "yesterday" %} aria-current="page"{% endif %} href="?day=yesterday#played"><span>Yesterday</span> <strong>{{ yesterday_play_count }}</strong></a>
+      <a{% if not day_filter %} aria-current="page"{% endif %} href="{% url 'playback_history' %}#played"><span>All</span> <strong>{{ all_play_count }}</strong></a>
+    </nav>
+    {% if play_days %}
+    <div class="played-day-list">
+      {% for day in play_days %}
+      <section class="played-day" id="played-day-{{ day.slug }}" aria-labelledby="played-day-title-{{ forloop.counter }}">
+        <header><h3 id="played-day-title-{{ forloop.counter }}">{{ day.label }}</h3><span class="played-day-badge">{{ day.count }} plays</span></header>
+        <ol class="track-card-list played-rows">
+          {% for item in day.items %}{% with play=item.play %}<li>{% include "accounts/partials/track_card.html" with track_id=play.track_id track_title=play.title track_game=play.game track_console=play.console track_artist=play.artist track_duration=play.duration_seconds artwork_url=play.artwork_url card_profile=play.user.member_profile card_album_url=play.album_playlist_url card_profile_url=play.profile_url card_time=play.played_at %}</li>{% endwith %}{% endfor %}
+        </ol>
+      </section>
+      {% endfor %}
+    </div>
+    {% if plays.paginator.num_pages > 1 %}<nav class="site-log-pagination" aria-label="Playback history pages">
+      {% if plays.has_previous %}<a class="quiet-link" href="?{% if day_filter %}day={{ day_filter }}&amp;{% endif %}page={{ plays.previous_page_number }}#played">Newer</a>{% endif %}<span>Page {{ plays.number }} of {{ plays.paginator.num_pages }}</span>{% if plays.has_next %}<a class="quiet-link" href="?{% if day_filter %}day={{ day_filter }}&amp;{% endif %}page={{ plays.next_page_number }}#played">Older</a>{% endif %}
+    </nav>{% endif %}
+    {% else %}<p class="empty-state">No SPCBOY plays have been recorded yet.</p>{% endif %}
+  </section>
+</section>
+<script src="{% static 'accounts/listening.js' %}?v=20261026-shell-1" defer></script>
+{% endblock %}

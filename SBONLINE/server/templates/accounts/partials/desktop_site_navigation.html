@@ -1,0 +1,9 @@
+<nav class="topnav" aria-label="Site navigation">
+  <div class="topnav-links">
+    <a data-nav-key="spcboy" href="{% url 'spcboy' %}"{% if request.resolver_match.url_name == 'spcboy' %} aria-current="page"{% endif %}>SPCBOY</a>
+    <a data-nav-key="history" href="{% url 'playback_history' %}"{% if request.resolver_match.url_name == 'playback_history' %} aria-current="page"{% endif %}>Listening</a>
+    <button type="button" data-spcboy-view-shortcut="favorites">Favorites</button>
+    <button type="button" data-spcboy-view-shortcut="recent">Recent</button>
+    <a data-nav-key="profile" href="{% url 'member_profile' %}"{% if request.resolver_match.url_name == 'member_profile' or request.resolver_match.url_name == 'member_public_profile' %} aria-current="page"{% endif %}>Profile</a>
+  </div>
+</nav>

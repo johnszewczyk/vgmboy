@@ -34,10 +34,10 @@ presentation client over the shared catalog, frontend, and playback packages;
 do not merge one skin into another.
 
 SBONLINE is the hosted SPCBOY web-player project; use `SBONLINE/AGENTS.md` for
-its route. Its production Django integration, account features, streaming
-adapter, and deployment currently remain in MathBook's `private-admin/` app.
-Keep SBONLINE separate from the SB2 macOS app, and do not claim production code
-has moved until its source and deployment packaging move together.
+its route. VGMMan owns its production Django app, browser player, streaming
+adapter, and release packaging under `SBONLINE/`. The rented webspace and its
+credentials are deployment targets only; MathBook owns no SBONLINE source.
+Keep SBONLINE separate from the SB2 macOS app.
 
 APPBOY is the iOS mobile player package under `APPBOY/`, maintaining its own
 Swift package, preference namespace, and sideload release boundary. It adapts

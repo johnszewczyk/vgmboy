@@ -1,0 +1,24 @@
+<article class="track-card track-card--{{ card_variant|default:'compact' }}">
+  <div class="track-card-main">
+    <div class="track-card-art">
+      {% if artwork_url %}<img src="{{ artwork_url }}" alt="" width="240" height="240" loading="lazy" decoding="async">{% else %}<span aria-hidden="true">♫</span>{% endif %}
+    </div>
+    <div class="track-card-copy">
+      <h2 class="track-card-title">{{ track_title }}</h2>
+      {% if track_artist %}<p class="track-card-artist">{{ track_artist }}</p>{% endif %}
+      <p class="track-card-album">{{ track_game }} <span aria-hidden="true">·</span> {{ track_console }}</p>
+    </div>
+  </div>
+  <footer class="track-card-status">
+    <div class="track-card-byline">
+      {% if card_profile %}<a class="track-card-member" href="{{ card_profile_url }}" aria-label="{{ card_profile.display_name }}’s profile">
+        {% include "accounts/partials/member_avatar.html" with avatar_profile=card_profile avatar_variant="member-avatar--micro" %}
+        <span>{{ card_profile.display_name }}</span>
+      </a>{% endif %}
+      {% if card_time %}{% include "accounts/partials/record_time.html" with record_time=card_time record_label=card_time_label time_class="track-card-time" %}{% endif %}
+    </div>
+    <div class="track-card-functions">
+      <a class="track-card-action track-card-play play-track-now" data-site-play-track{% if card_album_url %} data-site-play-album-url="{{ card_album_url }}"{% endif %} href="{% url 'spcboy' %}?play={{ track_id|urlencode }}" data-track-id="{{ track_id }}" data-track-title="{{ track_title }}" data-track-game="{{ track_game }}" data-track-console="{{ track_console }}" data-track-duration="{{ track_duration|default:0 }}" aria-label="Play {{ track_title }} now" title="Play now"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11L13 8z"/></svg></a>
+    </div>
+  </footer>
+</article>

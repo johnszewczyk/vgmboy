@@ -1,0 +1,1 @@
+<time class="site-record-time {{ time_class|default:'' }}" datetime="{{ record_time|date:'c' }}"{% if live_update %} data-presence-time{% endif %}>{{ record_label }}{{ record_time|date:"N d, h:i A" }}</time>
