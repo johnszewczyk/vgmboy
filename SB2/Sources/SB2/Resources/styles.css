@@ -1882,7 +1882,7 @@ body.sb2-frontend .sb-console { max-width: 28%; overflow: hidden; text-overflow:
 body.sb2-frontend .sb-album { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 body.sb2-frontend .sb-cpu { display: flex; align-items: center; gap: var(--sb-space-050); margin-left: auto; color: #858aa7; font-size: var(--sb-space-066); }
 body.sb2-frontend .sb-cpu-meter { width: 3.5rem; height: .3rem; background: #252a34; }
-body.sb2-frontend .sb-cpu-meter b { display: block; width: 0; height: 100%; background: #72d8a9; transition: width 160ms cubic-bezier(.2, 0, 0, 1); }
+body.sb2-frontend .sb-cpu-meter b { display: block; width: 0; height: 100%; background: #72d8a9; }
 body.sb2-frontend .sb-cpu strong { min-width: 3rem; color: #c0c5d8; font-size: inherit; font-weight: 400; text-align: right; }
 
 body.sb2-frontend .workspace {
@@ -2952,7 +2952,7 @@ body.sb2-frontend .options-path-control .tool-button {
 body.sb2-frontend .options-export-actions { align-items: center; }
 body.sb2-frontend .options-export-actions #aac-export-status { flex: 1 1 auto; min-width: 0; }
 body.sb2-frontend .options-export-actions #aac-export-cancel-button { flex: 0 0 8ch; width: 8ch; }
-body.sb2-frontend .options-unit-field { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; color: var(--muted); }
+body.sb2-frontend .options-unit-field { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: var(--sb-space-050); color: var(--muted); }
 body.sb2-frontend .options-status-value { min-width: 0; overflow-wrap: anywhere; color: var(--muted); }
 body.sb2-frontend .options-equalizer-panel { grid-column: 1 / -1; }
 body.sb2-frontend .equalizer-profile-row {

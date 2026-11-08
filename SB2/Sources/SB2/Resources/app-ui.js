@@ -5589,8 +5589,8 @@ async function sampleSB2CPU() {
       const wallMilliseconds = performance.now();
       if (Number.isFinite(cpuMilliseconds) && previousCPU !== null && previousWall !== null) {
         // The native bridge reports the SB2 host process in milliseconds.
-        // Keep the one-logical-core percentage precise enough to reveal the
-        // small steady audio workload common during ordinary playback.
+        // Sample once per second to expose the small steady audio workload
+        // without making the CPU meter itself a frequent source of work.
         const percent = Math.max(0, Math.min(100,
           ((cpuMilliseconds - previousCPU) / Math.max(1, wallMilliseconds - previousWall)) * 100
         ));
@@ -5607,7 +5607,7 @@ async function sampleSB2CPU() {
     }
   };
   await sample();
-  window.setInterval(sample, 250);
+  window.setInterval(sample, 1000);
 }
 
 async function toggleAllSidebarNodes() {
