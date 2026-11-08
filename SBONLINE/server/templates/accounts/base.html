@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="{% static 'accounts/sb-theme.css' %}?v=20261108-mobile-shell-3">
   <script src="{% static 'accounts/sb-interface.js' %}?v=20261108-vgmmobile-2" data-site-global defer></script>
 <link rel="stylesheet" href="{% static 'accounts/sb-presentation.css' %}?v=20261026-collections-1">
-  <link rel="stylesheet" href="{% static 'accounts/sb-mobile.css' %}?v=20261108-mobile-rebuild-3" media="(max-width: 780px)">
+  <link rel="stylesheet" href="{% static 'accounts/sb-mobile.css' %}?v=20261108-mobile-rebuild-4" media="(max-width: 780px)">
 </head>
 <body class="sbonline-site {% block body_class %}{% endblock %}{% if request.user.is_authenticated %} has-site-player{% endif %}">
   {% if request.user.is_authenticated %}
@@ -175,7 +175,7 @@
             <section class="spcboy-settings-group"><h3>Fonts</h3>
               <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Playlist font size</strong></span><input class="spcboy-settings-input" type="number" min="10" max="20" step="1" value="13" data-sb-preference="playlistFontSize" aria-label="Playlist font size"></label>
               <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Sidebar font size</strong></span><input class="spcboy-settings-input" type="number" min="10" max="20" step="1" value="13" data-sb-preference="sidebarFontSize" aria-label="Sidebar font size"></label>
-              <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Row gap</strong></span><input class="spcboy-settings-input" type="number" min="0" max="32" step="1" value="0" data-sb-preference="rowGap" aria-label="Row gap"></label>
+              <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Playlist row gap</strong></span><input class="spcboy-settings-input" type="number" min="0" max="32" step="1" value="0" data-sb-preference="rowGap" aria-label="Playlist row gap"></label>
             </section>
             <section class="spcboy-settings-group"><h3>Motion</h3>
               <div class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Animate interface</strong></span><button class="spcboy-long-play-toggle spcboy-boolean-toggle" type="button" role="switch" aria-checked="true" aria-label="Animate interface" data-sb-preference="motionEnabled">Yes</button></div>
