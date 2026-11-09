@@ -24,17 +24,17 @@
   <script src="{% static 'accounts/sb-presentation.js' %}?v=20261026-collections-1" data-site-global defer></script>
   <script src="{% static 'accounts/aac-stream.js' %}?v=20261107-aac-adts-1" data-site-global defer></script>
   <script src="{% static 'accounts/site-preferences.js' %}?v=20261031-profile-cloud-1" data-preferences-url="{% url 'spcboy_preferences' %}" data-site-global defer></script>
-  <script src="{% static 'accounts/site-player.js' %}?v=20261108-mobile-shell-3" data-site-global defer></script>
+  <script src="{% static 'accounts/site-player.js' %}?v=20261109-mobile-eq-profiles-1" data-site-global defer></script>
   <script src="{% static 'accounts/site-favorites.js' %}?v=20261101-favorite-swipe-cue-1" data-site-global defer></script>
   <script src="{% static 'accounts/site-navigation.js' %}?v=20261104-sbo-cleanup-1" data-site-global defer></script>
   {% endif %}
   {% block extra_head %}{% endblock %}
   {% if request.user.is_authenticated %}<link rel="stylesheet" href="{% static 'accounts/player.css' %}?v=20261103-gallery-ux-1">{% endif %}
   <link rel="stylesheet" href="{% static 'accounts/sbonline.css' %}?v=20261103-gallery-ux-1">
-  <link rel="stylesheet" href="{% static 'accounts/sb-theme.css' %}?v=20261108-mobile-shell-3">
+  <link rel="stylesheet" href="{% static 'accounts/sb-theme.css' %}?v=20261109-mobile-eq-profiles-1">
   <script src="{% static 'accounts/sb-interface.js' %}?v=20261108-vgmmobile-2" data-site-global defer></script>
 <link rel="stylesheet" href="{% static 'accounts/sb-presentation.css' %}?v=20261026-collections-1">
-  <link rel="stylesheet" href="{% static 'accounts/sb-mobile.css' %}?v=20261108-mobile-boundary-1" media="(max-width: 780px)">
+  <link rel="stylesheet" href="{% static 'accounts/sb-mobile.css' %}?v=20261109-mobile-eq-profiles-1" media="(max-width: 780px)">
   {% block mobile_head %}{% endblock %}
 </head>
 <body class="sbonline-site {% block body_class %}{% endblock %}{% if request.user.is_authenticated %} has-site-player{% endif %}">
@@ -152,8 +152,14 @@
             </section>
             <section class="spcboy-settings-group spcboy-equalizer-group" aria-labelledby="spcboy-equalizer-heading">
               <div class="spcboy-settings-group-heading"><div><h3 id="spcboy-equalizer-heading">Equalizer</h3></div><button class="spcboy-long-play-toggle spcboy-boolean-toggle spcboy-equalizer-toggle" id="spcboy-equalizer-enabled" type="button" role="switch" aria-checked="false" aria-label="Equalizer"><span class="spcboy-equalizer-toggle-desktop">No</span><span class="spcboy-equalizer-toggle-mobile">Equalizer OFF</span></button></div>
-              <div class="spcboy-equalizer-presets" role="group" aria-label="Equalizer presets">
+              <div class="spcboy-equalizer-presets spcboy-equalizer-presets-desktop" role="group" aria-label="Equalizer presets">
                 {% for preset in "123" %}<div class="spcboy-equalizer-preset"><button type="button" data-equalizer-preset-apply="{{ forloop.counter0 }}" disabled>Preset {{ forloop.counter }}</button><span data-equalizer-preset-state="{{ forloop.counter0 }}">Empty</span><button type="button" data-equalizer-preset-save="{{ forloop.counter0 }}">Save</button></div>{% endfor %}
+              </div>
+              <div class="spcboy-equalizer-presets-mobile">
+                <div class="spcboy-equalizer-profile-list" role="group" aria-label="Equalizer profile slots">
+                  {% for preset in "123" %}<button class="spcboy-equalizer-profile{% if forloop.first %} is-selected{% endif %}" type="button" data-equalizer-mobile-profile="{{ forloop.counter0 }}" aria-pressed="{% if forloop.first %}true{% else %}false{% endif %}"><strong>Preset {{ forloop.counter }}</strong><span data-equalizer-mobile-state="{{ forloop.counter0 }}">Empty</span></button>{% endfor %}
+                </div>
+                <button class="spcboy-equalizer-save-current" type="button" data-equalizer-mobile-save>Save current to Preset 1</button>
               </div>
               <p class="spcboy-equalizer-preset-status" id="spcboy-equalizer-preset-status" role="status" aria-live="polite"></p>
               <div class="spcboy-equalizer-bands" id="spcboy-equalizer-bands">
