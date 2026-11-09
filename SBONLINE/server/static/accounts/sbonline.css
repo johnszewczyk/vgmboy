@@ -104,6 +104,11 @@ body.spcboy-body .spcboy-media-card-title { color: var(--ink); }
   body.spcboy-body #site-player-transport-slot { display: none; }
 }
 @media (max-width: 780px) {
+  body.spcboy-body {
+    --sb-playlist-font-size: var(--sb-mobile-playlist-font-size,13px);
+    --sb-sidebar-font-size: var(--sb-mobile-sidebar-font-size,13px);
+    --sb-row-gap: var(--sb-mobile-row-gap,0px);
+  }
   body.spcboy-body { --site-navigation-height: 48px; --site-player-height: calc(46px + env(safe-area-inset-bottom)); }
   body.spcboy-body .topbar { padding-inline: 5px; gap: 4px; }
   body.spcboy-body .sbonline-context { display: none; }

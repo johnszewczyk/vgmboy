@@ -49,7 +49,6 @@
   const galleryEmpty = document.querySelector("#spcboy-gallery-empty");
   const galleryMore = document.querySelector("#spcboy-gallery-more");
   const shuffleFavoritesButton = document.querySelector("#spcboy-shuffle-favorites");
-  const searchMore = document.querySelector("#spcboy-search-more");
   const favoriteMore = document.querySelector("#spcboy-favorite-more");
   if (!page || !library) return;
 
@@ -135,19 +134,11 @@
   const tracksById = new Map();
   const trackIndexById = new Map();
   const trackRowsById = new Map();
-  const searchOnlyRows = new Map();
+  const searchOpenedSystems = new Set();
   const gameGroups = [];
   const gameGroupsByKey = new Map();
   const gameGroupsByConsoleGame = new Map();
   const galleryCards = [];
-  let searchMatches = null;
-  let searchNextPage = null;
-  let searchLoading = false;
-  let searchFailed = false;
-  let searchInitialPending = false;
-  let searchRequestToken = 0;
-  let searchTimer = null;
-  let searchController = null;
   let recentEntries = [];
   let collectionSidebarView = null;
   const recentHiddenEventIds = new Set();
@@ -747,30 +738,12 @@
     return terms.length > 0 && terms.every((term) => haystack.includes(term));
   }
 
-  function clearSearchOnlyRows() {
-    const idsByEntry = new Map();
-    for (const [row, entry] of searchOnlyRows) {
-      const ids = idsByEntry.get(entry) ?? new Set();
-      ids.add(row.dataset.id);
-      idsByEntry.set(entry, ids);
-      const rows = trackRowsById.get(row.dataset.id) ?? [];
-      const remaining = rows.filter((candidate) => candidate !== row);
-      if (remaining.length) trackRowsById.set(row.dataset.id, remaining);
-      else trackRowsById.delete(row.dataset.id);
-      row.remove();
-    }
-    searchOnlyRows.clear();
-    for (const [entry, ids] of idsByEntry) entry.tracks = entry.tracks.filter((track) => !ids.has(track.id));
+  function matchesTrackQuery(track, query) {
+    if (!query) return true;
+    return matchesSearchText(track?.game ?? "", query);
   }
 
   function placeSearchMore() {
-    const mobileAggregate = !isDesktop() && (view === "favorites" || Boolean(search.value.trim()));
-    const destination = view === "favorites" || view === "recent"
-      ? cardPanel
-      : view === "gallery"
-      ? galleryPanel
-      : isDesktop() || mobileAggregate ? playlistContent : trackList;
-    if (searchMore && destination && searchMore.parentElement !== destination) destination.append(searchMore);
     const favoriteDestination = view === "favorites" && isDesktop() ? playlistContent : cardPanel;
     const recentDestination = view === "recent" && isDesktop() ? playlistContent : cardPanel;
     if (recentMore.parentElement !== recentDestination) recentDestination.append(recentMore);
@@ -1045,7 +1018,6 @@
 
   function clearEntryRows(entry) {
     for (const row of entry.list.querySelectorAll(".spcboy-track-row")) {
-      searchOnlyRows.delete(row);
       const rows = trackRowsById.get(row.dataset.id) ?? [];
       const remaining = rows.filter((candidate) => candidate !== row);
       if (remaining.length) trackRowsById.set(row.dataset.id, remaining);
@@ -1055,16 +1027,12 @@
     entry.tracks = [];
   }
 
-  function appendTrackRow(entry, data, { searchOnly = false } = {}) {
+  function appendTrackRow(entry, data) {
     const existingRow = entry.list.querySelector(`.spcboy-track-row[data-id="${CSS.escape(data.id)}"]`);
     if (existingRow) return tracksById.get(data.id);
     const track = cacheTrack(entry, data);
     const row = makeTrackRow(track, entry.tracks.length);
     row.querySelector(".spcboy-track")?.setAttribute("aria-current", String(currentTrack?.id === track.id));
-    if (searchOnly) {
-      row.dataset.searchOnly = "true";
-      searchOnlyRows.set(row, entry);
-    }
     entry.tracks.push(track);
     entry.list.append(row);
     if (playlistContent.contains(row)) applyPlaylistColumnVisibilityToRow(row);
@@ -1270,13 +1238,6 @@
       if (selected) summary?.setAttribute("aria-current", "true");
       else summary?.removeAttribute("aria-current");
     }
-    if (searchInitialPending) {
-      galleryGrid.hidden = true;
-      galleryEmpty.hidden = false;
-      galleryMore.hidden = true;
-      galleryEmpty.textContent = "Searching hosted tracks…";
-      return 0;
-    }
     const matchingAlbums = galleryCards.filter((entry) => entry.consoleName === galleryConsoleName && !entry.row.hidden);
     const shownAlbums = new Set(matchingAlbums.slice(0, galleryVisibleCount));
     for (const entry of galleryCards) {
@@ -1406,7 +1367,7 @@
 
   function syncTrackContainers() {
     const desktop = isDesktop();
-    const mobileAggregate = !desktop && (view === "favorites" || Boolean(search.value.trim()));
+    const mobileAggregate = !desktop && view === "favorites";
     for (const entry of gameGroups) {
       const destination = desktop || mobileAggregate ? entry.playlistGroup : entry.slot;
       if (entry.list.parentElement !== destination) destination.append(entry.list);
@@ -1528,11 +1489,11 @@
 
   async function renderCatalog(catalog) {
     trackList.replaceChildren();
+    searchOpenedSystems.clear();
     tracks = [];
     tracksById.clear();
     trackIndexById.clear();
     trackRowsById.clear();
-    searchOnlyRows.clear();
     gameGroups.length = 0;
     gameGroupsByKey.clear();
     gameGroupsByConsoleGame.clear();
@@ -1563,6 +1524,7 @@
       system.append(content);
       trackList.append(system);
       system.querySelector("summary").addEventListener("click", (event) => {
+        if (event.isTrusted) searchOpenedSystems.delete(system);
         if (view === "gallery" && isDesktop()) {
           event.preventDefault();
           selectGalleryConsole(consoleName);
@@ -1760,6 +1722,8 @@
 
   function syncResponsiveLists() {
     const desktop = isDesktop();
+    search.setAttribute("aria-label", "Search game titles");
+    search.placeholder = "Search games";
     syncSidebarAlbumFavorites();
     if (!desktop) {
       trackList.querySelectorAll(".spcboy-system, .spcboy-game").forEach((details) => { details.open = false; });
@@ -1794,8 +1758,7 @@
     const source = view === "recent" ? recentPlaylistTracks() : favoritePlaylistTracks.filter(track =>
       favorites.has(track.id) || favoriteAlbums.has(track.albumId));
     const query = search.value.trim();
-    return source.filter(track => !query || matchesSearchText(
-      `${track.title} ${track.artist || ""} ${track.game} ${canonicalConsoleName(track.console)}`, query));
+    return source.filter(track => matchesTrackQuery(track, query));
   }
 
   function renderCollectionPlaylist(tracks) {
@@ -1867,14 +1830,13 @@
     recentMore.hidden = !recent || (recentNextPage === null || (!recentLoaded && !recentFailed));
     recentMore.disabled = recentLoading;
     recentMore.textContent = recentLoading ? "Loading…" : recentFailed ? "Retry" : "Load older";
-    if (searchMore) searchMore.hidden = true;
     playlistContent.replaceChildren();
     renderCollectionPlaylist(tracks);
     libraryState.textContent = `${tracks.length.toLocaleString()} ${recent ? "recent plays" : "favorites"} · ${keys.size.toLocaleString()} albums`;
   }
 
   function renderDesktopPlaylist() {
-    const mobileAggregate = !isDesktop() && (view === "favorites" || Boolean(search.value.trim()));
+    const mobileAggregate = !isDesktop() && view === "favorites";
     if ((!isDesktop() && !mobileAggregate) || view === "gallery") return;
     playlistContent.replaceChildren();
     const query = search.value.trim().toLocaleLowerCase();
@@ -1882,13 +1844,16 @@
       renderCollectionPlaylist(collectionTracks());
       return;
     }
-    const aggregate = view === "favorites" || Boolean(query);
+    const aggregate = view === "favorites";
     const candidates = aggregate
       ? gameGroups.filter((entry) => [...entry.list.querySelectorAll(".spcboy-track-row")].some((row) => !row.hidden))
       : [gameGroupsByKey.get(selectedGameKey)].filter((entry) => entry && !entry.row.hidden);
 
     if (!candidates.length) {
       playlistEmpty.hidden = false;
+      playlistEmpty.textContent = query && view !== "favorites"
+        ? "Select a matching game to view its tracks."
+        : "No matching tracks.";
       playlistContent.append(playlistEmpty);
       schedulePlaylistColumnLayout();
       scheduleSelectionIndicators();
@@ -1914,8 +1879,7 @@
     let visibleCount = 0;
     for (const track of favoritePlaylistTracks) {
       if (!favorites.has(track.id) && !favoriteAlbums.has(track.albumId)) continue;
-      const searchable = `${track.title} ${track.artist ?? ""} ${track.game} ${canonicalConsoleName(track.console)}`;
-      if (query && !matchesSearchText(searchable, query)) continue;
+      if (query && !matchesTrackQuery(track, query)) continue;
       cardList.append(makeTrackCard(track, visibleCount));
       visibleCount += 1;
     }
@@ -1935,7 +1899,6 @@
     favoriteMore.disabled = favoritePlaylistLoading;
     favoriteMore.textContent = favoritePlaylistLoading ? "Loading favorites…" : "Load more favorites";
     recentMore.hidden = true;
-    if (searchMore) searchMore.hidden = true;
     libraryState.textContent = `${favoritePlaylistTracks.length.toLocaleString()} favorites loaded`;
   }
 
@@ -1947,8 +1910,7 @@
       if (recentHiddenEventIds.has(String(entry.eventId))) continue;
       const searchTrack = tracksById.get(entry.trackId);
       const consoleName = canonicalConsoleName(entry.console);
-      const searchText = `${entry.title} ${searchTrack?.artist ?? ""} ${entry.game} ${consoleName}`;
-      if (query && !matchesSearchText(searchText, query)) continue;
+      if (query && !matchesTrackQuery({ game: entry.game }, query)) continue;
 
       const group = gameGroupsByConsoleGame.get(`${consoleName}\u0000${entry.game}`);
       const track = searchTrack || {
@@ -2002,7 +1964,6 @@
     recentMore.hidden = recentNextPage === null || (!recentLoaded && !recentFailed);
     recentMore.disabled = recentLoading;
     recentMore.textContent = recentLoading ? "Loading…" : recentFailed ? "Retry" : "Load older";
-    if (searchMore) searchMore.hidden = true;
     libraryState.textContent = `${recentEntries.length.toLocaleString()} recent plays loaded`;
   }
 
@@ -2062,15 +2023,10 @@
     syncTrackContainers();
     const showingRecent = view === "recent";
     const showingGallery = view === "gallery";
-    const desktopFavorites = isDesktop() && view === "favorites";
     const showingCards = !isDesktop() && (showingRecent || view === "favorites");
     const query = search.value.trim();
-    const matchingFavoriteGameKeys = new Set(favoritePlaylistTracks
-      .filter((track) => (favorites.has(track.id) || favoriteAlbums.has(track.albumId))
-        && (!query || matchesSearchText(`${track.title} ${track.artist ?? ""} ${track.game} ${canonicalConsoleName(track.console)}`, query)))
-      .map((track) => track.gameKey));
-    const mobileAggregate = !isDesktop() && (view === "favorites" || Boolean(query));
-    library.classList.toggle("is-searching", searchInitialPending && !showingRecent);
+    const titleOnlySearch = Boolean(query);
+    const mobileAggregate = !isDesktop() && view === "favorites";
     library.classList.toggle("is-mobile-results", mobileAggregate);
     library.classList.toggle("is-card-view", showingCards);
     library.classList.toggle("is-recent", showingRecent);
@@ -2098,7 +2054,6 @@
       label.textContent = label.dataset.totalCount;
     }
     if (showingCards) {
-      if (searchMore) searchMore.hidden = true;
       if (view === "recent") renderRecents();
       else renderFavorites();
       placeSearchMore();
@@ -2114,10 +2069,7 @@
         || (view === "favorites" && isFavorite);
       for (const row of matchingRows) {
         const track = tracksById.get(id);
-        const matchesCurrentQuery = !query
-          || (desktopFavorites
-            ? matchesSearchText(`${track?.title ?? ""} ${track?.artist ?? ""} ${track?.game ?? ""} ${canonicalConsoleName(track?.console ?? "")}`, query)
-            : Boolean(searchMatches?.has(id)));
+        const matchesCurrentQuery = !query || matchesTrackQuery(track, query);
         const isVisible = isVisibleInView && matchesCurrentQuery;
         row.hidden = !isVisible;
         if (isVisible) visibleTracks += 1;
@@ -2126,49 +2078,51 @@
     for (const entry of gameGroups) {
       const rows = [...entry.list.querySelectorAll(".spcboy-track-row")];
       const hasVisibleRows = rows.some((row) => !row.hidden);
+      const titleMatch = titleOnlySearch && matchesSearchText(entry.gameName, query);
       const shown = query
-        ? desktopFavorites
-          ? matchingFavoriteGameKeys.has(entry.key)
-          : hasVisibleRows
+        ? titleMatch
         : view === "all" || (view === "favorites" && (hasVisibleRows || favoriteAlbums.has(entry.albumId)))
           || (showingGallery && entry.artworkUrl);
-      const favoriteGroupVisible = desktopFavorites && (!query || matchesSearchText(`${entry.gameName} ${entry.consoleName}`, query));
-      entry.row.hidden = desktopFavorites ? !favoriteGroupVisible : !shown;
-      const selectionKey = desktopFavorites ? null : selectedGameKey;
-      entry.details.classList.toggle("is-selected", entry.key === selectionKey);
-      if (desktopFavorites ? favoriteGroupVisible : shown) visibleGames += 1;
+      entry.row.hidden = !shown;
+      entry.details.classList.toggle("is-selected", entry.key === selectedGameKey);
+      if (shown) visibleGames += 1;
+    }
+    if (titleOnlySearch && !showingGallery) {
+      for (const system of trackList.querySelectorAll(".spcboy-system")) {
+        const containsMatch = gameGroups.some((entry) =>
+          entry.details.closest(".spcboy-system") === system && !entry.row.hidden);
+        if (containsMatch && !system.open) {
+          system.open = true;
+          searchOpenedSystems.add(system);
+        }
+      }
+    } else if (!query) {
+      for (const system of searchOpenedSystems) system.open = false;
+      searchOpenedSystems.clear();
     }
     for (const system of library.querySelectorAll(".spcboy-system")) {
       const shown = gameGroups.some((entry) => entry.details.closest(".spcboy-system") === system && !entry.row.hidden);
       system.hidden = !(showingGallery && !query) && !shown;
     }
-    empty.hidden = desktopFavorites || visibleTracks !== 0 || (view === "all" && !query) || (showingGallery && !query)
+    empty.hidden = (titleOnlySearch ? visibleGames !== 0 : visibleTracks !== 0) || (view === "all" && !query) || (showingGallery && !query)
       || (view === "favorites" && favoritePlaylistLoading);
     const hasFavorites = favorites.size > 0 || favoriteAlbums.size > 0;
     empty.textContent = view === "favorites" && !hasFavorites
       ? "Favorite a track or album to build your Favorites playlist."
-      : query && searchLoading ? "Searching hosted tracks…"
-        : query && searchFailed ? "Search is temporarily unavailable. Try again."
-          : view === "favorites" && favoritePlaylistLoading ? "Loading your favorites…"
-            : view === "favorites" && favoritePlaylistFailed ? "Favorites could not load. Switch tabs and try again."
-              : "No matching tracks.";
+      : view === "favorites" && favoritePlaylistLoading ? "Loading your favorites…"
+        : view === "favorites" && favoritePlaylistFailed ? "Favorites could not load. Switch tabs and try again."
+          : titleOnlySearch ? "No matching games."
+            : "No matching tracks.";
     if (view === "favorites" && !hasFavorites) playlistEmpty.textContent = "Favorite a track or album to build your Favorites playlist.";
-    else if (query && searchLoading) playlistEmpty.textContent = "Searching hosted tracks…";
-    else if (query && searchFailed) playlistEmpty.textContent = "Search is temporarily unavailable. Try again.";
     else if (view === "favorites" && favoritePlaylistLoading) playlistEmpty.textContent = "Loading your favorites…";
     else if (view === "favorites" && favoritePlaylistFailed) playlistEmpty.textContent = "Favorites could not load. Switch tabs and try again.";
     else playlistEmpty.textContent = "No matching tracks.";
     if (showingGallery) {
       const galleryCount = renderGallery();
-      libraryState.textContent = query && searchLoading ? "Searching…" : `${galleryCount.toLocaleString()} albums`;
+      libraryState.textContent = `${galleryCount.toLocaleString()} albums`;
     } else {
       if (isDesktop() || mobileAggregate) renderDesktopPlaylist();
-      libraryState.textContent = query && searchLoading ? "Searching…" : gameCountLabel(visibleGames);
-    }
-    if (searchMore) {
-      searchMore.hidden = !query || !searchNextPage || view === "recent";
-      searchMore.disabled = searchLoading;
-      searchMore.textContent = searchLoading ? "Searching…" : "Load more results";
+      libraryState.textContent = gameCountLabel(visibleGames);
     }
     if (favoriteMore) {
       favoriteMore.hidden = view !== "favorites" || !favoritePlaylistNextPage || favoritePlaylistLoading || !favoritePlaylistTracks.length;
@@ -2180,95 +2134,10 @@
     scheduleSelectionIndicators();
   }
 
-  async function loadSearchPage(query, pageNumber, requestToken) {
-    const controller = new AbortController();
-    searchController = controller;
-    const url = new URL(page.dataset.searchUrl, window.location.href);
-    url.searchParams.set("q", query);
-    url.searchParams.set("page", String(pageNumber));
-    try {
-      const response = await fetch(url, {
-        credentials: "same-origin",
-        headers: { Accept: "application/json" },
-        signal: controller.signal,
-      });
-      if (!response.ok) throw new Error(`Search request returned ${response.status}.`);
-      const payload = await response.json();
-      if (requestToken !== searchRequestToken || query !== search.value.trim()) return;
-      if (!Array.isArray(payload.results)) throw new Error("Search results are invalid.");
-      if (pageNumber === 1) searchMatches = new Set();
-      for (const result of payload.results) {
-        if (typeof result.id !== "string") continue;
-        searchMatches.add(result.id);
-        const entry = gameGroupsByConsoleGame.get(`${canonicalConsoleName(result.console)}\u0000${result.game}`);
-        if (entry && !entry.loaded) appendTrackRow(entry, result, { searchOnly: true });
-      }
-      searchNextPage = Number.isInteger(payload.nextPage) ? payload.nextPage : null;
-      searchLoading = false;
-      searchFailed = false;
-      searchInitialPending = false;
-      applyFilters();
-    } catch {
-      if (requestToken !== searchRequestToken || controller.signal.aborted) return;
-      searchLoading = false;
-      searchFailed = true;
-      searchInitialPending = false;
-      searchNextPage = null;
-      applyFilters();
-    }
-  }
-
   function scheduleCatalogSearch() {
     captureWorkspace();
-    const query = search.value.trim();
     if (view === "gallery") galleryVisibleCount = 80;
-    window.clearTimeout(searchTimer);
-    if (searchController) searchController.abort();
-    searchRequestToken += 1;
-    clearSearchOnlyRows();
-    searchMatches = query ? new Set() : null;
-    const localCollection = view === "favorites" || view === "recent";
-    searchNextPage = query && !localCollection ? 1 : null;
-    searchLoading = Boolean(query) && !localCollection;
-    searchFailed = false;
-    searchInitialPending = Boolean(query) && !localCollection;
-    if (localCollection) {
-      applyFilters();
-      return;
-    }
-    if (query) {
-      library.classList.toggle("is-searching", view !== "recent");
-      libraryState.textContent = "Searching…";
-      empty.hidden = false;
-      empty.textContent = "Searching hosted tracks…";
-      playlistEmpty.hidden = false;
-      playlistEmpty.textContent = "Searching hosted tracks…";
-      if (view === "gallery") {
-        galleryGrid.hidden = true;
-        galleryEmpty.hidden = false;
-        galleryEmpty.textContent = "Searching hosted tracks…";
-      }
-      if (view === "recent") applyFilters();
-    } else applyFilters();
-    if (!query) return;
-    const token = searchRequestToken;
-    searchTimer = window.setTimeout(() => {
-      const load = () => {
-        if (token === searchRequestToken && query === search.value.trim()) loadSearchPage(query, 1, token);
-      };
-      if (catalogLoaded) load();
-      else catalogReady.then(load);
-    }, 65);
-  }
-
-  function loadMoreSearchResults() {
-    if (!searchNextPage || searchLoading) return;
-    const query = search.value.trim();
-    if (!query) return;
-    searchLoading = true;
-    const requestedPage = searchNextPage;
     applyFilters();
-    loadSearchPage(query, requestedPage, searchRequestToken);
   }
 
   async function selectTrack(track, startPlayback) {
@@ -2302,7 +2171,7 @@
         : playingFavorites
         ? (await loadFavoritePlaylist({allPages:true})).filter(candidate =>
             (!selectedGameKey || candidate.gameKey === selectedGameKey) &&
-            (!query || matchesSearchText(`${candidate.title} ${candidate.artist ?? ""} ${candidate.game} ${candidate.console}`, query)))
+            matchesTrackQuery(candidate, query))
         : resolvedGroup ? await ensureAlbumTracks(resolvedGroup) : [];
       if (selectionToken !== playbackSelectionToken) return;
       const playlist = albumTracks.length ? albumTracks : [track];
@@ -2356,6 +2225,7 @@
     hoveredPlaylistRow = null;
     lastPlaylistIndicatorTrackId = null;
     syncResponsiveLists();
+    if (search.value.trim()) scheduleCatalogSearch();
     applyGalleryZoom();
     schedulePlaylistColumnLayout();
     scheduleSelectionIndicators();
@@ -2649,7 +2519,6 @@
     mobileNowPlaying?.classList.remove("has-artwork");
   });
   recentMore.addEventListener("click", () => loadRecents());
-  searchMore?.addEventListener("click", loadMoreSearchResults);
   favoriteMore?.addEventListener("click", () => loadFavoritePlaylist());
   window.addEventListener("siteplayer:track", (event) => {
     const rawTrack = event.detail?.track;

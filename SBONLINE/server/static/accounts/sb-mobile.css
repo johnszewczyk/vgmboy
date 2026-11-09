@@ -1,7 +1,7 @@
 /* Site-wide SBO phone styling. SPCBOY player layout lives in spcboy-mobile.css. */
 .spcboy-collection-toolbar[hidden], .spcboy-card-select { display: none; }
 @media (max-width:780px) {
-  body.sbonline-site { --sb-control: 36px; --sb-radius: 5px; --sb-mobile-inset: 6px; --site-navigation-height: 48px; }
+  body.sbonline-site { --sb-control: 36px; --sb-radius: 5px; --sb-mobile-inset: 6px; --site-navigation-height: 48px; --site-motion-duration: var(--sb-mobile-motion-duration,200ms); }
   body.sbonline-site.has-site-player { --site-player-height: calc(32px + env(safe-area-inset-bottom)); }
   body.sbonline-site .topbar { height: calc(48px + env(safe-area-inset-top)); gap: var(--sb-gap); padding-inline: max(var(--sb-mobile-inset),env(safe-area-inset-left)); border-bottom: 1px solid var(--line); background: var(--chrome-bg); }
   body.sbonline-site .topbar-actions { min-width: 0; flex: 1; gap: var(--sb-gap); justify-content: flex-end; }

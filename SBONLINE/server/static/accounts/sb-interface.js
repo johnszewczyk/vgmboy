@@ -1,4 +1,4 @@
-/* Site-wide SB2 presentation preferences and one clipped selection surface. */
+/* Mobile SBO presentation preferences and one clipped selection surface. */
 (() => {
   if (window.SBInterface) return;
   const defaults = { playlistFontSize: 13, sidebarFontSize: 13, rowGap: 0, motionEnabled: true, motionDuration: 200 };
@@ -12,11 +12,10 @@
   if (typeof savedMotion === 'boolean') preferences.motionEnabled = savedMotion;
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   function apply() {
-    document.body.style.setProperty('--sb-playlist-font-size', `${preferences.playlistFontSize}px`);
-    document.body.style.setProperty('--sb-sidebar-font-size', `${preferences.sidebarFontSize}px`);
-    document.body.style.setProperty('--sb-row-gap', `${preferences.rowGap}px`);
-    document.body.dataset.sbMotion = preferences.motionEnabled && !reducedMotion.matches ? 'on' : 'off';
-    document.body.style.setProperty('--site-motion-duration', `${preferences.motionEnabled && !reducedMotion.matches ? preferences.motionDuration : 0}ms`);
+    document.body.style.setProperty('--sb-mobile-playlist-font-size', `${preferences.playlistFontSize}px`);
+    document.body.style.setProperty('--sb-mobile-sidebar-font-size', `${preferences.sidebarFontSize}px`);
+    document.body.style.setProperty('--sb-mobile-row-gap', `${preferences.rowGap}px`);
+    document.body.style.setProperty('--sb-mobile-motion-duration', `${preferences.motionEnabled && !reducedMotion.matches ? preferences.motionDuration : 0}ms`);
     for (const control of document.querySelectorAll('[data-sb-preference]')) {
       const value = preferences[control.dataset.sbPreference];
       if (control.type === 'checkbox') control.checked = value;
