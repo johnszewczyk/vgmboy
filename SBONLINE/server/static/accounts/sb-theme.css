@@ -125,6 +125,7 @@ body.sbonline-site .site-player-settings-panel .spcboy-speed-controls .spcboy-se
 .sbonline-site .spcboy-equalizer-band { display: grid; grid-template-columns: 52px minmax(0,1fr) 56px; align-items: center; min-height: 36px; gap: 12px; color: var(--ink); font: 12px/1.3 var(--sb-font); }
 .sbonline-site .spcboy-equalizer-band output, .sbonline-site .spcboy-volume-control output { min-width: 0; color: var(--ink); font: 12px/1 var(--sb-font); font-variant-numeric: tabular-nums; text-align: right; }
 .sbonline-site .spcboy-equalizer-presets { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: var(--sb-gap); }
+.sbonline-site .spcboy-equalizer-presets-mobile { display: none; }
 .sbonline-site .spcboy-equalizer-preset { display: grid; grid-template-rows: minmax(30px,auto) auto minmax(30px,auto); gap: var(--sb-gap); min-width: 0; padding: var(--sb-gap); border: 1px solid var(--line); border-radius: var(--sb-radius); background: var(--button-bg); text-align: center; }
 .sbonline-site .spcboy-equalizer-preset > button { min-width: 0; min-height: 30px; padding: 3px 5px; border: 1px solid var(--line); border-radius: var(--sb-radius); background: var(--surface-raised); color: var(--ink); font: 11px/1.2 var(--sb-font); cursor: pointer; touch-action: manipulation; }
 .sbonline-site .spcboy-equalizer-preset > button:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); }

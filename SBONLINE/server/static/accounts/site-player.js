@@ -30,6 +30,8 @@
   const equalizerError = document.querySelector("#spcboy-equalizer-error");
   const equalizerPresetApplyButtons = [...document.querySelectorAll("[data-equalizer-preset-apply]")];
   const equalizerPresetSaveButtons = [...document.querySelectorAll("[data-equalizer-preset-save]")];
+  const equalizerMobileProfileButtons = [...document.querySelectorAll("[data-equalizer-mobile-profile]")];
+  const equalizerMobileSaveButton = document.querySelector("[data-equalizer-mobile-save]");
   const equalizerPresetStatus = document.querySelector("#spcboy-equalizer-preset-status");
   const settingsPageButtons = [...document.querySelectorAll("[data-settings-page-target]")];
   const settingsPages = [...document.querySelectorAll("[data-settings-page]")];
@@ -156,6 +158,7 @@
     const gains = normalizeEqualizerGains(item?.gains);
     return gains ? { name: `Preset ${index + 1}`, gains } : null;
   });
+  let selectedEqualizerPresetIndex = 0;
   let audioContext = null;
   let equalizerSource = null;
   let equalizerFilters = [];
@@ -217,6 +220,20 @@
       if (state) state.textContent = saved ? "Saved" : "Empty";
     });
     equalizerPresetSaveButtons.forEach((button) => { button.disabled = !AudioContextClass || equalizerGraphFailed; });
+    equalizerMobileProfileButtons.forEach((button) => {
+      const index = Number(button.dataset.equalizerMobileProfile);
+      const saved = Boolean(equalizerPresets[index]);
+      const selected = index === selectedEqualizerPresetIndex;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-pressed", String(selected));
+      button.setAttribute("aria-label", `Preset ${index + 1}, ${saved ? "saved" : "empty"}${selected ? ", selected" : ""}`);
+      const state = document.querySelector(`[data-equalizer-mobile-state="${index}"]`);
+      if (state) state.textContent = saved ? "Saved" : "Empty";
+    });
+    if (equalizerMobileSaveButton) {
+      equalizerMobileSaveButton.disabled = !AudioContextClass || equalizerGraphFailed;
+      equalizerMobileSaveButton.textContent = `Save current to Preset ${selectedEqualizerPresetIndex + 1}`;
+    }
   }
   function updateEqualizerGraph() {
     if (!equalizerGraphReady) return;
@@ -1611,29 +1628,40 @@
     equalizerBandGains = equalizerBandGains.map(() => 0);
     saveEqualizerGains();
   });
+  async function applyEqualizerPreset(index) {
+    const preset = equalizerPresets[index];
+    if (!preset) return;
+    equalizerBandGains = [...preset.gains];
+    saveEqualizerGains();
+    const enabled = equalizerEnabled || await setEqualizerEnabled(true);
+    equalizerPresetStatus.textContent = enabled
+      ? `${preset.name} applied.`
+      : `${preset.name} loaded, but audio processing could not be enabled.`;
+  }
+  function saveEqualizerPreset(index) {
+    if (!Number.isInteger(index) || index < 0 || index >= equalizerPresets.length) return;
+    equalizerPresets[index] = { name: `Preset ${index + 1}`, gains: [...equalizerBandGains] };
+    storage.set("equalizerPresets", equalizerPresets);
+    syncEqualizerPresetControls();
+    equalizerPresetStatus.textContent = `Preset ${index + 1} saved.`;
+  }
   equalizerPresetApplyButtons.forEach((button) => {
-    button.addEventListener("click", async () => {
-      const index = Number(button.dataset.equalizerPresetApply);
-      const preset = equalizerPresets[index];
-      if (!preset) return;
-      equalizerBandGains = [...preset.gains];
-      saveEqualizerGains();
-      const enabled = equalizerEnabled || await setEqualizerEnabled(true);
-      equalizerPresetStatus.textContent = enabled
-        ? `${preset.name} applied.`
-        : `${preset.name} loaded, but audio processing could not be enabled.`;
-    });
+    button.addEventListener("click", () => applyEqualizerPreset(Number(button.dataset.equalizerPresetApply)));
   });
   equalizerPresetSaveButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      const index = Number(button.dataset.equalizerPresetSave);
+    button.addEventListener("click", () => saveEqualizerPreset(Number(button.dataset.equalizerPresetSave)));
+  });
+  equalizerMobileProfileButtons.forEach((button) => {
+    button.addEventListener("click", async () => {
+      const index = Number(button.dataset.equalizerMobileProfile);
       if (!Number.isInteger(index) || index < 0 || index >= equalizerPresets.length) return;
-      equalizerPresets[index] = { name: `Preset ${index + 1}`, gains: [...equalizerBandGains] };
-      storage.set("equalizerPresets", equalizerPresets);
+      selectedEqualizerPresetIndex = index;
       syncEqualizerPresetControls();
-      equalizerPresetStatus.textContent = `Preset ${index + 1} saved.`;
+      if (equalizerPresets[index]) await applyEqualizerPreset(index);
+      else equalizerPresetStatus.textContent = `Preset ${index + 1} selected. Save current settings to fill it.`;
     });
   });
+  equalizerMobileSaveButton?.addEventListener("click", () => saveEqualizerPreset(selectedEqualizerPresetIndex));
   queueToggle.addEventListener("click", () => {
     const open = queueToggle.getAttribute("aria-expanded") !== "true";
     if (open) openQueue();
