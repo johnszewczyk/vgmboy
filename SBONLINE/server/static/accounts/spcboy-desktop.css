@@ -26,7 +26,7 @@
   .spcboy-library.is-gallery .spcboy-system.is-gallery-selected > summary { border-radius: 2px; background: var(--blue-soft); color: var(--blue); }
   .spcboy-gallery-detail-summary { grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); }
   .spcboy-playlist-content .spcboy-track { min-height: 1.9rem; }
-  .spcboy-playlist-content .spcboy-track-title { font-size: .8rem; }
+  .spcboy-playlist-content .spcboy-track-title { font-size: .68rem; }
 }
 
 @media (min-width: 781px) {
@@ -182,14 +182,14 @@
   }
   .spcboy-body .spcboy-stage { display: grid; grid-template-rows: 1.75rem 1.7rem minmax(0, 1fr); }
   .spcboy-system > summary, .spcboy-game > summary { min-height: 1.3rem; gap: .32rem; padding-inline: .3rem; }
-  .spcboy-system-name { font-size: .66rem; }
-  .spcboy-game-name { font-size: .63rem; }
-  .spcboy-count { font-size: .56rem; }
+  .spcboy-system-name { font-size: .68rem; font-weight: 650; }
+  .spcboy-game-name { font-size: .68rem; }
+  .spcboy-count { font-size: .60rem; }
   .spcboy-system-content { margin-left: .38rem; padding-left: .2rem; }
   .spcboy-game.is-selected > summary { background: transparent; color: var(--blue); }
   .spcboy-track { min-height: 1.3rem; gap: .3rem; padding-inline: .2rem; }
-  .spcboy-track-title { font-size: .64rem; }
-  .spcboy-track-number, .spcboy-track-length { font-size: .56rem; }
+  .spcboy-track-title { font-size: .68rem; }
+  .spcboy-track-number, .spcboy-track-length { font-size: .60rem; }
   .spcboy-favorite, .spcboy-album-favorite { height: 1.3rem; }
   .spcboy-stage { min-height: 0; }
   .spcboy-playlist-pane { grid-row: 2 / 4; grid-template-rows: 1.7rem minmax(0, 1fr); }

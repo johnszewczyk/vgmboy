@@ -94,8 +94,8 @@
 .spcboy-system > summary, .spcboy-game > summary { position: relative; z-index: 2; transition: color var(--site-motion-duration) var(--site-motion-ease); }
 .spcboy-system > summary:hover, .spcboy-game > summary:hover { color: var(--blue); }
 .spcboy-system-name, .spcboy-game-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.spcboy-system-name { flex: 1; font-size: .72rem; font-weight: 700; }
-.spcboy-game-name { flex: 1; color: var(--muted); font-size: .69rem; }
+.spcboy-system-name { flex: 1; font-size: .68rem; font-weight: 700; }
+.spcboy-game-name { flex: 1; color: var(--muted); font-size: .68rem; }
 .spcboy-count { color: var(--spc-quiet); font: .6rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
 .spcboy-system-content { margin: 0 0 .1rem .45rem; padding-left: .25rem; border-left: 1px solid var(--line); }
 .spcboy-game-row { display: flex; min-width: 0; align-items: flex-start; gap: .1rem; }
@@ -135,7 +135,7 @@
 .spcboy-shuffle-favorites svg { width: .9rem; height: .9rem; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .spcboy-track-number, .spcboy-track-length { color: var(--spc-quiet); font: .6rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
 .spcboy-track-length { text-align: right; }
-.spcboy-track-title { min-width: 0; overflow: hidden; font-size: .7rem; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
+.spcboy-track-title { min-width: 0; overflow: hidden; font-size: .68rem; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
 .spcboy-track-artist { display: none; min-width: 0; overflow: hidden; color: var(--spc-quiet); font-size: .65rem; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
 .spcboy-track-game, .spcboy-track-system { display: none; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .spcboy-track-artwork { display: none; }
@@ -153,7 +153,7 @@
 .spcboy-playlist-content .spcboy-tracks { margin: 0; }
 .spcboy-playlist-content .spcboy-track { min-height: 1.55rem; grid-template-columns: 1.6rem minmax(5rem, 1.35fr) minmax(4rem, .8fr) 2.8rem; }
 .spcboy-playlist-content .spcboy-track-artist { display: block; }
-.spcboy-playlist-content .spcboy-track-title { font-size: .73rem; }
+.spcboy-playlist-content .spcboy-track-title { font-size: .68rem; }
 .spcboy-empty { margin: .75rem .4rem; color: var(--muted); font-size: .75rem; text-align: center; }
 .spcboy-search-more { display: block; min-height: 1.8rem; margin: .35rem auto .6rem; padding: 0 .75rem; border: 1px solid var(--line); border-radius: 2px; background: var(--white); color: var(--muted); font-size: .68rem; cursor: pointer; }
 .spcboy-search-more:hover { border-color: var(--blue); color: var(--blue); }

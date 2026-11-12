@@ -44,7 +44,6 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_http_methods, require_POST, require_safe
 from django.views.generic import TemplateView
 
-from .aac_transport import AACADTSPrimingFrameStripper
 from .forms import MAX_PROFILE_IMAGE_BYTES, EnrollmentForm, MemberProfileForm, SiteSettingsForm
 from .catalog_search import adjacent_catalog_track, build_catalog_index, catalog_index_is_current, query_catalog_index, search_terms
 from .spcboy_timing import (
@@ -686,24 +685,32 @@ def spcboy_preferences(request):
     if any(key not in {"imports", "updates", "removals"} for key in payload):
         return JsonResponse({"error": "Player preference data is invalid."}, status=400, headers=headers)
 
-    with transaction.atomic():
-        profile = MemberProfile.objects.select_for_update().get(pk=profile.pk)
-        preferences = profile.spcboy_preferences if isinstance(profile.spcboy_preferences, dict) else {}
-        preferences = {scope: dict(values) for scope, values in preferences.items() if isinstance(values, dict)}
-        for scope, values in payload.get("imports", {}).items():
-            target = preferences.setdefault(scope, {})
-            for key, value in values.items():
-                target.setdefault(key, value)
-        for scope, values in payload.get("updates", {}).items():
-            preferences.setdefault(scope, {}).update(values)
-        for scope, keys in payload.get("removals", {}).items():
-            target = preferences.setdefault(scope, {})
-            for key in keys:
-                target.pop(key, None)
-            if not target:
-                preferences.pop(scope, None)
-        profile.spcboy_preferences = preferences
-        profile.save(update_fields=["spcboy_preferences"])
+    from django.db import OperationalError
+    for attempt in range(4):
+        try:
+            with transaction.atomic():
+                profile = MemberProfile.objects.select_for_update().get(pk=profile.pk)
+                preferences = profile.spcboy_preferences if isinstance(profile.spcboy_preferences, dict) else {}
+                preferences = {scope: dict(values) for scope, values in preferences.items() if isinstance(values, dict)}
+                for scope, values in payload.get("imports", {}).items():
+                    target = preferences.setdefault(scope, {})
+                    for key, value in values.items():
+                        target.setdefault(key, value)
+                for scope, values in payload.get("updates", {}).items():
+                    preferences.setdefault(scope, {}).update(values)
+                for scope, keys in payload.get("removals", {}).items():
+                    target = preferences.setdefault(scope, {})
+                    for key in keys:
+                        target.pop(key, None)
+                    if not target:
+                        preferences.pop(scope, None)
+                profile.spcboy_preferences = preferences
+                profile.save(update_fields=["spcboy_preferences"])
+            break
+        except OperationalError:
+            if attempt == 3:
+                return JsonResponse({"error": "Database busy, please try again."}, status=503, headers=headers)
+            time.sleep(0.05 * (2 ** attempt))
     return JsonResponse({"preferences": preferences}, headers=headers)
 
 
@@ -1709,6 +1716,18 @@ def spcboy_audio(request, track_id):
     if speed_ticks % speed_denominator or not 32 <= speed_ticks // speed_denominator <= 128:
         return HttpResponseBadRequest("Source playback speed must use 1/64 steps from 1/2 to 2.")
 
+    eq_gains = []
+    if "eq" in request.GET:
+        try:
+            parts = [float(p.strip()) for p in request.GET.get("eq", "").split(",") if p.strip()]
+            if len(parts) == 10:
+                for g in parts:
+                    if not -12.0 <= g <= 12.0:
+                        raise ValueError
+                    eq_gains.append(round(g * 2) / 2)
+        except (TypeError, ValueError):
+            return HttpResponseBadRequest("Invalid equalizer parameters.")
+
     decoder = None
     encoder = None
     materialized_track = tempfile.TemporaryDirectory(prefix="spcboy-track-")
@@ -1799,6 +1818,19 @@ def spcboy_audio(request, track_id):
             stderr=subprocess.DEVNULL,
             bufsize=0,
         )
+        audio_filters = []
+        effective_volume = volume_step / 20.0
+        if effective_volume < 1.0:
+            audio_filters.append(f"volume={effective_volume:.4f}")
+        if eq_gains:
+            eq_frequencies = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
+            for freq, gain in zip(eq_frequencies, eq_gains):
+                if gain != 0:
+                    audio_filters.append(f"equalizer=f={freq}:width_type=q:w=1.414:g={gain:.1f}")
+            # Soft broadcast peak limiter prevents digital clipping without lowering baseline track volume
+            audio_filters.append("alimiter=limit=0.98:attack=5:release=50:asc=true")
+        af_string = ",".join(audio_filters)
+        ffmpeg_filter_args = ["-af", af_string] if af_string else []
         encoder = subprocess.Popen(
             [
                 settings.SPCBOY_FFMPEG,
@@ -1814,8 +1846,7 @@ def spcboy_audio(request, track_id):
                 "2",
                 "-i",
                 "pipe:0",
-                "-af",
-                f"volume={volume_step / 20:.2f}",
+                *ffmpeg_filter_args,
                 "-map",
                 "0:a:0",
                 *stream_encoding_args,
@@ -1854,7 +1885,6 @@ def spcboy_audio(request, track_id):
     history_saved = False
     quota_exhausted = False
     playback_session_expired = False
-    priming_frame = AACADTSPrimingFrameStripper()
 
     def stream_audio():
         nonlocal history_saved, quota_exhausted, playback_session_expired
@@ -1869,13 +1899,6 @@ def spcboy_audio(request, track_id):
                     if not chunk or time.time() - page_loaded_at >= page_session_limit_seconds:
                         playback_session_expired = time.time() - page_loaded_at >= page_session_limit_seconds
                         break
-                    try:
-                        chunk = priming_frame.push(chunk)
-                    except ValueError:
-                        logger.exception("FFmpeg did not produce the expected SPCBOY AAC stream.")
-                        return
-                    if not chunk:
-                        continue
                     if not history_saved:
                         try:
                             _record_spcboy_playback(request.user.pk, playback_id, track_id, track)

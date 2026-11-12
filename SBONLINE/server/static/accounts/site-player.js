@@ -91,16 +91,28 @@
   const maximumLongPlaySeconds = 86400;
   const equalizerFrequencies = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
   function parseSpeedFraction(value) {
-    const match = String(value).trim().match(/^(\d{1,7})\s*\/\s*(\d{1,7})$/);
-    if (!match) return null;
-    const numerator = Number(match[1]);
-    const denominator = Number(match[2]);
-    if (!Number.isSafeInteger(numerator) || !Number.isSafeInteger(denominator) || numerator < 1 || denominator < 1) return null;
-    const ticks = numerator * 64 / denominator;
-    if (!Number.isInteger(ticks) || ticks < 32 || ticks > 128) return null;
-    const divisor = (left, right) => right ? divisor(right, left % right) : left;
-    const common = divisor(numerator, denominator);
-    return { rate: numerator / denominator, fraction: `${numerator / common}/${denominator / common}` };
+    const raw = String(value).trim();
+    const match = raw.match(/^(\d{1,7})\s*\/\s*(\d{1,7})$/);
+    if (match) {
+      const numerator = Number(match[1]);
+      const denominator = Number(match[2]);
+      if (!Number.isSafeInteger(numerator) || !Number.isSafeInteger(denominator) || numerator < 1 || denominator < 1) return null;
+      const ticks = (numerator * 64) / denominator;
+      if (!Number.isInteger(ticks) || ticks < 32 || ticks > 128) return null;
+      const divisor = (left, right) => (right ? divisor(right, left % right) : left);
+      const common = divisor(numerator, denominator);
+      return { rate: numerator / denominator, fraction: `${numerator / common}/${denominator / common}` };
+    }
+    const asNum = Number(raw.replace(/[x×]$/, ""));
+    if (Number.isFinite(asNum) && asNum >= 0.5 && asNum <= 2) {
+      const ticks = Math.max(32, Math.min(128, Math.round(asNum * 64)));
+      const divisor = (left, right) => (right ? divisor(right, left % right) : left);
+      const common = divisor(ticks, 64);
+      const num = ticks / common;
+      const den = 64 / common;
+      return { rate: num / den, fraction: `${num}/${den}` };
+    }
+    return null;
   }
   function fractionForRate(rate) {
     const ticks = Math.round(rate * 64);
@@ -176,11 +188,22 @@
     volumeValue.value = String(percent);
     volumeValue.textContent = String(percent);
   }
+  function syncVolumeControls() {
+    applyVolumeStep();
+    const mobileVol = document.querySelector("#spcboy-mobile-volume");
+    if (mobileVol) mobileVol.value = String(volumeStep);
+    const mobileVal = document.querySelector("#spcboy-mobile-volume-value");
+    if (mobileVal) mobileVal.textContent = `${volumeStep * 5}%`;
+    const sbonlineVol = document.querySelector("#sbonline-volume-input");
+    if (sbonlineVol) sbonlineVol.value = String(volumeStep);
+    window.dispatchEvent(new CustomEvent("siteplayer:settings-changed"));
+  }
   function formatEqualizerGain(value) {
     const rounded = Math.round(value * 2) / 2;
     return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)}`;
   }
   function updateEqualizerToggle(enabled) {
+    if (!equalizerToggle) return;
     equalizerToggle.setAttribute("aria-checked", String(enabled));
     const desktopLabel = equalizerToggle.querySelector(".spcboy-equalizer-toggle-desktop");
     const mobileLabel = equalizerToggle.querySelector(".spcboy-equalizer-toggle-mobile");
@@ -243,9 +266,8 @@
       if (!parameter) return;
       parameter.setTargetAtTime(gain, audioContext.currentTime, 0.035);
     });
-    // Reserve headroom for positive EQ boosts before the browser sends audio to output.
-    const headroomDb = equalizerEnabled ? -Math.max(0, ...equalizerBandGains) : 0;
-    equalizerOutput.gain.setTargetAtTime((volumeStep / 20) * 10 ** (headroomDb / 20), audioContext.currentTime, 0.035);
+    // Baseline output level is unattenuated; server broadcast limiter prevents digital clipping
+    equalizerOutput.gain.setTargetAtTime(volumeStep / 20, audioContext.currentTime, 0.035);
   }
   function ensureEqualizerGraph() {
     if (equalizerGraphReady) return true;
@@ -406,46 +428,43 @@
     storage.set("equalizerBandGains", equalizerBandGains);
     syncEqualizerControls();
     updateEqualizerGraph();
+    window.dispatchEvent(new CustomEvent("siteplayer:settings-changed", { detail: { equalizerBandGains } }));
   }
   async function setEqualizerEnabled(enabled) {
-    if (enabled) {
-      if (!ensureEqualizerGraph()) {
-        equalizerEnabled = false;
-        updateEqualizerToggle(false);
-        syncOnlineControls();
-        return false;
-      }
+    equalizerEnabled = Boolean(enabled);
+    updateEqualizerToggle(equalizerEnabled);
+    storage.set("equalizerEnabled", equalizerEnabled);
+    if (equalizerError) equalizerError.textContent = "";
+    if (AudioContextClass && !equalizerGraphFailed) {
       try {
-        if (audioContext.state !== "running") await audioContext.resume();
+        if (ensureEqualizerGraph() && audioContext.state !== "running") {
+          await audioContext.resume();
+        }
       } catch {
-        equalizerEnabled = false;
-        updateEqualizerToggle(false);
-        storage.set("equalizerEnabled", false);
-        updateEqualizerGraph();
-        equalizerError.textContent = "Tap again to enable audio processing in this browser.";
-        syncOnlineControls();
-        return false;
+        /* Keep server-side pre-compressed EQ functional even if Web Audio fails */
       }
-      equalizerError.textContent = "";
     }
-    equalizerEnabled = enabled;
-    updateEqualizerToggle(enabled);
-    storage.set("equalizerEnabled", enabled);
     updateEqualizerGraph();
+    syncEqualizerControls();
     syncOnlineControls();
+    if (currentTrack) {
+      restartCurrentStream(sourcePositionSeconds());
+    }
+    window.dispatchEvent(new CustomEvent("siteplayer:settings-changed", { detail: { equalizerEnabled } }));
     return true;
   }
   function updateLongPlayToggle() {
+    if (!longPlayToggle) return;
     const duration = longPlaySeconds === 0 ? "Unlimited" : formatPlaybackTime(longPlaySeconds);
     longPlayToggle.setAttribute("aria-checked", String(longPlayEnabled));
     longPlayToggle.setAttribute("aria-label", `Long Play · ${longPlayEnabled ? "Yes" : "No"} · ${duration}`);
     longPlayToggle.title = `Long Play · ${duration}`;
     longPlayToggle.classList.toggle("is-enabled", longPlayEnabled);
     longPlayToggle.textContent = longPlayEnabled ? "Yes" : "No";
-    longPlayDurationInput.value = formatPlaybackTime(longPlaySeconds);
-
+    if (longPlayDurationInput) longPlayDurationInput.value = formatPlaybackTime(longPlaySeconds);
   }
   function updateBooleanSettingsToggle(toggle, enabled, label) {
+    if (!toggle) return;
     toggle.setAttribute("aria-checked", String(enabled));
     toggle.setAttribute("aria-label", `${label} · ${enabled ? "Yes" : "No"}`);
     toggle.title = `${label} · ${enabled ? "Yes" : "No"}`;
@@ -487,6 +506,7 @@
   let statusTimer = null;
   let expiryPollTimer = null;
   let volumeRestartTimer = null;
+  let eqRestartTimer = null;
   let queuedSkipRequest = null;
   let queuedSkipTimer = null;
   let queuedSkipGeneration = 0;
@@ -778,7 +798,10 @@
     params.set("speedDenominator", speedDenominator);
     params.set("fade", String(spcFadeSeconds));
     if (longPlayEnabled) params.set("longPlay", String(longPlaySeconds));
-    if (volumeStep < 20 && (!AudioContextClass || equalizerGraphFailed)) params.set("volume", String(volumeStep));
+    if (equalizerEnabled && equalizerBandGains.some((g) => g !== 0)) {
+      params.set("eq", equalizerBandGains.map((g) => (Math.round(g * 2) / 2).toFixed(1)).join(","));
+    }
+    if (volumeStep < 20 && (!equalizerGraphReady || equalizerGraphFailed || !AudioContextClass)) params.set("volume", String(volumeStep));
     return `${base}?${params}`;
   }
 
@@ -847,25 +870,26 @@
     navigator.mediaSession.playbackState = !currentTrack ? "none" : audio.paused || audio.ended ? "paused" : "playing";
     syncMediaPosition();
   }
+  function seekToTrackOffset(seconds) {
+    if (!currentTrack || playbackSessionExpired()) return;
+    const duration = effectiveDuration();
+    const offset = Math.max(0, Math.min(seconds, Number.isFinite(duration) ? Math.max(0, duration - .1) : seconds));
+    if (!Number.isFinite(offset)) return;
+    const resume = playbackWanted;
+    cancelStreamRecovery(true);
+    streamOffsetSeconds = offset;
+    setAudioSource(audioURL(currentTrack, offset));
+    if (resume) startAudioPlayback();
+    syncMediaPosition();
+    savePlayback();
+  }
   if (navigator.mediaSession) {
-    const seek = seconds => {
-      if (!currentTrack || playbackSessionExpired()) return;
-      const duration = effectiveDuration();
-      const offset = Math.max(0,Math.min(seconds,Number.isFinite(duration) ? Math.max(0,duration-.1) : seconds));
-      if (!Number.isFinite(offset)) return;
-      const resume = playbackWanted;
-      cancelStreamRecovery(true);
-      streamOffsetSeconds = offset;
-      setAudioSource(audioURL(currentTrack,offset));
-      if (resume) startAudioPlayback();
-      syncMediaPosition(); savePlayback();
-    };
     const actions = {
       play: () => startAudioPlayback(), pause: () => pausePlayback(),
       previoustrack: () => moveTrack(-1), nexttrack: () => moveTrack(1),
-      seekto: event => seek(event.seekTime),
-      seekbackward: event => seek(sourcePositionSeconds() - (event.seekOffset || 10)),
-      seekforward: event => seek(sourcePositionSeconds() + (event.seekOffset || 10)),
+      seekto: event => seekToTrackOffset(event.seekTime),
+      seekbackward: event => seekToTrackOffset(sourcePositionSeconds() - (event.seekOffset || 10)),
+      seekforward: event => seekToTrackOffset(sourcePositionSeconds() + (event.seekOffset || 10)),
     };
     for (const [action,handler] of Object.entries(actions)) {
       try { navigator.mediaSession.setActionHandler(action,handler); } catch { /* Unsupported action. */ }
@@ -1232,6 +1256,8 @@
 
   async function playTrackNow(rawTrack, options = {}) {
     if (playbackSessionExpired()) return false;
+    clearFadedSkip({ restoreOutput: true });
+    restoreTransportFade();
     window.clearTimeout(volumeRestartTimer);
     volumeRestartTimer = null;
     const track = normalizeTrack(rawTrack);
@@ -1369,7 +1395,7 @@
         await playTrackNow(targetTrack || request.targetTrack, targetOptions || request.targetOptions || {});
       }
     } finally {
-      if (request.playbackId === currentPlaybackId) restoreTransportFade();
+      restoreTransportFade();
     }
   }
 
@@ -1604,10 +1630,17 @@
     "#spcboy-play", "#spcboy-next", "#spcboy-previous", "#spcboy-gallery-play",
     "#spcboy-faded-skip", "#spcboy-equalizer-enabled", "#site-player-volume",
     ".spcboy-track", ".spcboy-media-card", "[data-site-play-track]", "[data-site-play-album-url]",
+    "#spcboy-mobile-play", "#spcboy-mobile-next", "#spcboy-mobile-previous",
+    "#spcboy-mobile-dock-play", ".spcboy-mobile-dock", "#spcboy-mobile-equalizer",
+    "#spcboy-mobile-volume", "#spcboy-mobile-reset-flat", "[data-mobile-eq-band]",
+    ".spcboy-mobile-app-nav button", ".spcboy-mobile-up-next button",
+    "#spcboy-mobile-detail-play", ".spcboy-mobile-track", ".spcboy-mobile-album-card",
   ].join(",");
   function prepareAudioGraphFromGesture(event) {
     const target = event.target instanceof Element ? event.target : event.target?.parentElement;
-    if (!equalizerEnabled && !fadedSkipsEnabled && !target?.closest(audioProcessingGestureSelector)) return;
+    const isMobileInteraction = Boolean(target?.closest("#spcboy-mobile-app"));
+    const matchesGesture = Boolean(target?.closest(audioProcessingGestureSelector));
+    if (!equalizerEnabled && !fadedSkipsEnabled && !isMobileInteraction && !matchesGesture) return;
     if (!ensureEqualizerGraph() || audioContext.state === "running") return;
     try { audioContext.resume().catch(() => {}); } catch { /* The next playback gesture can retry the suspended context. */ }
   }
@@ -1629,21 +1662,31 @@
     saveEqualizerGains();
   });
   async function applyEqualizerPreset(index) {
+    if (!Number.isInteger(index) || index < 0 || index >= equalizerPresets.length) return;
     const preset = equalizerPresets[index];
-    if (!preset) return;
-    equalizerBandGains = [...preset.gains];
+    equalizerBandGains = preset?.gains ? [...preset.gains] : equalizerFrequencies.map(() => 0);
     saveEqualizerGains();
     const enabled = equalizerEnabled || await setEqualizerEnabled(true);
-    equalizerPresetStatus.textContent = enabled
-      ? `${preset.name} applied.`
-      : `${preset.name} loaded, but audio processing could not be enabled.`;
+    if (equalizerPresetStatus) {
+      equalizerPresetStatus.textContent = enabled
+        ? `${preset?.name || `Preset ${index + 1}`} applied.`
+        : `${preset?.name || `Preset ${index + 1}`} loaded, but audio processing could not be enabled.`;
+    }
+    if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+      window.dispatchEvent(new CustomEvent("siteplayer:settings-changed"));
+    }
   }
   function saveEqualizerPreset(index) {
     if (!Number.isInteger(index) || index < 0 || index >= equalizerPresets.length) return;
     equalizerPresets[index] = { name: `Preset ${index + 1}`, gains: [...equalizerBandGains] };
     storage.set("equalizerPresets", equalizerPresets);
     syncEqualizerPresetControls();
-    equalizerPresetStatus.textContent = `Preset ${index + 1} saved.`;
+    if (equalizerPresetStatus) {
+      equalizerPresetStatus.textContent = `Preset ${index + 1} saved.`;
+    }
+    if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+      window.dispatchEvent(new CustomEvent("siteplayer:settings-changed"));
+    }
   }
   equalizerPresetApplyButtons.forEach((button) => {
     button.addEventListener("click", () => applyEqualizerPreset(Number(button.dataset.equalizerPresetApply)));
@@ -1651,17 +1694,21 @@
   equalizerPresetSaveButtons.forEach((button) => {
     button.addEventListener("click", () => saveEqualizerPreset(Number(button.dataset.equalizerPresetSave)));
   });
-  equalizerMobileProfileButtons.forEach((button) => {
-    button.addEventListener("click", async () => {
-      const index = Number(button.dataset.equalizerMobileProfile);
-      if (!Number.isInteger(index) || index < 0 || index >= equalizerPresets.length) return;
-      selectedEqualizerPresetIndex = index;
-      syncEqualizerPresetControls();
-      if (equalizerPresets[index]) await applyEqualizerPreset(index);
-      else equalizerPresetStatus.textContent = `Preset ${index + 1} selected. Save current settings to fill it.`;
+  if (typeof equalizerMobileProfileButtons !== "undefined" && Array.isArray(equalizerMobileProfileButtons)) {
+    equalizerMobileProfileButtons.forEach((button) => {
+      button.addEventListener("click", async () => {
+        const index = Number(button.dataset.equalizerMobileProfile);
+        if (!Number.isInteger(index) || index < 0 || index >= equalizerPresets.length) return;
+        selectedEqualizerPresetIndex = index;
+        syncEqualizerPresetControls();
+        if (equalizerPresets[index]) await applyEqualizerPreset(index);
+        else equalizerPresetStatus.textContent = `Preset ${index + 1} selected. Save current settings to fill it.`;
+      });
     });
-  });
-  equalizerMobileSaveButton?.addEventListener("click", () => saveEqualizerPreset(selectedEqualizerPresetIndex));
+  }
+  if (typeof equalizerMobileSaveButton !== "undefined" && equalizerMobileSaveButton) {
+    equalizerMobileSaveButton.addEventListener("click", () => saveEqualizerPreset(selectedEqualizerPresetIndex));
+  }
   queueToggle.addEventListener("click", () => {
     const open = queueToggle.getAttribute("aria-expanded") !== "true";
     if (open) openQueue();
@@ -1676,6 +1723,7 @@
     volumeStep = Math.max(0, Math.min(20, Math.round(Number(volumeInput.value))));
     storage.set("volumeStep", volumeStep);
     applyVolumeStep();
+    if (typeof syncVolumeControls === "function") syncVolumeControls();
     window.clearTimeout(volumeRestartTimer);
     if (ensureEqualizerGraph()) {
       updateEqualizerGraph();
@@ -1684,7 +1732,7 @@
       }
     } else if (currentTrack) {
       // Legacy browsers without Web Audio retain the server-volume fallback.
-      volumeRestartTimer = window.setTimeout(() => restartCurrentStream(), 350);
+      volumeRestartTimer = window.setTimeout(() => restartCurrentStream(sourcePositionSeconds()), 350);
     }
   });
   settingsClose.addEventListener("click", () => closePlayerPanels({ focus: true }));
@@ -1922,6 +1970,153 @@
     getCurrentTrack() { return currentTrack; },
     isPlaying() { return Boolean(currentTrack && !audio.paused && !audio.ended && !audio.error); },
     getQueue() { return [...queue]; },
+    togglePlayback() { playButton.click(); },
+    previous() { previousButton.click(); },
+    next() { nextButton.click(); },
+    seekTo(seconds) { seekToTrackOffset(Number(seconds) || 0); },
+    getVolume() { return volumeStep; },
+    setVolume(step) {
+      const num = Math.max(0, Math.min(20, Math.round(Number(step) || 0)));
+      volumeStep = num;
+      storage.set("volumeStep", volumeStep);
+      volumeInput.value = String(num);
+      syncVolumeControls();
+      window.clearTimeout(volumeRestartTimer);
+      if (ensureEqualizerGraph()) {
+        updateEqualizerGraph();
+        if (audioContext.state !== "running") {
+          audioContext.resume().catch(() => {});
+        }
+      } else if (currentTrack) {
+        volumeRestartTimer = window.setTimeout(() => restartCurrentStream(sourcePositionSeconds()), 350);
+      }
+    },
+    getEqualizerPresets() {
+      return equalizerPresets.map((preset, index) => ({
+        index,
+        name: preset?.name || `Preset ${index + 1}`,
+        gains: Array.isArray(preset?.gains) ? [...preset.gains] : equalizerFrequencies.map(() => 0),
+        saved: Boolean(preset?.gains),
+      }));
+    },
+    applyEqualizerPreset(index) {
+      return applyEqualizerPreset(Number(index) || 0);
+    },
+    saveEqualizerPreset(index) {
+      return saveEqualizerPreset(Number(index) || 0);
+    },
+    getSelectedEqualizerPresetIndex() {
+      return selectedEqualizerPresetIndex;
+    },
+    isEqualizerEnabled() { return equalizerEnabled; },
+    setEqualizerEnabled(enabled) { return setEqualizerEnabled(Boolean(enabled)); },
+    getEqualizerBands() { return [...equalizerBandGains]; },
+    getEqualizerFrequencies() { return [...equalizerFrequencies]; },
+    setEqualizerBandGain(index, gain) {
+      if (!Number.isInteger(index) || index < 0 || index >= equalizerBandGains.length) return;
+      const rounded = Math.max(-12, Math.min(12, Math.round(Number(gain) * 2) / 2));
+      equalizerBandGains[index] = rounded;
+      if (equalizerBandInputs[index]) equalizerBandInputs[index].value = String(rounded);
+      if (equalizerEnabled) ensureEqualizerGraph();
+      saveEqualizerGains();
+      if (equalizerEnabled && currentTrack) {
+        window.clearTimeout(eqRestartTimer);
+        eqRestartTimer = window.setTimeout(() => {
+          restartCurrentStream(sourcePositionSeconds());
+        }, 250);
+      }
+    },
+    resetEqualizer() {
+      equalizerBandGains = equalizerFrequencies.map(() => 0);
+      equalizerBandInputs.forEach(input => { input.value = "0"; });
+      saveEqualizerGains();
+      if (equalizerEnabled && currentTrack) {
+        restartCurrentStream(sourcePositionSeconds());
+      }
+    },
+    getFadedSkips() { return { enabled: fadedSkipsEnabled, seconds: spcFadeSeconds }; },
+    setFadedSkips(enabled, seconds) {
+      let changed = false;
+      if (typeof enabled === "boolean" && enabled !== fadedSkipsEnabled) {
+        fadedSkipsEnabled = enabled;
+        storage.set("fadedSkipsEnabled", enabled);
+        if (!fadedSkipsEnabled) clearFadedSkip();
+        updateFadedSkipToggle();
+        changed = true;
+      }
+      if (typeof seconds === "number" || typeof seconds === "string") {
+        const num = Math.max(0, Math.min(30, Math.round(Number(seconds) || 0)));
+        if (num !== spcFadeSeconds) {
+          spcFadeSeconds = num;
+          if (spcFadeSecondsInput) spcFadeSecondsInput.value = String(spcFadeSeconds);
+          storage.set("spcFadeSeconds", spcFadeSeconds);
+          changed = true;
+        }
+      }
+      if (changed) {
+        window.dispatchEvent(new CustomEvent("siteplayer:settings-changed", { detail: { fadedSkipsEnabled, spcFadeSeconds } }));
+      }
+    },
+    getPlaybackSpeed() { return { enabled: playbackSpeedEnabled, fraction: playbackRateFraction, rate: playbackRate }; },
+    setPlaybackSpeed(enabled, fraction) {
+      let changed = false;
+      let rateChanged = false;
+      if (typeof enabled === "boolean" && enabled !== playbackSpeedEnabled) {
+        playbackSpeedEnabled = enabled;
+        storage.set("playbackSpeedEnabled", enabled);
+        updateSpeedEnabledToggle();
+        changed = true;
+      }
+      if (typeof fraction === "string" && fraction.trim()) {
+        const parsed = parseSpeedFraction(fraction);
+        if (parsed && (parsed.rate !== playbackRate || parsed.fraction !== playbackRateFraction)) {
+          playbackRateFraction = parsed.fraction;
+          playbackRate = parsed.rate;
+          if (speedInput) speedInput.value = parsed.fraction;
+          storage.set("playbackRateFraction", parsed.fraction);
+          storage.set("playbackRate", parsed.rate);
+          changed = true;
+          rateChanged = true;
+        }
+      }
+      if (changed) {
+        if (currentTrack) {
+          restartCurrentStream(sourcePositionSeconds());
+        }
+        syncOnlineControls();
+        window.dispatchEvent(new CustomEvent("siteplayer:settings-changed", { detail: { playbackSpeedEnabled, playbackRateFraction } }));
+      }
+    },
+    getLongPlay() { return { enabled: longPlayEnabled, seconds: longPlaySeconds }; },
+    setLongPlay(enabled, seconds) {
+      let changed = false;
+      if (typeof enabled === "boolean" && enabled !== longPlayEnabled) {
+        longPlayEnabled = enabled;
+        storage.set("longPlayEnabled", enabled);
+        updateLongPlayToggle();
+        changed = true;
+      }
+      if (typeof seconds === "string" && seconds.trim()) {
+        const parsed = parseLongPlayDuration(seconds);
+        if (parsed !== null) seconds = parsed;
+      }
+      if (Number.isInteger(seconds) && seconds !== longPlaySeconds) {
+        longPlaySeconds = Math.max(0, Math.min(maximumLongPlaySeconds, seconds));
+        if (longPlayDurationInput) longPlayDurationInput.value = formatPlaybackTime(longPlaySeconds);
+        storage.set("longPlayDurationSeconds", longPlaySeconds);
+        changed = true;
+      }
+      if (changed) {
+        if (currentTrack) {
+          restartCurrentStream(sourcePositionSeconds());
+        }
+        syncOnlineControls();
+        window.dispatchEvent(new CustomEvent("siteplayer:settings-changed", { detail: { longPlayEnabled, longPlaySeconds } }));
+      }
+    },
+    formatPlaybackTime,
+    parseLongPlayDuration,
+    parseSpeedFraction,
   };
   window.SitePlayer.setLibraryNavigator(async (track, step) => {
     const url = new URL(dock.dataset.navigationUrl, window.location.href);

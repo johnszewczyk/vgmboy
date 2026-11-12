@@ -1,24 +1,33 @@
 (() => {
   const page = document.querySelector(".spcboy-page");
   const library = document.querySelector("#spcboy-library");
+  const mobileApp = document.querySelector("#spcboy-mobile-app");
   const mobileAppNav = document.querySelector("#spcboy-mobile-app-nav");
   const mobileAppButtons = [...document.querySelectorAll("[data-mobile-app-page]")];
-  const mobileNowPlaying = document.querySelector("#spcboy-mobile-now-playing");
-  const mobileNowArtwork = document.querySelector("#spcboy-mobile-now-artwork");
+  const mobileScreenPlaying = document.querySelector("#spcboy-mobile-screen-playing");
+  const mobileScreenLibrary = document.querySelector("#spcboy-mobile-screen-library");
+  const mobileScreenGallery = document.querySelector("#spcboy-mobile-screen-gallery");
+  const mobileScreenRecent = document.querySelector("#spcboy-mobile-screen-recent");
+  const mobileScreenFavorites = document.querySelector("#spcboy-mobile-screen-favorites");
+  const mobileScreenDetail = document.querySelector("#spcboy-mobile-screen-detail");
+  const mobileScreenSound = document.querySelector("#spcboy-mobile-screen-sound");
+  const mobileNowArtwork = document.querySelector("#spcboy-mobile-now-art");
   const mobileNowTitle = document.querySelector("#spcboy-mobile-now-title");
   const mobileNowAlbum = document.querySelector("#spcboy-mobile-now-album");
-  const mobileProgress = document.querySelector("#spcboy-mobile-progress");
   const mobileProgressFill = document.querySelector("#spcboy-mobile-progress-fill");
   const mobileElapsed = document.querySelector("#spcboy-mobile-elapsed");
   const mobileDuration = document.querySelector("#spcboy-mobile-duration");
-  const mobileUpNext = document.querySelector("#spcboy-mobile-up-next");
   const mobilePlayButton = document.querySelector("#spcboy-mobile-play");
   const mobilePreviousButton = document.querySelector("#spcboy-mobile-previous");
   const mobileNextButton = document.querySelector("#spcboy-mobile-next");
-  const mobileSoundSettings = document.querySelector("#spcboy-mobile-sound-settings");
-  const mobileOptionsSettings = document.querySelector("#spcboy-mobile-options-settings");
-  const mobileSoundPages = document.querySelector("#spcboy-mobile-sound-pages");
-  const mobileOptionsPages = document.querySelector("#spcboy-mobile-options-pages");
+  const mobileUpNext = document.querySelector("#spcboy-mobile-up-next");
+  const mobileDock = document.querySelector("#spcboy-mobile-dock");
+  const mobileDockArt = document.querySelector("#spcboy-mobile-dock-art");
+  const mobileDockTitle = document.querySelector("#spcboy-mobile-dock-title");
+  const mobileDockSubtitle = document.querySelector("#spcboy-mobile-dock-subtitle");
+  const mobileDockPlay = document.querySelector("#spcboy-mobile-dock-play");
+  const mobileDockProgressFill = document.querySelector("#spcboy-mobile-dock-progress-fill");
+  const mobileToast = document.querySelector("#spcboy-mobile-toast");
   const drawerSettingsPages = document.querySelector("#drawer-options .spcboy-settings-pages");
   const audioSettingsPage = document.querySelector("#spcboy-settings-page-audio");
   const playbackSettingsPage = document.querySelector("#spcboy-settings-page-playback");
@@ -154,6 +163,7 @@
   let favoritePlaylistLoading = false;
   let favoritePlaylistFailed = false;
   let favoritePlaylistPromise = null;
+  let rawCatalog = null;
   let catalogLoaded = false;
   let catalogAvailable = false;
   let catalogLoadingPhase = "idle";
@@ -187,6 +197,23 @@
     if (workspaceToolbar && stage) {
       if (mobile && workspaceToolbar.parentElement !== library) library.insertBefore(workspaceToolbar,stage);
       else if (!mobile && workspaceToolbar.parentElement !== stage) stage.prepend(workspaceToolbar);
+    }
+    const activeGalleryConsoles = typeof galleryConsoles !== "undefined" ? galleryConsoles : document.querySelector('.spcboy-gallery-consoles');
+    if (activeGalleryConsoles) {
+      const desktop = window.matchMedia('(min-width: 781px)').matches;
+      if (view === "gallery") {
+        if (desktop) {
+          const sidebar = document.querySelector('.spcboy-tree');
+          if (sidebar && activeGalleryConsoles.parentElement !== sidebar) sidebar.append(activeGalleryConsoles);
+          activeGalleryConsoles.setAttribute('aria-orientation', 'vertical');
+          if (typeof trackList !== "undefined" && trackList) trackList.hidden = true;
+        } else {
+          const galleryToolbar = document.querySelector('.spcboy-gallery-toolbar');
+          if (galleryToolbar && activeGalleryConsoles.parentElement !== galleryToolbar) galleryToolbar.prepend(activeGalleryConsoles);
+          activeGalleryConsoles.setAttribute('aria-orientation', 'horizontal');
+          if (typeof trackList !== "undefined" && trackList) trackList.hidden = false;
+        }
+      }
     }
     for (const tab of tabs) {
       const selected = tab.dataset.view === view;
@@ -288,13 +315,8 @@
   }
 
   function placeMobileSettingsPages() {
-    if (!drawerSettingsPages || !mobileSoundPages || !mobileOptionsPages) return;
-    if (isDesktop()) {
-      drawerSettingsPages.append(playbackSettingsPage, audioSettingsPage, interfaceSettingsPage);
-    } else {
-      mobileSoundPages.append(audioSettingsPage, playbackSettingsPage);
-      mobileOptionsPages.append(interfaceSettingsPage);
-    }
+    // Mobile uses its own dedicated markup in spcboy_mobile_shell.html;
+    // desktop settings pages permanently remain in #drawer-options.
   }
 
   function applyPlaylistColumnVisibility() {
@@ -1345,7 +1367,7 @@
 
   function openGalleryAlbum(entry) {
     if (!entry) return;
-    if (!isDesktop()) {
+    if (typeof isDesktop === "function" && !isDesktop()) {
       showGalleryAlbumDetails(entry);
       return;
     }
@@ -1488,6 +1510,7 @@
   }
 
   async function renderCatalog(catalog) {
+    rawCatalog = catalog;
     trackList.replaceChildren();
     searchOpenedSystems.clear();
     tracks = [];
@@ -1617,8 +1640,16 @@
     catalogLoaded = true;
     catalogAvailable = true;
     resolveCatalogReady();
-    renderMobileNowPlaying(window.SitePlayer?.getCurrentTrack?.() || currentTrack);
-    renderMobileUpNext();
+    try {
+      renderMobileNowPlaying(window.SitePlayer?.getCurrentTrack?.() || currentTrack);
+      renderMobileUpNext();
+      if (!isDesktop()) {
+        renderMobileLibrary();
+        renderMobileGallery();
+      }
+    } catch (err) {
+      console.warn("Mobile initial render warning:", err);
+    }
     selectedGameKey = gameGroups[0]?.key ?? null;
     if (!hasSavedWorkspace) activeWorkspace().albumId = gameGroups[0]?.albumId || null;
     libraryState.textContent = gameCountLabel(gameGroups.length);
@@ -2177,7 +2208,7 @@
       const playlist = albumTracks.length ? albumTracks : [track];
       await window.SitePlayer?.playPlaylist(playlist, {
         startTrackId: track.id,
-        toggle: true,
+        toggle: isDesktop(),
       });
       return;
     }
@@ -2307,6 +2338,22 @@
   }
   let mobileTrackListAlbumId = "";
   let mobileTrackListGeneration = 0;
+  let mobilePreviousPage = "gallery";
+  let mobileGallerySelectedConsole = "";
+  let mobileToastTimer = null;
+  let openMobileConsole = "";
+  let openMobileAlbumId = "";
+
+  function showMobileToast(message) {
+    if (!mobileToast) return;
+    mobileToast.textContent = message;
+    mobileToast.classList.add("is-visible");
+    window.clearTimeout(mobileToastTimer);
+    mobileToastTimer = window.setTimeout(() => {
+      mobileToast.classList.remove("is-visible");
+    }, 1500);
+  }
+
   function mobileGroupForTrack(track) {
     if (!track) return null;
     const albumId = track.albumId
@@ -2319,195 +2366,1147 @@
       || (track.gameKey ? gameGroupsByKey.get(track.gameKey) : null)
       || null;
   }
-  function renderMobileAlbumTracks(group, albumTracks, activeTrack) {
-    if (!mobileUpNext) return;
-    mobileUpNext.replaceChildren();
-    if (!albumTracks.length) {
-      const item = document.createElement("li");
-      if (group.loadFailed) {
-        const retry = document.createElement("button");
-        retry.type = "button";
-        retry.textContent = "Retry track list";
-        retry.addEventListener("click", () => {
-          retry.disabled = true;
-          ensureAlbumTracks(group, { retry: true }).then((tracks) => {
-            renderMobileAlbumTracks(group, tracks, window.SitePlayer?.getCurrentTrack?.() || currentTrack);
+
+  function setMobileAppPage(nextPage) {
+    if (!mobileAppNav) return;
+    if (!["playing", "library", "gallery", "recent", "favorites", "sound", "detail"].includes(nextPage)) return;
+    mobileAppPage = nextPage;
+    const navButtons = mobileAppNav.querySelectorAll("[data-mobile-app-page]");
+    for (const button of navButtons) {
+      const selected = button.dataset.mobileAppPage === nextPage;
+      if (selected) button.setAttribute("aria-current", "page");
+      else button.removeAttribute("aria-current");
+    }
+    if (mobileScreenPlaying) mobileScreenPlaying.classList.toggle("is-hidden", nextPage !== "playing");
+    if (mobileScreenLibrary) mobileScreenLibrary.classList.toggle("is-hidden", nextPage !== "library");
+    if (mobileScreenGallery) mobileScreenGallery.classList.toggle("is-hidden", nextPage !== "gallery");
+    if (mobileScreenRecent) mobileScreenRecent.classList.toggle("is-hidden", nextPage !== "recent");
+    if (mobileScreenFavorites) mobileScreenFavorites.classList.toggle("is-hidden", nextPage !== "favorites");
+    if (mobileScreenDetail) mobileScreenDetail.classList.toggle("is-hidden", nextPage !== "detail");
+    if (mobileScreenSound) mobileScreenSound.classList.toggle("is-hidden", nextPage !== "sound");
+
+    if (mobileDock) {
+      mobileDock.classList.toggle("is-hidden", nextPage === "playing");
+    }
+
+    try {
+      if (nextPage === "playing") renderMobileNowPlaying();
+      else if (nextPage === "library") renderMobileLibrary();
+      else if (nextPage === "gallery") renderMobileGallery();
+      else if (nextPage === "recent") renderMobileRecents();
+      else if (nextPage === "favorites") renderMobileFavorites();
+      else if (nextPage === "sound") syncMobileSoundControls();
+    } catch (err) {
+      console.warn("Mobile page render warning:", err);
+    }
+  }
+
+  function renderMobileLibrary() {
+    const tree = document.querySelector("#spcboy-mobile-library-tree");
+    const searchInput = document.querySelector("#spcboy-mobile-library-search");
+    if (!tree) return;
+    if (!catalogAvailable && !gameGroups.length) {
+      tree.innerHTML = '<p class="spcboy-mobile-empty">Loading hosted games…</p>';
+      return;
+    }
+    const query = (searchInput?.value || "").trim().toLowerCase();
+    let consoles = Array.isArray(rawCatalog?.consoles) ? rawCatalog.consoles : [];
+    if (!consoles.length && gameGroups.length) {
+      const names = [...new Set(gameGroups.map((g) => g.consoleName))];
+      consoles = names.map((name) => ({ name, games: gameGroups.filter((g) => g.consoleName === name) }));
+    }
+    tree.replaceChildren();
+
+    consoles.forEach((consoleData) => {
+      const consoleName = canonicalConsoleName(consoleData.name);
+      const games = gameGroups.filter((group) => {
+        if (group.consoleName !== consoleName) return false;
+        if (!query) return true;
+        return group.gameName.toLowerCase().includes(query)
+          || (group.tracks && group.tracks.some(t => (t.title || "").toLowerCase().includes(query)));
+      });
+      if (!games.length) return;
+
+      const isOpen = openMobileConsole === consoleName || Boolean(query);
+      const groupSection = document.createElement("section");
+      groupSection.className = "spcboy-mobile-console-group";
+
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "spcboy-mobile-console-toggle";
+      toggle.setAttribute("aria-expanded", String(isOpen));
+
+      const name = document.createElement("span");
+      name.className = "spcboy-mobile-console-name";
+      name.textContent = consoleName;
+
+      const count = document.createElement("span");
+      count.className = "spcboy-mobile-console-count";
+      count.textContent = `${games.length} album${games.length === 1 ? "" : "s"}`;
+
+      const chevron = document.createElement("span");
+      chevron.className = "spcboy-mobile-console-chevron";
+      chevron.setAttribute("aria-hidden", "true");
+      chevron.textContent = isOpen ? "⌄" : "›";
+
+      toggle.append(name, count, chevron);
+      toggle.addEventListener("click", () => {
+        openMobileConsole = openMobileConsole === consoleName ? "" : consoleName;
+        openMobileAlbumId = "";
+        renderMobileLibrary();
+      });
+      groupSection.append(toggle);
+
+      if (isOpen) {
+        const albumsContainer = document.createElement("div");
+        albumsContainer.className = "spcboy-mobile-console-albums";
+
+        games.forEach((gameEntry) => {
+          const albumEntry = document.createElement("div");
+          albumEntry.className = "spcboy-mobile-album-entry";
+
+          const isAlbumOpen = openMobileAlbumId === gameEntry.key || (Boolean(query) && gameEntry.gameName.toLowerCase().includes(query));
+          const albumToggle = document.createElement("button");
+          albumToggle.type = "button";
+          albumToggle.className = "spcboy-mobile-album-toggle";
+          albumToggle.setAttribute("aria-expanded", String(isAlbumOpen));
+
+          const albumTitle = document.createElement("span");
+          albumTitle.className = "spcboy-mobile-album-title";
+          albumTitle.textContent = gameEntry.gameName;
+
+          const albumCount = document.createElement("span");
+          albumCount.className = "spcboy-mobile-album-count";
+          albumCount.textContent = `${gameEntry.trackCount} track${gameEntry.trackCount === 1 ? "" : "s"}`;
+
+          const albumChevron = document.createElement("span");
+          albumChevron.className = "spcboy-mobile-album-chevron";
+          albumChevron.textContent = isAlbumOpen ? "⌄" : "›";
+
+          albumToggle.append(albumTitle, albumCount, albumChevron);
+          albumToggle.addEventListener("click", () => {
+            openMobileAlbumId = openMobileAlbumId === gameEntry.key ? "" : gameEntry.key;
+            renderMobileLibrary();
           });
+          albumEntry.append(albumToggle);
+
+          if (isAlbumOpen) {
+            const inlineTracks = document.createElement("div");
+            inlineTracks.className = "spcboy-mobile-inline-tracks";
+
+            if (gameEntry.loaded && gameEntry.tracks.length) {
+              renderInlineTrackList(gameEntry, inlineTracks, query);
+            } else {
+              const loadingEl = document.createElement("div");
+              loadingEl.className = "spcboy-mobile-track";
+              loadingEl.textContent = "Loading tracks…";
+              inlineTracks.append(loadingEl);
+              ensureAlbumTracks(gameEntry).then(() => {
+                inlineTracks.replaceChildren();
+                renderInlineTrackList(gameEntry, inlineTracks, query);
+              });
+            }
+
+            const detailsLink = document.createElement("button");
+            detailsLink.type = "button";
+            detailsLink.className = "spcboy-mobile-album-detail-link";
+            detailsLink.textContent = "Album artwork";
+            detailsLink.addEventListener("click", () => openMobileAlbumDetail(gameEntry, "library"));
+            inlineTracks.append(detailsLink);
+
+            albumEntry.append(inlineTracks);
+          }
+          albumsContainer.append(albumEntry);
         });
-        item.append(retry);
+        groupSection.append(albumsContainer);
       }
-      mobileUpNext.append(item);
-      return;
-    }
-    albumTracks.forEach((track, index) => {
-      const item = document.createElement("li");
-      const button = document.createElement("button");
-      const isCurrent = track.id === activeTrack?.id;
-      button.type = "button";
-      button.setAttribute("aria-label", `Play ${track.title}${group.gameName ? `, ${group.gameName}` : ""}`);
-      if (isCurrent) button.setAttribute("aria-current", "true");
-      const title = document.createElement("span");
-      title.textContent = track.title || track.id;
-      const number = document.createElement("span");
-      number.textContent = String(index + 1).padStart(2, "0");
-      button.append(title, number);
-      button.addEventListener("click", () => selectTrack(track, true));
-      item.append(button);
-      mobileUpNext.append(item);
+      tree.append(groupSection);
     });
-  }
-  function renderMobileUpNext() {
-    if (!mobileUpNext) return;
-    if (isDesktop()) {
-      mobileUpNext.replaceChildren();
-      mobileTrackListAlbumId = "";
-      return;
+
+    if (!tree.childElementCount) {
+      const empty = document.createElement("p");
+      empty.className = "spcboy-mobile-empty";
+      empty.textContent = "No matching games or tracks.";
+      tree.append(empty);
     }
+  }
+
+  function renderInlineTrackList(gameEntry, container, query) {
     const activeTrack = window.SitePlayer?.getCurrentTrack?.() || currentTrack;
+    gameEntry.tracks.forEach((track, idx) => {
+      if (query && !track.title.toLowerCase().includes(query) && !gameEntry.gameName.toLowerCase().includes(query)) return;
+      const trackBtn = document.createElement("button");
+      trackBtn.type = "button";
+      trackBtn.className = "spcboy-mobile-track" + (activeTrack?.id === track.id ? " is-playing" : "");
+      const num = document.createElement("span");
+      num.textContent = String(idx + 1).padStart(2, "0");
+      const titleSpan = document.createElement("span");
+      titleSpan.textContent = track.title || track.id;
+      trackBtn.append(num, titleSpan);
+      trackBtn.addEventListener("click", () => {
+        selectTrack(track, true);
+        setMobileAppPage("playing");
+      });
+      container.append(trackBtn);
+    });
+  }
+
+  function renderMobileGallery() {
+    const grid = document.querySelector("#spcboy-mobile-gallery-grid");
+    const picker = document.querySelector("#spcboy-mobile-gallery-console-select");
+    const searchInput = document.querySelector("#spcboy-mobile-gallery-search");
+    if (!grid) return;
+    if (!catalogAvailable && !gameGroups.length) {
+      grid.innerHTML = '<p class="spcboy-mobile-empty" style="grid-column: 1 / -1;">Loading album artwork…</p>';
+      return;
+    }
+    let consoles = Array.isArray(rawCatalog?.consoles) ? rawCatalog.consoles : [];
+    if (!consoles.length && gameGroups.length) {
+      const names = [...new Set(gameGroups.map((g) => g.consoleName))];
+      consoles = names.map((name) => ({ name }));
+    }
+    if (picker && !picker.options.length) {
+      const allOpt = document.createElement("option");
+      allOpt.value = "";
+      allOpt.textContent = "All Consoles";
+      picker.append(allOpt);
+      consoles.forEach((c) => {
+        const cName = canonicalConsoleName(c.name);
+        const opt = document.createElement("option");
+        opt.value = cName;
+        opt.textContent = cName;
+        picker.append(opt);
+      });
+      picker.value = mobileGallerySelectedConsole || "";
+    }
+    const activeConsole = picker?.value || mobileGallerySelectedConsole || "";
+    const query = (searchInput?.value || "").trim().toLowerCase();
+
+    const matches = galleryCards.filter((entry) => {
+      const matchConsole = !activeConsole || entry.consoleName === activeConsole;
+      const matchQuery = !query || entry.gameName.toLowerCase().includes(query);
+      return matchConsole && matchQuery;
+    });
+
+    grid.replaceChildren();
+    matches.slice(0, 100).forEach((entry) => {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "spcboy-mobile-album-card";
+      card.setAttribute("aria-label", `Open ${entry.gameName}`);
+
+      const coverWrap = document.createElement("span");
+      coverWrap.className = "spcboy-mobile-cover-wrap";
+
+      const img = document.createElement("img");
+      img.src = entry.artworkUrl;
+      img.alt = "";
+      img.loading = "lazy";
+      img.decoding = "async";
+      coverWrap.append(img);
+
+      const name = document.createElement("span");
+      name.className = "spcboy-mobile-album-name";
+      name.textContent = entry.gameName;
+
+      const meta = document.createElement("span");
+      meta.className = "spcboy-mobile-album-meta";
+      meta.textContent = `${entry.trackCount} track${entry.trackCount === 1 ? "" : "s"}`;
+
+      card.append(coverWrap, name, meta);
+      card.addEventListener("click", () => openMobileAlbumDetail(entry, "gallery"));
+      grid.append(card);
+    });
+
+    if (!matches.length) {
+      const empty = document.createElement("p");
+      empty.className = "spcboy-mobile-empty";
+      empty.style.gridColumn = "1 / -1";
+      empty.textContent = "No albums found.";
+      grid.append(empty);
+    }
+  }
+
+  function openMobileAlbumDetail(entry, returnPage = "gallery") {
+    mobileDetailEntry = entry;
+    mobilePreviousPage = returnPage;
+    const backLabel = document.querySelector("#spcboy-mobile-back-label");
+    if (backLabel) backLabel.textContent = returnPage === "library" ? "Library" : "Gallery";
+
+    const heroArt = document.querySelector("#spcboy-mobile-detail-artwork");
+    const heroTitle = document.querySelector("#spcboy-mobile-detail-title");
+    const heroMeta = document.querySelector("#spcboy-mobile-detail-meta");
+    const playAlbumBtn = document.querySelector("#spcboy-mobile-detail-play");
+    const tracklistEl = document.querySelector("#spcboy-mobile-detail-tracks");
+    const statusEl = document.querySelector("#spcboy-mobile-detail-status");
+
+    if (heroArt) {
+      heroArt.src = entry.detailArtworkUrl || entry.artworkUrl || "";
+      heroArt.alt = `${entry.gameName} artwork`;
+    }
+    if (heroTitle) heroTitle.textContent = entry.gameName;
+    if (heroMeta) heroMeta.textContent = `${entry.consoleName} · ${entry.trackCount} tracks`;
+
+    if (playAlbumBtn) {
+      playAlbumBtn.onclick = async () => {
+        showMobileLoadingIndicator(`Loading ${entry.gameName}…`);
+        const tracks = await ensureAlbumTracks(entry);
+        if (tracks.length) {
+          window.SitePlayer?.playPlaylist?.(tracks, { startTrackId: tracks[0]?.id, toggle: false });
+          setMobileAppPage("playing");
+        }
+      };
+    }
+
+    if (tracklistEl) {
+      tracklistEl.replaceChildren();
+      if (statusEl) {
+        statusEl.textContent = "Loading tracks…";
+        statusEl.classList.remove("is-hidden");
+      }
+      ensureAlbumTracks(entry).then((tracks) => {
+        if (statusEl) statusEl.classList.add("is-hidden");
+        const activeTrack = window.SitePlayer?.getCurrentTrack?.() || currentTrack;
+        tracklistEl.replaceChildren();
+        tracks.forEach((track, idx) => {
+          const row = document.createElement("li");
+          const btn = document.createElement("button");
+          btn.type = "button";
+          const isPlaying = activeTrack?.id === track.id;
+          btn.className = "spcboy-mobile-track-row spcboy-mobile-detail-track-row" + (isPlaying ? " is-playing" : "");
+          const num = document.createElement("span");
+          num.className = "spcboy-mobile-track-num spcboy-mobile-detail-number";
+          num.textContent = String(idx + 1).padStart(2, "0");
+          const title = document.createElement("span");
+          title.className = "spcboy-mobile-track-title spcboy-mobile-detail-title";
+          title.textContent = track.title || track.id;
+          const len = document.createElement("span");
+          len.className = "spcboy-mobile-track-len spcboy-mobile-detail-length";
+          len.textContent = formatMobileTime(track.durationSeconds || window.SitePlayer?.getDuration?.(track));
+          btn.append(num, title, len);
+          btn.dataset.trackId = track.id;
+          btn.onclick = (e) => {
+            e.preventDefault();
+            btn.classList.add("is-loading");
+            showMobileLoadingIndicator(track.title || "Loading track…");
+            selectTrack(track, true);
+            setMobileAppPage("playing");
+          };
+          row.append(btn);
+          tracklistEl.append(row);
+        });
+      }).catch(() => {
+        if (statusEl) {
+          statusEl.textContent = "Failed to load album tracks.";
+          statusEl.classList.remove("is-hidden");
+        }
+      });
+    }
+
+    setMobileAppPage("detail");
+    if (mobileScreenDetail) mobileScreenDetail.scrollTop = 0;
+  }
+
+  let activeFaderAnimationId = null;
+  let currentMobileEqPreset = 0;
+
+  function updateMobileEqToolbar(activeMode) {
+    document.querySelectorAll("[data-mobile-eq-mode]").forEach((btn) => {
+      const mode = btn.dataset.mobileEqMode;
+      const isActive = String(mode) === String(activeMode);
+      btn.classList.toggle("is-active", isActive);
+      btn.setAttribute("aria-pressed", String(isActive));
+    });
+    const saveBtn = document.querySelector("#spcboy-mobile-save-preset");
+    if (saveBtn && typeof activeMode === "number") {
+      saveBtn.textContent = `Save to Preset ${activeMode + 1}`;
+    }
+  }
+
+  function animateMobileFaders(targetGains, { duration = 240, onComplete } = {}) {
+    if (activeFaderAnimationId) {
+      cancelAnimationFrame(activeFaderAnimationId);
+      activeFaderAnimationId = null;
+    }
+    const sliders = [...document.querySelectorAll("[data-mobile-eq-band]")];
+    if (!sliders.length) {
+      if (typeof onComplete === "function") onComplete();
+      return;
+    }
+    const startGains = sliders.map((s) => Number(s.value) || 0);
+    const startTime = performance.now();
+
+    function easeOutCubic(t) {
+      return 1 - Math.pow(1 - t, 3);
+    }
+
+    function step(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      const eased = easeOutCubic(progress);
+
+      sliders.forEach((slider, idx) => {
+        const start = startGains[idx];
+        const target = targetGains[idx] ?? 0;
+        const current = start + (target - start) * eased;
+        slider.value = current.toFixed(1);
+        const output = document.querySelector(`[data-mobile-eq-value="${idx}"]`);
+        if (output) {
+          const rounded = Math.round(current * 2) / 2;
+          output.textContent = (rounded > 0 ? "+" : "") + rounded.toFixed(1);
+        }
+      });
+
+      if (progress < 1) {
+        activeFaderAnimationId = requestAnimationFrame(step);
+      } else {
+        activeFaderAnimationId = null;
+        sliders.forEach((slider, idx) => {
+          const target = targetGains[idx] ?? 0;
+          slider.value = String(target);
+          const output = document.querySelector(`[data-mobile-eq-value="${idx}"]`);
+          if (output) {
+            output.textContent = (target > 0 ? "+" : "") + target.toFixed(1);
+          }
+        });
+        if (typeof onComplete === "function") onComplete();
+      }
+    }
+    activeFaderAnimationId = requestAnimationFrame(step);
+  }
+
+  function syncMobileSoundControls() {
+    if (!window.SitePlayer) return;
+    const vol = window.SitePlayer.getVolume?.();
+    const volInput = document.querySelector("#spcboy-mobile-volume");
+    const volValue = document.querySelector("#spcboy-mobile-volume-value");
+    if (volInput && typeof vol === "number") volInput.value = String(vol);
+    if (volValue && typeof vol === "number") volValue.textContent = `${Math.round(vol * 5)}%`;
+
+    const eqEnabled = window.SitePlayer.isEqualizerEnabled?.();
+    const activePreset = typeof currentMobileEqPreset === "number" ? currentMobileEqPreset : 0;
+    updateMobileEqToolbar(eqEnabled ? activePreset : "off");
+
+    const gains = window.SitePlayer.getEqualizerBands?.() || [];
+    gains.forEach((gain, idx) => {
+      const input = document.querySelector(`[data-mobile-eq-band="${idx}"]`);
+      const output = document.querySelector(`[data-mobile-eq-value="${idx}"]`);
+      if (input && activeFaderAnimationId === null) input.value = String(gain);
+      if (output && activeFaderAnimationId === null) output.textContent = (gain > 0 ? "+" : "") + Number(gain).toFixed(1);
+    });
+
+    const skips = window.SitePlayer.getFadedSkips?.();
+    const skipToggle = document.querySelector("#spcboy-mobile-faded-skip");
+    const fadeInput = document.querySelector("#spcboy-mobile-fade-seconds");
+    if (skipToggle && skips) {
+      skipToggle.setAttribute("aria-checked", String(skips.enabled));
+      skipToggle.textContent = skips.enabled ? "Yes" : "No";
+    }
+    if (fadeInput && skips) fadeInput.value = String(skips.seconds);
+
+    const speed = window.SitePlayer.getPlaybackSpeed?.();
+    const speedToggle = document.querySelector("#spcboy-mobile-speed-enabled");
+    const speedFraction = document.querySelector("#spcboy-mobile-speed");
+    if (speedToggle && speed) {
+      speedToggle.setAttribute("aria-checked", String(speed.enabled));
+      speedToggle.textContent = speed.enabled ? "Yes" : "No";
+    }
+    if (speedFraction && speed) speedFraction.value = speed.fraction;
+
+    const longPlay = window.SitePlayer.getLongPlay?.();
+    const lpToggle = document.querySelector("#spcboy-mobile-long-play");
+    const lpInput = document.querySelector("#spcboy-mobile-long-play-duration");
+    if (lpToggle && longPlay) {
+      lpToggle.setAttribute("aria-checked", String(longPlay.enabled));
+      lpToggle.textContent = longPlay.enabled ? "Yes" : "No";
+    }
+    const fmt = window.SitePlayer?.formatPlaybackTime || formatMobileTime;
+    if (lpInput && longPlay) lpInput.value = fmt(longPlay.seconds);
+  }
+
+  let currentRenderedNowAlbumKey = null;
+
+  function showMobileLoadingIndicator(text = "Preparing audio stream…") {
+    const artLoading = document.querySelector("#spcboy-mobile-art-loading");
+    const loadingText = artLoading?.querySelector(".spcboy-mobile-loading-text");
+    const dockSpinner = document.querySelector("#spcboy-mobile-dock-spinner");
+    if (loadingText) loadingText.textContent = text;
+    if (artLoading) artLoading.classList.remove("is-hidden");
+    if (dockSpinner) dockSpinner.classList.remove("is-hidden");
+  }
+
+  function hideMobileLoadingIndicator() {
+    const artLoading = document.querySelector("#spcboy-mobile-art-loading");
+    const dockSpinner = document.querySelector("#spcboy-mobile-dock-spinner");
+    if (artLoading) artLoading.classList.add("is-hidden");
+    if (dockSpinner) dockSpinner.classList.add("is-hidden");
+    document.querySelectorAll(".spcboy-mobile-track-row.is-loading").forEach((el) => el.classList.remove("is-loading"));
+  }
+
+  function renderMobileNowAlbumTracks(activeTrack) {
+    const listEl = document.querySelector("#spcboy-mobile-now-tracklist");
+    const countEl = document.querySelector("#spcboy-mobile-now-album-count");
+    const headingEl = document.querySelector("#spcboy-mobile-now-album-heading");
+    const statusEl = document.querySelector("#spcboy-mobile-now-tracklist-status");
+    if (!listEl) return;
+
+    if (!activeTrack) {
+      currentRenderedNowAlbumKey = null;
+      listEl.replaceChildren();
+      if (countEl) countEl.textContent = "";
+      if (headingEl) headingEl.textContent = "Album Tracks";
+      return;
+    }
+
     const group = mobileGroupForTrack(activeTrack);
+    const albumKey = group?.key || activeTrack.gameKey || activeTrack.albumId || activeTrack.game || "unknown";
+    const albumName = activeTrack.game || group?.gameName || "Album Tracks";
+    if (headingEl) headingEl.textContent = albumName;
+
+    // Fast-path: if this album's DOM is already built, DO NOT wipe children or re-create elements.
+    // Simply update the active .is-playing row state in place.
+    // This stops ALL jumpiness, scroll jumping, and touch-interruptions when songs change or time updates!
+    if (currentRenderedNowAlbumKey === albumKey && listEl.children.length > 0) {
+      const rows = listEl.querySelectorAll(".spcboy-mobile-track-row");
+      for (const row of rows) {
+        const isPlaying = row.dataset.trackId === activeTrack.id;
+        row.classList.toggle("is-playing", isPlaying);
+        if (isPlaying) row.classList.remove("is-loading");
+      }
+      return;
+    }
+
+    currentRenderedNowAlbumKey = albumKey;
+
     if (group) {
-      if (group.albumId !== mobileTrackListAlbumId) {
-        mobileTrackListAlbumId = group.albumId;
-        mobileTrackListGeneration += 1;
-        mobileUpNext.replaceChildren();
-      }
-      if (group.loaded) {
-        renderMobileAlbumTracks(group, group.tracks, activeTrack);
-        return;
-      }
-      const generation = mobileTrackListGeneration;
-      if (!mobileUpNext.firstElementChild) {
-        const loading = document.createElement("li");
-        loading.className = "spcboy-mobile-track-list-state";
-        loading.textContent = "Loading tracks…";
-        mobileUpNext.append(loading);
-      }
-      ensureAlbumTracks(group).then((albumTracks) => {
-        const latestTrack = window.SitePlayer?.getCurrentTrack?.() || currentTrack;
-        if (generation !== mobileTrackListGeneration || mobileGroupForTrack(latestTrack)?.albumId !== group.albumId) return;
-        renderMobileAlbumTracks(group, albumTracks, latestTrack);
-        renderMobileNowPlaying(latestTrack);
+      if (countEl) countEl.textContent = `${group.trackCount || group.tracks?.length || ""} tracks`;
+      ensureAlbumTracks(group).then((tracks) => {
+        if (currentRenderedNowAlbumKey !== albumKey) return;
+        if (statusEl) statusEl.classList.add("is-hidden");
+        listEl.replaceChildren();
+        tracks.forEach((track, idx) => {
+          const row = document.createElement("li");
+          const btn = document.createElement("button");
+          btn.type = "button";
+          const isPlaying = track.id === activeTrack.id;
+          btn.className = "spcboy-mobile-track-row spcboy-mobile-detail-track-row" + (isPlaying ? " is-playing" : "");
+          btn.dataset.trackId = track.id;
+          const num = document.createElement("span");
+          num.className = "spcboy-mobile-track-num spcboy-mobile-detail-number";
+          num.textContent = String(idx + 1).padStart(2, "0");
+          const title = document.createElement("span");
+          title.className = "spcboy-mobile-track-title spcboy-mobile-detail-title";
+          title.textContent = track.title || track.id;
+          const len = document.createElement("span");
+          len.className = "spcboy-mobile-track-len spcboy-mobile-detail-length";
+          len.textContent = formatMobileTime(track.durationSeconds || window.SitePlayer?.getDuration?.(track));
+          btn.append(num, title, len);
+          btn.onclick = (e) => {
+            e.preventDefault();
+            btn.classList.add("is-loading");
+            showMobileLoadingIndicator(track.title || "Loading track…");
+            selectTrack(track, true);
+          };
+          row.append(btn);
+          listEl.append(row);
+        });
+      }).catch(() => {
+        if (statusEl) {
+          statusEl.textContent = "Could not load album tracks.";
+          statusEl.classList.remove("is-hidden");
+        }
       });
       return;
     }
-    mobileTrackListAlbumId = "";
-    mobileUpNext.replaceChildren();
-    const tracks = (window.SitePlayer?.getQueue?.() || []).slice(0, 3);
-    const queueActions = [...document.querySelectorAll("#site-player-queue .site-player-queue-track")];
-    tracks.forEach((track, index) => {
-      const item = document.createElement("li");
-      const button = document.createElement("button");
-      button.type = "button";
-      button.setAttribute("aria-label", `Play ${track.title}${track.game ? `, ${track.game}` : ""}`);
+
+    const queueTracks = [activeTrack, ...(window.SitePlayer?.getQueue?.() || [])];
+    if (countEl) countEl.textContent = `${queueTracks.length} tracks`;
+    listEl.replaceChildren();
+    queueTracks.forEach((track, idx) => {
+      const row = document.createElement("li");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      const isPlaying = track.id === activeTrack.id;
+      btn.className = "spcboy-mobile-track-row spcboy-mobile-detail-track-row" + (isPlaying ? " is-playing" : "");
+      btn.dataset.trackId = track.id;
+      const num = document.createElement("span");
+      num.className = "spcboy-mobile-track-num spcboy-mobile-detail-number";
+      num.textContent = String(idx + 1).padStart(2, "0");
       const title = document.createElement("span");
+      title.className = "spcboy-mobile-track-title spcboy-mobile-detail-title";
       title.textContent = track.title || track.id;
-      const album = document.createElement("span");
-      album.textContent = track.game || "";
-      button.append(title, album);
-      button.addEventListener("click", () => {
-        if (queueActions[index]) queueActions[index].click();
-        else window.SitePlayer?.playNow?.(track);
-      });
-      item.append(button);
-      mobileUpNext.append(item);
+      const len = document.createElement("span");
+      len.className = "spcboy-mobile-track-len spcboy-mobile-detail-length";
+      len.textContent = formatMobileTime(track.durationSeconds || window.SitePlayer?.getDuration?.(track));
+      btn.append(num, title, len);
+      btn.onclick = (e) => {
+        e.preventDefault();
+        btn.classList.add("is-loading");
+        showMobileLoadingIndicator(track.title || "Loading track…");
+        selectTrack(track, true);
+      };
+      row.append(btn);
+      listEl.append(row);
     });
   }
+
+  function renderMobileRecents() {
+    const listEl = document.querySelector("#spcboy-mobile-recent-tracks");
+    const countEl = document.querySelector("#spcboy-mobile-recent-count");
+    const emptyEl = document.querySelector("#spcboy-mobile-recent-empty");
+    const moreBtn = document.querySelector("#spcboy-mobile-recent-more");
+    const searchInput = document.querySelector("#spcboy-mobile-recent-search");
+    if (!listEl) return;
+
+    if (!recentLoaded && !recentLoading) {
+      loadRecents(false).then(() => renderMobileRecents()).catch(() => {});
+    }
+
+    if (recentLoading && !recentEntries.length) {
+      if (emptyEl) {
+        emptyEl.textContent = "Loading your recent plays…";
+        emptyEl.classList.remove("is-hidden");
+      }
+      listEl.replaceChildren();
+      return;
+    }
+
+    const query = (searchInput?.value || "").trim().toLowerCase();
+    const tracks = recentPlaylistTracks().filter((track) => {
+      if (!query) return true;
+      return (track.title || "").toLowerCase().includes(query)
+        || (track.game || "").toLowerCase().includes(query)
+        || (track.console || "").toLowerCase().includes(query);
+    });
+
+    if (countEl) {
+      countEl.textContent = `${tracks.length} track${tracks.length === 1 ? "" : "s"}`;
+    }
+
+    if (!tracks.length) {
+      listEl.replaceChildren();
+      if (emptyEl) {
+        emptyEl.textContent = query ? "No recent plays match your search." : "No recently played tracks yet.";
+        emptyEl.classList.remove("is-hidden");
+      }
+      if (moreBtn) moreBtn.classList.add("is-hidden");
+      return;
+    }
+
+    if (emptyEl) emptyEl.classList.add("is-hidden");
+    listEl.replaceChildren();
+
+    const activeTrack = currentTrack || window.SitePlayer?.getCurrentTrack?.();
+
+    tracks.forEach((track, idx) => {
+      const row = document.createElement("li");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      const isPlaying = Boolean(activeTrack && track.id === activeTrack.id);
+      btn.className = "spcboy-mobile-track-row spcboy-mobile-recent-track-row" + (isPlaying ? " is-playing" : "");
+      btn.dataset.trackId = track.id;
+
+      const num = document.createElement("span");
+      num.className = "spcboy-mobile-track-num";
+      num.textContent = String(idx + 1).padStart(2, "0");
+
+      const info = document.createElement("div");
+      info.className = "spcboy-mobile-recent-info";
+
+      const title = document.createElement("span");
+      title.className = "spcboy-mobile-track-title";
+      title.textContent = track.title || track.id;
+
+      const meta = document.createElement("span");
+      meta.className = "spcboy-mobile-recent-meta";
+      meta.textContent = `${track.game || "Unknown Game"}${track.timestamp ? " · " + track.timestamp : ""}`;
+
+      info.append(title, meta);
+
+      const len = document.createElement("span");
+      len.className = "spcboy-mobile-track-len";
+      len.textContent = formatMobileTime(track.durationSeconds || window.SitePlayer?.getDuration?.(track));
+
+      btn.append(num, info, len);
+      btn.onclick = (e) => {
+        e.preventDefault();
+        btn.classList.add("is-loading");
+        showMobileLoadingIndicator(track.title || "Loading track…");
+        selectTrack(track, true);
+      };
+      row.append(btn);
+      listEl.append(row);
+    });
+
+    if (moreBtn) {
+      const canLoadMore = recentNextPage !== null;
+      moreBtn.classList.toggle("is-hidden", !canLoadMore);
+      moreBtn.disabled = recentLoading;
+      moreBtn.textContent = recentLoading ? "Loading…" : "Load more recent plays";
+    }
+  }
+
+  function renderMobileFavorites() {
+    const listEl = document.querySelector("#spcboy-mobile-favorites-tracks");
+    const countEl = document.querySelector("#spcboy-mobile-favorites-count");
+    const emptyEl = document.querySelector("#spcboy-mobile-favorites-empty");
+    const searchInput = document.querySelector("#spcboy-mobile-favorites-search");
+    if (!listEl) return;
+
+    if (!favoritePlaylistLoaded && !favoritePlaylistLoading) {
+      loadFavoritePlaylist({ allPages: true }).then(() => renderMobileFavorites()).catch(() => {});
+    }
+
+    if (favoritePlaylistLoading && !favoritePlaylistTracks.length) {
+      if (emptyEl) {
+        emptyEl.textContent = "Loading your favorites…";
+        emptyEl.classList.remove("is-hidden");
+      }
+      listEl.replaceChildren();
+      return;
+    }
+
+    const query = (searchInput?.value || "").trim().toLowerCase();
+    const tracks = favoritePlaylistTracks.filter((track) => {
+      if (!query) return true;
+      return (track.title || "").toLowerCase().includes(query)
+        || (track.game || track.gameTitle || "").toLowerCase().includes(query)
+        || (track.console || track.system || "").toLowerCase().includes(query);
+    });
+
+    if (countEl) {
+      countEl.textContent = String(tracks.length);
+    }
+
+    if (!tracks.length) {
+      if (emptyEl) {
+        emptyEl.textContent = query
+          ? "No favorites matched your search."
+          : "No favorite tracks yet. Star tracks in Library or Gallery to build your Favorites.";
+        emptyEl.classList.remove("is-hidden");
+      }
+      listEl.replaceChildren();
+      return;
+    }
+
+    if (emptyEl) emptyEl.classList.add("is-hidden");
+    const frag = document.createDocumentFragment();
+    const activeTrack = currentTrack || window.SitePlayer?.getCurrentTrack?.();
+
+    tracks.forEach((track, idx) => {
+      const row = document.createElement("li");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      const isPlaying = Boolean(activeTrack && track.id === activeTrack.id);
+      btn.className = "spcboy-mobile-track-row spcboy-mobile-recent-track-row" + (isPlaying ? " is-playing" : "");
+      btn.dataset.trackId = track.id;
+
+      const num = document.createElement("span");
+      num.className = "spcboy-mobile-track-num";
+      num.textContent = String(idx + 1).padStart(2, "0");
+
+      const info = document.createElement("div");
+      info.className = "spcboy-mobile-recent-info";
+
+      const title = document.createElement("span");
+      title.className = "spcboy-mobile-track-title";
+      title.textContent = track.title || track.id;
+
+      const meta = document.createElement("span");
+      meta.className = "spcboy-mobile-recent-meta";
+      const metaParts = [track.game || track.gameTitle, track.console || track.system].filter(Boolean);
+      meta.textContent = metaParts.join(" · ");
+
+      info.append(title, meta);
+
+      const len = document.createElement("span");
+      len.className = "spcboy-mobile-track-len";
+      len.textContent = formatMobileTime(track.durationSeconds || window.SitePlayer?.getDuration?.(track));
+
+      btn.append(num, info, len);
+      btn.onclick = (e) => {
+        e.preventDefault();
+        btn.classList.add("is-loading");
+        num.textContent = "⏳";
+        showMobileLoadingIndicator(track.title || "Loading track…");
+        window.SitePlayer?.playPlaylist(tracks, { startIndex: idx, toggle: false });
+      };
+      row.append(btn);
+      frag.append(row);
+    });
+
+    listEl.replaceChildren(frag);
+  }
+
+  function renderMobileUpNext() {
+    renderMobileNowAlbumTracks(currentTrack || window.SitePlayer?.getCurrentTrack?.());
+  }
+
   function renderMobileNowPlaying(track = currentTrack) {
-    if (!mobileNowPlaying) return;
-    const activeTrack = track || null;
+    const activeTrack = track || window.SitePlayer?.getCurrentTrack?.() || null;
     const matchingGroup = mobileGroupForTrack(activeTrack);
     const artworkURL = activeTrack
       ? (matchingGroup?.detailArtworkUrl || activeTrack.artworkUrl || tracksById.get(activeTrack.id)?.artworkUrl || matchingGroup?.artworkUrl || "")
       : "";
-    mobileNowPlaying.classList.toggle("is-empty", !activeTrack);
-    mobileNowPlaying.classList.toggle("has-artwork", Boolean(artworkURL));
+
     if (mobileNowTitle) mobileNowTitle.textContent = activeTrack?.title || "Nothing playing";
     if (mobileNowAlbum) mobileNowAlbum.textContent = activeTrack?.game || matchingGroup?.gameName || activeTrack?.console || "";
     if (mobileNowArtwork) {
-      mobileNowArtwork.hidden = false;
       mobileNowArtwork.alt = artworkURL ? `${activeTrack.game || activeTrack.title} artwork` : "";
-      mobileNowArtwork.dataset.fallbackArtwork = matchingGroup?.artworkUrl && artworkURL !== matchingGroup.artworkUrl
-        ? matchingGroup.artworkUrl : "";
       if (artworkURL && mobileNowArtwork.getAttribute("src") !== artworkURL) mobileNowArtwork.src = artworkURL;
       if (!artworkURL) mobileNowArtwork.removeAttribute("src");
     }
-    const timeline = mobileNowPlaying.querySelector(".spcboy-mobile-now-timeline");
-    if (timeline) timeline.hidden = !activeTrack;
+
     const playing = Boolean(activeTrack && window.SitePlayer?.isPlaying?.());
     if (mobilePlayButton) {
-      mobilePlayButton.disabled = playButton?.disabled ?? !activeTrack;
-      mobilePlayButton.classList.toggle("is-playing", playing);
+      mobilePlayButton.disabled = !activeTrack;
+      mobilePlayButton.textContent = playing ? "Ⅱ" : "▶";
       mobilePlayButton.setAttribute("aria-label", playing ? "Pause" : "Play");
     }
-    if (mobilePreviousButton) mobilePreviousButton.disabled = previousButton?.disabled ?? !activeTrack;
-    if (mobileNextButton) mobileNextButton.disabled = nextButton?.disabled ?? !activeTrack;
+    if (mobilePreviousButton) mobilePreviousButton.disabled = !activeTrack;
+    if (mobileNextButton) mobileNextButton.disabled = !activeTrack;
+
     const clockParts = document.querySelector("#spcboy-playback-clock")?.textContent.split(" / ") || [];
     const elapsedText = activeTrack ? (clockParts[0] || "0:00") : "0:00";
     const durationText = activeTrack ? (clockParts[1] || formatMobileTime(window.SitePlayer?.getDuration?.(activeTrack))) : "0:00";
     if (mobileElapsed) mobileElapsed.textContent = elapsedText;
     if (mobileDuration) mobileDuration.textContent = durationText;
+
     const elapsed = parseMobileTime(elapsedText);
     const duration = parseMobileTime(durationText);
-    const progress = Number.isFinite(duration) && duration > 0 ? Math.max(0, Math.min(100, elapsed / duration * 100)) : 0;
+    const progress = Number.isFinite(duration) && duration > 0 ? Math.max(0, Math.min(100, (elapsed / duration) * 100)) : 0;
     if (mobileProgressFill) mobileProgressFill.style.width = `${progress}%`;
-    if (mobileProgress) mobileProgress.setAttribute("aria-valuenow", String(Math.round(progress)));
-  }
-  function setMobileAppPage(nextPage, { syncView = true } = {}) {
-    if (!mobileAppNav || !mobileNowPlaying) return;
-    if (!["playing", "library", "gallery", "sound", "options"].includes(nextPage)) return;
-    mobileAppPage = nextPage;
-    if (isDesktop()) {
-      library.hidden = false;
-      mobileNowPlaying.hidden = true;
-      mobileSoundSettings.hidden = true;
-      mobileOptionsSettings.hidden = true;
-      document.body.classList.remove("spcboy-mobile-playing", "spcboy-mobile-library", "spcboy-mobile-gallery", "spcboy-mobile-sound", "spcboy-mobile-options");
-      return;
+
+    // Update Dock
+    if (mobileDockTitle) mobileDockTitle.textContent = activeTrack?.title || "Nothing playing";
+    if (mobileDockSubtitle) mobileDockSubtitle.textContent = activeTrack ? `${activeTrack.game || matchingGroup?.gameName || ""} · ${activeTrack.console || ""}` : "";
+    if (mobileDockArt) {
+      if (artworkURL && mobileDockArt.getAttribute("src") !== artworkURL) mobileDockArt.src = artworkURL;
+      if (!artworkURL) mobileDockArt.removeAttribute("src");
     }
-    mobileNowPlaying.hidden = mobileAppPage !== "playing";
-    library.hidden = mobileAppPage !== "library" && mobileAppPage !== "gallery";
-    mobileSoundSettings.hidden = mobileAppPage !== "sound";
-    mobileOptionsSettings.hidden = mobileAppPage !== "options";
-    audioSettingsPage.hidden = mobileAppPage !== "sound";
-    playbackSettingsPage.hidden = mobileAppPage !== "sound";
-    interfaceSettingsPage.hidden = mobileAppPage !== "options";
-    document.body.classList.remove("spcboy-mobile-playing", "spcboy-mobile-library", "spcboy-mobile-gallery", "spcboy-mobile-sound", "spcboy-mobile-options");
-    document.body.classList.add(`spcboy-mobile-${mobileAppPage}`);
-    for (const button of mobileAppButtons) {
-      const selected = button.dataset.mobileAppPage === mobileAppPage;
-      if (selected) button.setAttribute("aria-current", "page");
-      else button.removeAttribute("aria-current");
+    if (mobileDockPlay) {
+      mobileDockPlay.disabled = !activeTrack;
+      mobileDockPlay.textContent = playing ? "Ⅱ" : "▶";
+      mobileDockPlay.setAttribute("aria-label", playing ? "Pause" : "Play");
     }
-    if (!syncView) return;
-    const targetView = nextPage === "gallery" ? "gallery" : nextPage === "library" ? "all" : null;
-    if (targetView && view !== targetView) tabs.find(tab => tab.dataset.view === targetView)?.click();
+    if (mobileDockProgressFill) mobileDockProgressFill.style.width = `${progress}%`;
+
+    renderMobileNowAlbumTracks(activeTrack);
   }
-  mobileAppNav?.addEventListener("click", event => {
-    const nextPage = event.target instanceof Element
-      ? event.target.closest("[data-mobile-app-page]")?.dataset.mobileAppPage
-      : null;
-    if (!nextPage) return;
-    setMobileAppPage(nextPage);
+
+  document.querySelectorAll("[data-mobile-app-page]").forEach((btn) => {
+    btn.onclick = (event) => {
+      event.preventDefault();
+      const nextPage = btn.dataset.mobileAppPage;
+      if (nextPage) setMobileAppPage(nextPage);
+    };
   });
-  mobilePlayButton?.addEventListener("click", () => playButton?.click());
-  mobilePreviousButton?.addEventListener("click", () => previousButton?.click());
-  mobileNextButton?.addEventListener("click", () => nextButton?.click());
+
+  mobileAppNav?.addEventListener("click", (event) => {
+    const rawTarget = event.target && event.target.nodeType === 3 ? event.target.parentElement : event.target;
+    const btn = rawTarget && typeof rawTarget.closest === "function" ? rawTarget.closest("[data-mobile-app-page]") : null;
+    if (!btn) return;
+    event.preventDefault();
+    const nextPage = btn.dataset.mobileAppPage;
+    if (nextPage) setMobileAppPage(nextPage);
+  });
+
+  const mobileProgressWrap = document.querySelector("#spcboy-mobile-progress-wrap");
+  function handleMobileProgressSeek(event) {
+    if (!mobileProgressWrap || !window.SitePlayer) return;
+    const rect = mobileProgressWrap.getBoundingClientRect();
+    const clientX = event.touches && event.touches[0] ? event.touches[0].clientX : event.clientX;
+    if (typeof clientX !== "number") return;
+    const fraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const activeTrack = window.SitePlayer.getCurrentTrack?.() || currentTrack;
+    const duration = window.SitePlayer.getDuration?.(activeTrack) || 0;
+    if (duration > 0) {
+      window.SitePlayer.seekTo?.(duration * fraction);
+    }
+  }
+  mobileProgressWrap?.addEventListener("click", handleMobileProgressSeek);
+
+  document.querySelector("#spcboy-mobile-detail-back")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    setMobileAppPage(mobilePreviousPage || "gallery");
+  });
+
+  const dockMain = document.querySelector("#spcboy-mobile-dock-main");
+  if (dockMain) {
+    dockMain.onclick = (event) => {
+      const rawTarget = event.target && event.target.nodeType === 3 ? event.target.parentElement : event.target;
+      if (rawTarget && typeof rawTarget.closest === "function" && rawTarget.closest("#spcboy-mobile-dock-play")) return;
+      event.preventDefault();
+      setMobileAppPage("playing");
+    };
+  }
+
+  const dockPlayBtn = document.querySelector("#spcboy-mobile-dock-play");
+  if (dockPlayBtn) {
+    dockPlayBtn.onclick = (event) => {
+      event.stopPropagation();
+      event.preventDefault();
+      window.SitePlayer?.togglePlayback?.();
+    };
+  }
+
+  if (mobilePlayButton) {
+    mobilePlayButton.onclick = (event) => {
+      event.preventDefault();
+      window.SitePlayer?.togglePlayback?.();
+    };
+  }
+  if (mobilePreviousButton) {
+    mobilePreviousButton.onclick = (event) => {
+      event.preventDefault();
+      window.SitePlayer?.previous?.();
+    };
+  }
+  if (mobileNextButton) {
+    mobileNextButton.onclick = (event) => {
+      event.preventDefault();
+      window.SitePlayer?.next?.();
+    };
+  }
+
+  document.querySelector("#spcboy-mobile-volume")?.addEventListener("input", (e) => {
+    const val = Number(e.target.value);
+    window.SitePlayer?.setVolume?.(val);
+    const valEl = document.querySelector("#spcboy-mobile-volume-value");
+    if (valEl) valEl.textContent = `${Math.round(val * 5)}%`;
+  });
+
+  document.querySelectorAll("[data-mobile-eq-mode]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const mode = btn.dataset.mobileEqMode;
+      if (mode === "off") {
+        await window.SitePlayer?.setEqualizerEnabled?.(false);
+        updateMobileEqToolbar("off");
+        showMobileToast("Equalizer OFF");
+      } else {
+        const presetIdx = Number(mode);
+        currentMobileEqPreset = presetIdx;
+        const presets = window.SitePlayer?.getEqualizerPresets?.() || [];
+        const preset = presets[presetIdx];
+        const targetGains = preset?.gains && preset.saved ? preset.gains : Array(10).fill(0);
+        animateMobileFaders(targetGains, {
+          duration: 240,
+          onComplete: async () => {
+            await window.SitePlayer?.applyEqualizerPreset?.(presetIdx);
+            targetGains.forEach((g, i) => window.SitePlayer?.setEqualizerBandGain?.(i, g));
+            updateMobileEqToolbar(presetIdx);
+            showMobileToast(preset?.saved ? `Preset ${presetIdx + 1} loaded` : `Preset ${presetIdx + 1} (Flat)`);
+          },
+        });
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-mobile-eq-band]").forEach((input) => {
+    input.addEventListener("input", () => {
+      const idx = Number(input.dataset.mobileEqBand);
+      const val = Number(input.value);
+      window.SitePlayer?.setEqualizerBandGain?.(idx, val);
+      const output = document.querySelector(`[data-mobile-eq-value="${idx}"]`);
+      if (output) output.textContent = (val > 0 ? "+" : "") + val.toFixed(1);
+      if (!window.SitePlayer?.isEqualizerEnabled?.()) {
+        window.SitePlayer?.setEqualizerEnabled?.(true);
+      }
+      updateMobileEqToolbar(currentMobileEqPreset);
+    });
+  });
+
+  const resetFlatBtn = document.querySelector("#spcboy-mobile-reset-flat");
+  if (resetFlatBtn) {
+    resetFlatBtn.onclick = () => {
+      animateMobileFaders(Array(10).fill(0), {
+        duration: 240,
+        onComplete: () => {
+          window.SitePlayer?.resetEqualizer?.();
+          updateMobileEqToolbar(currentMobileEqPreset);
+          showMobileToast("Equalizer reset to Flat");
+        },
+      });
+    };
+  }
+
+  const savePresetBtn = document.querySelector("#spcboy-mobile-save-preset");
+  if (savePresetBtn) {
+    savePresetBtn.onclick = () => {
+      const idx = typeof currentMobileEqPreset === "number" ? currentMobileEqPreset : 0;
+      window.SitePlayer?.saveEqualizerPreset?.(idx);
+      showMobileToast(`Preset ${idx + 1} saved!`);
+    };
+  }
+
+  const skipBtn = document.querySelector("#spcboy-mobile-faded-skip");
+  if (skipBtn) {
+    skipBtn.onclick = () => {
+      const skips = window.SitePlayer?.getFadedSkips?.();
+      const next = !skips?.enabled;
+      const fadeInput = document.querySelector("#spcboy-mobile-fade-seconds");
+      const secondsVal = fadeInput?.value ? Number(fadeInput.value) : null;
+      skipBtn.setAttribute("aria-checked", String(next));
+      skipBtn.textContent = next ? "Yes" : "No";
+      window.SitePlayer?.setFadedSkips?.(next, secondsVal);
+      syncMobileSoundControls();
+    };
+  }
+
+  const fadeSecsInput = document.querySelector("#spcboy-mobile-fade-seconds");
+  if (fadeSecsInput) {
+    const applyFade = () => {
+      window.SitePlayer?.setFadedSkips?.(null, Number(fadeSecsInput.value));
+      syncMobileSoundControls();
+    };
+    fadeSecsInput.onchange = applyFade;
+    fadeSecsInput.onkeydown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        applyFade();
+        fadeSecsInput.blur();
+      }
+    };
+  }
+
+  const speedBtn = document.querySelector("#spcboy-mobile-speed-enabled");
+  if (speedBtn) {
+    speedBtn.onclick = () => {
+      const speed = window.SitePlayer?.getPlaybackSpeed?.();
+      const next = !speed?.enabled;
+      const speedInput = document.querySelector("#spcboy-mobile-speed");
+      const fractionVal = speedInput?.value?.trim() || "";
+      speedBtn.setAttribute("aria-checked", String(next));
+      speedBtn.textContent = next ? "Yes" : "No";
+      window.SitePlayer?.setPlaybackSpeed?.(next, fractionVal || null);
+      syncMobileSoundControls();
+    };
+  }
+
+  const speedFractionInput = document.querySelector("#spcboy-mobile-speed");
+  if (speedFractionInput) {
+    const applySpeed = () => {
+      const val = speedFractionInput.value.trim();
+      const parsed = window.SitePlayer?.parseSpeedFraction?.(val);
+      if (parsed) {
+        speedFractionInput.value = parsed.fraction;
+      }
+      window.SitePlayer?.setPlaybackSpeed?.(null, val);
+      syncMobileSoundControls();
+    };
+    speedFractionInput.onchange = applySpeed;
+    speedFractionInput.onkeydown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        applySpeed();
+        speedFractionInput.blur();
+      }
+    };
+  }
+
+  const lpBtn = document.querySelector("#spcboy-mobile-long-play");
+  if (lpBtn) {
+    lpBtn.onclick = () => {
+      const lp = window.SitePlayer?.getLongPlay?.();
+      const next = !lp?.enabled;
+      const lpInput = document.querySelector("#spcboy-mobile-long-play-duration");
+      const durationVal = lpInput?.value?.trim() || "";
+      lpBtn.setAttribute("aria-checked", String(next));
+      lpBtn.textContent = next ? "Yes" : "No";
+      window.SitePlayer?.setLongPlay?.(next, durationVal || null);
+      syncMobileSoundControls();
+    };
+  }
+
+  const lpDurationInput = document.querySelector("#spcboy-mobile-long-play-duration");
+  if (lpDurationInput) {
+    const applyLongPlay = () => {
+      const val = lpDurationInput.value.trim();
+      window.SitePlayer?.setLongPlay?.(null, val);
+      syncMobileSoundControls();
+    };
+    lpDurationInput.onchange = applyLongPlay;
+    lpDurationInput.onkeydown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        applyLongPlay();
+        lpDurationInput.blur();
+      }
+    };
+  }
+
+  document.querySelector("#spcboy-mobile-library-search")?.addEventListener("input", () => {
+    renderMobileLibrary();
+  });
+  document.querySelector("#spcboy-mobile-gallery-search")?.addEventListener("input", () => {
+    renderMobileGallery();
+  });
+  document.querySelector("#spcboy-mobile-recent-search")?.addEventListener("input", () => {
+    renderMobileRecents();
+  });
+  document.querySelector("#spcboy-mobile-recent-more")?.addEventListener("click", () => {
+    loadRecents(false).then(() => renderMobileRecents());
+  });
+  document.querySelector("#spcboy-mobile-favorites-search")?.addEventListener("input", () => {
+    renderMobileFavorites();
+  });
+  document.querySelector("#spcboy-mobile-shuffle-favs")?.addEventListener("click", async () => {
+    const tracks = await loadFavoritePlaylist({ allPages: true });
+    if (tracks.length) {
+      showMobileLoadingIndicator("Shuffling Favorites…");
+      window.SitePlayer?.playPlaylist(tracks, { shuffle: true, toggle: false });
+    }
+  });
+  document.querySelector("#spcboy-mobile-gallery-console-select")?.addEventListener("change", (e) => {
+    mobileGallerySelectedConsole = e.target.value;
+    renderMobileGallery();
+  });
+
+  window.addEventListener("siteplayer:settings-changed", () => {
+    if (!isDesktop()) syncMobileSoundControls();
+  });
+
   const queueObserverTarget = document.querySelector("#site-player-queue");
   if (queueObserverTarget && mobileUpNext) {
     new MutationObserver(renderMobileUpNext).observe(queueObserverTarget, { childList: true });
   }
+
   if (mobileAppNav) {
-    placeMobileSettingsPages();
-    setMobileAppPage(mobileAppPage, { syncView: false });
-    const activeTrack = window.SitePlayer?.getCurrentTrack?.() || currentTrack;
-    if (activeTrack) currentTrack = activeTrack;
-    renderMobileNowPlaying(activeTrack);
-    renderMobileUpNext();
+    try {
+      setMobileAppPage(mobileAppPage);
+      const activeTrack = window.SitePlayer?.getCurrentTrack?.() || currentTrack;
+      if (activeTrack) currentTrack = activeTrack;
+      renderMobileNowPlaying(activeTrack);
+    } catch (err) {
+      console.warn("Initial mobile page setup warning:", err);
+    }
   }
+
   audio?.addEventListener("timeupdate", () => renderMobileNowPlaying());
-  audio?.addEventListener("playing", () => renderMobileNowPlaying());
-  audio?.addEventListener("pause", () => renderMobileNowPlaying());
-  audio?.addEventListener("ended", () => renderMobileNowPlaying());
+  audio?.addEventListener("playing", () => {
+    hideMobileLoadingIndicator();
+    renderMobileNowPlaying();
+  });
+  audio?.addEventListener("canplay", () => {
+    hideMobileLoadingIndicator();
+  });
+  audio?.addEventListener("pause", () => {
+    renderMobileNowPlaying();
+  });
+  audio?.addEventListener("ended", () => {
+    hideMobileLoadingIndicator();
+    renderMobileNowPlaying();
+  });
+  audio?.addEventListener("waiting", () => {
+    showMobileLoadingIndicator("Buffering stream…");
+  });
+  audio?.addEventListener("loadstart", () => {
+    showMobileLoadingIndicator("Preparing audio stream…");
+  });
+  audio?.addEventListener("error", () => {
+    hideMobileLoadingIndicator();
+    showMobileToast("Playback error. Tap to retry.");
+  });
   mobileNowArtwork?.addEventListener("error", () => {
     const fallback = mobileNowArtwork.dataset.fallbackArtwork;
     if (fallback && mobileNowArtwork.getAttribute("src") !== fallback) {
@@ -2516,7 +3515,9 @@
       return;
     }
     mobileNowArtwork.removeAttribute("src");
-    mobileNowPlaying?.classList.remove("has-artwork");
+  });
+  mobileDockArt?.addEventListener("error", () => {
+    mobileDockArt.removeAttribute("src");
   });
   recentMore.addEventListener("click", () => loadRecents());
   favoriteMore?.addEventListener("click", () => loadFavoritePlaylist());
@@ -2532,6 +3533,8 @@
     syncCurrentTrackRows(currentTrack.id, true);
     renderMobileNowPlaying(currentTrack);
     renderMobileUpNext();
+    if (mobileAppPage === "recent") renderMobileRecents();
+    if (mobileAppPage === "favorites") renderMobileFavorites();
     scheduleSelectionIndicators();
     if (view === "recent" && event.detail.playing && !recentLoading && recentRefreshedPlaybackId !== event.detail.playbackId) {
       recentRefreshedPlaybackId = event.detail.playbackId;

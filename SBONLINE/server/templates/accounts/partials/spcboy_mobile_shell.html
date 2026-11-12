@@ -1,36 +1,241 @@
-{# Phone-only controls and views. The catalog section is a shared player component after this shell. #}
-<div class="spcboy-mobile-app" id="spcboy-mobile-app">
+{# Phone-only controls and views. Simple, sane, functional mobile player shell. #}
+<div class="spcboy-mobile-app" id="spcboy-mobile-app" aria-label="Mobile music player">
+  <!-- Top App Navigation Tabs -->
   <nav class="spcboy-mobile-app-nav" id="spcboy-mobile-app-nav" aria-label="Player pages">
-    <button type="button" data-mobile-app-page="playing" aria-current="page">Playing</button>
-    <button type="button" data-mobile-app-page="library">Library</button>
-    <button type="button" data-mobile-app-page="gallery">Gallery</button>
-    <button type="button" data-mobile-app-page="sound">Sound</button>
-    <button type="button" data-mobile-app-page="options">Options</button>
+    <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="playing" aria-current="page">Playing</button>
+    <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="library">Library</button>
+    <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="gallery">Gallery</button>
+    <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="recent">Recent</button>
+    <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="favorites">Favorites</button>
+    <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="sound">Sound</button>
   </nav>
-  <section class="spcboy-mobile-now-playing" id="spcboy-mobile-now-playing" aria-label="Now playing" hidden>
-    <div class="spcboy-mobile-now-content">
-      <img class="spcboy-mobile-now-artwork" id="spcboy-mobile-now-artwork" alt="" decoding="async">
-      <div class="spcboy-mobile-now-copy">
-        <p class="spcboy-mobile-now-title" id="spcboy-mobile-now-title">Nothing playing</p>
-        <p class="spcboy-mobile-now-album" id="spcboy-mobile-now-album"></p>
+
+  <!-- 1. Now Playing Screen -->
+  <section class="spcboy-mobile-screen spcboy-mobile-screen-playing" id="spcboy-mobile-screen-playing" aria-label="Now playing">
+    <div class="spcboy-mobile-now-layout">
+      <div class="spcboy-mobile-art-wrap">
+        <img class="spcboy-mobile-now-art" id="spcboy-mobile-now-art" alt="" decoding="async">
+        <div class="spcboy-mobile-art-loading is-hidden" id="spcboy-mobile-art-loading" aria-live="polite">
+          <div class="spcboy-mobile-spinner" aria-hidden="true"></div>
+          <span class="spcboy-mobile-loading-text">Preparing audio stream…</span>
+        </div>
       </div>
-      <div class="spcboy-mobile-now-timeline">
-        <div class="spcboy-mobile-progress" id="spcboy-mobile-progress" role="progressbar" aria-label="Track progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="spcboy-mobile-progress-fill"></span></div>
-        <div class="spcboy-mobile-times"><time id="spcboy-mobile-elapsed">0:00</time><time id="spcboy-mobile-duration">0:00</time></div>
+      <div class="spcboy-mobile-track-meta">
+        <div class="spcboy-mobile-now-title" id="spcboy-mobile-now-title">Nothing playing</div>
+        <div class="spcboy-mobile-now-album" id="spcboy-mobile-now-album">Select a track from Library or Gallery</div>
+      </div>
+      <div class="spcboy-mobile-scrub-section">
+        <div class="spcboy-mobile-progress-wrap" id="spcboy-mobile-progress-wrap" role="slider" aria-label="Seek position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
+          <div class="spcboy-mobile-progress-track">
+            <span class="spcboy-mobile-progress-fill" id="spcboy-mobile-progress-fill"></span>
+          </div>
+        </div>
+        <div class="spcboy-mobile-times">
+          <span id="spcboy-mobile-elapsed">0:00</span>
+          <span id="spcboy-mobile-duration">0:00</span>
+        </div>
       </div>
       <div class="spcboy-mobile-now-controls" aria-label="Playback controls">
-        <button type="button" id="spcboy-mobile-previous" aria-label="Previous track" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4v12M15 5 7 10l8 5z"/></svg></button>
-        <button type="button" id="spcboy-mobile-play" aria-label="Play" disabled><svg class="mobile-play-glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 9 6-9 6z"/></svg><svg class="mobile-play-pause" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 4h4v12H5zM11 4h4v12h-4z"/></svg></button>
-        <button type="button" id="spcboy-mobile-next" aria-label="Next track" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15 4v12M5 5l8 5-8 5z"/></svg></button>
+        <button type="button" class="spcboy-mobile-ctrl-btn" id="spcboy-mobile-previous" aria-label="Previous track" title="Previous track">|◀</button>
+        <button type="button" class="spcboy-mobile-ctrl-btn spcboy-mobile-play-btn" id="spcboy-mobile-play" aria-label="Play" title="Play">▶</button>
+        <button type="button" class="spcboy-mobile-ctrl-btn" id="spcboy-mobile-next" aria-label="Next track" title="Next track">▶|</button>
       </div>
-      <ol class="spcboy-mobile-up-next" id="spcboy-mobile-up-next" aria-label="Current album tracks"></ol>
+      <div class="spcboy-mobile-now-album-section">
+        <div class="spcboy-mobile-now-album-header">
+          <h3 class="spcboy-mobile-section-heading" id="spcboy-mobile-now-album-heading">Album Tracks</h3>
+          <span class="spcboy-mobile-badge" id="spcboy-mobile-now-album-count"></span>
+        </div>
+        <ol class="spcboy-mobile-tracklist" id="spcboy-mobile-now-tracklist" aria-label="Album tracks"></ol>
+        <p class="spcboy-mobile-detail-status is-hidden" id="spcboy-mobile-now-tracklist-status" role="status"></p>
+      </div>
     </div>
   </section>
-  <section class="spcboy-mobile-settings" id="spcboy-mobile-sound-settings" aria-label="Sound settings" hidden>
-    <div class="spcboy-settings-pages" id="spcboy-mobile-sound-pages"></div>
+
+  <!-- 2. Library Screen -->
+  <section class="spcboy-mobile-screen spcboy-mobile-screen-library is-hidden" id="spcboy-mobile-screen-library" aria-label="Library">
+    <div class="spcboy-mobile-search-row">
+      <input id="spcboy-mobile-library-search" type="search" placeholder="Search games or tracks..." autocomplete="off" aria-label="Search library tracks or games">
+    </div>
+    <div class="spcboy-mobile-library-tree" id="spcboy-mobile-library-tree" aria-live="polite">
+      <p class="spcboy-mobile-empty">Loading hosted games…</p>
+    </div>
   </section>
-  <section class="spcboy-mobile-settings" id="spcboy-mobile-options-settings" aria-label="Options" hidden>
-    <div class="spcboy-settings-pages" id="spcboy-mobile-options-pages"></div>
+
+  <!-- 3. Gallery Screen -->
+  <section class="spcboy-mobile-screen spcboy-mobile-screen-gallery is-hidden" id="spcboy-mobile-screen-gallery" aria-label="Gallery">
+    <div class="spcboy-mobile-search-row">
+      <input id="spcboy-mobile-gallery-search" type="search" placeholder="Search albums..." autocomplete="off" aria-label="Search gallery albums">
+    </div>
+    <div class="spcboy-mobile-picker-wrap">
+      <label class="spcboy-gallery-console-picker"><span class="visually-hidden">Gallery console</span>
+        <select class="spcboy-mobile-console-picker" id="spcboy-mobile-gallery-console-select" aria-label="Console"></select>
+      </label>
+    </div>
+    <div class="spcboy-mobile-album-grid" id="spcboy-mobile-gallery-grid" aria-live="polite"></div>
+    <div class="spcboy-mobile-gallery-footer">
+      <button type="button" class="spcboy-mobile-load-more is-hidden" id="spcboy-mobile-gallery-more">Load more albums</button>
+    </div>
   </section>
+
+  <!-- 4. Album Detail Screen -->
+  <section class="spcboy-mobile-screen spcboy-mobile-screen-detail is-hidden" id="spcboy-mobile-screen-detail" aria-label="Album details">
+    <div class="spcboy-mobile-detail-top">
+      <button type="button" class="spcboy-mobile-back-button" id="spcboy-mobile-detail-back">
+        <span aria-hidden="true">‹</span> <span id="spcboy-mobile-back-label">Gallery</span>
+      </button>
+    </div>
+    <div class="spcboy-mobile-album-hero">
+      <img class="spcboy-mobile-hero-art" id="spcboy-mobile-detail-artwork" alt="" decoding="async">
+      <div class="spcboy-mobile-hero-copy">
+        <h2 id="spcboy-mobile-detail-title"></h2>
+        <p class="spcboy-mobile-hero-meta" id="spcboy-mobile-detail-meta"></p>
+      </div>
+    </div>
+    <button type="button" class="spcboy-mobile-play-album-button" id="spcboy-mobile-detail-play">
+      <span aria-hidden="true">▶</span> Play Album
+    </button>
+    <ol class="spcboy-mobile-tracklist spcboy-mobile-detail-tracklist" id="spcboy-mobile-detail-tracks" aria-label="Album tracks"></ol>
+    <p class="spcboy-mobile-detail-status is-hidden" id="spcboy-mobile-detail-status" role="status"></p>
+  </section>
+
+  <!-- Recent Screen -->
+  <section class="spcboy-mobile-screen spcboy-mobile-screen-recent is-hidden" id="spcboy-mobile-screen-recent" aria-label="Recent plays">
+    <div class="spcboy-mobile-search-row">
+      <input id="spcboy-mobile-recent-search" type="search" placeholder="Search recent plays..." autocomplete="off" aria-label="Search recent plays">
+    </div>
+    <div class="spcboy-mobile-recent-header">
+      <h3 class="spcboy-mobile-section-heading">Recently Played</h3>
+      <span class="spcboy-mobile-badge" id="spcboy-mobile-recent-count"></span>
+    </div>
+    <ol class="spcboy-mobile-tracklist" id="spcboy-mobile-recent-tracks" aria-label="Recently played tracks"></ol>
+    <p class="spcboy-mobile-empty is-hidden" id="spcboy-mobile-recent-empty">No recently played tracks yet.</p>
+    <div class="spcboy-mobile-gallery-footer">
+      <button type="button" class="spcboy-mobile-load-more is-hidden" id="spcboy-mobile-recent-more">Load more recent plays</button>
+    </div>
+  </section>
+
+  <!-- Favorites Screen -->
+  <section class="spcboy-mobile-screen spcboy-mobile-screen-favorites is-hidden" id="spcboy-mobile-screen-favorites" aria-label="Favorites">
+    <div class="spcboy-mobile-search-row">
+      <input id="spcboy-mobile-favorites-search" type="search" placeholder="Search favorites..." autocomplete="off" aria-label="Search favorites">
+    </div>
+    <div class="spcboy-mobile-recent-header">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <h3 class="spcboy-mobile-section-heading">Favorites</h3>
+        <span class="spcboy-mobile-badge" id="spcboy-mobile-favorites-count">0</span>
+      </div>
+      <button type="button" class="spcboy-mobile-btn-text" id="spcboy-mobile-shuffle-favs" style="font-size:13px;display:flex;align-items:center;gap:4px;">🔀 Shuffle</button>
+    </div>
+    <ol class="spcboy-mobile-tracklist" id="spcboy-mobile-favorites-tracks" aria-label="Favorite tracks"></ol>
+    <p class="spcboy-mobile-empty is-hidden" id="spcboy-mobile-favorites-empty">No favorite tracks yet. Star tracks in Library or Gallery to build your Favorites.</p>
+  </section>
+
+  <!-- Sound Screen -->
+  <section class="spcboy-mobile-screen spcboy-mobile-screen-sound is-hidden" id="spcboy-mobile-screen-sound" aria-label="Sound">
+    <div class="spcboy-mobile-sound-layout">
+      <!-- Volume -->
+      <section class="spcboy-mobile-card">
+        <div class="spcboy-mobile-card-header">
+          <h3>Volume</h3>
+          <output id="spcboy-mobile-volume-value" class="spcboy-mobile-badge">100%</output>
+        </div>
+        <input id="spcboy-mobile-volume" class="spcboy-mobile-slider" type="range" min="0" max="20" step="1" value="20" aria-label="Volume">
+      </section>
+
+      <!-- Equalizer -->
+      <section class="spcboy-mobile-card">
+        <div class="spcboy-mobile-card-header">
+          <h3>Equalizer</h3>
+          <div class="spcboy-mobile-eq-toolbar" role="toolbar" aria-label="Equalizer Presets">
+            <button type="button" class="spcboy-mobile-eq-btn is-active" data-mobile-eq-mode="off" aria-pressed="true">OFF</button>
+            <button type="button" class="spcboy-mobile-eq-btn" data-mobile-eq-mode="0" aria-pressed="false">1</button>
+            <button type="button" class="spcboy-mobile-eq-btn" data-mobile-eq-mode="1" aria-pressed="false">2</button>
+            <button type="button" class="spcboy-mobile-eq-btn" data-mobile-eq-mode="2" aria-pressed="false">3</button>
+          </div>
+        </div>
+        <div class="spcboy-mobile-eq-bands" aria-label="Equalizer bands">
+          <label class="spcboy-mobile-eq-row"><span class="spcboy-mobile-eq-label"><strong>31 Hz</strong><output data-mobile-eq-value="0">0.0</output></span><input class="spcboy-mobile-slider" type="range" min="-12" max="12" step="0.5" value="0" data-mobile-eq-band="0" aria-label="31 Hz gain"></label>
+          <label class="spcboy-mobile-eq-row"><span class="spcboy-mobile-eq-label"><strong>62 Hz</strong><output data-mobile-eq-value="1">0.0</output></span><input class="spcboy-mobile-slider" type="range" min="-12" max="12" step="0.5" value="0" data-mobile-eq-band="1" aria-label="62 Hz gain"></label>
+          <label class="spcboy-mobile-eq-row"><span class="spcboy-mobile-eq-label"><strong>125 Hz</strong><output data-mobile-eq-value="2">0.0</output></span><input class="spcboy-mobile-slider" type="range" min="-12" max="12" step="0.5" value="0" data-mobile-eq-band="2" aria-label="125 Hz gain"></label>
+          <label class="spcboy-mobile-eq-row"><span class="spcboy-mobile-eq-label"><strong>250 Hz</strong><output data-mobile-eq-value="3">0.0</output></span><input class="spcboy-mobile-slider" type="range" min="-12" max="12" step="0.5" value="0" data-mobile-eq-band="3" aria-label="250 Hz gain"></label>
+          <label class="spcboy-mobile-eq-row"><span class="spcboy-mobile-eq-label"><strong>500 Hz</strong><output data-mobile-eq-value="4">0.0</output></span><input class="spcboy-mobile-slider" type="range" min="-12" max="12" step="0.5" value="0" data-mobile-eq-band="4" aria-label="500 Hz gain"></label>
+          <label class="spcboy-mobile-eq-row"><span class="spcboy-mobile-eq-label"><strong>1 kHz</strong><output data-mobile-eq-value="5">0.0</output></span><input class="spcboy-mobile-slider" type="range" min="-12" max="12" step="0.5" value="0" data-mobile-eq-band="5" aria-label="1 kHz gain"></label>
+          <label class="spcboy-mobile-eq-row"><span class="spcboy-mobile-eq-label"><strong>2 kHz</strong><output data-mobile-eq-value="6">0.0</output></span><input class="spcboy-mobile-slider" type="range" min="-12" max="12" step="0.5" value="0" data-mobile-eq-band="6" aria-label="2 kHz gain"></label>
+          <label class="spcboy-mobile-eq-row"><span class="spcboy-mobile-eq-label"><strong>4 kHz</strong><output data-mobile-eq-value="7">0.0</output></span><input class="spcboy-mobile-slider" type="range" min="-12" max="12" step="0.5" value="0" data-mobile-eq-band="7" aria-label="4 kHz gain"></label>
+          <label class="spcboy-mobile-eq-row"><span class="spcboy-mobile-eq-label"><strong>8 kHz</strong><output data-mobile-eq-value="8">0.0</output></span><input class="spcboy-mobile-slider" type="range" min="-12" max="12" step="0.5" value="0" data-mobile-eq-band="8" aria-label="8 kHz gain"></label>
+          <label class="spcboy-mobile-eq-row"><span class="spcboy-mobile-eq-label"><strong>16 kHz</strong><output data-mobile-eq-value="9">0.0</output></span><input class="spcboy-mobile-slider" type="range" min="-12" max="12" step="0.5" value="0" data-mobile-eq-band="9" aria-label="16 kHz gain"></label>
+        </div>
+        <div class="spcboy-mobile-eq-actions">
+          <button id="spcboy-mobile-reset-flat" type="button" class="spcboy-mobile-btn-secondary">Reset to Flat</button>
+          <button id="spcboy-mobile-save-preset" type="button" class="spcboy-mobile-btn-secondary">Save to Preset 1</button>
+        </div>
+      </section>
+
+      <!-- Fade Out -->
+      <section class="spcboy-mobile-card">
+        <div class="spcboy-mobile-row">
+          <div>
+            <strong>Faded Skips</strong>
+            <small class="spcboy-mobile-dim">Fade audio on track change</small>
+          </div>
+          <button class="spcboy-mobile-switch" id="spcboy-mobile-faded-skip" type="button" role="switch" aria-checked="false">No</button>
+        </div>
+        <label class="spcboy-mobile-field">
+          <span>Fade duration (seconds)</span>
+          <input id="spcboy-mobile-fade-seconds" type="number" min="0" max="30" step="1" value="5" aria-label="Fade duration">
+        </label>
+      </section>
+
+      <!-- Play Speed -->
+      <section class="spcboy-mobile-card">
+        <div class="spcboy-mobile-row">
+          <div>
+            <strong>Native Format Speed</strong>
+            <small class="spcboy-mobile-dim">Source decoder rate</small>
+          </div>
+          <button class="spcboy-mobile-switch" id="spcboy-mobile-speed-enabled" type="button" role="switch" aria-checked="false">No</button>
+        </div>
+        <label class="spcboy-mobile-field">
+          <span>Speed fraction</span>
+          <input id="spcboy-mobile-speed" type="text" value="1/1" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Speed fraction">
+        </label>
+      </section>
+
+      <!-- Long Play -->
+      <section class="spcboy-mobile-card">
+        <div class="spcboy-mobile-row">
+          <div>
+            <strong>Long Play</strong>
+            <small class="spcboy-mobile-dim">Override track loop cutoff</small>
+          </div>
+          <button class="spcboy-mobile-switch" id="spcboy-mobile-long-play" type="button" role="switch" aria-checked="false">No</button>
+        </div>
+        <label class="spcboy-mobile-field">
+          <span>Duration (0 = unlimited)</span>
+          <input id="spcboy-mobile-long-play-duration" type="text" value="3:00" aria-label="Long play duration">
+        </label>
+      </section>
+    </div>
+  </section>
+
+  <!-- Persistent Mini-Player Dock (visible on Library, Gallery, Detail, Sound) -->
+  <footer class="spcboy-mobile-dock" id="spcboy-mobile-dock" aria-label="Mini player">
+    <div class="spcboy-mobile-dock-progress" id="spcboy-mobile-dock-progress" aria-hidden="true">
+      <span id="spcboy-mobile-dock-progress-fill"></span>
+    </div>
+    <div class="spcboy-mobile-dock-main" id="spcboy-mobile-dock-main">
+      <img class="spcboy-mobile-dock-art" id="spcboy-mobile-dock-art" alt="" decoding="async">
+      <div class="spcboy-mobile-dock-spinner is-hidden" id="spcboy-mobile-dock-spinner" aria-hidden="true"></div>
+      <div class="spcboy-mobile-dock-copy">
+        <div class="spcboy-mobile-dock-title" id="spcboy-mobile-dock-title">Nothing playing</div>
+        <div class="spcboy-mobile-dock-subtitle" id="spcboy-mobile-dock-subtitle"></div>
+      </div>
+      <button type="button" class="spcboy-mobile-dock-play" id="spcboy-mobile-dock-play" aria-label="Play">▶</button>
+    </div>
+  </footer>
+
+  <!-- Toast Notification -->
+  <div class="spcboy-mobile-toast" id="spcboy-mobile-toast" role="status" aria-live="polite"></div>
+
   <form id="spcboy-csrf-form" hidden>{% csrf_token %}</form>
 </div>

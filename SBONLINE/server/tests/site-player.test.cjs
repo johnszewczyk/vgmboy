@@ -18,6 +18,7 @@ function fixture(overrides = {}) {
     audioURL: (_, offset) => `track?start=${offset}`, applyPlaybackRate() {},
     setPlayerStatus: message => calls.push(message), updateControls() {},
     setAudioSource(url) { context.audio.src = url; },
+    sourcePositionSeconds() { return context.streamOffsetSeconds + (Number(context.audio.currentTime) || 0); },
     ...overrides,
   });
   vm.runInContext(playback, context);
@@ -60,7 +61,7 @@ test('An expired page does not request playback', async () => {
   assert.deepEqual(calls, []);
 });
 
-test('Volume gain combines the selected level with EQ headroom', () => {
+test('Volume gain applies the selected level without dropping volume on EQ boost', () => {
   const gains = [];
   const context = vm.createContext({
     equalizerGraphReady: true, equalizerEnabled: true, equalizerBandGains: [6, -3],
@@ -69,7 +70,7 @@ test('Volume gain combines the selected level with EQ headroom', () => {
   });
   vm.runInContext(source.slice(source.indexOf('  function updateEqualizerGraph()'), source.indexOf('  function ensureEqualizerGraph()')), context);
   context.updateEqualizerGraph();
-  assert.ok(Math.abs(gains[0] - .25 * 10 ** (-6 / 20)) < 1e-9);
+  assert.ok(Math.abs(gains[0] - .25) < 1e-9);
 });
 
 test('Equalizer builds one filter chain and applies the selected band curve', () => {
@@ -127,7 +128,7 @@ test('Equalizer builds one filter chain and applies the selected band curve', ()
   ]);
   assert.equal(parameters.filter(([key]) => typeof key === 'number').length, 10);
   const outputTarget = parameters.find(([key]) => key === 'output');
-  assert.ok(Math.abs(outputTarget[1] - .5 * 10 ** (-6 / 20)) < 1e-9);
+  assert.ok(Math.abs(outputTarget[1] - .5) < 1e-9);
 });
 
 test('Equalizer saves and reapplies all three browser presets', async () => {
@@ -151,7 +152,8 @@ test('Equalizer saves and reapplies all three browser presets', async () => {
     saveEqualizerGains: () => savedCurves.push(Array.from(context.equalizerBandGains)),
     setEqualizerEnabled: async enabled => { context.equalizerEnabled = enabled; return enabled; },
   });
-  vm.runInContext(source.slice(source.lastIndexOf('  equalizerPresetApplyButtons.forEach'), source.indexOf('  queueToggle.addEventListener(')), context);
+  const applyStart = source.indexOf('  async function applyEqualizerPreset');
+  vm.runInContext(source.slice(applyStart !== -1 ? applyStart : source.lastIndexOf('  equalizerPresetApplyButtons.forEach'), source.indexOf('  queueToggle.addEventListener(')), context);
 
   for (let index = 0; index < 3; index += 1) {
     context.equalizerBandGains = Array.from({ length: 10 }, (_, band) => index * 2 + band / 2);
@@ -212,7 +214,13 @@ for (const playing of [false, true]) test(`Reload/login restores position with f
   const entries = new Map();
   let resumed = false;
   const context = vm.createContext({
-    userPrefix: 'spcboy:7:', sessionStorage: { getItem: k => entries.get(k), setItem: (k,v) => entries.set(k,v) },
+    userPrefix: 'spcboy:7:',
+    window: {
+      SBOProfileStorage: {
+        set(scope, key, val) { entries.set('playback:session', JSON.stringify(val)); },
+        get(scope, key, fallback) { const v = entries.get('playback:session'); return v ? JSON.parse(v) : fallback; },
+      },
+    },
     currentTrack: { id: 'guile-1', title: 'Guile', game: 'SFII', durationSeconds: 120, sourcePath: 'private', audioUrl: 'expired-token' },
     queue: [{id:'guile-2',title:'Next'}], playlistHistory: [], nowPlayingPlaylist: true,
     audio: { currentTime: 8, paused: !playing, ended: false }, streamOffsetSeconds: 12,
@@ -220,11 +228,14 @@ for (const playing of [false, true]) test(`Reload/login restores position with f
     createPlaybackId: () => 'fresh-playback', audioURL: (_,offset) => `authorized-with-new-page-token?start=${offset}`,
     setAudioSource(url) { context.audio.src = url; },
     applyPlaybackRate() {}, renderQueue() {}, updateControls() {}, setPlayerStatus() {},
+    renderCurrentTrack() {},
+    sourcePositionSeconds() { return context.streamOffsetSeconds + (Number(context.audio.currentTime) || 0); },
     startAudioPlayback() { resumed = true; },
   });
-  vm.runInContext(source.slice(source.indexOf('  const playbackStorageKey'),source.indexOf('  function effectiveDuration(')),context);
+  const saveStart = source.indexOf('  function albumIdForTrack(');
+  vm.runInContext(source.slice(saveStart !== -1 ? saveStart : source.indexOf('  function savedTrack('), source.indexOf('  function effectiveDuration(')), context);
   context.savePlayback();
-  const saved = JSON.parse(entries.get('spcboy:7:playback-v1'));
+  const saved = JSON.parse(entries.get('playback:session'));
   assert.equal(saved.position,20);
   assert.equal(saved.track.sourcePath,undefined);
   assert.equal(saved.track.audioUrl,undefined);
@@ -271,6 +282,7 @@ function recoveryFixture() {
     playbackSessionExpired: () => false, stopPlaybackSession() {},
     startAudioPlayback() { starts++; }, setPlayerStatus: text => statuses.push(text),
     updateControls() {}, savePlayback() {}, showStreamQuotaMessage() { statuses.push('quota'); },
+    clearFadedSkip() {},
   });
   vm.runInContext(source.slice(source.indexOf('  let streamNeedsRetry = false;'), source.indexOf('  const aacTransport =')), context);
   vm.runInContext('playbackWanted = true;', context);
@@ -349,6 +361,8 @@ test('System controls share transport, preserve paused seeks and use absolute po
     pausePlayback() {pauses++;}, startAudioPlayback() {plays++;}, moveTrack() {},
     cancelStreamRecovery() {}, setAudioSource(url) {sources.push(url); context.audio.currentTime=0;},
     audioURL:(_,offset)=>`aac?start=${offset}`, applyPlaybackRate() {}, savePlayback() {},
+    effectivePlaybackRate: () => 1,
+    sourcePositionSeconds() { return context.streamOffsetSeconds + (Number(context.audio.currentTime) || 0); },
   });
   vm.runInContext(source.slice(source.indexOf('  function syncMediaPosition()'),source.indexOf('  function renderQueue()')),context);
   context.syncMediaPosition(); assert.equal(positions.at(-1).position,25);
@@ -366,8 +380,39 @@ for (const changing of [false,true]) test(`Device pause cancels recovery except 
     audio:{ended:false,error:null,addEventListener:(_,handler)=>{context.onPause=handler;}},
     cancelStreamRecovery(){cancelled=true;},syncMediaSession(){},updateControls(){},emitTrack(){},
     clearNowPlaying(){},window:{clearInterval(){}},
+    clearFadedSkip(){},
   });
   vm.runInContext(source.slice(source.indexOf('  audio.addEventListener("pause",'),source.indexOf('  audio.addEventListener("waiting",')),context);
   context.onPause();
   assert.equal(cancelled,!changing); assert.equal(context.playbackWanted,changing);
+});
+
+test('Speed fraction parser accepts fractional and decimal values from 1/2 to 2', () => {
+  const context = vm.createContext({ storage: { remove() {}, get() { return null; } } });
+  vm.runInContext(source.slice(source.indexOf('  function parseSpeedFraction('), source.indexOf('  const savedFraction =')), context);
+  const one = context.parseSpeedFraction('1/1');
+  assert.equal(one?.rate, 1);
+  assert.equal(one?.fraction, '1/1');
+  const frac = context.parseSpeedFraction('33/32');
+  assert.equal(frac?.rate, 33/32);
+  assert.equal(frac?.fraction, '33/32');
+  const dec = context.parseSpeedFraction('1.5');
+  assert.equal(dec?.rate, 1.5);
+  assert.equal(dec?.fraction, '3/2');
+  const withX = context.parseSpeedFraction('1.25x');
+  assert.equal(withX?.rate, 1.25);
+  assert.equal(withX?.fraction, '5/4');
+  assert.equal(context.parseSpeedFraction('0.1'), null);
+  assert.equal(context.parseSpeedFraction('3.0'), null);
+});
+
+test('Long play duration parser parses strings, M:SS, and H:MM:SS', () => {
+  const context = vm.createContext({ maximumLongPlaySeconds: 86400 });
+  vm.runInContext(source.slice(source.indexOf('  function parseLongPlayDuration('), source.indexOf('  let spcFadeSeconds =')), context);
+  assert.equal(context.parseLongPlayDuration('180'), 180);
+  assert.equal(context.parseLongPlayDuration('3:00'), 180);
+  assert.equal(context.parseLongPlayDuration('1:02:03'), 3723);
+  assert.equal(context.parseLongPlayDuration('0'), 0);
+  assert.equal(context.parseLongPlayDuration('-5'), null);
+  assert.equal(context.parseLongPlayDuration('invalid'), null);
 });

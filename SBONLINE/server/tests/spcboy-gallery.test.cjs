@@ -55,7 +55,7 @@ test('mobile Gallery keeps its dropdown filter in the Gallery toolbar', () => {
   assert.equal(context.trackList.hidden, false);
   assert.ok(calls.includes('move-console-filter-to-gallery-toolbar'));
   const onlineCss = readFileSync(`${__dirname}/../static/accounts/sbonline.css`, 'utf8');
-  const mobileCss = readFileSync(`${__dirname}/../static/accounts/sb-mobile.css`, 'utf8');
+  const mobileCss = readFileSync(`${__dirname}/../static/accounts/spcboy-mobile.css`, 'utf8');
   assert.match(onlineCss, /spcboy-gallery-console-picker \{ display: none;/);
   assert.match(mobileCss, /spcboy-gallery-console-picker \{ display:grid;/);
 });

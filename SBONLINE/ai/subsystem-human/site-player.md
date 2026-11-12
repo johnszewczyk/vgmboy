@@ -48,9 +48,11 @@ or audio stream and is not playback evidence.
 ## Production source
 
 - [Player template](../../server/templates/accounts/spcboy.html)
+- [Mobile shell partial](../../server/templates/accounts/partials/spcboy_mobile_shell.html)
 - [Base account template and shared settings](../../server/templates/accounts/base.html)
 - [Hosted theme](../../server/static/accounts/sb-theme.css)
-- [Hosted mobile layout](../../server/static/accounts/sb-mobile.css)
+- [Hosted mobile player stylesheet](../../server/static/accounts/spcboy-mobile.css)
+- [Hosted site mobile stylesheet](../../server/static/accounts/sb-mobile.css)
 - [Player page adapter](../../server/static/accounts/spcboy.js)
 - [Audio engine](../../server/static/accounts/site-player.js)
 - [Account and site administration](site-admin.md)
