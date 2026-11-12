@@ -3269,12 +3269,17 @@
     };
   }
 
-  document.querySelector("#spcboy-mobile-volume")?.addEventListener("input", (e) => {
-    const val = Number(e.target.value);
-    window.SitePlayer?.setVolume?.(val);
-    const valEl = document.querySelector("#spcboy-mobile-volume-value");
-    if (valEl) valEl.textContent = `${Math.round(val * 5)}%`;
-  });
+  const mobileVolSlider = document.querySelector("#spcboy-mobile-volume");
+  if (mobileVolSlider) {
+    const handleMobileVol = (e) => {
+      const val = Number(e.target.value);
+      window.SitePlayer?.setVolume?.(val);
+      const valEl = document.querySelector("#spcboy-mobile-volume-value");
+      if (valEl) valEl.textContent = `${Math.round(val * 5)}%`;
+    };
+    mobileVolSlider.addEventListener("input", handleMobileVol);
+    mobileVolSlider.addEventListener("change", handleMobileVol);
+  }
 
   document.querySelectorAll("[data-mobile-eq-mode]").forEach((btn) => {
     btn.addEventListener("click", async () => {

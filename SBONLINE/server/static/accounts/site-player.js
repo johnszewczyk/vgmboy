@@ -180,13 +180,36 @@
   let equalizerGraphReady = false;
   let equalizerGraphFailed = false;
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  let supportsAudioVolume = null;
+  function testAudioVolumeSupport() {
+    if (supportsAudioVolume !== null) return supportsAudioVolume;
+    try {
+      if (typeof document === "undefined") {
+        supportsAudioVolume = true;
+        return true;
+      }
+      const t = document.createElement("audio");
+      t.volume = 0.5;
+      supportsAudioVolume = Math.abs(t.volume - 0.5) < 0.05;
+    } catch {
+      supportsAudioVolume = false;
+    }
+    return supportsAudioVolume;
+  }
   function applyVolumeStep() {
     const percent = volumeStep * 5;
-    volumeInput.value = String(volumeStep);
-    volumeInput.closest(".spcboy-equalizer-slider")?.style.setProperty("--range-percent", `${percent}%`);
-    volumeInput.setAttribute("aria-valuetext", `${percent} percent`);
-    volumeValue.value = String(percent);
-    volumeValue.textContent = String(percent);
+    if (volumeInput) {
+      volumeInput.value = String(volumeStep);
+      volumeInput.closest(".spcboy-equalizer-slider")?.style.setProperty("--range-percent", `${percent}%`);
+      volumeInput.setAttribute("aria-valuetext", `${percent} percent`);
+    }
+    if (volumeValue) {
+      volumeValue.value = String(percent);
+      volumeValue.textContent = String(percent);
+    }
+    try {
+      if (audio) audio.volume = Math.max(0, Math.min(1, volumeStep / 20));
+    } catch {}
   }
   function syncVolumeControls() {
     applyVolumeStep();
@@ -196,6 +219,8 @@
     if (mobileVal) mobileVal.textContent = `${volumeStep * 5}%`;
     const sbonlineVol = document.querySelector("#sbonline-volume-input");
     if (sbonlineVol) sbonlineVol.value = String(volumeStep);
+    const sbonlineVal = document.querySelector("#sbonline-volume-value");
+    if (sbonlineVal) sbonlineVal.textContent = String(volumeStep * 5);
     window.dispatchEvent(new CustomEvent("siteplayer:settings-changed"));
   }
   function formatEqualizerGain(value) {
@@ -801,7 +826,7 @@
     if (equalizerEnabled && equalizerBandGains.some((g) => g !== 0)) {
       params.set("eq", equalizerBandGains.map((g) => (Math.round(g * 2) / 2).toFixed(1)).join(","));
     }
-    if (volumeStep < 20 && (!equalizerGraphReady || equalizerGraphFailed || !AudioContextClass)) params.set("volume", String(volumeStep));
+    if (volumeStep < 20 && (!testAudioVolumeSupport() || !equalizerGraphReady || equalizerGraphFailed || !AudioContextClass)) params.set("volume", String(volumeStep));
     return `${base}?${params}`;
   }
 
@@ -832,11 +857,11 @@
     playButton.classList.toggle("is-playing", playing);
     playButton.classList.toggle("sb-is-playing", playing);
     const canNavigate = nowPlayingPlaylist
-      ? queue.length > 0
+      ? queue.length > 0 || playlistHistory.length > 0
       : Boolean(libraryNavigator) || library.length > 1;
-    const canGoBack = nowPlayingPlaylist ? playlistHistory.length > 0 : canNavigate;
-    previousButton.disabled = playbackExpired || !currentTrack || !canGoBack || libraryNavigationPending;
-    nextButton.disabled = playbackExpired || (!queue.length && (nowPlayingPlaylist || !currentTrack || !canNavigate)) || libraryNavigationPending;
+    const canGoBack = Boolean(currentTrack);
+    previousButton.disabled = playbackExpired || !currentTrack || libraryNavigationPending;
+    nextButton.disabled = playbackExpired || (!canNavigate && !currentTrack) || libraryNavigationPending;
     updatePlaybackClock();
   }
 
@@ -1357,15 +1382,18 @@
         [playlist[index], playlist[swapIndex]] = [playlist[swapIndex], playlist[index]];
       }
     }
-    const startIndex = Math.max(0, playlist.findIndex((track) => track.id === options.startTrackId));
+    let startIndex = 0;
+    if (options.startTrackId) {
+      const idx = playlist.findIndex((track) => track.id === options.startTrackId);
+      if (idx >= 0) startIndex = idx;
+    } else if (Number.isInteger(options.startIndex) && options.startIndex >= 0 && options.startIndex < playlist.length) {
+      startIndex = options.startIndex;
+    }
     const first = playlist[startIndex];
     if (!first) return false;
-    queue = [
-      ...playlist.slice(startIndex + 1),
-      ...playlist.slice(0, startIndex),
-    ];
+    queue = playlist.slice(startIndex + 1);
+    playlistHistory = playlist.slice(0, startIndex);
     nowPlayingPlaylist = true;
-    playlistHistory = [];
     renderQueue();
     updateControls();
     return playTrack(first, { toggle: Boolean(options.toggle) });
@@ -1409,52 +1437,105 @@
   }
 
   async function moveTrackNow(step, { bypassFadedSkip = false, alreadyRecordedPlaybackId = null } = {}) {
-    if (playbackSessionExpired()) return;
+    if (playbackSessionExpired() || !currentTrack) return;
+    if (step < 0) {
+      if (sourcePositionSeconds() > 2.5) {
+        seekToTrackOffset(0);
+        return;
+      }
+      if (nowPlayingPlaylist) {
+        if (playlistHistory.length) {
+          const previous = playlistHistory.pop();
+          if (currentTrack) queue.unshift(currentTrack);
+          renderQueue();
+          updateControls();
+          await playTrack(previous, { toggle: false, bypassFadedSkip });
+          return;
+        }
+        if (queue.length) {
+          const last = queue.pop();
+          if (currentTrack) queue.unshift(currentTrack);
+          renderQueue();
+          updateControls();
+          await playTrack(last, { toggle: false, bypassFadedSkip });
+          return;
+        }
+        seekToTrackOffset(0);
+        return;
+      }
+      if (libraryNavigator) {
+        if (libraryNavigationPending) return;
+        libraryNavigationPending = true;
+        setPlayerStatus("Preparing previous track…", { busy: true });
+        updateControls();
+        try {
+          const prev = await libraryNavigator(currentTrack, -1);
+          if (prev) await playTrack(prev, { toggle: false, bypassFadedSkip });
+          else seekToTrackOffset(0);
+        } catch {
+          seekToTrackOffset(0);
+        } finally {
+          libraryNavigationPending = false;
+          updateControls();
+        }
+        return;
+      }
+      if (library.length > 1) {
+        const index = library.findIndex((track) => track.id === currentTrack.id);
+        const prev = index < 0 ? library.length - 1 : (index - 1 + library.length) % library.length;
+        await playTrack(library[prev], { bypassFadedSkip });
+        return;
+      }
+      seekToTrackOffset(0);
+      return;
+    }
+    // step > 0 (NEXT)
     if (nowPlayingPlaylist) {
-      if (step > 0) {
-        if (queue.length) await playNextFromQueue({ bypassFadedSkip, alreadyRecordedPlaybackId });
-        else setPlayerStatus("Playlist complete.");
+      if (queue.length) {
+        await playNextFromQueue({ bypassFadedSkip, alreadyRecordedPlaybackId });
         return;
       }
       if (playlistHistory.length) {
-        const previous = playlistHistory.pop();
-        if (currentTrack) queue.unshift(currentTrack);
+        const allTracks = [...playlistHistory, currentTrack];
+        playlistHistory = [];
+        const first = allTracks[0];
+        queue = allTracks.slice(1);
         renderQueue();
         updateControls();
-        await playTrack(previous, { toggle: false, bypassFadedSkip });
+        await playTrack(first, { toggle: false, bypassFadedSkip });
+        return;
       }
+      seekToTrackOffset(0);
       return;
     }
-    if (step > 0 && queue.length) {
+    if (queue.length) {
       await playNextFromQueue({ bypassFadedSkip, alreadyRecordedPlaybackId });
       return;
     }
-    if (!currentTrack) return;
     if (libraryNavigator) {
       if (libraryNavigationPending) return;
       libraryNavigationPending = true;
-      setPlayerStatus(step > 0 ? "Preparing next track…" : "Preparing previous track…", { busy: true });
+      setPlayerStatus("Preparing next track…", { busy: true });
       updateControls();
       try {
-        const next = await libraryNavigator(currentTrack, step);
+        const next = await libraryNavigator(currentTrack, 1);
         if (next) await playTrack(next, { toggle: false, bypassFadedSkip });
-        else setPlayerStatus("No adjacent track is available.", { timeout: 4000 });
+        else seekToTrackOffset(0);
       } catch {
-        setPlayerStatus("Could not load the adjacent track. Try again.", { timeout: 5000 });
+        seekToTrackOffset(0);
       } finally {
         libraryNavigationPending = false;
         updateControls();
       }
       return;
     }
-    if (library.length < 2) return;
-    const index = library.findIndex((track) => track.id === currentTrack.id);
-    if (index < 0) {
-      if (step > 0) await playTrack(library[0], { bypassFadedSkip });
+    if (library.length > 1) {
+      const index = library.findIndex((track) => track.id === currentTrack.id);
+      const next = index < 0 ? 0 : (index + 1) % library.length;
+      await playTrack(library[next], { bypassFadedSkip });
       return;
     }
-    const next = (index + step + library.length) % library.length;
-    await playTrack(library[next], { bypassFadedSkip });
+    seekToTrackOffset(0);
   }
 
   playButton.addEventListener("click", () => {
@@ -1727,11 +1808,14 @@
     window.clearTimeout(volumeRestartTimer);
     if (ensureEqualizerGraph()) {
       updateEqualizerGraph();
-      if (audioContext.state !== "running") {
+      if (audioContext && audioContext.state !== "running") {
         audioContext.resume().catch(() => { setPlayerStatus("Press Play to resume audio processing."); });
       }
     } else if (currentTrack) {
       // Legacy browsers without Web Audio retain the server-volume fallback.
+      volumeRestartTimer = window.setTimeout(() => restartCurrentStream(sourcePositionSeconds()), 350);
+    }
+    if (typeof testAudioVolumeSupport === "function" && !testAudioVolumeSupport() && currentTrack) {
       volumeRestartTimer = window.setTimeout(() => restartCurrentStream(sourcePositionSeconds()), 350);
     }
   });
@@ -1971,23 +2055,27 @@
     isPlaying() { return Boolean(currentTrack && !audio.paused && !audio.ended && !audio.error); },
     getQueue() { return [...queue]; },
     togglePlayback() { playButton.click(); },
-    previous() { previousButton.click(); },
-    next() { nextButton.click(); },
+    previous() { return moveTrack(-1); },
+    next() { return moveTrack(1); },
     seekTo(seconds) { seekToTrackOffset(Number(seconds) || 0); },
     getVolume() { return volumeStep; },
     setVolume(step) {
       const num = Math.max(0, Math.min(20, Math.round(Number(step) || 0)));
       volumeStep = num;
       storage.set("volumeStep", volumeStep);
-      volumeInput.value = String(num);
+      if (volumeInput) volumeInput.value = String(num);
+      applyVolumeStep();
       syncVolumeControls();
       window.clearTimeout(volumeRestartTimer);
       if (ensureEqualizerGraph()) {
         updateEqualizerGraph();
-        if (audioContext.state !== "running") {
+        if (audioContext && audioContext.state !== "running") {
           audioContext.resume().catch(() => {});
         }
       } else if (currentTrack) {
+        volumeRestartTimer = window.setTimeout(() => restartCurrentStream(sourcePositionSeconds()), 350);
+      }
+      if (typeof testAudioVolumeSupport === "function" && !testAudioVolumeSupport() && currentTrack) {
         volumeRestartTimer = window.setTimeout(() => restartCurrentStream(sourcePositionSeconds()), 350);
       }
     },

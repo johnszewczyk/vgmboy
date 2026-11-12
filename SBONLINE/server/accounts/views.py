@@ -1827,8 +1827,8 @@ def spcboy_audio(request, track_id):
             for freq, gain in zip(eq_frequencies, eq_gains):
                 if gain != 0:
                     audio_filters.append(f"equalizer=f={freq}:width_type=q:w=1.414:g={gain:.1f}")
-            # Soft broadcast peak limiter prevents digital clipping without lowering baseline track volume
-            audio_filters.append("alimiter=limit=0.98:attack=5:release=50:asc=true")
+            # Safety peak limiter catches digital clipping on boosted EQ bands without altering baseline level
+            audio_filters.append("alimiter=level=false:asc=false:limit=1.0:attack=5:release=50")
         af_string = ",".join(audio_filters)
         ffmpeg_filter_args = ["-af", af_string] if af_string else []
         encoder = subprocess.Popen(
