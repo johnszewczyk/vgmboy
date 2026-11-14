@@ -285,14 +285,16 @@
   }
   function updateEqualizerGraph() {
     if (!equalizerGraphReady) return;
+    const immediate = arguments[0]?.immediate === true;
+    const smoothing = immediate ? 0.001 : 0.035;
     const activeGains = equalizerEnabled ? equalizerBandGains : equalizerBandGains.map(() => 0);
     activeGains.forEach((gain, index) => {
       const parameter = equalizerFilters[index]?.gain;
       if (!parameter) return;
-      parameter.setTargetAtTime(gain, audioContext.currentTime, 0.035);
+      parameter.setTargetAtTime(gain, audioContext.currentTime, smoothing);
     });
-    // Baseline output level is unattenuated; server broadcast limiter prevents digital clipping
-    equalizerOutput.gain.setTargetAtTime(volumeStep / 20, audioContext.currentTime, 0.035);
+    // Baseline output level is unattenuated; live Web Audio EQ keeps playback continuous.
+    equalizerOutput.gain.setTargetAtTime(volumeStep / 20, audioContext.currentTime, smoothing);
   }
   function ensureEqualizerGraph() {
     if (equalizerGraphReady) return true;
@@ -318,7 +320,7 @@
       equalizerOutput.connect(transportFadeOutput);
       transportFadeOutput.connect(audioContext.destination);
       equalizerGraphReady = true;
-      updateEqualizerGraph();
+      updateEqualizerGraph({ immediate: true });
       return true;
     } catch {
       // If graph setup fails after creating the media source, keep direct output connected.
@@ -460,19 +462,16 @@
     updateEqualizerToggle(equalizerEnabled);
     storage.set("equalizerEnabled", equalizerEnabled);
     if (equalizerError) equalizerError.textContent = "";
-    if (AudioContextClass && !equalizerGraphFailed) {
-      try {
-        if (ensureEqualizerGraph() && audioContext.state !== "running") {
-          await audioContext.resume();
-        }
-      } catch {
-        /* Keep server-side pre-compressed EQ functional even if Web Audio fails */
-      }
-    }
+    const graphReady = ensureEqualizerGraph();
     updateEqualizerGraph();
     syncEqualizerControls();
     syncOnlineControls();
-    if (currentTrack) {
+    if (graphReady) {
+      if (audioContext && audioContext.state !== "running") {
+        audioContext.resume().catch(() => {});
+      }
+    } else if (currentTrack) {
+      // Legacy fallback when Web Audio graph cannot be initialized.
       restartCurrentStream(sourcePositionSeconds());
     }
     window.dispatchEvent(new CustomEvent("siteplayer:settings-changed", { detail: { equalizerEnabled } }));
@@ -823,10 +822,11 @@
     params.set("speedDenominator", speedDenominator);
     params.set("fade", String(spcFadeSeconds));
     if (longPlayEnabled) params.set("longPlay", String(longPlaySeconds));
-    if (equalizerEnabled && equalizerBandGains.some((g) => g !== 0)) {
+    const usesClientAudioGraph = Boolean(AudioContextClass && !equalizerGraphFailed);
+    if (!usesClientAudioGraph && equalizerEnabled && equalizerBandGains.some((g) => g !== 0)) {
       params.set("eq", equalizerBandGains.map((g) => (Math.round(g * 2) / 2).toFixed(1)).join(","));
     }
-    if (volumeStep < 20 && (!testAudioVolumeSupport() || !equalizerGraphReady || equalizerGraphFailed || !AudioContextClass)) params.set("volume", String(volumeStep));
+    if (volumeStep < 20 && !usesClientAudioGraph) params.set("volume", String(volumeStep));
     return `${base}?${params}`;
   }
 
@@ -1714,14 +1714,14 @@
     "#spcboy-mobile-play", "#spcboy-mobile-next", "#spcboy-mobile-previous",
     "#spcboy-mobile-dock-play", ".spcboy-mobile-dock", "#spcboy-mobile-equalizer",
     "#spcboy-mobile-volume", "#spcboy-mobile-reset-flat", "[data-mobile-eq-band]",
-    ".spcboy-mobile-app-nav button", ".spcboy-mobile-up-next button",
-    "#spcboy-mobile-detail-play", ".spcboy-mobile-track", ".spcboy-mobile-album-card",
+    "[data-mobile-eq-mode]", "#spcboy-mobile-save-preset", "#spcboy-mobile-shuffle-favs",
+    "#spcboy-mobile-detail-play", ".spcboy-mobile-track", ".spcboy-mobile-track-row",
+    ".spcboy-mobile-detail-track-row", ".spcboy-mobile-album-card",
   ].join(",");
   function prepareAudioGraphFromGesture(event) {
     const target = event.target instanceof Element ? event.target : event.target?.parentElement;
-    const isMobileInteraction = Boolean(target?.closest("#spcboy-mobile-app"));
     const matchesGesture = Boolean(target?.closest(audioProcessingGestureSelector));
-    if (!equalizerEnabled && !fadedSkipsEnabled && !isMobileInteraction && !matchesGesture) return;
+    if (!equalizerEnabled && !fadedSkipsEnabled && !matchesGesture) return;
     if (!ensureEqualizerGraph() || audioContext.state === "running") return;
     try { audioContext.resume().catch(() => {}); } catch { /* The next playback gesture can retry the suspended context. */ }
   }
@@ -1735,12 +1735,25 @@
       const index = Number(input.dataset.equalizerBand);
       if (!Number.isInteger(index) || index < 0 || index >= equalizerBandGains.length) return;
       equalizerBandGains[index] = Math.max(-12, Math.min(12, Math.round(Number(input.value) * 2) / 2));
+      if (equalizerEnabled && ensureEqualizerGraph() && audioContext?.state !== "running") {
+        audioContext?.resume().catch(() => {});
+      }
       saveEqualizerGains();
+      if (!equalizerGraphReady && equalizerEnabled && currentTrack) {
+        window.clearTimeout(eqRestartTimer);
+        eqRestartTimer = window.setTimeout(() => restartCurrentStream(sourcePositionSeconds()), 250);
+      }
     });
   });
   equalizerResetButton.addEventListener("click", () => {
     equalizerBandGains = equalizerBandGains.map(() => 0);
+    if (equalizerEnabled && ensureEqualizerGraph() && audioContext?.state !== "running") {
+      audioContext?.resume().catch(() => {});
+    }
     saveEqualizerGains();
+    if (!equalizerGraphReady && equalizerEnabled && currentTrack) {
+      restartCurrentStream(sourcePositionSeconds());
+    }
   });
   async function applyEqualizerPreset(index) {
     if (!Number.isInteger(index) || index < 0 || index >= equalizerPresets.length) return;
@@ -1813,9 +1826,6 @@
       }
     } else if (currentTrack) {
       // Legacy browsers without Web Audio retain the server-volume fallback.
-      volumeRestartTimer = window.setTimeout(() => restartCurrentStream(sourcePositionSeconds()), 350);
-    }
-    if (typeof testAudioVolumeSupport === "function" && !testAudioVolumeSupport() && currentTrack) {
       volumeRestartTimer = window.setTimeout(() => restartCurrentStream(sourcePositionSeconds()), 350);
     }
   });
@@ -2075,9 +2085,6 @@
       } else if (currentTrack) {
         volumeRestartTimer = window.setTimeout(() => restartCurrentStream(sourcePositionSeconds()), 350);
       }
-      if (typeof testAudioVolumeSupport === "function" && !testAudioVolumeSupport() && currentTrack) {
-        volumeRestartTimer = window.setTimeout(() => restartCurrentStream(sourcePositionSeconds()), 350);
-      }
     },
     getEqualizerPresets() {
       return equalizerPresets.map((preset, index) => ({
@@ -2105,9 +2112,12 @@
       const rounded = Math.max(-12, Math.min(12, Math.round(Number(gain) * 2) / 2));
       equalizerBandGains[index] = rounded;
       if (equalizerBandInputs[index]) equalizerBandInputs[index].value = String(rounded);
-      if (equalizerEnabled) ensureEqualizerGraph();
+      const graphReady = equalizerEnabled ? ensureEqualizerGraph() : equalizerGraphReady;
+      if (equalizerEnabled && graphReady && audioContext && audioContext.state !== "running") {
+        audioContext.resume().catch(() => {});
+      }
       saveEqualizerGains();
-      if (equalizerEnabled && currentTrack) {
+      if (!graphReady && equalizerEnabled && currentTrack) {
         window.clearTimeout(eqRestartTimer);
         eqRestartTimer = window.setTimeout(() => {
           restartCurrentStream(sourcePositionSeconds());
@@ -2117,8 +2127,9 @@
     resetEqualizer() {
       equalizerBandGains = equalizerFrequencies.map(() => 0);
       equalizerBandInputs.forEach(input => { input.value = "0"; });
+      const graphReady = equalizerEnabled ? ensureEqualizerGraph() : equalizerGraphReady;
       saveEqualizerGains();
-      if (equalizerEnabled && currentTrack) {
+      if (!graphReady && equalizerEnabled && currentTrack) {
         restartCurrentStream(sourcePositionSeconds());
       }
     },

@@ -416,3 +416,68 @@ test('Long play duration parser parses strings, M:SS, and H:MM:SS', () => {
   assert.equal(context.parseLongPlayDuration('-5'), null);
   assert.equal(context.parseLongPlayDuration('invalid'), null);
 });
+
+test('Equalizer toggle applies live without restarting active playback when Web Audio is ready', async () => {
+  const calls = [];
+  let ctx = null;
+  class AudioContextMock {
+    constructor() { this.state = 'suspended'; ctx = this; }
+    resume() { calls.push('resume'); this.state = 'running'; return Promise.resolve(); }
+  }
+  const storageValues = new Map();
+  const context = vm.createContext({
+    equalizerEnabled: false,
+    equalizerError: { textContent: '' },
+    AudioContextClass: AudioContextMock,
+    equalizerGraphFailed: false,
+    audioContext: null,
+    currentTrack: { id: 'guile' },
+    window: { dispatchEvent(event) { calls.push(['event', event.type, event.detail?.equalizerEnabled]); } },
+    CustomEvent: class { constructor(type, init = {}) { this.type = type; this.detail = init.detail; } },
+    storage: { set(k, v) { storageValues.set(k, v); } },
+    updateEqualizerToggle(enabled) { calls.push(['toggle-ui', enabled]); },
+    ensureEqualizerGraph() {
+      if (!ctx) ctx = new AudioContextMock();
+      context.audioContext = ctx;
+      calls.push('ensure-graph');
+      return true;
+    },
+    updateEqualizerGraph() { calls.push(['update-graph', context.equalizerEnabled]); },
+    syncEqualizerControls() { calls.push('sync-eq'); },
+    syncOnlineControls() { calls.push('sync-online'); },
+    restartCurrentStream() { throw new Error('Should not restart active stream when Web Audio EQ is live'); },
+    sourcePositionSeconds() { return 12; },
+  });
+  vm.runInContext(source.slice(source.indexOf('  async function setEqualizerEnabled('), source.indexOf('  function updateLongPlayToggle(')), context);
+  assert.equal(await context.setEqualizerEnabled(true), true);
+  assert.equal(storageValues.get('equalizerEnabled'), true);
+  assert.ok(calls.includes('resume'));
+  assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === 'update-graph' && entry[1] === true));
+});
+
+test('audioURL skips server eq and volume params when Web Audio client processing is available', () => {
+  const context = vm.createContext({
+    URLSearchParams,
+    dock: { dataset: { audioUrl: '/audio/spcboy/TRACK_ID/', pageLoadToken: 'tok' } },
+    currentPlaybackId: 'pb1',
+    playbackSpeedEnabled: false,
+    playbackRateFraction: '1/1',
+    spcFadeSeconds: 5,
+    longPlayEnabled: false,
+    longPlaySeconds: 180,
+    equalizerEnabled: true,
+    equalizerBandGains: [6, 0, 0, 0, 0, 0, 0, 0, 0, -3],
+    volumeStep: 10,
+    equalizerGraphFailed: false,
+    AudioContextClass: function AudioContextMock() {},
+  });
+  vm.runInContext(source.slice(source.indexOf('  function audioURL('), source.indexOf('  function nativeFormatPlaybackRate(')), context);
+  const clientUrl = context.audioURL({ id: 'guile' }, 0);
+  assert.equal(clientUrl.includes('eq='), false);
+  assert.equal(clientUrl.includes('volume='), false);
+
+  context.AudioContextClass = null;
+  const legacyUrl = context.audioURL({ id: 'guile' }, 0);
+  assert.equal(legacyUrl.includes('eq=6.0'), true);
+  assert.equal(legacyUrl.includes('volume=10'), true);
+});

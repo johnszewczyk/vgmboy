@@ -115,7 +115,8 @@
     box-sizing: border-box;
   }
 
-  .spcboy-mobile-screen.is-hidden {
+  .spcboy-mobile-screen.is-hidden,
+  #spcboy-mobile-app .is-hidden {
     display: none !important;
   }
 
@@ -242,9 +243,11 @@
     display: block;
     height: 100%;
     background: var(--sb-m-accent);
-    width: 0%;
+    width: 100%;
     border-radius: 3px;
-    transition: width 0.1s linear;
+    transform: scaleX(0);
+    transform-origin: left center;
+    will-change: transform;
   }
 
   .spcboy-mobile-times {
@@ -360,13 +363,14 @@
     overflow: hidden;
   }
 
-  .spcboy-mobile-console-toggle {
+  #spcboy-mobile-app .spcboy-mobile-console-toggle,
+  #spcboy-mobile-app .spcboy-mobile-console-toggle[aria-expanded="true"] {
     width: 100%;
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 12px 14px;
-    background: none;
+    background: transparent;
     border: none;
     color: var(--sb-m-ink);
     font-size: 14px;
@@ -404,13 +408,14 @@
     border-bottom: none;
   }
 
-  .spcboy-mobile-album-toggle {
+  #spcboy-mobile-app .spcboy-mobile-album-toggle,
+  #spcboy-mobile-app .spcboy-mobile-album-toggle[aria-expanded="true"] {
     width: 100%;
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 10px 14px;
-    background: none;
+    background: transparent;
     border: none;
     color: var(--sb-m-ink);
     font-size: var(--sb-mobile-sidebar-font-size, 13px);
@@ -491,8 +496,32 @@
   }
 
   /* Gallery */
-  .spcboy-gallery-console-picker { display:grid;
+  body.sbonline-site #spcboy-mobile-app .spcboy-gallery-console-picker { display:grid;
     margin-bottom: 12px;
+  }
+
+  .spcboy-mobile-gallery-footer {
+    margin-top: 16px;
+    display: flex;
+    justify-content: center;
+  }
+
+  .spcboy-mobile-load-more {
+    width: 100%;
+    min-height: 44px;
+    padding: 0 16px;
+    border: 1px solid var(--sb-m-line);
+    border-radius: 8px;
+    background: var(--sb-m-card);
+    color: var(--sb-m-accent);
+    font: 14px/1 var(--sb-m-font);
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .spcboy-mobile-load-more:active {
+    background: var(--sb-m-card-active);
   }
 
   .spcboy-mobile-console-picker {
@@ -820,8 +849,21 @@
     transition: background-color var(--site-motion-duration) var(--site-motion-ease), color var(--site-motion-duration) var(--site-motion-ease);
   }
 
-  .spcboy-mobile-eq-btn.is-active,
-  .spcboy-mobile-eq-btn[aria-pressed="true"] {
+  .spcboy-mobile-favorites-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .spcboy-mobile-btn-shuffle {
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  #spcboy-mobile-app .spcboy-mobile-eq-btn.is-active,
+  #spcboy-mobile-app .spcboy-mobile-eq-btn[aria-pressed="true"] {
     background: var(--sb-m-accent);
     color: #081317;
   }
@@ -921,7 +963,7 @@
     filter: brightness(1.2);
   }
 
-  .spcboy-mobile-switch[aria-checked="true"] {
+  #spcboy-mobile-app .spcboy-mobile-switch[aria-checked="true"] {
     background: var(--sb-m-accent);
     color: #000;
     border-color: var(--sb-m-accent);
@@ -988,9 +1030,12 @@
 
   #spcboy-mobile-dock-progress-fill {
     display: block;
+    width: 100%;
     height: 100%;
     background: var(--sb-m-accent);
-    width: 0%;
+    transform: scaleX(0);
+    transform-origin: left center;
+    will-change: transform;
   }
 
   .spcboy-mobile-dock-main {

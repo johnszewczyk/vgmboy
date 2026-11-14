@@ -11,6 +11,10 @@
   const savedMotion = storage?.get('interface', 'motionEnabled', defaults.motionEnabled);
   if (typeof savedMotion === 'boolean') preferences.motionEnabled = savedMotion;
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const coarsePointer = matchMedia('(pointer: coarse)');
+  function isSelectionSuppressed(node) {
+    return coarsePointer.matches || Boolean(node?.closest?.('#spcboy-mobile-app'));
+  }
   function apply() {
     document.body.style.setProperty('--sb-mobile-playlist-font-size', `${preferences.playlistFontSize}px`);
     document.body.style.setProperty('--sb-mobile-sidebar-font-size', `${preferences.sidebarFontSize}px`);
@@ -64,7 +68,7 @@
   }
   function position(instant = false) {
     frame = 0;
-    if (!target?.isConnected || !target.getClientRects().length || target.closest('[inert],[hidden]')) { marker.classList.remove('is-ready'); return; }
+    if (isSelectionSuppressed(target) || !target?.isConnected || !target.getClientRects().length || target.closest('[inert],[hidden]')) { marker.classList.remove('is-ready'); return; }
     const rect = target.getBoundingClientRect();
     let left = Math.max(0,rect.left), top = Math.max(0,rect.top), right = Math.min(innerWidth,rect.right), bottom = Math.min(innerHeight,rect.bottom);
     for (let parent = target.parentElement; parent; parent = parent.parentElement) {
@@ -82,25 +86,36 @@
   }
   function schedule() { if (!frame) frame = requestAnimationFrame(() => position()); }
   document.addEventListener('pointerover', event => {
-    if (event.pointerType === 'touch') return;
+    if (event.pointerType === 'touch' || coarsePointer.matches) return;
     const next = event.target.closest(selector);
-    if (next !== target) setTarget(next);
+    if (next && !isSelectionSuppressed(next) && next !== target) setTarget(next);
   });
   document.addEventListener('pointerout', event => {
+    if (coarsePointer.matches) return;
     if (!event.relatedTarget || !event.relatedTarget.closest?.(selector)) setTarget(logicalTarget);
   });
   document.addEventListener('focusin', event => {
+    if (coarsePointer.matches) return;
     const next = event.target.closest(selector);
+    if (isSelectionSuppressed(next)) return;
     logicalTarget = next;
     setTarget(next);
   });
   document.addEventListener('click', event => {
+    if (coarsePointer.matches) return;
     const next = event.target.closest(selector);
+    if (isSelectionSuppressed(next)) return;
     logicalTarget = next;
     setTarget(next);
   });
-  document.addEventListener('scroll', () => position(true), { capture: true, passive: true });
-  window.addEventListener('resize', () => position(true), { passive: true });
+  document.addEventListener('scroll', () => {
+    if (!target || isSelectionSuppressed(target)) return;
+    position(true);
+  }, { capture: true, passive: true });
+  window.addEventListener('resize', () => {
+    if (!target || isSelectionSuppressed(target)) return;
+    position(true);
+  }, { passive: true });
   document.addEventListener('site:pageleave', () => {
     if (logicalTarget?.matches('.topnav a[data-nav-key]')) {
       setTarget(logicalTarget);
