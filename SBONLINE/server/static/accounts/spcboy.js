@@ -1669,11 +1669,11 @@
     if (requestedTrackId) {
       fetchTrackDetail(requestedTrackId).then((requestedTrack) => {
         if (requestedTrack) {
-          requestedURL.searchParams.delete("play");
-          requestedURL.searchParams.delete("album");
-          window.history.replaceState(null, "", requestedURL);
-          selectTrack(requestedTrack, true);
-        } else playerState.textContent = "That track is no longer available in the library.";
+        requestedURL.searchParams.delete("play");
+        requestedURL.searchParams.delete("album");
+        window.history.replaceState(null, "", requestedURL);
+        selectTrack(requestedTrack, true, { source: "album" });
+      } else playerState.textContent = "That track is no longer available in the library.";
       }).catch(() => { playerState.textContent = "That track is no longer available in the library."; });
     } else if (requestedAlbumId) {
       if (!/^[0-9a-f]{32}$/.test(requestedAlbumId)) {
@@ -1977,7 +1977,7 @@
             try { playable = await fetchTrackDetail(entry.trackId); }
             catch { /* The snapshot can still try playback if metadata lookup is briefly offline. */ }
           }
-          if (playable) selectTrack(playable, true);
+          if (playable) selectTrack(playable, true, { source: "recent" });
           else playerState.textContent = "That recent track is no longer in the hosted library.";
         },
       });
@@ -2174,14 +2174,17 @@
     applyFilters();
   }
 
-  async function selectTrack(track, startPlayback) {
+  async function selectTrack(track, startPlayback, options = {}) {
     const selectionToken = ++playbackSelectionToken;
-    const resolvedGroup = track.gameKey
+    const explicitGroup = options?.group || null;
+    const explicitTracks = Array.isArray(options?.tracks) ? options.tracks : null;
+    const playlistSource = options?.source || view;
+    const resolvedGroup = explicitGroup || (track.gameKey
       ? gameGroupsByKey.get(track.gameKey)
-      : gameGroupsByConsoleGame.get(`${canonicalConsoleName(track.console)}\u0000${track.game}`);
+      : gameGroupsByConsoleGame.get(`${canonicalConsoleName(track.console)}\u0000${track.game}`));
     if (resolvedGroup) track = cacheTrack(resolvedGroup, track);
-    const playingFavorites = view === "favorites";
-    const playingCollection = playingFavorites || view === "recent";
+    const playingFavorites = playlistSource === "favorites";
+    const playingCollection = playingFavorites || playlistSource === "recent" || playlistSource === "queue";
     if (track.gameKey && !playingCollection) {
       selectGame(track.gameKey);
       const selectedGroup = gameGroupsByKey.get(track.gameKey);
@@ -2200,7 +2203,9 @@
 
     if (startPlayback) {
       const query = search.value.trim();
-      const albumTracks = view === "recent"
+      const albumTracks = explicitTracks
+        ? explicitTracks
+        : playlistSource === "recent"
         ? collectionTracks().filter(candidate => candidate.available !== false && (!selectedGameKey || candidate.gameKey === selectedGameKey))
         : playingFavorites
         ? (await loadFavoritePlaylist({allPages:true})).filter(candidate =>
@@ -2208,9 +2213,11 @@
             matchesTrackQuery(candidate, query))
         : resolvedGroup ? await ensureAlbumTracks(resolvedGroup) : [];
       if (selectionToken !== playbackSelectionToken) return;
-      const playlist = albumTracks.length ? albumTracks : [track];
+      const containsTarget = albumTracks.some((candidate) => candidate && candidate.id === track.id);
+      const playlist = containsTarget && albumTracks.length ? albumTracks : [track];
       await window.SitePlayer?.playPlaylist(playlist, {
         startTrackId: track.id,
+        startTrack: track,
         toggle: isDesktop(),
       });
       return;
@@ -2383,10 +2390,18 @@
       || null;
   }
 
-  function setMobileAppPage(nextPage) {
+  function setMobileAppPage(nextPage, { syncView = true } = {}) {
     if (!mobileAppNav) return;
     if (!["playing", "library", "gallery", "recent", "favorites", "sound", "detail"].includes(nextPage)) return;
     mobileAppPage = nextPage;
+    if (syncView && !isDesktop()) {
+      const mobileViewMap = { library: "all", gallery: "gallery", recent: "recent", favorites: "favorites" };
+      if (nextPage in mobileViewMap && view !== mobileViewMap[nextPage]) {
+        view = mobileViewMap[nextPage];
+        storage.set("view", view);
+        syncViewButtons();
+      }
+    }
     const navButtons = mobileAppNav.querySelectorAll("[data-mobile-app-page]");
     for (const button of navButtons) {
       const selected = button.dataset.mobileAppPage === nextPage;
@@ -2566,7 +2581,7 @@
       titleSpan.textContent = track.title || track.id;
       trackBtn.append(num, titleSpan);
       trackBtn.addEventListener("click", () => {
-        selectTrack(track, true);
+        selectTrack(track, true, { source: "album", group: gameEntry });
         setMobileAppPage("playing");
       });
       container.append(trackBtn);
@@ -2716,7 +2731,7 @@
             e.preventDefault();
             btn.classList.add("is-loading");
             showMobileLoadingIndicator(track.title || "Loading track…");
-            selectTrack(track, true);
+            selectTrack(track, true, { source: "album", group: entry });
             setMobileAppPage("playing");
           };
           row.append(btn);
@@ -2935,7 +2950,7 @@
             e.preventDefault();
             btn.classList.add("is-loading");
             showMobileLoadingIndicator(track.title || "Loading track…");
-            selectTrack(track, true);
+            selectTrack(track, true, { source: "album", group });
           };
           row.append(btn);
           listEl.append(row);
@@ -2973,7 +2988,7 @@
         e.preventDefault();
         btn.classList.add("is-loading");
         showMobileLoadingIndicator(track.title || "Loading track…");
-        selectTrack(track, true);
+        selectTrack(track, true, { source: "queue", tracks: queueTracks });
       };
       row.append(btn);
       listEl.append(row);
@@ -3062,7 +3077,7 @@
         e.preventDefault();
         btn.classList.add("is-loading");
         showMobileLoadingIndicator(track.title || "Loading track…");
-        selectTrack(track, true);
+        selectTrack(track, true, { source: "recent", tracks });
       };
       row.append(btn);
       listEl.append(row);

@@ -1396,7 +1396,14 @@
     let startIndex = 0;
     if (options.startTrackId) {
       const idx = playlist.findIndex((track) => track.id === options.startTrackId);
-      if (idx >= 0) startIndex = idx;
+      if (idx >= 0) {
+        startIndex = idx;
+      } else {
+        const targetTrack = normalizeTrack(options.startTrack) || normalizeTrack(libraryById.get(options.startTrackId));
+        if (!targetTrack) return false;
+        playlist.splice(0, playlist.length, targetTrack);
+        startIndex = 0;
+      }
     } else if (Number.isInteger(options.startIndex) && options.startIndex >= 0 && options.startIndex < playlist.length) {
       startIndex = options.startIndex;
     }

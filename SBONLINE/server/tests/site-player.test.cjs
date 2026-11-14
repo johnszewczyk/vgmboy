@@ -481,3 +481,32 @@ test('audioURL skips server eq and volume params when Web Audio client processin
   assert.equal(legacyUrl.includes('eq=6.0'), true);
   assert.equal(legacyUrl.includes('volume=10'), true);
 });
+
+test('playPlaylist never falls back to playlist[0] when an explicit startTrackId is missing', async () => {
+  const played = [];
+  const context = vm.createContext({
+    playbackSessionExpired: () => false,
+    normalizeTrack: (t) => (t && t.id ? { ...t } : null),
+    libraryById: new Map(),
+    queue: [],
+    playlistHistory: [],
+    nowPlayingPlaylist: false,
+    renderQueue() {},
+    updateControls() {},
+    playTrack: (track) => { played.push(track.id); return true; },
+  });
+  vm.runInContext(source.slice(source.indexOf('  async function playPlaylist('), source.indexOf('  async function finishFadedSkip(')), context);
+
+  const favList = [{ id: 'doggy-and-magic', title: 'Doggy and Magic' }, { id: 'fav-2', title: 'Fav 2' }];
+  const target = { id: 'target-track', title: 'Target Track' };
+
+  const ok = await context.playPlaylist(favList, { startTrackId: 'target-track', startTrack: target });
+  assert.equal(ok, true);
+  assert.deepEqual(played, ['target-track']);
+  assert.equal(context.queue.length, 0);
+
+  played.length = 0;
+  const missingResult = await context.playPlaylist(favList, { startTrackId: 'unknown-track' });
+  assert.equal(missingResult, false);
+  assert.deepEqual(played, []);
+});

@@ -82,3 +82,71 @@ test('spcboy_audio keeps silent pre-roll when starting from t=0', () => {
   assert.match(viewsPy, /pre_roll_ms = 100 if start_ms == 0 else 0/);
   assert.match(viewsPy, /adelay=\{pre_roll_ms\}\|\{pre_roll_ms\}/);
 });
+
+test('mobile library track selection plays the targeted song even when view is favorites', async () => {
+  const playCalls = [];
+  const favTrack = { id: 'doggy-and-magic', title: 'Doggy and Magic', game: 'Fav Game', console: 'SNES', gameKey: 'SNES\u0000Fav Game' };
+  const libTrack1 = { id: 'lib-1', title: 'Track 1', game: 'Target Game', console: 'GB', gameKey: 'GB\u0000Target Game' };
+  const libTrack2 = { id: 'lib-2', title: 'Target Song', game: 'Target Game', console: 'GB', gameKey: 'GB\u0000Target Game' };
+  const targetGroup = {
+    key: 'GB\u0000Target Game',
+    gameName: 'Target Game',
+    consoleName: 'GB',
+    albumId: 'alb1',
+    tracks: [libTrack1, libTrack2],
+    details: { closest: () => ({ open: false }), open: false },
+  };
+  const context = vm.createContext({
+    playbackSelectionToken: 0,
+    view: 'favorites',
+    search: { value: '' },
+    selectedGameKey: null,
+    currentTrack: null,
+    gameGroupsByKey: new Map([[targetGroup.key, targetGroup]]),
+    gameGroupsByConsoleGame: new Map([[targetGroup.key, targetGroup]]),
+    cacheTrack: (_, t) => t,
+    selectGame() {},
+    isDesktop: () => false,
+    syncCurrentTrackRows() {},
+    applyFilters() {},
+    scheduleSelectionIndicators() {},
+    collectionTracks: () => [favTrack],
+    loadFavoritePlaylist: async () => [favTrack],
+    ensureAlbumTracks: async (g) => g.tracks,
+    matchesTrackQuery: () => true,
+    window: {
+      SitePlayer: {
+        async playPlaylist(playlist, options) {
+          playCalls.push({ ids: playlist.map((t) => t.id), startTrackId: options.startTrackId, startTrack: options.startTrack });
+          return true;
+        },
+        async play(t) {
+          playCalls.push({ single: t.id });
+          return true;
+        },
+      },
+    },
+  });
+
+  const start = spcboyJs.indexOf('  async function selectTrack(');
+  const end = spcboyJs.indexOf('  search.addEventListener("input"', start);
+  vm.runInContext(spcboyJs.slice(start, end), context);
+
+  await context.selectTrack(libTrack2, true, { source: 'album', group: targetGroup });
+  assert.equal(playCalls.length, 1);
+  assert.deepEqual(Array.from(playCalls[0].ids), ['lib-1', 'lib-2']);
+  assert.equal(playCalls[0].startTrackId, 'lib-2');
+
+  // If an album list does not contain the targeted track, fall back to [track], never unrelated track #1.
+  playCalls.length = 0;
+  targetGroup.tracks = [favTrack];
+  await context.selectTrack(libTrack2, true, { source: 'album', group: targetGroup });
+  assert.equal(playCalls.length, 1);
+  assert.deepEqual(Array.from(playCalls[0].ids), ['lib-2']);
+  assert.equal(playCalls[0].startTrackId, 'lib-2');
+
+  // Verify mobile callers pass explicit playlist sources.
+  assert.match(spcboyJs, /selectTrack\(track,\s*true,\s*\{\s*source:\s*"album",\s*group:\s*gameEntry\s*\}\)/);
+  assert.match(spcboyJs, /selectTrack\(track,\s*true,\s*\{\s*source:\s*"album",\s*group:\s*entry\s*\}\)/);
+  assert.match(spcboyJs, /selectTrack\(track,\s*true,\s*\{\s*source:\s*"recent",\s*tracks\s*\}\)/);
+});
