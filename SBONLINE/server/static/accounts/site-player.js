@@ -1445,11 +1445,11 @@
     }
   }
 
-  async function moveTrack(step) {
+  async function moveTrack(step, { completeQueuedTarget = false } = {}) {
     if (queuedSkipRequest) {
       const request = queuedSkipRequest;
       clearFadedSkip({ restoreOutput: false });
-      return finishFadedSkip(request, { declick: true, step });
+      return finishFadedSkip(request, completeQueuedTarget ? { declick: true } : { declick: true, step });
     }
     return moveTrackNow(step);
   }
@@ -2007,7 +2007,7 @@
       updateControls();
       return;
     }
-    moveTrack(1);
+    moveTrack(1, { completeQueuedTarget: true });
   });
   audio.addEventListener("error", async () => {
     const failedPlaybackId = currentPlaybackId;

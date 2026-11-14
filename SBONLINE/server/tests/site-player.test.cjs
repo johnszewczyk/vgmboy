@@ -510,3 +510,37 @@ test('playPlaylist never falls back to playlist[0] when an explicit startTrackId
   assert.equal(missingResult, false);
   assert.deepEqual(played, []);
 });
+
+test('ended listener completes pending faded skip to targetTrack instead of skipping past it', async () => {
+  const finished = [];
+  const audioListeners = {};
+  const req = { playbackId: 'pb-1', targetTrack: { id: 'lib-target', title: 'Target' }, targetOptions: {} };
+  const context = vm.createContext({
+    queuedSkipRequest: req,
+    audio: {
+      src: 'blob:prev',
+      ended: true,
+      addEventListener(eventName, handler) {
+        audioListeners[eventName] = handler;
+      },
+    },
+    effectiveDuration: () => 0,
+    sourcePositionSeconds: () => 10,
+    clearFadedSkip() { context.queuedSkipRequest = null; },
+    finishFadedSkip(request, opts) { finished.push({ request, opts }); },
+    moveTrackNow(step) { throw new Error(`Should not call moveTrackNow(${step}) during queued skip`); },
+  });
+  const moveBlock = source.slice(
+    source.indexOf('  async function moveTrack('),
+    source.indexOf('  async function moveTrackNow('),
+  );
+  const endedBlock = source.slice(
+    source.indexOf('  audio.addEventListener("ended",'),
+    source.indexOf('  audio.addEventListener("error",'),
+  );
+  vm.runInContext(`${moveBlock}\n${endedBlock}`, context);
+  await audioListeners.ended();
+  assert.equal(finished.length, 1);
+  assert.equal(finished[0].request, req);
+  assert.equal(finished[0].opts.step, undefined);
+});

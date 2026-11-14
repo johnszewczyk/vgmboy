@@ -98,6 +98,8 @@ test('mobile library track selection plays the targeted song even when view is f
   };
   const context = vm.createContext({
     playbackSelectionToken: 0,
+    pendingSelectionToken: 0,
+    lastPlayerTrackId: favTrack.id,
     view: 'favorites',
     search: { value: '' },
     selectedGameKey: null,
@@ -145,8 +147,73 @@ test('mobile library track selection plays the targeted song even when view is f
   assert.deepEqual(Array.from(playCalls[0].ids), ['lib-2']);
   assert.equal(playCalls[0].startTrackId, 'lib-2');
 
-  // Verify mobile callers pass explicit playlist sources.
-  assert.match(spcboyJs, /selectTrack\(track,\s*true,\s*\{\s*source:\s*"album",\s*group:\s*gameEntry\s*\}\)/);
+  // Verify loaded album tracks trigger playPlaylist synchronously inside click gesture.
+  playCalls.length = 0;
+  targetGroup.tracks = [libTrack1, libTrack2];
+  targetGroup.loaded = true;
+  const syncPromise = context.selectTrack(libTrack2, true, { source: 'album', group: targetGroup });
+  assert.equal(playCalls.length, 1);
+  assert.equal(playCalls[0].startTrackId, 'lib-2');
+  await syncPromise;
+
+  // Verify stale siteplayer:track for the previously playing track does not abort an async library selection.
+  const listeners = {};
+  const staleRaceContext = vm.createContext({
+    playbackSelectionToken: 0,
+    pendingSelectionToken: 0,
+    lastPlayerTrackId: favTrack.id,
+    view: 'all',
+    search: { value: '' },
+    selectedGameKey: null,
+    currentTrack: favTrack,
+    tracksById: new Map([[favTrack.id, favTrack]]),
+    gameGroupsByKey: new Map([[targetGroup.key, targetGroup]]),
+    gameGroupsByConsoleGame: new Map([[targetGroup.key, targetGroup]]),
+    cacheTrack: (_, t) => t,
+    selectGame() {},
+    isDesktop: () => false,
+    syncCurrentTrackRows() {},
+    applyFilters() {},
+    scheduleSelectionIndicators() {},
+    renderMobileNowPlaying() {},
+    renderMobileUpNext() {},
+    renderMobileRecents() {},
+    renderMobileFavorites() {},
+    mobileAppPage: 'playing',
+    loadRecents() {},
+    ensureAlbumTracks: async () => [libTrack1, libTrack2],
+    matchesTrackQuery: () => true,
+    recentMore: { addEventListener() {} },
+    favoriteMore: null,
+    mobileNowArtwork: null,
+    mobileDockArt: null,
+    audio: null,
+    window: {
+      addEventListener(name, fn) { listeners[name] = fn; },
+      SitePlayer: {
+        async playPlaylist(playlist, options) {
+          playCalls.push({ ids: playlist.map((t) => t.id), startTrackId: options.startTrackId });
+          return true;
+        },
+      },
+    },
+  });
+  targetGroup.loaded = false;
+  playCalls.length = 0;
+  vm.runInContext(spcboyJs.slice(start, end), staleRaceContext);
+  const trackEventStart = spcboyJs.indexOf('  window.addEventListener("siteplayer:track",');
+  const trackEventEnd = spcboyJs.indexOf('  // Tabs are browsing contexts', trackEventStart);
+  vm.runInContext(spcboyJs.slice(trackEventStart, trackEventEnd), staleRaceContext);
+  const pendingSelection = staleRaceContext.selectTrack(libTrack2, true, { source: 'album', group: targetGroup });
+  listeners['siteplayer:track']({ detail: { track: favTrack } });
+  await pendingSelection;
+  assert.equal(playCalls.length, 1);
+  assert.equal(playCalls[0].startTrackId, 'lib-2');
+
+  // Verify mobile & row callers pass explicit playlist sources.
+  assert.match(spcboyJs, /selectTrack\(track,\s*true,\s*\{\s*source:\s*"album",\s*group:\s*gameEntry,\s*tracks:\s*gameEntry\.tracks\s*\}\)/);
   assert.match(spcboyJs, /selectTrack\(track,\s*true,\s*\{\s*source:\s*"album",\s*group:\s*entry\s*\}\)/);
   assert.match(spcboyJs, /selectTrack\(track,\s*true,\s*\{\s*source:\s*"recent",\s*tracks\s*\}\)/);
+  assert.match(spcboyJs, /makeTrackRow\(track,\s*entry\.tracks\.length,\s*\{\s*source:\s*"album",\s*group:\s*entry\s*\}\)/);
+  assert.match(spcboyJs, /selectTrack\(track,\s*true,\s*playbackOptions \|\| \{\}\)/);
 });

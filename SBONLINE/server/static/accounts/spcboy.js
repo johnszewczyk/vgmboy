@@ -176,7 +176,9 @@
   let resolveCatalogReady;
   const catalogReady = new Promise((resolve) => { resolveCatalogReady = resolve; });
   let currentTrack = null;
+  let lastPlayerTrackId = window.SitePlayer?.getCurrentTrack?.()?.id || null;
   let playbackSelectionToken = 0;
+  let pendingSelectionToken = 0;
   let currentPlaybackId = null;
   let announcedPlaybackId = null;
   let streamOffsetSeconds = 0;
@@ -970,7 +972,7 @@
     return card;
   }
 
-  function makeTrackRow(track, index) {
+  function makeTrackRow(track, index, playbackOptions = null) {
     const item = document.createElement("li");
     item.className = "spcboy-track-row";
     item.dataset.id = track.id;
@@ -1000,7 +1002,7 @@
       button.append(cell);
     }
     button.disabled = track.available === false;
-    button.addEventListener("click", () => selectTrack(track, true));
+    button.addEventListener("click", () => selectTrack(track, true, playbackOptions || {}));
 
     const favorite = document.createElement("button");
     favorite.className = "site-favorite-toggle spcboy-favorite";
@@ -1054,7 +1056,7 @@
     const existingRow = entry.list.querySelector(`.spcboy-track-row[data-id="${CSS.escape(data.id)}"]`);
     if (existingRow) return tracksById.get(data.id);
     const track = cacheTrack(entry, data);
-    const row = makeTrackRow(track, entry.tracks.length);
+    const row = makeTrackRow(track, entry.tracks.length, { source: "album", group: entry });
     row.querySelector(".spcboy-track")?.setAttribute("aria-current", String(currentTrack?.id === track.id));
     entry.tracks.push(track);
     entry.list.append(row);
@@ -1334,7 +1336,7 @@
       }
       galleryDetailStatus.hidden = true;
       albumTracks.forEach((track, index) => {
-        const row = makeTrackRow(track, index);
+        const row = makeTrackRow(track, index, { source: "album", group: entry });
         row.classList.add("spcboy-gallery-detail-row");
         galleryDetailTracks.append(row);
         const rows = trackRowsById.get(track.id) ?? [];
@@ -1806,7 +1808,7 @@
       list.className = "spcboy-tracks spcboy-collection-track-list";
       list.setAttribute("aria-label", view === "recent" ? "Recent tracks" : "Favorite tracks");
       selected.forEach((track, index) => {
-        const row = makeTrackRow(track, index);
+        const row = makeTrackRow(track, index, { source: view === "recent" ? "recent" : "favorites", tracks: selected });
         if (track.eventId != null) row.dataset.recentEventId = String(track.eventId);
         applyPlaylistColumnVisibilityToRow(row);
         list.append(row);
@@ -1914,7 +1916,9 @@
     for (const track of favoritePlaylistTracks) {
       if (!favorites.has(track.id) && !favoriteAlbums.has(track.albumId)) continue;
       if (query && !matchesTrackQuery(track, query)) continue;
-      cardList.append(makeTrackCard(track, visibleCount));
+      cardList.append(makeTrackCard(track, visibleCount, {
+        onPlay: () => selectTrack(track, true, { source: "favorites" }),
+      }));
       visibleCount += 1;
     }
     cardPanel.setAttribute("aria-label", "Your favorite tracks");
@@ -2176,6 +2180,7 @@
 
   async function selectTrack(track, startPlayback, options = {}) {
     const selectionToken = ++playbackSelectionToken;
+    pendingSelectionToken = startPlayback ? selectionToken : 0;
     const explicitGroup = options?.group || null;
     const explicitTracks = Array.isArray(options?.tracks) ? options.tracks : null;
     const playlistSource = options?.source || view;
@@ -2203,16 +2208,27 @@
 
     if (startPlayback) {
       const query = search.value.trim();
-      const albumTracks = explicitTracks
-        ? explicitTracks
-        : playlistSource === "recent"
-        ? collectionTracks().filter(candidate => candidate.available !== false && (!selectedGameKey || candidate.gameKey === selectedGameKey))
-        : playingFavorites
-        ? (await loadFavoritePlaylist({allPages:true})).filter(candidate =>
-            (!selectedGameKey || candidate.gameKey === selectedGameKey) &&
-            matchesTrackQuery(candidate, query))
-        : resolvedGroup ? await ensureAlbumTracks(resolvedGroup) : [];
+      let albumTracks;
+      if (explicitTracks) {
+        albumTracks = explicitTracks;
+      } else if (playlistSource === "recent") {
+        albumTracks = collectionTracks().filter(candidate => candidate.available !== false && (!selectedGameKey || candidate.gameKey === selectedGameKey));
+      } else if (playingFavorites) {
+        const favoriteTracks = typeof favoritePlaylistLoaded !== "undefined" && favoritePlaylistLoaded
+          ? favoritePlaylistTracks
+          : await loadFavoritePlaylist({ allPages: true });
+        albumTracks = favoriteTracks.filter(candidate =>
+          (!selectedGameKey || candidate.gameKey === selectedGameKey) &&
+          matchesTrackQuery(candidate, query));
+      } else if (resolvedGroup) {
+        albumTracks = resolvedGroup.loaded && Array.isArray(resolvedGroup.tracks) && resolvedGroup.tracks.length
+          ? resolvedGroup.tracks
+          : await ensureAlbumTracks(resolvedGroup);
+      } else {
+        albumTracks = [];
+      }
       if (selectionToken !== playbackSelectionToken) return;
+      if (pendingSelectionToken === selectionToken) pendingSelectionToken = 0;
       const containsTarget = albumTracks.some((candidate) => candidate && candidate.id === track.id);
       const playlist = containsTarget && albumTracks.length ? albumTracks : [track];
       await window.SitePlayer?.playPlaylist(playlist, {
@@ -2581,7 +2597,7 @@
       titleSpan.textContent = track.title || track.id;
       trackBtn.append(num, titleSpan);
       trackBtn.addEventListener("click", () => {
-        selectTrack(track, true, { source: "album", group: gameEntry });
+        selectTrack(track, true, { source: "album", group: gameEntry, tracks: gameEntry.tracks });
         setMobileAppPage("playing");
       });
       container.append(trackBtn);
@@ -3174,7 +3190,12 @@
         btn.classList.add("is-loading");
         num.textContent = "⏳";
         showMobileLoadingIndicator(track.title || "Loading track…");
-        window.SitePlayer?.playPlaylist(tracks, { startIndex: idx, toggle: false });
+        window.SitePlayer?.playPlaylist(tracks, {
+          startTrackId: track.id,
+          startTrack: track,
+          startIndex: idx,
+          toggle: false,
+        });
       };
       row.append(btn);
       frag.append(row);
@@ -3581,6 +3602,9 @@
   window.addEventListener("siteplayer:track", (event) => {
     const rawTrack = event.detail?.track;
     if (!rawTrack) return;
+    const staleWhileSelecting = Boolean(pendingSelectionToken && rawTrack.id && rawTrack.id === lastPlayerTrackId);
+    if (rawTrack.id) lastPlayerTrackId = rawTrack.id;
+    if (staleWhileSelecting) return;
     if (rawTrack.id !== currentTrack?.id) playbackSelectionToken += 1;
     const group = rawTrack.gameKey
       ? gameGroupsByKey.get(rawTrack.gameKey)
