@@ -26,6 +26,11 @@
 - Startup loads Games, Paths, Gallery metadata, and search indexes before
   reporting ready. Tabs and view switches reuse those snapshots, including empty
   results; search filters the current view without reloading the catalog.
+  Console and Gallery matching runs in a Web Worker after the index is copied in
+  small batches; each new query cancels older work. If a Console query matches
+  more than 250 games, results stay grouped under collapsed system rows with a
+  match count on each row. Expand a system to reveal its matching titles. Smaller
+  result sets reveal their titles directly.
 - Development runs can select an isolated catalog with
   `SPCBOY_SB2_CATALOG_PATH`; normal launches keep using the shared default.
 - If startup lasts beyond a short reveal delay, a compact status card shows

@@ -72,13 +72,20 @@ in the SB2 home view.
   switch or newer sidebar action.
 
 - Sidebar snapshots belong to the catalog session, not individual playlist
-  tabs. Loaded empty results are cached. Search filters those snapshots locally;
+  tabs. Loaded empty results are cached. Search filters those snapshots;
   switching tabs or entering search must not refresh Games, Files, or Gallery.
-  Explicit Reload Library invalidates their generations.
-- Path-tree search debounces input and slices tree indexing, filtering, and row
-  insertion across animation frames. A newer query or sidebar render cancels
-  obsolete work. Keep those operations cancellable so large trees do not block
-  typing, clicks, or scrolling.
+  Explicit Reload Library invalidates their generations. Console and Gallery
+  text indexes are copied to the Web Worker in bounded batches. Search requests
+  run in cancellable worker slices; if Worker creation fails, the local
+  fallback yields between short slices and never scans the full catalog in one
+  main-thread task. Coalesce input once per animation frame instead of adding
+  a fixed debounce delay. Broad Console searches keep matching systems
+  collapsed, show each system's match count, and expand only the system the
+  user chooses; narrow searches continue to reveal their matching titles.
+- Path-tree search slices tree indexing, filtering, and row insertion across
+  animation frames. A newer query or sidebar render cancels obsolete work.
+  Keep those operations cancellable so large trees do not block typing, clicks,
+  or scrolling.
 - Favorites and Recent are playlist projections in the existing two-pane
   workspace. The sidebar keeps the selected Console or Path library view and
   its disclosure controls while either collection is active. Favorites default

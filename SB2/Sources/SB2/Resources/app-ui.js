@@ -45,14 +45,21 @@ let sidebarContextMenuGeneration = 0;
 let databaseGameSearchRecords = [];
 let sidebarSearchWorker = null;
 let sidebarSearchWorkerFailed = false;
-let sidebarSearchWorkerReady = new Set();
+let sidebarSearchWorkerReady = new Map();
 let sidebarSearchWorkerRequestID = 0;
+let sidebarSearchIndexRevisionByScope = new Map();
 let pendingSidebarSearchByScope = new Map();
 let pendingSidebarSearchRequests = new Map();
 let latestSidebarSearchByScope = new Map();
+let sidebarSearchFallbackRequestByScope = new Map();
 let galleryGameSearchRecords = [];
-let sidebarSearchTimer = 0;
+let sidebarSearchFrame = 0;
 let sidebarSearchGeneration = 0;
+let databaseSearchConsoleMatchCounts = new Map();
+let databaseSearchExpandedConsoles = new Set();
+const SIDEBAR_SEARCH_INDEX_BATCH_SIZE = 512;
+const SIDEBAR_SEARCH_FALLBACK_BUDGET_MS = 4;
+const SIDEBAR_SEARCH_INLINE_RESULT_LIMIT = 250;
 let catalogGeneration = 0;
 let databaseGamesLoaded = false;
 let databaseFilesLoaded = false;
@@ -562,7 +569,8 @@ function rebuildDatabaseGameSearchIndex(games = state.databaseGames) {
     game,
     // CatalogBrowserCore publishes this complete normalized search projection.
     // The WebKit list only filters it locally so typing never reopens SQLite.
-    searchText: String(game.searchText || "")
+    searchText: String(game.searchText || ""),
+    consoleName: databaseConsoleName(game)
   }));
   databaseGamesByID = new Map(databaseGameSearchRecords.map(({ game }) => [databaseGameKey(game), game]));
   databaseGamesByName = new Map();
@@ -573,13 +581,18 @@ function rebuildDatabaseGameSearchIndex(games = state.databaseGames) {
     candidates.push(game);
     databaseGamesByName.set(key, candidates);
   }
-  refreshSidebarSearchWorkerIndex("catalog", databaseGameSearchRecords);
+  if (databaseGameSearchRecords.length) {
+    if (sidebarSearchWorker) refreshSidebarSearchWorkerIndex("catalog", databaseGameSearchRecords);
+    else ensureSidebarSearchWorker();
+  }
+  else refreshSidebarSearchWorkerIndex("catalog", databaseGameSearchRecords);
 }
 
 function rebuildGalleryGameSearchIndex(games = state.galleryGames) {
   galleryGameSearchRecords = (Array.isArray(games) ? games : []).map((game) => ({
     game,
-    searchText: String(game.searchText || "")
+    searchText: String(game.searchText || ""),
+    consoleName: databaseConsoleName(game)
   }));
   galleryGamesByID = new Map(galleryGameSearchRecords.map(({ game }) => [databaseGameKey(game), game]));
   galleryVisibleQuery = null;
@@ -609,6 +622,8 @@ function invalidateDatabaseGames() {
   databaseAlbumTrackIDs.clear();
   state.databaseGameGroups = [];
   state.databaseSearchGames = null;
+  databaseSearchConsoleMatchCounts = new Map();
+  databaseSearchExpandedConsoles = new Set();
   rebuildDatabaseGameSearchIndex([]);
   state.galleryGames = [];
   galleryConsoleGroups = [];
@@ -618,22 +633,13 @@ function invalidateDatabaseGames() {
   galleryRenderSignature = null;
 }
 
-function localDatabaseSearch(query) {
-  const normalizedQuery = normalizedSidebarQuery(query);
-  const terms = normalizedQuery ? normalizedQuery.split(" ") : [];
-  if (!terms.length) return state.databaseGames;
-  return databaseGameSearchRecords
-    .filter(({ searchText }) => terms.every((term) => searchText.includes(term)))
-    .map(({ game }) => game);
-}
-
 function sidebarSearchRecordsForScope(scope) {
   return scope === "gallery" ? galleryGameSearchRecords : databaseGameSearchRecords;
 }
 
 function dispatchSidebarSearch(request) {
   const worker = sidebarSearchWorker;
-  if (!worker || !sidebarSearchWorkerReady.has(request.scope)) {
+  if (!worker || sidebarSearchWorkerReady.get(request.scope) !== request.indexRevision) {
     pendingSidebarSearchByScope.set(request.scope, request);
     return;
   }
@@ -643,6 +649,7 @@ function dispatchSidebarSearch(request) {
     worker.postMessage({
       type: "search",
       scope: request.scope,
+      revision: request.indexRevision,
       requestID: request.requestID,
       query: request.query
     });
@@ -653,7 +660,7 @@ function dispatchSidebarSearch(request) {
 
 function handleSidebarSearchWorkerFailure(error) {
   if (sidebarSearchWorkerFailed) return;
-  console.warn("[SPCBoy] sidebar search worker unavailable; using the local index", error);
+  console.warn("[SPCBoy] sidebar search worker unavailable; using sliced local search", error);
   sidebarSearchWorkerFailed = true;
   sidebarSearchWorker?.terminate();
   sidebarSearchWorker = null;
@@ -661,7 +668,7 @@ function handleSidebarSearchWorkerFailure(error) {
   pendingSidebarSearchByScope.clear();
   pendingSidebarSearchRequests.clear();
   for (const request of latestSidebarSearchByScope.values()) {
-    if (request.generation === sidebarSearchGeneration) applySidebarSearch(request.query);
+    if (request.generation === sidebarSearchGeneration) runSidebarSearchFallback(request);
   }
 }
 
@@ -672,9 +679,10 @@ function ensureSidebarSearchWorker() {
     sidebarSearchWorker.addEventListener("message", (event) => {
       const message = event.data || {};
       if (message.type === "ready") {
-        sidebarSearchWorkerReady.add(message.scope);
+        if (sidebarSearchIndexRevisionByScope.get(message.scope) !== message.revision) return;
+        sidebarSearchWorkerReady.set(message.scope, message.revision);
         const pending = pendingSidebarSearchByScope.get(message.scope);
-        if (pending) dispatchSidebarSearch(pending);
+        if (pending?.indexRevision === message.revision) dispatchSidebarSearch(pending);
         return;
       }
       if (message.type !== "results") return;
@@ -682,18 +690,18 @@ function ensureSidebarSearchWorker() {
       pendingSidebarSearchRequests.delete(message.requestID);
       if (!request
           || latestSidebarSearchByScope.get(request.scope)?.requestID !== request.requestID
-          || request.generation !== sidebarSearchGeneration) return;
-      applySidebarSearch(request.query, Array.isArray(message.ids) ? message.ids : []);
+          || request.generation !== sidebarSearchGeneration
+          || request.indexRevision !== message.revision) return;
+      applySidebarSearch(
+        request.query,
+        Array.isArray(message.ids) ? message.ids : [],
+        Array.isArray(message.consoleCounts) ? message.consoleCounts : [],
+        request.generation
+      );
     });
     sidebarSearchWorker.addEventListener("error", (event) => handleSidebarSearchWorkerFailure(event.message || event));
     for (const scope of ["catalog", "gallery"]) {
-      const records = sidebarSearchRecordsForScope(scope);
-      sidebarSearchWorkerReady.delete(scope);
-      sidebarSearchWorker.postMessage({
-        type: "index",
-        scope,
-        records: records.map(({ game, searchText }) => ({ id: databaseGameKey(game), searchText }))
-      });
+      refreshSidebarSearchWorkerIndex(scope, sidebarSearchRecordsForScope(scope));
     }
   } catch (error) {
     handleSidebarSearchWorkerFailure(error);
@@ -703,16 +711,53 @@ function ensureSidebarSearchWorker() {
 
 function refreshSidebarSearchWorkerIndex(scope, records) {
   if (!sidebarSearchWorker || sidebarSearchWorkerFailed) return;
+  const worker = sidebarSearchWorker;
+  const revision = (sidebarSearchIndexRevisionByScope.get(scope) || 0) + 1;
+  sidebarSearchIndexRevisionByScope.set(scope, revision);
   sidebarSearchWorkerReady.delete(scope);
+  const pending = pendingSidebarSearchByScope.get(scope);
+  if (pending) pendingSidebarSearchByScope.delete(scope);
+  for (const [requestID, request] of pendingSidebarSearchRequests) {
+    if (request.scope === scope) pendingSidebarSearchRequests.delete(requestID);
+  }
+  const sourceRecords = Array.isArray(records) ? records : [];
+  let offset = 0;
   try {
-    sidebarSearchWorker.postMessage({
-      type: "index",
+    worker.postMessage({
+      type: "index-start",
       scope,
-      records: records.map(({ game, searchText }) => ({ id: databaseGameKey(game), searchText }))
+      revision,
+      recordCount: sourceRecords.length
     });
   } catch (error) {
     handleSidebarSearchWorkerFailure(error);
+    return;
   }
+
+  const sendBatch = () => {
+    if (worker !== sidebarSearchWorker
+        || sidebarSearchWorkerFailed
+        || sidebarSearchIndexRevisionByScope.get(scope) !== revision) return;
+    const batch = [];
+    const startedAt = performance.now();
+    while (offset < sourceRecords.length
+        && batch.length < SIDEBAR_SEARCH_INDEX_BATCH_SIZE
+        && performance.now() - startedAt < 4) {
+      const { game, searchText, consoleName } = sourceRecords[offset++];
+      batch.push({ id: databaseGameKey(game), searchText, consoleName });
+    }
+    try {
+      if (batch.length) worker.postMessage({ type: "index-batch", scope, revision, records: batch });
+      if (offset < sourceRecords.length) {
+        window.setTimeout(sendBatch, 0);
+      } else {
+        worker.postMessage({ type: "index-complete", scope, revision });
+      }
+    } catch (error) {
+      handleSidebarSearchWorkerFailure(error);
+    }
+  };
+  sendBatch();
 }
 
 function prepareSidebarSearch() {
@@ -720,20 +765,17 @@ function prepareSidebarSearch() {
 }
 
 function requestSidebarSearch(query, scope, generation) {
+  const worker = ensureSidebarSearchWorker();
   const request = {
     requestID: ++sidebarSearchWorkerRequestID,
     scope,
     query,
-    generation
+    generation,
+    indexRevision: sidebarSearchIndexRevisionByScope.get(scope) || 0
   };
   latestSidebarSearchByScope.set(scope, request);
-  if (sidebarSearchWorkerFailed) {
-    if (normalizedSidebarQuery(state.sidebarQuery) !== normalizedSidebarQuery(query)) applySidebarSearch(query);
-    return;
-  }
-  ensureSidebarSearchWorker();
-  if (sidebarSearchWorkerFailed) {
-    if (normalizedSidebarQuery(state.sidebarQuery) !== normalizedSidebarQuery(query)) applySidebarSearch(query);
+  if (!worker || sidebarSearchWorkerFailed) {
+    runSidebarSearchFallback(request);
     return;
   }
   dispatchSidebarSearch(request);
@@ -741,29 +783,76 @@ function requestSidebarSearch(query, scope, generation) {
 
 function cancelPendingSidebarSearch() {
   sidebarSearchGeneration += 1;
-  window.clearTimeout(sidebarSearchTimer);
-  sidebarSearchTimer = 0;
+  if (sidebarSearchFrame) window.cancelAnimationFrame(sidebarSearchFrame);
+  sidebarSearchFrame = 0;
   pendingSidebarSearchByScope.clear();
   pendingSidebarSearchRequests.clear();
   latestSidebarSearchByScope.clear();
+  sidebarSearchFallbackRequestByScope.clear();
 }
 
-function applySidebarSearch(query, matchingIDs = null) {
+function sidebarSearchRequestIsCurrent(request) {
+  return request.generation === sidebarSearchGeneration
+    && latestSidebarSearchByScope.get(request.scope)?.requestID === request.requestID;
+}
+
+function runSidebarSearchFallback(request) {
+  if (sidebarSearchFallbackRequestByScope.get(request.scope) === request.requestID) return;
+  sidebarSearchFallbackRequestByScope.set(request.scope, request.requestID);
+  const records = sidebarSearchRecordsForScope(request.scope);
+  const terms = normalizedSidebarQuery(request.query).split(/\s+/).filter(Boolean);
+  const ids = [];
+  const consoleCounts = new Map();
+  let offset = 0;
+
+  const processBatch = () => {
+    if (!sidebarSearchRequestIsCurrent(request)) {
+      if (sidebarSearchFallbackRequestByScope.get(request.scope) === request.requestID) {
+        sidebarSearchFallbackRequestByScope.delete(request.scope);
+      }
+      return;
+    }
+    const startedAt = performance.now();
+    while (offset < records.length && performance.now() - startedAt < SIDEBAR_SEARCH_FALLBACK_BUDGET_MS) {
+      const record = records[offset++];
+      if (!terms.every((term) => record.searchText.includes(term))) continue;
+      const id = databaseGameKey(record.game);
+      ids.push(id);
+      const consoleName = record.consoleName;
+      if (consoleName) consoleCounts.set(consoleName, (consoleCounts.get(consoleName) || 0) + 1);
+    }
+    if (offset < records.length) {
+      window.requestAnimationFrame(processBatch);
+      return;
+    }
+    sidebarSearchFallbackRequestByScope.delete(request.scope);
+    applySidebarSearch(request.query, ids, [...consoleCounts], request.generation);
+  };
+
+  processBatch();
+}
+
+function applySidebarSearch(query, matchingIDs = null, matchingConsoleCounts = null, generation = sidebarSearchGeneration) {
+  if (generation !== sidebarSearchGeneration) return;
   const normalizedQuery = normalizedSidebarQuery(query);
-  if (normalizedQuery === normalizedSidebarQuery(state.sidebarQuery)) {
+  const queryChanged = normalizedQuery !== normalizedSidebarQuery(state.sidebarQuery);
+  if (!queryChanged && !Array.isArray(matchingIDs)) {
     state.sidebarQuery = String(query || "");
     state.sidebarView = Object.freeze(localSidebarView(state.sidebarMode, state.sidebarQuery));
     return;
   }
+  if (queryChanged) databaseSearchExpandedConsoles = new Set();
   invalidateSidebarInteractions();
   state.sidebarQuery = String(query || "");
   state.databaseSidebarError = "";
   if (state.sidebarMode === "consoles" && !isGalleryActive() && normalizedQuery) {
     state.databaseSearchGames = Array.isArray(matchingIDs)
       ? matchingIDs.map((id) => databaseGamesByID.get(id)).filter(Boolean)
-      : localDatabaseSearch(normalizedQuery);
+      : [];
+    databaseSearchConsoleMatchCounts = new Map(Array.isArray(matchingConsoleCounts) ? matchingConsoleCounts : []);
   } else {
     state.databaseSearchGames = null;
+    databaseSearchConsoleMatchCounts = new Map();
   }
   if (isGalleryActive() && normalizedQuery && Array.isArray(matchingIDs)) {
     galleryVisibleDatabaseResults = matchingIDs.map((id) => galleryGamesByID.get(id)).filter(Boolean);
@@ -779,22 +868,17 @@ function updateSidebarSearch(query) {
   sidebarSearchGeneration += 1;
   treeRenderGeneration += 1;
   const generation = sidebarSearchGeneration;
-  window.clearTimeout(sidebarSearchTimer);
-  sidebarSearchTimer = 0;
-  if (!normalizedSidebarQuery(requestedQuery)) {
-    applySidebarSearch(requestedQuery);
-    return;
-  }
-  sidebarSearchTimer = window.setTimeout(() => {
-    sidebarSearchTimer = 0;
+  if (sidebarSearchFrame) window.cancelAnimationFrame(sidebarSearchFrame);
+  sidebarSearchFrame = window.requestAnimationFrame(() => {
+    sidebarSearchFrame = 0;
     if (generation !== sidebarSearchGeneration) return;
     const normalizedQuery = normalizedSidebarQuery(requestedQuery);
     if (normalizedQuery && state.sidebarMode === "consoles") {
       requestSidebarSearch(requestedQuery, isGalleryActive() ? "gallery" : "catalog", generation);
     } else {
-      applySidebarSearch(requestedQuery);
+      applySidebarSearch(requestedQuery, null, null, generation);
     }
-  }, 100);
+  });
 }
 
 async function syncSidebarView() {
@@ -2279,6 +2363,30 @@ function visibleDatabaseGames() {
   return galleryVisibleDatabaseResults;
 }
 
+function databaseSearchIsBroad() {
+  return !isGalleryActive()
+    && Boolean(normalizedSidebarQuery(state.sidebarQuery))
+    && Array.isArray(state.databaseSearchGames)
+    && state.databaseSearchGames.length > SIDEBAR_SEARCH_INLINE_RESULT_LIMIT;
+}
+
+function syncDatabaseSearchMatchCount(heading, consoleName, broadSearch) {
+  if (!heading) return;
+  let count = heading.querySelector(".database-search-match-count");
+  const matchCount = broadSearch ? databaseSearchConsoleMatchCounts.get(consoleName) || 0 : 0;
+  if (!matchCount) {
+    count?.remove();
+    return;
+  }
+  if (!count) {
+    count = document.createElement("span");
+    count.className = "database-search-match-count";
+    count.setAttribute("aria-hidden", "true");
+    heading.appendChild(count);
+  }
+  count.textContent = matchCount.toLocaleString();
+}
+
 function databaseGameGroupsFor(games, sourceGroups) {
   const gamesByKey = new Map(games.map((game) => [databaseGameKey(game), game]));
   return (Array.isArray(sourceGroups) ? sourceGroups : [])
@@ -2476,12 +2584,16 @@ function renderDatabaseGames() {
   const gamesForView = visibleDatabaseGames();
   const renderSourceGames = galleryActive ? state.galleryGames : state.databaseGames;
   const query = state.sidebarQuery.trim();
+  const broadSearch = !galleryActive && Boolean(query)
+    && gamesForView.length > SIDEBAR_SEARCH_INLINE_RESULT_LIMIT;
   databaseVisibleGameIDs = !galleryActive && query
     ? new Set(gamesForView.map(databaseGameKey))
     : null;
-  const visibleConsoleNames = query
-    ? new Set(gamesForView.map(databaseConsoleName))
-    : null;
+  const visibleConsoleNames = !query
+    ? null
+    : broadSearch
+      ? new Set(databaseSearchConsoleMatchCounts.keys())
+      : new Set(gamesForView.map(databaseConsoleName));
   if (renderedDatabaseGames !== renderSourceGames) {
     resetSidebarContent();
     databaseConsoleGroups = [];
@@ -2516,6 +2628,16 @@ function renderDatabaseGames() {
         const preserveFocus = document.activeElement === heading;
         if (galleryActive) {
           selectDatabaseSidebarRow(heading, { focus: preserveFocus });
+          return;
+        }
+        if (databaseSearchIsBroad()) {
+          selectDatabaseSidebarRow(heading, { focus: preserveFocus });
+          if (databaseSearchExpandedConsoles.has(consoleName)) databaseSearchExpandedConsoles.delete(consoleName);
+          else databaseSearchExpandedConsoles.add(consoleName);
+          renderDatabaseGames();
+          if (preserveFocus) {
+            refs.treeRoot.querySelector(`[data-database-console-name="${CSS.escape(consoleName)}"]`)?.focus();
+          }
           return;
         }
         try {
@@ -2602,6 +2724,7 @@ function renderDatabaseGames() {
     const heading = group.querySelector(".database-console-row");
     const groupIsVisible = !visibleConsoleNames || visibleConsoleNames.has(consoleName);
     group.classList.toggle("is-hidden", !groupIsVisible);
+    syncDatabaseSearchMatchCount(heading, consoleName, broadSearch && groupIsVisible);
     const isSelected = groupIsVisible
       && state.selectedDatabaseConsoleName === consoleName
       && (galleryActive || !state.selectedDatabaseGameKey);
@@ -2610,7 +2733,9 @@ function renderDatabaseGames() {
       heading?.setAttribute("aria-pressed", String(isSelected));
       continue;
     }
-    if (query && groupIsVisible) {
+    if (broadSearch) {
+      games.classList.toggle("is-hidden", !databaseSearchExpandedConsoles.has(consoleName));
+    } else if (query && groupIsVisible) {
       games.classList.remove("is-hidden");
     } else {
       games.classList.toggle("is-hidden", collapsedDatabaseConsoles.has(consoleName));
@@ -2636,6 +2761,10 @@ function renderDatabaseGames() {
         ? "No artwork titles match this search."
         : "No Title Snap artwork is indexed. Scan the library with ScanSong."
     });
+  } else if (broadSearch) {
+    const matchCount = gamesForView.length.toLocaleString();
+    const consoleCount = databaseSearchConsoleMatchCounts.size.toLocaleString();
+    updateSidebarStats(`${matchCount} matches across ${consoleCount} systems. Expand a system or refine your search.`);
   } else if (!galleryActive && state.sidebarQuery.trim() && gamesForView.length === 0) {
     updateSidebarStats("No database games match this search.");
   } else if (!galleryActive && state.databaseGames.length === 0) {
@@ -2648,6 +2777,13 @@ function renderDatabaseGames() {
 
 async function setAllDatabaseConsolesCollapsed(collapsed) {
   if (isGalleryActive()) return;
+  if (databaseSearchIsBroad()) {
+    databaseSearchExpandedConsoles = collapsed
+      ? new Set()
+      : new Set(databaseSearchConsoleMatchCounts.keys());
+    renderDatabaseGames();
+    return;
+  }
   await applySharedDatabaseGroupAction("allCollapsed", null, null, { collapsed });
   renderDatabaseGames();
 }
@@ -3140,7 +3276,10 @@ async function readDatabaseGames(generation) {
     throw error;
   }
   state.databaseSidebarError = "";
-  state.databaseSearchGames = state.sidebarQuery.trim() ? localDatabaseSearch(state.sidebarQuery) : null;
+  state.databaseSearchGames = null;
+  if (state.sidebarQuery.trim() && state.sidebarMode === "consoles" && !isGalleryActive()) {
+    requestSidebarSearch(state.sidebarQuery, "catalog", sidebarSearchGeneration);
+  }
   if (previousSelection && state.selectedDatabaseGameKey === previousSelection
       && !state.databaseGames.some((game) => databaseGameKey(game) === previousSelection)) {
     state.selectedDatabaseGameKey = null;
@@ -5618,6 +5757,7 @@ async function toggleAllSidebarNodes() {
 function sidebarHasExpandedNodes() {
   if (isGalleryActive()) return false;
   if (currentSidebarView().contentMode === "database") {
+    if (databaseSearchIsBroad()) return databaseSearchExpandedConsoles.size > 0;
     return databaseConsoleGroups.some(({ consoleName }) => !collapsedDatabaseConsoles.has(consoleName));
   }
   const expandedFolders = [...refs.treeRoot.querySelectorAll(

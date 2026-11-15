@@ -322,6 +322,7 @@ body.is-file-drag-over::after {
 .database-indent,
 .tree-indent { flex: 0 0 2ch; width: 2ch; }
 .database-console-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.database-search-match-count { flex: 0 0 auto; margin-left: auto; padding-left: var(--sb-space-050); color: var(--muted); font-size: .75em; font-variant-numeric: tabular-nums; }
 
 .tool-button {
   min-width: 24px;
