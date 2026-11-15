@@ -2,6 +2,7 @@
 {% block title %}Log{% endblock %}
 {% block content %}
 <div class="page-heading"><div><p class="eyebrow">Account security</p><h1>Log</h1><p class="muted">Active browser sessions and sign-in events. Music history has its own site page.</p></div></div>
+{% include "accounts/partials/admin_navigation.html" %}
 
 <section class="metric-grid site-log-summary" aria-label="Sign-in summary for the last 24 hours">
   <article class="metric-card"><span>Active sessions</span><strong class="metric-value">{{ active_device_count }}</strong><p class="metric-detail">Signed-in browsers</p></article>

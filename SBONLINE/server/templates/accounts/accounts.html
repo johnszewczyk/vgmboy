@@ -8,10 +8,11 @@
     <div><h1>Admin</h1></div>
     <span class="account-count">{{ account_rows|length }} account{{ account_rows|length|pluralize }}</span>
   </header>
+  {% include "accounts/partials/admin_navigation.html" %}
 
   <section class="accounts-section" id="site-settings" aria-label="Site settings">
-    <section class="profile-library-section" aria-labelledby="site-streaming-heading">
-      <header class="community-section-heading"><h2 id="site-streaming-heading">Audio streaming</h2></header>
+    <section class="panel admin-controls-card" aria-labelledby="site-streaming-heading">
+      <header class="community-section-heading"><h2 id="site-streaming-heading">Site controls</h2></header>
       <form method="post" action="{% url 'accounts' %}" class="profile-form">
         {% csrf_token %}<input type="hidden" name="action" value="site-settings">
         <div class="profile-fields">
@@ -28,6 +29,9 @@
   </section>
 
   <section class="accounts-section" aria-label="Site accounts">
+    <header class="accounts-section-heading">
+      <h2>Accounts</h2>
+    </header>
     {% if account_rows %}
     <div class="account-card-grid">
       {% for member in account_rows %}
@@ -50,6 +54,24 @@
           </div>
         </details>
         {% else %}<p class="account-no-sessions"><span>Active browser sessions</span><span>0</span></p>{% endif %}
+        {% if member.pk == request.user.pk %}
+        <div class="account-card-actions">
+          <a class="accounts-button" href="{% url 'member_profile' %}">Edit profile</a>
+          <a class="accounts-button" href="{% url 'member_profile' %}?tab=security">Sign-in &amp; passkeys</a>
+        </div>
+        {% elif is_owner and not member.is_staff and not member.is_superuser and not member.is_site_persona %}
+        <div class="account-card-actions">
+          <form method="post" action="{% url 'toggle_user' member.pk %}">
+            {% csrf_token %}<button class="accounts-button" type="submit">{% if member.is_active %}Suspend{% else %}Reactivate{% endif %}</button>
+          </form>
+          {% if member.is_active %}
+          <form method="post" action="{% url 'create_passkey_recovery_invite' member.pk %}">
+            {% csrf_token %}<button class="accounts-button" type="submit">Recovery invite</button>
+          </form>
+          {% endif %}
+          <a class="accounts-button accounts-button-danger" href="{% url 'delete_user' member.pk %}">Delete</a>
+        </div>
+        {% endif %}
       </article>
       {% endfor %}
     </div>

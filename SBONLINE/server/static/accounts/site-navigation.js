@@ -36,9 +36,7 @@
     if (pathname.includes("/history")) return "history";
     if (pathname.includes("/community")) return "community";
     if (pathname.includes("/profile") || pathname.includes("/members/")) return "profile";
-    if (pathname.includes("/accounts")) return "admin";
-    if (pathname.includes("/usage")) return "usage";
-    if (pathname.includes("/site-log")) return "log";
+    if (pathname.includes("/accounts") || pathname.includes("/usage") || pathname.includes("/site-log") || pathname.includes("/server")) return "admin";
     return null;
   }
 

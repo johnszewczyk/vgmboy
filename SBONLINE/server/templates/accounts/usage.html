@@ -6,6 +6,7 @@
   <div><h1>Usage</h1><p class="muted">Monthly account traffic and server status.</p></div>
   <form class="month-picker" method="get"><label class="visually-hidden" for="month-choice">Usage month</label><select id="month-choice" name="month" aria-label="Usage month">{% for period in periods %}<option value="{{ period.value }}"{% if period.value == selected_period %} selected{% endif %}>{{ period.label }}</option>{% endfor %}</select><noscript><button class="quiet-button" type="submit">Show</button></noscript></form>
 </div>
+{% if request.user.is_superuser %}{% include "accounts/partials/admin_navigation.html" %}{% endif %}
 
 <section class="metric-grid" aria-label="Private-section data transfer">
   <article class="metric-card metric-primary"><span>Responses · {{ selected_period }}</span><strong class="metric-value">{{ total }}</strong><p class="metric-detail">All signed-in accounts{% if is_current_period %} · month in progress{% endif %}</p></article>

@@ -85,6 +85,11 @@
       <form method="post" action="{% url 'generate_login_password' %}">{% csrf_token %}<button class="quiet-button" type="submit">Generate login password</button></form>
       {% endif %}
     </section>
+    <section class="profile-login-password panel">
+      <div class="section-heading"><div><p class="eyebrow">Session</p><h2>Sign out</h2></div></div>
+      <p>Sign out of this browser session. Playback stops when your session ends.</p>
+      <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="quiet-button" type="submit">Sign out</button></form>
+    </section>
   </section>
 </section>
 <script src="{% static 'accounts/profile.js' %}?v=20261028-heic-avatar-1" defer></script>

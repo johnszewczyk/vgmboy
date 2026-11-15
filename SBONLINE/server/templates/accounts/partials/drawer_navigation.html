@@ -6,6 +6,7 @@
     <button type="button" data-spcboy-view-shortcut="recent"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-recent"></use></svg><span>Recent plays</span></button>
     <a href="{% url 'member_profile' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-user-round"></use></svg><span>Profile</span></a>
     <a href="{% url 'member_profile' %}?tab=security"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-log-in"></use></svg><span>Sign-in</span></a>
+    <form class="drawer-logout-form" method="post" action="{% url 'logout' %}">{% csrf_token %}<button type="submit"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-log-in"></use></svg><span>Sign out</span></button></form>
   </nav>
   {% if request.user.is_superuser %}
   <section class="drawer-navigation-category" aria-labelledby="drawer-admin-heading">
