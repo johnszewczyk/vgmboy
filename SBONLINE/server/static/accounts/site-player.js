@@ -2030,7 +2030,8 @@
   audio.addEventListener("ended", async () => {
     const source = audio.src;
     const expectedDuration = effectiveDuration();
-    if (expectedDuration > 0 && sourcePositionSeconds() < expectedDuration - 1) {
+    const streamEndedCleanly = typeof aacTransport !== "undefined" && Boolean(aacTransport?.streamEnded);
+    if (!streamEndedCleanly && expectedDuration > 0 && sourcePositionSeconds() < expectedDuration - 1) {
       const quotaReached = await hasReachedStreamQuota();
       if (source !== audio.src || !audio.ended) return;
       if (quotaReached) showStreamQuotaMessage();

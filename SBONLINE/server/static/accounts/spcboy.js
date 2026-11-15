@@ -2209,35 +2209,39 @@
     scheduleSelectionIndicators();
 
     if (startPlayback) {
-      const query = search.value.trim();
-      let albumTracks;
-      if (explicitTracks) {
-        albumTracks = explicitTracks;
-      } else if (playlistSource === "recent") {
-        albumTracks = collectionTracks().filter(candidate => candidate.available !== false && (!selectedGameKey || candidate.gameKey === selectedGameKey));
-      } else if (playingFavorites) {
-        const favoriteTracks = typeof favoritePlaylistLoaded !== "undefined" && favoritePlaylistLoaded
-          ? favoritePlaylistTracks
-          : await loadFavoritePlaylist({ allPages: true });
-        albumTracks = favoriteTracks.filter(candidate =>
-          (!selectedGameKey || candidate.gameKey === selectedGameKey) &&
-          matchesTrackQuery(candidate, query));
-      } else if (resolvedGroup) {
-        albumTracks = resolvedGroup.loaded && Array.isArray(resolvedGroup.tracks) && resolvedGroup.tracks.length
-          ? resolvedGroup.tracks
-          : await ensureAlbumTracks(resolvedGroup);
-      } else {
-        albumTracks = [];
+      try {
+        const query = search.value.trim();
+        let albumTracks;
+        if (explicitTracks) {
+          albumTracks = explicitTracks;
+        } else if (playlistSource === "recent") {
+          albumTracks = collectionTracks().filter(candidate => candidate.available !== false && (!selectedGameKey || candidate.gameKey === selectedGameKey));
+        } else if (playingFavorites) {
+          const favoriteTracks = typeof favoritePlaylistLoaded !== "undefined" && favoritePlaylistLoaded
+            ? favoritePlaylistTracks
+            : await loadFavoritePlaylist({ allPages: true });
+          albumTracks = favoriteTracks.filter(candidate =>
+            (!selectedGameKey || candidate.gameKey === selectedGameKey) &&
+            matchesTrackQuery(candidate, query));
+        } else if (resolvedGroup) {
+          albumTracks = resolvedGroup.loaded && Array.isArray(resolvedGroup.tracks) && resolvedGroup.tracks.length
+            ? resolvedGroup.tracks
+            : await ensureAlbumTracks(resolvedGroup, { retry: Boolean(resolvedGroup.loadFailed) });
+        } else {
+          albumTracks = [];
+        }
+        if (selectionToken !== playbackSelectionToken) return;
+        if (pendingSelectionToken === selectionToken) pendingSelectionToken = 0;
+        const containsTarget = albumTracks.some((candidate) => candidate && candidate.id === track.id);
+        const playlist = containsTarget && albumTracks.length ? albumTracks : [track];
+        await window.SitePlayer?.playPlaylist(playlist, {
+          startTrackId: track.id,
+          startTrack: track,
+          toggle: isDesktop(),
+        });
+      } finally {
+        if (pendingSelectionToken === selectionToken) pendingSelectionToken = 0;
       }
-      if (selectionToken !== playbackSelectionToken) return;
-      if (pendingSelectionToken === selectionToken) pendingSelectionToken = 0;
-      const containsTarget = albumTracks.some((candidate) => candidate && candidate.id === track.id);
-      const playlist = containsTarget && albumTracks.length ? albumTracks : [track];
-      await window.SitePlayer?.playPlaylist(playlist, {
-        startTrackId: track.id,
-        startTrack: track,
-        toggle: isDesktop(),
-      });
       return;
     }
     await window.SitePlayer?.play(track, { toggle: false });

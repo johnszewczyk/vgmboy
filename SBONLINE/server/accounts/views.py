@@ -1672,7 +1672,8 @@ def spcboy_audio(request, track_id):
         return HttpResponseGone("Reload the page to start another playback session.")
 
     stream_period = _month_start()
-    if audio_stream_remaining(request.user.pk, stream_period) <= 0:
+    stream_remaining = audio_stream_remaining(request.user.pk, stream_period)
+    if stream_remaining <= 0:
         response = HttpResponse("Monthly audio streaming allowance reached.", status=429)
         response["X-Audio-Quota-Limit"] = str(MONTHLY_AUDIO_STREAM_LIMIT_BYTES)
         response["X-Audio-Quota-Remaining"] = "0"
@@ -1889,9 +1890,24 @@ def spcboy_audio(request, track_id):
     history_saved = False
     quota_exhausted = False
     playback_session_expired = False
+    unclaimed_bytes = 0
+    last_claim_at = time.monotonic()
+
+    def flush_audio_bytes():
+        nonlocal unclaimed_bytes, last_claim_at, quota_exhausted, stream_remaining
+        if unclaimed_bytes <= 0:
+            return unclaimed_bytes, 0
+        pending = unclaimed_bytes
+        unclaimed_bytes = 0
+        last_claim_at = time.monotonic()
+        allowed = claim_audio_stream_bytes(request.user.pk, pending, stream_period)
+        stream_remaining = max(0, stream_remaining - allowed)
+        if allowed < pending:
+            quota_exhausted = True
+        return pending, allowed
 
     def stream_audio():
-        nonlocal history_saved, quota_exhausted, playback_session_expired
+        nonlocal history_saved, quota_exhausted, playback_session_expired, unclaimed_bytes, last_claim_at, stream_remaining
         try:
             if encoder.stdout is not None:
                 while time.time() - page_loaded_at < page_session_limit_seconds:
@@ -1910,30 +1926,55 @@ def spcboy_audio(request, track_id):
                             # History persistence must not interrupt a live audio stream.
                             logger.exception("Could not save an SPCBOY playback history event.")
                         history_saved = True
-                    try:
-                        allowed = claim_audio_stream_bytes(request.user.pk, len(chunk))
-                    except DatabaseError:
-                        logger.exception("Could not account for SPCBOY audio bytes; stopping this stream.")
-                        quota_exhausted = True
-                        break
-                    if allowed <= 0:
-                        quota_exhausted = True
-                        break
-                    yield chunk[:allowed]
-                    if allowed < len(chunk):
-                        quota_exhausted = True
-                        break
+                    # Batch MonthlyUsage updates (~every 128 KB or 5s) when well under monthly quota
+                    # to minimize SQLite write contention while still enforcing the byte cap cleanly.
+                    if stream_remaining > 262144:
+                        unclaimed_bytes += len(chunk)
+                        if unclaimed_bytes >= 131072 or (time.monotonic() - last_claim_at) >= 5.0:
+                            try:
+                                pending, allowed = flush_audio_bytes()
+                            except DatabaseError:
+                                logger.exception("Could not account for SPCBOY audio bytes; stopping this stream.")
+                                quota_exhausted = True
+                                break
+                            if quota_exhausted:
+                                excess = pending - allowed
+                                yield chunk[: max(0, len(chunk) - excess)]
+                                break
+                        yield chunk
+                    else:
+                        unclaimed_bytes += len(chunk)
+                        try:
+                            pending, allowed = flush_audio_bytes()
+                        except DatabaseError:
+                            logger.exception("Could not account for SPCBOY audio bytes; stopping this stream.")
+                            quota_exhausted = True
+                            break
+                        if allowed <= 0:
+                            quota_exhausted = True
+                            break
+                        excess = pending - allowed
+                        safe_len = max(0, len(chunk) - excess)
+                        yield chunk[:safe_len]
+                        if quota_exhausted:
+                            break
                 if time.time() - page_loaded_at >= page_session_limit_seconds:
                     playback_session_expired = True
             if not quota_exhausted and not playback_session_expired:
                 encoder.wait()
                 decoder.wait()
         finally:
+            try:
+                flush_audio_bytes()
+            except DatabaseError:
+                logger.exception("Could not flush trailing SPCBOY audio byte usage.")
             if encoder.stdout is not None:
                 encoder.stdout.close()
             for process in (encoder, decoder):
-                if process.poll() is None:
+                if process is not None and process.poll() is None:
                     process.terminate()
+            for process in (encoder, decoder):
+                if process is not None and process.poll() is None:
                     try:
                         process.wait(timeout=2)
                     except subprocess.TimeoutExpired:

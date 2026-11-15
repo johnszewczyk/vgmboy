@@ -19,7 +19,7 @@
       }
       const media = new Source(), abort = new AbortController();
       const objectURL = URL.createObjectURL(media);
-      const run = active = { abort, objectURL, timer: null };
+      const run = active = { abort, objectURL, timer: null, ended: false };
       const report = error => {
         if (active !== run || abort.signal.aborted) return;
         abort.abort(); clearTimeout(run.timer);
@@ -80,7 +80,11 @@
           const reader = response.body.getReader();
           while (!abort.signal.aborted) {
             const {value, done} = await networkRead(() => reader.read());
-            if (done) { if (media.readyState === 'open') media.endOfStream(); break; }
+            if (done) {
+              run.ended = true;
+              if (media.readyState === 'open') media.endOfStream();
+              break;
+            }
             // Network chunks can coalesce. Bound each append before checking
             // backpressure again so one large read cannot fill the media buffer.
             for (let offset=0; offset<value.byteLength && !abort.signal.aborted; offset+=65536) {
@@ -93,13 +97,21 @@
           }
         } catch (error) { report(error); }
       }, {once:true});
-      media.addEventListener('sourceclose', () => report(new Error('AAC source closed')), {once:true});
+      media.addEventListener('sourceclose', () => {
+        if (!run.ended) report(new Error('AAC source closed'));
+      }, {once:true});
       audio.disableRemotePlayback = true;
       audio.dataset.streamCodec = 'aac';
       audio.src = objectURL;
       run.timer = setTimeout(() => report(new Error('AAC source did not open')),8000);
     }
-    return { load, cancel, supported:Boolean(Source), get interrupted() { return Boolean(active?.abort.signal.aborted); } };
+    return {
+      load,
+      cancel,
+      supported: Boolean(Source),
+      get interrupted() { return Boolean(active?.abort.signal.aborted); },
+      get streamEnded() { return Boolean(active?.ended); },
+    };
   }
   window.SBAACStream = Object.freeze({attach});
 })();

@@ -232,4 +232,5 @@ test('mobile shell replaces track length with favorite toggles and renames tempo
 
   assert.match(mobileCss, /\.spcboy-mobile-track-item\b/);
   assert.match(mobileCss, /#spcboy-mobile-app \.spcboy-mobile-track-favorite/);
+  assert.match(spcboyJs, /finally\s*\{\s*if\s*\(pendingSelectionToken === selectionToken\)\s*pendingSelectionToken = 0;\s*\}/);
 });

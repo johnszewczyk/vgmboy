@@ -614,3 +614,21 @@ test('iPhone/ManagedMediaSource falls back to server ?eq= and restarts stream ac
   assert.equal(restarts, 1);
   assert.deepEqual(Array.from(presetContext.equalizerBandGains), Array(10).fill(-2));
 });
+
+test('Clean stream EOF advances to next track even for Infinite Long Play or early-ending VGM/GME tracks', async () => {
+  const { context, calls } = fixture({
+    streamOffsetSeconds: 0,
+    effectiveDuration: () => Infinity,
+    aacTransport: { supported: true, streamEnded: true },
+    hasReachedStreamQuota: async () => { throw new Error('Should not check quota on clean stream EOF'); },
+    moveTrack: (step) => calls.push(['next', step]),
+  });
+  Object.assign(context.audio, { ended: true, currentTime: 42, addEventListener: (_, handler) => { context.onEnded = handler; } });
+  vm.runInContext(ended, context);
+  await context.onEnded();
+  assert.deepEqual(calls, [['next', 1]]);
+
+  const aacStreamSource = readFileSync(`${__dirname}/../static/accounts/aac-stream.js`, 'utf8');
+  assert.match(aacStreamSource, /if\s*\(!run\.ended\)\s*report\(new Error\('AAC source closed'\)\);/);
+  assert.match(aacStreamSource, /get streamEnded\(\)\s*\{\s*return Boolean\(active\?\.ended\);\s*\}/);
+});
