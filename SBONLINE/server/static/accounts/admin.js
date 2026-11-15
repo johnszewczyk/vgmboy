@@ -18,10 +18,7 @@
   });
   document.addEventListener("site:navigated", setTheme);
 
-  function findCopyStatus(button) {
-    return button?.closest(".accounts-section, .invite-result, .login-password-result, main.page-shell")?.querySelector(".copy-status")
-      || document.querySelector(".copy-status");
-  }
+  const status = document.querySelector(".copy-status");
 
   function selectCopyValue(element) {
     try {
@@ -32,10 +29,9 @@
     element.select?.();
   }
 
-  async function copyValue(target, button) {
+  async function copyValue(target) {
     const element = document.getElementById(target);
     if (!element) return;
-    const status = findCopyStatus(button);
     const value = "value" in element ? element.value : element.textContent;
 
     try {
@@ -66,10 +62,8 @@
     if (status) status.textContent = "Text selected. Press ⌘C or Ctrl+C to copy.";
   }
 
-  document.addEventListener("click", (event) => {
-    const button = event.target.closest?.("[data-copy-target]");
-    if (!button) return;
-    void copyValue(button.dataset.copyTarget, button);
+  document.querySelectorAll("[data-copy-target]").forEach((button) => {
+    button.addEventListener("click", () => copyValue(button.dataset.copyTarget));
   });
 
   const hasPasskeySupport = Boolean(
@@ -110,146 +104,135 @@
       || "";
   }
 
-  function bindPasskeyControls() {
-    document.querySelectorAll("[data-passkey-register]").forEach((button) => {
-      if (button.dataset.passkeyBound === "1") return;
-      button.dataset.passkeyBound = "1";
-      const controls = button.closest("[data-passkey-controls]");
+  document.querySelectorAll("[data-passkey-register]").forEach((button) => {
+    const controls = button.closest("[data-passkey-controls]");
+    const status = controls?.querySelector("[data-passkey-status]");
+    if (!hasPasskeySupport) {
+      button.disabled = true;
+      if (status) status.textContent = "Passkey setup needs a compatible browser and device. Open this invitation on one to continue.";
+      return;
+    }
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      if (status) status.textContent = "Waiting for your device…";
+      try {
+        const urls = controls.dataset;
+        const options = await passkeyJson(urls.passkeyOptions, csrfFor(button));
+        options.challenge = decodeBase64Url(options.challenge);
+        options.user.id = decodeBase64Url(options.user.id);
+        options.excludeCredentials = (options.excludeCredentials || []).map((item) => ({
+          ...item,
+          id: decodeBase64Url(item.id),
+        }));
+        const credential = await navigator.credentials.create({ publicKey: options });
+        if (!credential) throw new Error("The device did not create a passkey.");
+        const response = credential.response;
+        const name = controls.querySelector("[data-passkey-name]")?.value?.trim() || "";
+        const result = await passkeyJson(urls.passkeyVerify, csrfFor(button), {
+          id: credential.id,
+          rawId: encodeBase64Url(credential.rawId),
+          type: credential.type,
+          authenticatorAttachment: credential.authenticatorAttachment,
+          response: {
+            attestationObject: encodeBase64Url(response.attestationObject),
+            clientDataJSON: encodeBase64Url(response.clientDataJSON),
+            transports: response.getTransports ? response.getTransports() : [],
+          },
+          clientExtensionResults: credential.getClientExtensionResults(),
+          name,
+        });
+        if (result.redirect_url) {
+          window.location.assign(result.redirect_url);
+          return;
+        }
+        if (result.username_required) {
+          const setupForm = button.closest("form");
+          const usernameForm = controls.querySelector("[data-enrollment-username]");
+          if (setupForm) setupForm.hidden = true;
+          if (usernameForm) {
+            usernameForm.hidden = false;
+            usernameForm.querySelector('input[name="username"]')?.focus();
+          }
+          if (status) status.textContent = "Passkey ready. Choose a username to finish setup.";
+          return;
+        }
+        button.textContent = "Passkey added";
+        if (status) status.textContent = "Passkey ready. Use it the next time you sign in.";
+      } catch (error) {
+        button.disabled = false;
+        if (status) status.textContent = error.name === "NotAllowedError"
+          ? "Passkey setup was canceled. You can try again."
+          : error.message || "Passkey setup could not be completed.";
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-enrollment-username]").forEach((form) => {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const controls = form.closest("[data-passkey-controls]");
       const status = controls?.querySelector("[data-passkey-status]");
-      if (!hasPasskeySupport) {
-        button.disabled = true;
-        if (status) status.textContent = "Passkey setup needs a compatible browser and device. Open this invitation on one to continue.";
-        return;
+      const button = form.querySelector('button[type="submit"]');
+      const username = form.querySelector('input[name="username"]');
+      if (!controls || !button || !username) return;
+      button.disabled = true;
+      if (status) status.textContent = "Saving your username…";
+      try {
+        const result = await passkeyJson(controls.dataset.passkeyUsernameUrl, csrfFor(form), {
+          username: username.value,
+        });
+        window.location.assign(result.redirect_url);
+      } catch (error) {
+        button.disabled = false;
+        if (status) status.textContent = error.message || "The username could not be saved. Try another.";
       }
-      button.addEventListener("click", async () => {
-        button.disabled = true;
-        if (status) status.textContent = "Waiting for your device…";
-        try {
-          const urls = controls.dataset;
-          const options = await passkeyJson(urls.passkeyOptions, csrfFor(button));
-          options.challenge = decodeBase64Url(options.challenge);
-          options.user.id = decodeBase64Url(options.user.id);
-          options.excludeCredentials = (options.excludeCredentials || []).map((item) => ({
-            ...item,
-            id: decodeBase64Url(item.id),
-          }));
-          const credential = await navigator.credentials.create({ publicKey: options });
-          if (!credential) throw new Error("The device did not create a passkey.");
-          const response = credential.response;
-          const name = controls.querySelector("[data-passkey-name]")?.value?.trim() || "";
-          const result = await passkeyJson(urls.passkeyVerify, csrfFor(button), {
-            id: credential.id,
-            rawId: encodeBase64Url(credential.rawId),
-            type: credential.type,
-            authenticatorAttachment: credential.authenticatorAttachment,
-            response: {
-              attestationObject: encodeBase64Url(response.attestationObject),
-              clientDataJSON: encodeBase64Url(response.clientDataJSON),
-              transports: response.getTransports ? response.getTransports() : [],
-            },
-            clientExtensionResults: credential.getClientExtensionResults(),
-            name,
-          });
-          if (result.redirect_url) {
-            window.location.assign(result.redirect_url);
-            return;
-          }
-          if (result.username_required) {
-            const setupForm = button.closest("form");
-            const usernameForm = controls.querySelector("[data-enrollment-username]");
-            if (setupForm) setupForm.hidden = true;
-            if (usernameForm) {
-              usernameForm.hidden = false;
-              usernameForm.querySelector('input[name="username"]')?.focus();
-            }
-            if (status) status.textContent = "Passkey ready. Choose a username to finish setup.";
-            return;
-          }
-          button.textContent = "Passkey added";
-          if (status) status.textContent = "Passkey ready. Use it the next time you sign in.";
-        } catch (error) {
-          button.disabled = false;
-          if (status) status.textContent = error.name === "NotAllowedError"
-            ? "Passkey setup was canceled. You can try again."
-            : error.message || "Passkey setup could not be completed.";
-        }
-      });
     });
+  });
 
-    document.querySelectorAll("[data-enrollment-username]").forEach((form) => {
-      if (form.dataset.passkeyBound === "1") return;
-      form.dataset.passkeyBound = "1";
-      form.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        const controls = form.closest("[data-passkey-controls]");
-        const status = controls?.querySelector("[data-passkey-status]");
-        const button = form.querySelector('button[type="submit"]');
-        const username = form.querySelector('input[name="username"]');
-        if (!controls || !button || !username) return;
-        button.disabled = true;
-        if (status) status.textContent = "Saving your username…";
-        try {
-          const result = await passkeyJson(controls.dataset.passkeyUsernameUrl, csrfFor(form), {
-            username: username.value,
-          });
-          window.location.assign(result.redirect_url);
-        } catch (error) {
-          button.disabled = false;
-          if (status) status.textContent = error.message || "The username could not be saved. Try another.";
-        }
-      });
-    });
-
-    document.querySelectorAll("[data-passkey-login]").forEach((button) => {
-      if (button.dataset.passkeyBound === "1") return;
-      button.dataset.passkeyBound = "1";
-      if (!hasPasskeySupport) {
-        button.disabled = true;
-        const status = document.querySelector("[data-passkey-login-status]");
-        if (status) status.textContent = "Passkey sign-in needs a compatible browser and device.";
-        return;
+  document.querySelectorAll("[data-passkey-login]").forEach((button) => {
+    if (!hasPasskeySupport) {
+      button.disabled = true;
+      const status = document.querySelector("[data-passkey-login-status]");
+      if (status) status.textContent = "Passkey sign-in needs a compatible browser and device.";
+      return;
+    }
+    button.addEventListener("click", async () => {
+      const status = document.querySelector("[data-passkey-login-status]");
+      button.disabled = true;
+      if (status) status.textContent = "Waiting for your passkey…";
+      try {
+        const options = await passkeyJson(button.dataset.passkeyOptions, csrfFor(button));
+        options.challenge = decodeBase64Url(options.challenge);
+        options.allowCredentials = (options.allowCredentials || []).map((item) => ({
+          ...item,
+          id: decodeBase64Url(item.id),
+        }));
+        const credential = await navigator.credentials.get({ publicKey: options });
+        if (!credential) throw new Error("The device did not return a passkey.");
+        const response = credential.response;
+        const next = button.closest("form")?.querySelector('input[name="next"]')?.value || "";
+        const result = await passkeyJson(button.dataset.passkeyVerify, csrfFor(button), {
+          id: credential.id,
+          rawId: encodeBase64Url(credential.rawId),
+          type: credential.type,
+          authenticatorAttachment: credential.authenticatorAttachment,
+          response: {
+            authenticatorData: encodeBase64Url(response.authenticatorData),
+            clientDataJSON: encodeBase64Url(response.clientDataJSON),
+            signature: encodeBase64Url(response.signature),
+            userHandle: response.userHandle ? encodeBase64Url(response.userHandle) : null,
+          },
+          clientExtensionResults: credential.getClientExtensionResults(),
+          next,
+        });
+        window.location.assign(result.redirect_url);
+      } catch (error) {
+        button.disabled = false;
+        if (status) status.textContent = error.name === "NotAllowedError"
+          ? "Passkey sign-in was canceled. You can try again."
+          : error.message || "Passkey sign-in could not be completed.";
       }
-      button.addEventListener("click", async () => {
-        const status = document.querySelector("[data-passkey-login-status]");
-        button.disabled = true;
-        if (status) status.textContent = "Waiting for your passkey…";
-        try {
-          const options = await passkeyJson(button.dataset.passkeyOptions, csrfFor(button));
-          options.challenge = decodeBase64Url(options.challenge);
-          options.allowCredentials = (options.allowCredentials || []).map((item) => ({
-            ...item,
-            id: decodeBase64Url(item.id),
-          }));
-          const credential = await navigator.credentials.get({ publicKey: options });
-          if (!credential) throw new Error("The device did not return a passkey.");
-          const response = credential.response;
-          const next = button.closest("form")?.querySelector('input[name="next"]')?.value || "";
-          const result = await passkeyJson(button.dataset.passkeyVerify, csrfFor(button), {
-            id: credential.id,
-            rawId: encodeBase64Url(credential.rawId),
-            type: credential.type,
-            authenticatorAttachment: credential.authenticatorAttachment,
-            response: {
-              authenticatorData: encodeBase64Url(response.authenticatorData),
-              clientDataJSON: encodeBase64Url(response.clientDataJSON),
-              signature: encodeBase64Url(response.signature),
-              userHandle: response.userHandle ? encodeBase64Url(response.userHandle) : null,
-            },
-            clientExtensionResults: credential.getClientExtensionResults(),
-            next,
-          });
-          window.location.assign(result.redirect_url);
-        } catch (error) {
-          button.disabled = false;
-          if (status) status.textContent = error.name === "NotAllowedError"
-            ? "Passkey sign-in was canceled. You can try again."
-            : error.message || "Passkey sign-in could not be completed.";
-        }
-      });
     });
-  }
-
-  bindPasskeyControls();
-  document.addEventListener("site:navigated", bindPasskeyControls);
+  });
 
 })();

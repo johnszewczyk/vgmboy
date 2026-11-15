@@ -8,6 +8,7 @@
     <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="recent">Recent</button>
     <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="favorites">Favorites</button>
     <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="sound">Sound</button>
+    {% if request.user.is_superuser %}<button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="admin">Admin</button>{% endif %}
   </nav>
 
   <!-- 1. Now Playing Screen -->
@@ -217,6 +218,94 @@
       </section>
     </div>
   </section>
+
+  {% if request.user.is_superuser %}
+  <!-- Admin Screen (Owner Mobile) -->
+  <section class="spcboy-mobile-screen spcboy-mobile-screen-admin is-hidden" id="spcboy-mobile-screen-admin" data-admin-url="{% url 'spcboy_admin' %}" aria-label="Admin">
+    <div class="spcboy-mobile-sound-layout">
+      <section class="spcboy-mobile-card">
+        <div class="spcboy-mobile-card-header">
+          <h3>Site Controls</h3>
+          <span class="spcboy-mobile-badge" id="spcboy-mobile-admin-status"></span>
+        </div>
+        <label class="spcboy-mobile-field">
+          <span>AAC bitrate</span>
+          <select id="spcboy-mobile-admin-bitrate" class="spcboy-mobile-select" aria-label="Global AAC bitrate"></select>
+        </label>
+        <label class="spcboy-mobile-field">
+          <span>Session limit (min)</span>
+          <input id="spcboy-mobile-admin-session-limit" type="number" min="1" max="1440" step="1" inputmode="numeric" value="60" aria-label="Playback session limit in minutes">
+        </label>
+        <div class="spcboy-mobile-eq-actions">
+          <button type="button" class="spcboy-mobile-btn-secondary" id="spcboy-mobile-admin-save-settings">Save Controls</button>
+        </div>
+      </section>
+
+      <section class="spcboy-mobile-card">
+        <div class="spcboy-mobile-card-header">
+          <h3>Invitations</h3>
+          <span class="spcboy-mobile-badge" id="spcboy-mobile-admin-invite-count">0</span>
+        </div>
+        <button type="button" class="spcboy-mobile-play-album-button spcboy-mobile-admin-primary-btn" id="spcboy-mobile-admin-create-invite">+ Create Invite</button>
+        <div class="spcboy-mobile-admin-created is-hidden" id="spcboy-mobile-admin-created-invite" aria-live="polite"></div>
+        <div class="spcboy-mobile-admin-list" id="spcboy-mobile-admin-invites-list">
+          <p class="spcboy-mobile-empty">Loading invitations…</p>
+        </div>
+      </section>
+
+      <section class="spcboy-mobile-card">
+        <div class="spcboy-mobile-card-header">
+          <h3>Accounts</h3>
+          <span class="spcboy-mobile-badge" id="spcboy-mobile-admin-account-count">0</span>
+        </div>
+        <div class="spcboy-mobile-admin-list" id="spcboy-mobile-admin-accounts-list">
+          <p class="spcboy-mobile-empty">Loading accounts…</p>
+        </div>
+      </section>
+
+      <section class="spcboy-mobile-card">
+        <div class="spcboy-mobile-card-header">
+          <h3>Account &amp; Sign-In</h3>
+        </div>
+        <label class="spcboy-mobile-field spcboy-mobile-field--wide">
+          <span>Display name</span>
+          <input id="spcboy-mobile-admin-display-name" type="text" maxlength="40" autocomplete="nickname" aria-label="Display name">
+        </label>
+        <div class="spcboy-mobile-eq-actions">
+          <button type="button" class="spcboy-mobile-btn-secondary" id="spcboy-mobile-admin-save-name">Save Name</button>
+        </div>
+        <div class="spcboy-mobile-admin-divider"></div>
+        <div class="spcboy-mobile-row">
+          <div>
+            <strong>Login Password</strong>
+            <small class="spcboy-mobile-dim" id="spcboy-mobile-admin-password-state">For devices without passkeys</small>
+          </div>
+        </div>
+        <div class="spcboy-mobile-admin-created is-hidden" id="spcboy-mobile-admin-created-password" aria-live="polite"></div>
+        <div class="spcboy-mobile-eq-actions" id="spcboy-mobile-admin-password-actions">
+          <button type="button" class="spcboy-mobile-btn-secondary" id="spcboy-mobile-admin-gen-password">Generate Password</button>
+          <button type="button" class="spcboy-mobile-btn-secondary spcboy-mobile-admin-danger-btn is-hidden" id="spcboy-mobile-admin-revoke-password">Revoke</button>
+        </div>
+        <form class="spcboy-mobile-admin-logout" method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="spcboy-mobile-btn-secondary spcboy-mobile-admin-danger-btn">Sign Out</button>
+        </form>
+      </section>
+
+      <section class="spcboy-mobile-card">
+        <div class="spcboy-mobile-card-header">
+          <h3>Server &amp; Sign-In Log</h3>
+          <button type="button" class="spcboy-mobile-btn-text" id="spcboy-mobile-admin-refresh">Refresh</button>
+        </div>
+        <div class="spcboy-mobile-admin-metrics" id="spcboy-mobile-admin-server-metrics"></div>
+        <details class="spcboy-mobile-admin-log-details">
+          <summary>Recent sign-in events</summary>
+          <div class="spcboy-mobile-admin-list" id="spcboy-mobile-admin-logins-list"></div>
+        </details>
+      </section>
+    </div>
+  </section>
+  {% endif %}
 
   <!-- Persistent Mini-Player Dock (visible on Library, Gallery, Detail, Sound) -->
   <footer class="spcboy-mobile-dock" id="spcboy-mobile-dock" aria-label="Mini player">

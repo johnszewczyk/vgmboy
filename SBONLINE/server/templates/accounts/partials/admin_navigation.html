@@ -1,7 +1,0 @@
-{% with url_name=request.resolver_match.url_name %}
-<nav class="listening-page-nav admin-subnav" aria-label="Admin sections">
-  <a href="{% url 'accounts' %}"{% if url_name == 'accounts' or url_name == 'invite_created' or url_name == 'delete_user' %} aria-current="page"{% endif %}>Accounts &amp; settings</a>
-  <a href="{% url 'usage' %}"{% if url_name == 'usage' or url_name == 'server_status' %} aria-current="page"{% endif %}>Usage &amp; server</a>
-  <a href="{% url 'site_log' %}"{% if url_name == 'site_log' %} aria-current="page"{% endif %}>Log</a>
-</nav>
-{% endwith %}

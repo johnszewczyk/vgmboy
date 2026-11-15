@@ -241,7 +241,7 @@ body.sbonline-site {
 .sbonline-site :is(.profile-tabs,.listening-page-nav) { display: flex; align-items: stretch; gap: var(--sb-gap); padding: var(--sb-gap); border: 0; background: var(--paper); overflow-x: auto; }
 .sbonline-site :is(.profile-tabs,.listening-page-nav) > :is(button,a) { flex: 1 0 auto; min-height: 32px; margin: 0; padding: 6px 10px; border: 0; border-radius: var(--sb-radius); background: var(--sb-button-surface); color: var(--sb-button-ink); font: 12px/1.3 var(--sb-font); white-space: nowrap; text-decoration: none; }
 .sbonline-site :is(.profile-tabs,.listening-page-nav) > :is(button,a):hover { color: var(--sb-button-hover-ink); background: var(--sb-button-hover-surface); }
-.sbonline-site :is(.profile-tabs,.listening-page-nav) > :is([aria-selected="true"],[aria-current="page"]) { color: var(--sb-button-selected-ink); background: var(--sb-button-selected-surface); box-shadow: inset 0 -1px var(--sb-button-selected-ink); }
+.sbonline-site :is(.profile-tabs,.listening-page-nav) > [aria-selected="true"] { color: var(--sb-button-selected-ink); background: var(--sb-button-selected-surface); box-shadow: inset 0 -1px var(--sb-button-selected-ink); }
 .listening-page .community-heading { margin-bottom: 6px; }
 .listening-page #now-playing-live-count { color: var(--muted); font: 11px/1.4 var(--sb-font); }
 .listening-page .listening-page-nav { margin: 0 0 8px; }
@@ -290,17 +290,3 @@ body.sbonline-site {
 .sbonline-site .site-favorite-toggle:is(.is-active,.is-favorite) svg { fill:currentColor; }
 .sbonline-site .site-favorite-toggle[aria-busy="true"] { opacity:.55; cursor:wait; }
 .accounts-page #site-settings { max-width:44rem; }
-.sbonline-site .admin-subnav { margin: 0 0 .25rem; }
-.sbonline-site .admin-controls-card { padding: 14px; }
-.sbonline-site .admin-controls-card .community-section-heading { margin: -14px -14px 12px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
-.sbonline-site .profile-fields input[type="number"],
-.sbonline-site .accounts-page :is(input[type="number"],select) { width: 100%; min-height: 2.3rem; padding: .45rem .65rem; border: 1px solid var(--input-line); border-radius: var(--sb-radius); background: var(--input-bg); color: var(--ink); font: inherit; }
-.sbonline-site .profile-fields input[type="number"]:focus-visible,
-.sbonline-site .accounts-page :is(input[type="number"],select):focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
-.sbonline-site .account-card-actions { display: flex; flex-wrap: wrap; gap: 6px; padding-top: .5rem; border-top: 1px solid var(--line-subtle); }
-.sbonline-site .account-card-actions form { margin: 0; }
-.sbonline-site .accounts-button-danger { color: var(--red); border-color: var(--notice-error-line, color-mix(in srgb, var(--red) 40%, var(--line))); }
-.sbonline-site .accounts-button-danger:hover { background: var(--message-error-bg); border-color: var(--red); color: var(--red); }
-.sbonline-site .drawer-logout-form { margin: 0; }
-.sbonline-site :is(.primary-button,.primary-link,.quiet-button,.quiet-link,.danger-button,.danger-button-solid) { border-radius: var(--sb-radius); }
-.sbonline-site .accounts-page .primary-button { border: 1px solid var(--line); }

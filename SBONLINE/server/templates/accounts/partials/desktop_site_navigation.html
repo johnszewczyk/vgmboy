@@ -5,6 +5,5 @@
     <button type="button" data-spcboy-view-shortcut="favorites">Favorites</button>
     <button type="button" data-spcboy-view-shortcut="recent">Recent</button>
     <a data-nav-key="profile" href="{% url 'member_profile' %}"{% if request.resolver_match.url_name == 'member_profile' or request.resolver_match.url_name == 'member_public_profile' %} aria-current="page"{% endif %}>Profile</a>
-    {% if request.user.is_superuser %}<a data-nav-key="admin" href="{% url 'accounts' %}"{% if request.resolver_match.url_name == 'accounts' or request.resolver_match.url_name == 'usage' or request.resolver_match.url_name == 'site_log' or request.resolver_match.url_name == 'server_status' or request.resolver_match.url_name == 'invite_created' or request.resolver_match.url_name == 'delete_user' %} aria-current="page"{% endif %}>Admin</a>{% endif %}
   </div>
 </nav>

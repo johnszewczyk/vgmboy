@@ -1047,23 +1047,29 @@ def member_profile(request):
     })
 
 
-@login_required
-@never_cache
-@require_POST
-def generate_login_password(request):
+def _rotate_login_password(user):
+    """Create or replace a one-time generated login password for legacy devices."""
     key = secrets.token_urlsafe(32)
-    previous_key = AccessKeyCredential.objects.filter(user=request.user).first()
+    previous_key = AccessKeyCredential.objects.filter(user=user).first()
     AccessKeyCredential.objects.update_or_create(
-        user=request.user,
+        user=user,
         defaults={
             "key_digest": _access_key_digest(key),
             "created_at": timezone.now(),
             "last_used_at": None,
         },
     )
+    return key, previous_key is not None
+
+
+@login_required
+@never_cache
+@require_POST
+def generate_login_password(request):
+    key, replaced = _rotate_login_password(request.user)
     return render(request, "accounts/login_password_created.html", {
         "login_password": key,
-        "replaced": previous_key is not None,
+        "replaced": replaced,
     })
 
 
@@ -2166,6 +2172,21 @@ def create_invite(request):
     return _show_invitation_code(request, invitation, code)
 
 
+def _issue_recovery_invite(member, creator):
+    """Revoke prior open recovery invites and issue a fresh single-use recovery invite."""
+    Invitation.objects.filter(
+        username__iexact=member.username,
+        is_recovery=True,
+        used_at__isnull=True,
+        revoked_at__isnull=True,
+    ).update(revoked_at=timezone.now())
+    return _create_invitation(
+        username=member.username,
+        creator=creator,
+        is_recovery=True,
+    )
+
+
 @login_required
 @require_POST
 def create_passkey_recovery_invite(request, user_id):
@@ -2176,17 +2197,7 @@ def create_passkey_recovery_invite(request, user_id):
     if not member.is_active:
         messages.error(request, "Reactivate this account before issuing a passkey recovery invitation.")
         return redirect("accounts")
-    Invitation.objects.filter(
-        username__iexact=member.username,
-        is_recovery=True,
-        used_at__isnull=True,
-        revoked_at__isnull=True,
-    ).update(revoked_at=timezone.now())
-    invitation, code = _create_invitation(
-        username=member.username,
-        creator=request.user.username,
-        is_recovery=True,
-    )
+    invitation, code = _issue_recovery_invite(member, request.user.username)
     return _show_invitation_code(request, invitation, code)
 
 
@@ -2250,19 +2261,8 @@ def toggle_user(request, user_id):
     return redirect("accounts")
 
 
-@login_required
-@require_http_methods(["GET", "POST"])
-def delete_user(request, user_id):
-    denied = _owner_required(request)
-    if denied:
-        return denied
-    member = get_object_or_404(User, pk=user_id, is_staff=False, is_superuser=False)
-    account = PasskeyAccount.objects.filter(user=member, username_set=False).first()
-    member_label = "Pending join" if account else member.username
-
-    if request.method == "GET":
-        return render(request, "accounts/delete_user.html", {"member": member, "member_label": member_label})
-
+def _delete_member_account(user_id):
+    """Atomically end sessions, cancel open invites, and delete a non-staff user."""
     now = timezone.now()
     with transaction.atomic():
         member = get_object_or_404(
@@ -2304,9 +2304,234 @@ def delete_user(request, user_id):
         ).update(revoked_at=now)
         username = "Pending join" if PasskeyAccount.objects.filter(user=member, username_set=False).exists() else member.username
         member.delete()
+        return username
 
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def delete_user(request, user_id):
+    denied = _owner_required(request)
+    if denied:
+        return denied
+    member = get_object_or_404(User, pk=user_id, is_staff=False, is_superuser=False)
+    account = PasskeyAccount.objects.filter(user=member, username_set=False).first()
+    member_label = "Pending join" if account else member.username
+
+    if request.method == "GET":
+        return render(request, "accounts/delete_user.html", {"member": member, "member_label": member_label})
+
+    username = _delete_member_account(user_id)
     messages.success(request, f"Account {username} was permanently deleted. Site Log history was retained.")
     return redirect("accounts")
+
+
+def _spcboy_admin_payload(request, *, message="", extra=None):
+    """Build the mobile-native Admin screen payload."""
+    site_settings, _ = SiteSettings.objects.get_or_create(pk=1)
+    active_logins, _active_digests = _active_account_sessions(request)
+    account_rows = _account_rows(active_logins)
+    current_period = timezone.now().astimezone(datetime_timezone.utc).date().replace(day=1)
+    usage_by_user = {
+        row.user_id: row
+        for row in MonthlyUsage.objects.filter(period=current_period)
+    }
+    accounts_payload = []
+    for member in account_rows:
+        usage_row = usage_by_user.get(member.pk)
+        audio_bytes = usage_row.audio_bytes if usage_row else 0
+        accounts_payload.append({
+            "id": member.pk,
+            "username": member.username,
+            "displayName": member.display_name,
+            "roleLabel": member.role_label,
+            "isActive": member.is_active,
+            "setupPending": member.setup_pending,
+            "isSitePersona": member.is_site_persona,
+            "isCurrentUser": member.pk == request.user.pk,
+            "canManage": not member.is_staff and not member.is_superuser and not member.is_site_persona,
+            "activeSessionCount": member.device_count,
+            "lastLoginAt": timezone.localtime(member.last_login).strftime("%b %-d, %-I:%M %p") if member.last_login else None,
+            "audioQuota": f"{_bytes_label(audio_bytes)} / {_bytes_label(MONTHLY_AUDIO_STREAM_LIMIT_BYTES)}",
+        })
+
+    open_invites = (
+        Invitation.objects.filter(
+            used_at__isnull=True,
+            revoked_at__isnull=True,
+            expires_at__gt=timezone.now(),
+        )
+        .order_by("-created_at")
+    )
+    invitations_payload = []
+    join_url = request.build_absolute_uri(reverse("join_code"))
+    for inv in open_invites:
+        code = _decrypt_invitation_code(inv)
+        invitations_payload.append({
+            "selector": str(inv.selector),
+            "isRecovery": inv.is_recovery,
+            "username": inv.username,
+            "visibleCode": code,
+            "joinUrl": _invitation_url(request, inv) if inv.is_recovery else join_url,
+            "createdAt": timezone.localtime(inv.created_at).strftime("%b %-d, %-I:%M %p"),
+            "expiresAt": timezone.localtime(inv.expires_at).strftime("%b %-d, %-I:%M %p"),
+        })
+
+    profile = _member_profile(request.user)
+    server = _server_stats()
+    recent_logins = []
+    for event in LoginEvent.objects.order_by("-occurred_at", "-pk")[:10]:
+        recent_logins.append({
+            "occurredAt": timezone.localtime(event.occurred_at).strftime("%b %-d, %-I:%M %p"),
+            "username": event.username or "Unknown",
+            "eventType": event.event_type,
+            "ipAddress": event.ip_address or "Unavailable",
+        })
+
+    payload = {
+        "siteSettings": {
+            "aacBitrate": site_settings.aac_bitrate,
+            "aacChoices": [
+                {"value": val, "label": label}
+                for val, label in SiteSettings._meta.get_field("aac_bitrate").choices
+            ],
+            "sessionLimitMinutes": site_settings.player_session_limit_minutes,
+        },
+        "accounts": accounts_payload,
+        "invitations": invitations_payload,
+        "selfAccount": {
+            "displayName": profile.display_name,
+            "hasLoginPassword": AccessKeyCredential.objects.filter(user=request.user).exists(),
+        },
+        "server": {
+            "memory": f"{server['memory_used']} / {server['memory_total']}",
+            "memoryPercent": server["memory_percent"],
+            "disk": f"{server['disk_used']} / {server['disk_total']}",
+            "diskPercent": server["disk_percent"],
+            "load": server["load"],
+            "uptime": f"{server['uptime_days']}d {server['uptime_hours']}h",
+        },
+        "recentLogins": recent_logins,
+        "message": message,
+    }
+    if extra:
+        payload.update(extra)
+    return payload
+
+
+@login_required
+@never_cache
+@require_http_methods(["GET", "POST"])
+def spcboy_admin(request):
+    if not request.user.is_superuser:
+        return JsonResponse({"error": "Owner access required."}, status=403)
+    if request.method == "GET":
+        return JsonResponse(_spcboy_admin_payload(request))
+
+    try:
+        data = json.loads(request.body.decode("utf-8") or "{}")
+    except (UnicodeDecodeError, ValueError):
+        return JsonResponse({"error": "Invalid JSON body."}, status=400)
+
+    action = str(data.get("action") or "").strip()
+    if action == "save-site-settings":
+        site_settings, _ = SiteSettings.objects.get_or_create(pk=1)
+        form = SiteSettingsForm(
+            {
+                "aac_bitrate": data.get("aacBitrate"),
+                "player_session_limit_minutes": data.get("sessionLimitMinutes"),
+            },
+            instance=site_settings,
+        )
+        if not form.is_valid():
+            errors = [msg for field_errs in form.errors.values() for msg in field_errs]
+            return JsonResponse({"error": errors[0] if errors else "Invalid site settings."}, status=400)
+        form.save()
+        return JsonResponse(_spcboy_admin_payload(request, message="Site controls saved."))
+
+    if action == "create-invite":
+        invitation, code = _create_invitation(creator=request.user.username)
+        created = {
+            "selector": str(invitation.selector),
+            "code": code,
+            "joinUrl": request.build_absolute_uri(reverse("join_code")),
+            "isRecovery": False,
+        }
+        return JsonResponse(_spcboy_admin_payload(request, message="Invitation created.", extra={"createdInvite": created}))
+
+    if action == "revoke-invite":
+        selector = str(data.get("selector") or "").strip()
+        try:
+            invite_uuid = uuid.UUID(selector)
+        except ValueError:
+            return JsonResponse({"error": "Invalid invitation ID."}, status=400)
+        invitation = Invitation.objects.filter(
+            selector=invite_uuid,
+            used_at__isnull=True,
+            revoked_at__isnull=True,
+        ).first()
+        if not invitation:
+            return JsonResponse({"error": "Invitation is no longer open."}, status=404)
+        invitation.revoked_at = timezone.now()
+        invitation.save(update_fields=["revoked_at"])
+        return JsonResponse(_spcboy_admin_payload(request, message="Invitation canceled."))
+
+    if action in {"toggle-user", "recovery-invite", "delete-user"}:
+        try:
+            user_id = int(data.get("userId"))
+        except (TypeError, ValueError):
+            return JsonResponse({"error": "Invalid account ID."}, status=400)
+        member = User.objects.filter(pk=user_id, is_staff=False, is_superuser=False).first()
+        if not member or _member_profile(member).is_site_persona or member.pk == request.user.pk:
+            return JsonResponse({"error": "Account cannot be managed."}, status=404)
+
+        if action == "toggle-user":
+            member.is_active = not member.is_active
+            member.save(update_fields=["is_active"])
+            state = "reactivated" if member.is_active else "suspended"
+            return JsonResponse(_spcboy_admin_payload(request, message=f"Account {state}."))
+
+        if action == "recovery-invite":
+            if not member.is_active:
+                return JsonResponse({"error": "Reactivate account before issuing a recovery invite."}, status=400)
+            invitation, code = _issue_recovery_invite(member, request.user.username)
+            created = {
+                "selector": str(invitation.selector),
+                "code": code,
+                "joinUrl": _invitation_url(request, invitation),
+                "isRecovery": True,
+                "username": member.username,
+            }
+            return JsonResponse(_spcboy_admin_payload(request, message="Recovery invite created.", extra={"createdInvite": created}))
+
+        username = _delete_member_account(member.pk)
+        return JsonResponse(_spcboy_admin_payload(request, message=f"Account {username} deleted."))
+
+    if action == "update-display-name":
+        profile = _member_profile(request.user)
+        form = MemberProfileForm(
+            {
+                "display_name": data.get("displayName", ""),
+                "theme_preference": profile.theme_preference or "dark",
+            },
+            user=request.user,
+        )
+        if not form.is_valid():
+            errors = [msg for field_errs in form.errors.values() for msg in field_errs]
+            return JsonResponse({"error": errors[0] if errors else "Invalid display name."}, status=400)
+        profile.display_name = form.cleaned_data["display_name"]
+        profile.save(update_fields=["display_name"])
+        return JsonResponse(_spcboy_admin_payload(request, message="Display name updated."))
+
+    if action == "generate-login-password":
+        key, replaced = _rotate_login_password(request.user)
+        msg = "Replacement login password generated." if replaced else "Login password generated."
+        return JsonResponse(_spcboy_admin_payload(request, message=msg, extra={"createdLoginPassword": key}))
+
+    if action == "revoke-login-password":
+        AccessKeyCredential.objects.filter(user=request.user).delete()
+        return JsonResponse(_spcboy_admin_payload(request, message="Login password revoked."))
+
+    return JsonResponse({"error": "Unsupported admin action."}, status=400)
 
 
 def _invite_page(request, invitation, *, form=None, error=None, status=200):

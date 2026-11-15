@@ -11,6 +11,7 @@
   const mobileScreenFavorites = document.querySelector("#spcboy-mobile-screen-favorites");
   const mobileScreenDetail = document.querySelector("#spcboy-mobile-screen-detail");
   const mobileScreenSound = document.querySelector("#spcboy-mobile-screen-sound");
+  const mobileScreenAdmin = document.querySelector("#spcboy-mobile-screen-admin");
   const mobileNowArtwork = document.querySelector("#spcboy-mobile-now-art");
   const mobileNowTitle = document.querySelector("#spcboy-mobile-now-title");
   const mobileNowAlbum = document.querySelector("#spcboy-mobile-now-album");
@@ -2414,7 +2415,7 @@
 
   function setMobileAppPage(nextPage, { syncView = true } = {}) {
     if (!mobileAppNav) return;
-    if (!["playing", "library", "gallery", "recent", "favorites", "sound", "detail"].includes(nextPage)) return;
+    if (!["playing", "library", "gallery", "recent", "favorites", "sound", "detail", "admin"].includes(nextPage)) return;
     mobileAppPage = nextPage;
     if (syncView && !isDesktop()) {
       const mobileViewMap = { library: "all", gallery: "gallery", recent: "recent", favorites: "favorites" };
@@ -2437,6 +2438,7 @@
     if (mobileScreenFavorites) mobileScreenFavorites.classList.toggle("is-hidden", nextPage !== "favorites");
     if (mobileScreenDetail) mobileScreenDetail.classList.toggle("is-hidden", nextPage !== "detail");
     if (mobileScreenSound) mobileScreenSound.classList.toggle("is-hidden", nextPage !== "sound");
+    if (mobileScreenAdmin) mobileScreenAdmin.classList.toggle("is-hidden", nextPage !== "admin");
 
     if (mobileDock) {
       mobileDock.classList.toggle("is-hidden", nextPage === "playing");
@@ -2449,6 +2451,7 @@
       else if (nextPage === "recent") renderMobileRecents();
       else if (nextPage === "favorites") renderMobileFavorites();
       else if (nextPage === "sound") syncMobileSoundControls();
+      else if (nextPage === "admin") void loadMobileAdmin();
     } catch (err) {
       console.warn("Mobile page render warning:", err);
     }
@@ -3423,6 +3426,343 @@
       showMobileToast(`Preset ${idx + 1} saved!`);
     };
   }
+
+  // Native Mobile Admin Console
+  let mobileAdminPendingDeleteId = null;
+  let mobileAdminBusy = false;
+
+  function makeMobileNode(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    return node;
+  }
+
+  async function copyMobileAdminText(value, label) {
+    if (!value) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        showMobileToast(`${label} copied`);
+        return;
+      }
+    } catch {}
+    showMobileToast("Copy failed · select text manually");
+  }
+
+  function renderMobileAdmin(data) {
+    if (!mobileScreenAdmin || !data) return;
+    const bitrateSelect = document.querySelector("#spcboy-mobile-admin-bitrate");
+    const limitInput = document.querySelector("#spcboy-mobile-admin-session-limit");
+    const statusBadge = document.querySelector("#spcboy-mobile-admin-status");
+    const inviteCount = document.querySelector("#spcboy-mobile-admin-invite-count");
+    const createdInviteBox = document.querySelector("#spcboy-mobile-admin-created-invite");
+    const invitesList = document.querySelector("#spcboy-mobile-admin-invites-list");
+    const accountCount = document.querySelector("#spcboy-mobile-admin-account-count");
+    const accountsList = document.querySelector("#spcboy-mobile-admin-accounts-list");
+    const displayNameInput = document.querySelector("#spcboy-mobile-admin-display-name");
+    const passwordState = document.querySelector("#spcboy-mobile-admin-password-state");
+    const createdPasswordBox = document.querySelector("#spcboy-mobile-admin-created-password");
+    const genPasswordBtn = document.querySelector("#spcboy-mobile-admin-gen-password");
+    const revokePasswordBtn = document.querySelector("#spcboy-mobile-admin-revoke-password");
+    const metricsGrid = document.querySelector("#spcboy-mobile-admin-server-metrics");
+    const loginsList = document.querySelector("#spcboy-mobile-admin-logins-list");
+
+    if (statusBadge) statusBadge.textContent = "";
+
+    if (bitrateSelect && Array.isArray(data.siteSettings?.aacChoices)) {
+      bitrateSelect.replaceChildren();
+      for (const choice of data.siteSettings.aacChoices) {
+        const option = makeMobileNode("option", "", choice.label);
+        option.value = String(choice.value);
+        if (Number(choice.value) === Number(data.siteSettings.aacBitrate)) option.selected = true;
+        bitrateSelect.appendChild(option);
+      }
+    }
+    if (limitInput && data.siteSettings?.sessionLimitMinutes !== undefined) {
+      limitInput.value = String(data.siteSettings.sessionLimitMinutes);
+    }
+
+    if (createdInviteBox) {
+      if (data.createdInvite) {
+        createdInviteBox.replaceChildren();
+        createdInviteBox.classList.remove("is-hidden");
+        const heading = makeMobileNode(
+          "strong",
+          "",
+          data.createdInvite.isRecovery
+            ? `Recovery invite for ${data.createdInvite.username}`
+            : "New one-time member invite ready",
+        );
+        const codeBox = makeMobileNode("div", "spcboy-mobile-admin-code", data.createdInvite.code);
+        const actions = makeMobileNode("div", "spcboy-mobile-admin-actions");
+        const copyCodeBtn = makeMobileNode("button", "spcboy-mobile-btn-secondary", "Copy Code");
+        copyCodeBtn.type = "button";
+        copyCodeBtn.onclick = () => void copyMobileAdminText(data.createdInvite.code, "Invite code");
+        const copyLinkBtn = makeMobileNode("button", "spcboy-mobile-btn-secondary", "Copy Link");
+        copyLinkBtn.type = "button";
+        copyLinkBtn.onclick = () => void copyMobileAdminText(data.createdInvite.joinUrl, "Invite link");
+        actions.append(copyCodeBtn, copyLinkBtn);
+        createdInviteBox.append(heading, codeBox, actions);
+      } else {
+        createdInviteBox.classList.add("is-hidden");
+        createdInviteBox.replaceChildren();
+      }
+    }
+
+    const invites = Array.isArray(data.invitations) ? data.invitations : [];
+    if (inviteCount) inviteCount.textContent = String(invites.length);
+    if (invitesList) {
+      invitesList.replaceChildren();
+      if (!invites.length) {
+        invitesList.appendChild(makeMobileNode("p", "spcboy-mobile-empty", "No open invitations."));
+      } else {
+        for (const inv of invites) {
+          const item = makeMobileNode("div", "spcboy-mobile-admin-item");
+          const head = makeMobileNode("div", "spcboy-mobile-admin-item-head");
+          const title = makeMobileNode(
+            "h4",
+            "spcboy-mobile-admin-item-title",
+            inv.isRecovery ? `Recovery · ${inv.username}` : "Member invitation",
+          );
+          const pill = makeMobileNode("span", "spcboy-mobile-admin-pill is-active", "Open");
+          head.append(title, pill);
+          item.appendChild(head);
+          item.appendChild(makeMobileNode("small", "spcboy-mobile-dim", `Expires ${inv.expiresAt}`));
+          if (inv.visibleCode) {
+            item.appendChild(makeMobileNode("div", "spcboy-mobile-admin-code", inv.visibleCode));
+          }
+          const actions = makeMobileNode("div", "spcboy-mobile-admin-actions");
+          if (inv.visibleCode) {
+            const copyBtn = makeMobileNode("button", "spcboy-mobile-btn-secondary", "Copy Code");
+            copyBtn.type = "button";
+            copyBtn.onclick = () => void copyMobileAdminText(inv.visibleCode, "Invite code");
+            actions.appendChild(copyBtn);
+          }
+          if (inv.joinUrl) {
+            const linkBtn = makeMobileNode("button", "spcboy-mobile-btn-secondary", "Copy Link");
+            linkBtn.type = "button";
+            linkBtn.onclick = () => void copyMobileAdminText(inv.joinUrl, "Invite link");
+            actions.appendChild(linkBtn);
+          }
+          const revokeBtn = makeMobileNode("button", "spcboy-mobile-btn-secondary spcboy-mobile-admin-danger-btn", "Revoke");
+          revokeBtn.type = "button";
+          revokeBtn.onclick = () => void postMobileAdminAction({ action: "revoke-invite", selector: inv.selector });
+          actions.appendChild(revokeBtn);
+          item.appendChild(actions);
+          invitesList.appendChild(item);
+        }
+      }
+    }
+
+    const accounts = Array.isArray(data.accounts) ? data.accounts : [];
+    if (accountCount) accountCount.textContent = String(accounts.length);
+    if (accountsList) {
+      accountsList.replaceChildren();
+      for (const account of accounts) {
+        const item = makeMobileNode("div", "spcboy-mobile-admin-item");
+        const head = makeMobileNode("div", "spcboy-mobile-admin-item-head");
+        const title = makeMobileNode("h4", "spcboy-mobile-admin-item-title", account.displayName || account.username);
+        const pillText = !account.isActive
+          ? "Suspended"
+          : account.isSitePersona
+            ? "Persona"
+            : account.setupPending
+              ? "Setup pending"
+              : "Active";
+        const pillClass = !account.isActive
+          ? "spcboy-mobile-admin-pill is-suspended"
+          : account.isActive && !account.setupPending && !account.isSitePersona
+            ? "spcboy-mobile-admin-pill is-active"
+            : "spcboy-mobile-admin-pill";
+        const pill = makeMobileNode("span", pillClass, pillText);
+        head.append(title, pill);
+        item.appendChild(head);
+
+        const meta = `${account.roleLabel} · ${account.activeSessionCount} active · ${account.audioQuota}`;
+        item.appendChild(makeMobileNode("small", "spcboy-mobile-dim", meta));
+        if (account.lastLoginAt) {
+          item.appendChild(makeMobileNode("small", "spcboy-mobile-dim", `Last sign-in ${account.lastLoginAt}`));
+        }
+
+        if (account.canManage) {
+          const actions = makeMobileNode("div", "spcboy-mobile-admin-actions");
+          const toggleBtn = makeMobileNode(
+            "button",
+            "spcboy-mobile-btn-secondary",
+            account.isActive ? "Suspend" : "Reactivate",
+          );
+          toggleBtn.type = "button";
+          toggleBtn.onclick = () => {
+            mobileAdminPendingDeleteId = null;
+            void postMobileAdminAction({ action: "toggle-user", userId: account.id });
+          };
+          actions.appendChild(toggleBtn);
+
+          if (account.isActive) {
+            const recoveryBtn = makeMobileNode("button", "spcboy-mobile-btn-secondary", "Recovery");
+            recoveryBtn.type = "button";
+            recoveryBtn.onclick = () => {
+              mobileAdminPendingDeleteId = null;
+              void postMobileAdminAction({ action: "recovery-invite", userId: account.id });
+            };
+            actions.appendChild(recoveryBtn);
+          }
+
+          if (mobileAdminPendingDeleteId === account.id) {
+            const confirmBtn = makeMobileNode("button", "spcboy-mobile-btn-secondary spcboy-mobile-admin-danger-btn is-confirming", "Confirm Delete");
+            confirmBtn.type = "button";
+            confirmBtn.onclick = () => {
+              mobileAdminPendingDeleteId = null;
+              void postMobileAdminAction({ action: "delete-user", userId: account.id });
+            };
+            const cancelBtn = makeMobileNode("button", "spcboy-mobile-btn-secondary", "Cancel");
+            cancelBtn.type = "button";
+            cancelBtn.onclick = () => {
+              mobileAdminPendingDeleteId = null;
+              renderMobileAdmin(data);
+            };
+            actions.append(confirmBtn, cancelBtn);
+          } else {
+            const deleteBtn = makeMobileNode("button", "spcboy-mobile-btn-secondary spcboy-mobile-admin-danger-btn", "Delete");
+            deleteBtn.type = "button";
+            deleteBtn.onclick = () => {
+              mobileAdminPendingDeleteId = account.id;
+              renderMobileAdmin(data);
+            };
+            actions.appendChild(deleteBtn);
+          }
+          item.appendChild(actions);
+        }
+        accountsList.appendChild(item);
+      }
+    }
+
+    if (displayNameInput && data.selfAccount?.displayName !== undefined) {
+      displayNameInput.value = data.selfAccount.displayName;
+    }
+    if (passwordState && genPasswordBtn && revokePasswordBtn) {
+      const hasPassword = Boolean(data.selfAccount?.hasLoginPassword);
+      passwordState.textContent = hasPassword
+        ? "A generated password is active for devices without passkeys."
+        : "For devices that cannot use passkeys.";
+      genPasswordBtn.textContent = hasPassword ? "Replace Password" : "Generate Password";
+      revokePasswordBtn.classList.toggle("is-hidden", !hasPassword);
+    }
+    if (createdPasswordBox) {
+      if (data.createdLoginPassword) {
+        createdPasswordBox.replaceChildren();
+        createdPasswordBox.classList.remove("is-hidden");
+        createdPasswordBox.appendChild(makeMobileNode("strong", "", "One-time login password (shown once)"));
+        createdPasswordBox.appendChild(makeMobileNode("div", "spcboy-mobile-admin-code", data.createdLoginPassword));
+        const actions = makeMobileNode("div", "spcboy-mobile-admin-actions");
+        const copyPwBtn = makeMobileNode("button", "spcboy-mobile-btn-secondary", "Copy Password");
+        copyPwBtn.type = "button";
+        copyPwBtn.onclick = () => void copyMobileAdminText(data.createdLoginPassword, "Login password");
+        actions.appendChild(copyPwBtn);
+        createdPasswordBox.appendChild(actions);
+      } else if (!data.selfAccount?.hasLoginPassword) {
+        createdPasswordBox.classList.add("is-hidden");
+        createdPasswordBox.replaceChildren();
+      }
+    }
+
+    if (metricsGrid && data.server) {
+      metricsGrid.replaceChildren();
+      const metrics = [
+        ["Memory", `${data.server.memory} (${data.server.memoryPercent}%)`],
+        ["Disk", `${data.server.disk} (${data.server.diskPercent}%)`],
+        ["Load", data.server.load || "Unavailable"],
+        ["Uptime", data.server.uptime || "0d 0h"],
+      ];
+      for (const [label, value] of metrics) {
+        const box = makeMobileNode("div", "spcboy-mobile-admin-metric");
+        box.append(makeMobileNode("span", "", label), makeMobileNode("strong", "", value));
+        metricsGrid.appendChild(box);
+      }
+    }
+
+    if (loginsList) {
+      loginsList.replaceChildren();
+      const events = Array.isArray(data.recentLogins) ? data.recentLogins : [];
+      if (!events.length) {
+        loginsList.appendChild(makeMobileNode("p", "spcboy-mobile-empty", "No recent sign-in events."));
+      } else {
+        for (const ev of events) {
+          const item = makeMobileNode("div", "spcboy-mobile-admin-item");
+          const head = makeMobileNode("div", "spcboy-mobile-admin-item-head");
+          const ok = ev.eventType === "success";
+          head.append(
+            makeMobileNode("h4", "spcboy-mobile-admin-item-title", ev.username),
+            makeMobileNode("span", `spcboy-mobile-admin-pill ${ok ? "is-active" : "is-suspended"}`, ok ? "Success" : "Failed"),
+          );
+          item.append(head, makeMobileNode("small", "spcboy-mobile-dim", `${ev.occurredAt} · ${ev.ipAddress}`));
+          loginsList.appendChild(item);
+        }
+      }
+    }
+  }
+
+  async function loadMobileAdmin() {
+    const adminUrl = mobileScreenAdmin?.dataset?.adminUrl;
+    if (!adminUrl) return;
+    const statusBadge = document.querySelector("#spcboy-mobile-admin-status");
+    if (statusBadge) statusBadge.textContent = "Loading…";
+    try {
+      const response = await fetch(adminUrl, { credentials: "same-origin" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not load admin controls.");
+      renderMobileAdmin(data);
+    } catch (error) {
+      if (statusBadge) statusBadge.textContent = "Error";
+      showMobileToast(error.message || "Could not load admin controls.");
+    }
+  }
+
+  async function postMobileAdminAction(payload) {
+    const adminUrl = mobileScreenAdmin?.dataset?.adminUrl;
+    if (!adminUrl || mobileAdminBusy) return;
+    mobileAdminBusy = true;
+    const csrf = document.querySelector("#spcboy-csrf-form [name='csrfmiddlewaretoken']")?.value;
+    try {
+      const response = await fetch(adminUrl, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf || "" },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Admin action failed.");
+      renderMobileAdmin(data);
+      if (data.message) showMobileToast(data.message);
+    } catch (error) {
+      showMobileToast(error.message || "Admin action failed.");
+    } finally {
+      mobileAdminBusy = false;
+    }
+  }
+
+  document.querySelector("#spcboy-mobile-admin-save-settings")?.addEventListener("click", () => {
+    const aacBitrate = document.querySelector("#spcboy-mobile-admin-bitrate")?.value;
+    const sessionLimitMinutes = document.querySelector("#spcboy-mobile-admin-session-limit")?.value;
+    void postMobileAdminAction({ action: "save-site-settings", aacBitrate, sessionLimitMinutes });
+  });
+  document.querySelector("#spcboy-mobile-admin-create-invite")?.addEventListener("click", () => {
+    void postMobileAdminAction({ action: "create-invite" });
+  });
+  document.querySelector("#spcboy-mobile-admin-save-name")?.addEventListener("click", () => {
+    const displayName = document.querySelector("#spcboy-mobile-admin-display-name")?.value || "";
+    void postMobileAdminAction({ action: "update-display-name", displayName });
+  });
+  document.querySelector("#spcboy-mobile-admin-gen-password")?.addEventListener("click", () => {
+    void postMobileAdminAction({ action: "generate-login-password" });
+  });
+  document.querySelector("#spcboy-mobile-admin-revoke-password")?.addEventListener("click", () => {
+    void postMobileAdminAction({ action: "revoke-login-password" });
+  });
+  document.querySelector("#spcboy-mobile-admin-refresh")?.addEventListener("click", () => {
+    void loadMobileAdmin();
+  });
 
   const skipBtn = document.querySelector("#spcboy-mobile-faded-skip");
   if (skipBtn) {

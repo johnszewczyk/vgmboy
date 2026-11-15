@@ -25,6 +25,7 @@ urlpatterns = [
     path("spcboy/recents.json", views.spcboy_recents, name="spcboy_recents"),
     path("spcboy/now-playing.json", views.spcboy_now_playing, name="spcboy_now_playing"),
     path("spcboy/favorites.json", views.spcboy_favorites, name="spcboy_favorites"),
+    path("spcboy/admin.json", views.spcboy_admin, name="spcboy_admin"),
     path("audio/spcboy/<slug:track_id>/", views.spcboy_audio, name="spcboy_audio"),
     path("spcboy/stream-quota.json", views.spcboy_stream_quota, name="spcboy_stream_quota"),
     path("community/", RedirectView.as_view(pattern_name="playback_history", permanent=False), name="community"),

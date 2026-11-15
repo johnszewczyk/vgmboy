@@ -26,12 +26,12 @@
   <script src="{% static 'accounts/site-preferences.js' %}?v=20261031-profile-cloud-1" data-preferences-url="{% url 'spcboy_preferences' %}" data-site-global defer></script>
   <script src="{% static 'accounts/site-player.js' %}?v=20261115-v2" data-site-global defer></script>
   <script src="{% static 'accounts/site-favorites.js' %}?v=20261101-favorite-swipe-cue-1" data-site-global defer></script>
-  <script src="{% static 'accounts/site-navigation.js' %}?v=20261115-admin-nav-1" data-site-global defer></script>
+  <script src="{% static 'accounts/site-navigation.js' %}?v=20261104-sbo-cleanup-1" data-site-global defer></script>
   {% endif %}
   {% block extra_head %}{% endblock %}
   {% if request.user.is_authenticated %}<link rel="stylesheet" href="{% static 'accounts/player.css' %}?v=20261103-gallery-ux-1">{% endif %}
   <link rel="stylesheet" href="{% static 'accounts/sbonline.css' %}?v=20261114-v11">
-  <link rel="stylesheet" href="{% static 'accounts/sb-theme.css' %}?v=20261115-admin-ui-1">
+  <link rel="stylesheet" href="{% static 'accounts/sb-theme.css' %}?v=20261114-v11">
   <script src="{% static 'accounts/sb-interface.js' %}?v=20261114-v10" data-site-global defer></script>
 <link rel="stylesheet" href="{% static 'accounts/sb-presentation.css' %}?v=20261026-collections-1">
   <link rel="stylesheet" href="{% static 'accounts/sb-mobile.css' %}?v=20261114-v11" media="(max-width: 780px)">
@@ -218,6 +218,6 @@
   </footer>
   {% endif %}
   <footer class="site-foot">Private access · HTTPS only</footer>
-  <script src="{% static 'accounts/admin.js' %}?v=20261115-pjax-copy-1" data-site-global defer></script>
+  <script src="{% static 'accounts/admin.js' %}?v=20261031-shared-desktop-toolbar-1" data-site-global defer></script>
 </body>
 </html>
