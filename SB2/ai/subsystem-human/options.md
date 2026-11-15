@@ -1,8 +1,11 @@
 # Options
 
 - Options slide down over the main content from the Options toolbar button or
-  Command-comma (⌘,). Command-comma toggles the page; Escape, the visible Close
-  Options button, and clicking outside the page dismiss it.
+  Command-comma (⌘,). Entrance and dismissal use the UI Chrome > Animations
+  duration and easing; disabling selection motion or enabling the system's
+  reduced-motion preference makes the transition immediate. Command-comma
+  toggles the page; Escape, the visible Close Options button, and clicking
+  outside the page dismiss it.
 - Close Options is a square icon button using the standard straight-line X mark
   from SB2's toolbar icon set.
   The Options layer covers home controls and floating popovers while leaving

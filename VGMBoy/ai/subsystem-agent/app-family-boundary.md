@@ -2,8 +2,9 @@
 
 ## Scope
 
-VGMBoy owns the shared playback core, decoder integration, archive preparation, dependency staging,
-and scanner-facing inspection builds for the CocoaSpice, SB2, SBONLINE, ViewBoy,
+VGMBoy owns the shared playback core, decoder integration, archive preparation,
+dependency staging, and scanner-facing inspection builds for CocoaSpice, SB2,
+SBONLINE, ViewBoy, and ScanSong.
 
 ## Ownership
 

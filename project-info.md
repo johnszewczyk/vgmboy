@@ -27,9 +27,6 @@ history live in this repository.
   package and sideload release boundary. It translates SB2's pixel-style theme
   and native WebKit bridge to responsive mobile and tablet viewports without
   cloning legacy SBONLINE templates or mobile prototypes.
-  family subfolder. It uses CatalogReader for catalog access, FrontendCore for
-  favorites and queue policy, and VGMBoy for playback.
-
 ## Task Routing
 
 Select the smallest owner that matches the request and read only its route.

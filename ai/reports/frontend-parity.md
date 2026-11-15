@@ -3,6 +3,7 @@
 ## Rule
 
 Equivalent player behavior should use the same shared policy and VGMBoy command
+contract. CocoaSpice, SB2, and ViewBoy retain separate renderers, app
 identities, persistence keys, and host adapters; shared contracts do not promise
 pixel-identical UI. SPCBoyWK is retired and is not an active parity target.
 

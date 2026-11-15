@@ -1,9 +1,10 @@
 # FrontendCore
 
-`FrontendCore` contains UI-neutral services shared by CocoaSpice, SB2, ViewBoy,
-archive-cache identity and policy, cache leases, preferences, favorites and
-playlist identity, shared startup progress, playback queues, and native
-transport coordination. The package does not read or write the catalog,
+`FrontendCore` contains UI-neutral services shared by CocoaSpice, SB2, and
+ViewBoy. Retired SPCBoyWK source is archived outside the active tree. Its
+modules own archive-cache identity and policy, cache leases, preferences,
+favorites and playlist identity, shared startup progress, playback queues, and
+native transport coordination. The package does not read or write the catalog,
 prepare playback/export archive sources, decode audio, or render a frontend.
 
 `VGMBoyArchiveCore` owns archive/member validation, archive-tool execution,

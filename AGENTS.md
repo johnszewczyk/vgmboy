@@ -27,9 +27,10 @@ from the active tree and retained as a local ZIP under `LocalRecovery/`; Git
 history remains the source of record. Do not add features or list it as an
 active app. SB2 is the current SPCBOY frontend under development with its own
 package and release boundary. LaunchPad has separate entries for SB2, ViewBoy,
-published Markdown library and its viewer. Keep each frontend as a separate
-presentation client over the shared catalog, frontend, and playback packages;
-do not merge one skin into another.
+and VGMManDocs. CocoaSpice, SB2, and ViewBoy are the active player apps.
+VGMManDocs owns the published Markdown library and its viewer. Keep each
+frontend as a separate presentation client over the shared catalog, frontend,
+and playback packages; do not merge one skin into another.
 
 SBONLINE is the hosted SPCBOY web-player project; use `SBONLINE/AGENTS.md` for
 its route. VGMMan owns its production Django app, browser player, streaming
@@ -48,5 +49,3 @@ For a ViewBoy task, the active application and UI live in `ViewBoy/`; use its
 `LocalRecovery/ViewBoy/` contains historical archives only. ViewBoy's
 implementation and launch script are in `ViewBoy/` regardless of historical
 bridge names.
-
-does not use ViewBoy's native host or playback bridge.

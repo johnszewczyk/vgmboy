@@ -3,6 +3,7 @@
 Status: implementation and verification remain in progress. SB2 is the primary
 interface and the only frontend in the current regression-testing scope, per
 user direction. Finish the shared VGMBoy and FrontendCore work using SB2 before
+returning to ViewBoy and CocoaSpice. Earlier
 cross-frontend checkpoints are historical evidence, not current scope. Recheck
 paths, working-tree changes, and findings before continuing.
 
@@ -41,6 +42,7 @@ The remaining work is grouped by the current SB2-first scope:
 6. After the shared module and SB2 gate are complete, return to ViewBoy and
    CocoaSpice for adapter migration and compatibility/regression checks. Review
    direct VGMBoy clients and any affected hosted integration before declaring
+   shared API compatibility.
 7. Refresh owner documentation, run the applicable package and documentation
    checks, record fixture and release evidence, and commit/push task-owned work.
 
@@ -1827,8 +1829,9 @@ frontend adapters translate user intent and display authoritative results.
 | App-specific controls, navigation, queue policy and presentation | SB2, ViewBoy, CocoaSpice |
 | Archive and UAC interpretation | Existing owning components; preserve their contracts |
 
-deprecated and excluded from this plan at the user’s direction. Investigate hosted SBONLINE integration before
-changing a shared contract it consumes; do not alter its separately owned
+Review direct PlaybackController clients, including VGMBoy itself. Investigate
+hosted SBONLINE integration before changing a shared contract it consumes; do
+not alter its separately owned
 production deployment as part of this plan without an explicit cross-project
 scope. Avoid introducing a second playback engine or frontend-specific transport
 implementation.
@@ -2122,6 +2125,7 @@ Migrate SB2, ViewBoy and CocoaSpice in small reviewable steps to the shared
 transaction and authoritative status, removing duplicated transport decisions
 only when their behavior is covered. Verify ViewBoy's renderer generation
 handling explicitly. Check direct VGMBoy callers and affected hosted integration
+for API compatibility. Preserve app-specific options, selection,
 archives, queue, navigation and persistence; update implemented current-state
 subsystem documentation with the final behavior.
 
@@ -2141,6 +2145,7 @@ identity, formats, app build and observed results:
   subsecond and zero duration, loops/fades and in-memory/archive sources.
 - Package and renderer checks for touched owners; `scripts/verify-family.sh`
   covers several family packages but does **not** cover SB2. Select SB2 checks
+  explicitly. SB2's `ai/AGENTS.md` says not to add
   tests or run test suites unless requested: obtain authorization through the
   implementation request before doing either. CocoaSpice's instructions prefer
   human testing unless a quick sanity check suffices.
