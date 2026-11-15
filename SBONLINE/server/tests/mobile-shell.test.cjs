@@ -217,3 +217,19 @@ test('mobile library track selection plays the targeted song even when view is f
   assert.match(spcboyJs, /makeTrackRow\(track,\s*entry\.tracks\.length,\s*\{\s*source:\s*"album",\s*group:\s*entry\s*\}\)/);
   assert.match(spcboyJs, /selectTrack\(track,\s*true,\s*playbackOptions \|\| \{\}\)/);
 });
+
+test('mobile shell replaces track length with favorite toggles and renames tempo to Slow Play', () => {
+  const mobileShellHtml = readFileSync(`${__dirname}/../templates/accounts/partials/spcboy_mobile_shell.html`, 'utf8');
+  assert.match(mobileShellHtml, /<strong>Slow Play<\/strong>/);
+  assert.doesNotMatch(mobileShellHtml, /Native Format Speed/);
+
+  assert.doesNotMatch(spcboyJs, /spcboy-mobile-track-len/);
+  assert.match(spcboyJs, /function createMobileTrackFavoriteButton\(/);
+  assert.match(spcboyJs, /button\.dataset\.favoriteKind = "track"/);
+  assert.match(spcboyJs, /use href="#icon-star"/);
+  assert.match(spcboyJs, /Could not load tracks · Tap to retry/);
+  assert.match(spcboyJs, /hideMobileLoadingIndicator\(\);\s*showMobileToast\("Could not load album tracks\."\);/);
+
+  assert.match(mobileCss, /\.spcboy-mobile-track-item\b/);
+  assert.match(mobileCss, /#spcboy-mobile-app \.spcboy-mobile-track-favorite/);
+});

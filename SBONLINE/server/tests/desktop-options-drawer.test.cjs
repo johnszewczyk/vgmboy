@@ -36,4 +36,10 @@ test('site-player syncs segmented OFF/1/2/3 EQ toolbar and percentage volume bad
   assert.match(sitePlayerJs, /const isActive = isOff \? !equalizerEnabled : \(equalizerEnabled && Number\(mode\) === selectedEqualizerPresetIndex\);/);
   assert.match(sitePlayerJs, /if \(!equalizerEnabled\) setEqualizerEnabled\(true\);/);
   assert.match(sitePlayerJs, /animateEqualizerBandSliders/);
+
+  const catalogWorkspaceHtml = readFileSync(`${serverDir}/templates/accounts/partials/spcboy_catalog_workspace.html`, 'utf8');
+  assert.match(baseHtml, /<h3 id="spcboy-play-speed-heading">Slow Play<\/h3>/);
+  assert.match(baseHtml, /<strong>Slow Play<\/strong>/);
+  assert.match(catalogWorkspaceHtml, /aria-label="Slow Play disabled"/);
+  assert.match(sitePlayerJs, /updateBooleanSettingsToggle\(speedEnabledToggle,\s*playbackSpeedEnabled,\s*"Slow Play"\)/);
 });

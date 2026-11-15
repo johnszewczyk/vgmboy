@@ -544,3 +544,73 @@ test('ended listener completes pending faded skip to targetTrack instead of skip
   assert.equal(finished[0].request, req);
   assert.equal(finished[0].opts.step, undefined);
 });
+
+test('startAudioPlayback resolves immediately when audioContext.resume hangs in WebKit', async () => {
+  const pendingResume = new Promise(() => {});
+  const { context, calls } = fixture({
+    audioContext: { state: 'suspended', resume: () => pendingResume },
+  });
+  const ok = await context.startAudioPlayback();
+  assert.equal(ok, true);
+  assert.deepEqual(calls, ['play']);
+});
+
+test('iPhone/ManagedMediaSource falls back to server ?eq= and restarts stream across preset changes', async () => {
+  const clientGraphStart = source.indexOf('  function supportsClientAudioGraph()');
+  const clientGraphEnd = source.indexOf('  function updateEqualizerGraph()');
+  const audioUrlBlock = source.slice(source.indexOf('  function audioURL('), source.indexOf('  function nativeFormatPlaybackRate('));
+  const iosContext = vm.createContext({
+    URLSearchParams,
+    dock: { dataset: { audioUrl: '/audio/spcboy/TRACK_ID/', pageLoadToken: 'tok' } },
+    currentPlaybackId: 'pb1',
+    playbackSpeedEnabled: false,
+    playbackRateFraction: '1/1',
+    spcFadeSeconds: 5,
+    longPlayEnabled: false,
+    longPlaySeconds: 180,
+    equalizerEnabled: true,
+    equalizerBandGains: [6, 0, 0, 0, 0, 0, 0, 0, 0, -3],
+    volumeStep: 10,
+    equalizerGraphFailed: false,
+    AudioContextClass: function AudioContextMock() {},
+    window: { ManagedMediaSource: function ManagedMediaSourceMock() {} },
+    navigator: { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X)' },
+    document: {},
+    testAudioVolumeSupport: () => false,
+  });
+  vm.runInContext(`${source.slice(clientGraphStart, clientGraphEnd)}\n${audioUrlBlock}`, iosContext);
+  assert.equal(iosContext.supportsClientAudioGraph(), false);
+  const iosUrl = iosContext.audioURL({ id: 'guile' }, 0);
+  assert.equal(iosUrl.includes('eq=6.0'), true);
+  assert.equal(iosUrl.includes('volume=10'), true);
+
+  let restarts = 0;
+  const presetContext = vm.createContext({
+    equalizerPresetApplyButtons: [],
+    equalizerPresetSaveButtons: [],
+    equalizerPresets: [
+      { name: 'Preset 1', gains: Array(10).fill(3) },
+      { name: 'Preset 2', gains: Array(10).fill(-2) },
+      null,
+    ],
+    equalizerBandGains: Array(10).fill(3),
+    equalizerFrequencies: Array(10).fill(100),
+    equalizerEnabled: true,
+    selectedEqualizerPresetIndex: 0,
+    currentTrack: { id: 'guile' },
+    equalizerPresetStatus: { textContent: '' },
+    storage: { set() {} },
+    saveEqualizerGains() {},
+    updateEqualizerGraph() {},
+    ensureEqualizerGraph: () => false,
+    sourcePositionSeconds: () => 42,
+    restartCurrentStream(pos) { restarts += 1; assert.equal(pos, 42); },
+    syncEqualizerPresetControls() {},
+    setEqualizerEnabled: async () => true,
+  });
+  const applyStart = source.indexOf('  async function applyEqualizerPreset');
+  vm.runInContext(source.slice(applyStart, source.indexOf('  queueToggle.addEventListener(')), presetContext);
+  await presetContext.applyEqualizerPreset(1);
+  assert.equal(restarts, 1);
+  assert.deepEqual(Array.from(presetContext.equalizerBandGains), Array(10).fill(-2));
+});

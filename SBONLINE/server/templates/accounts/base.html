@@ -24,7 +24,7 @@
   <script src="{% static 'accounts/sb-presentation.js' %}?v=20261026-collections-1" data-site-global defer></script>
   <script src="{% static 'accounts/aac-stream.js' %}?v=20261107-aac-adts-1" data-site-global defer></script>
   <script src="{% static 'accounts/site-preferences.js' %}?v=20261031-profile-cloud-1" data-preferences-url="{% url 'spcboy_preferences' %}" data-site-global defer></script>
-  <script src="{% static 'accounts/site-player.js' %}?v=20261114-v13" data-site-global defer></script>
+  <script src="{% static 'accounts/site-player.js' %}?v=20261115-v1" data-site-global defer></script>
   <script src="{% static 'accounts/site-favorites.js' %}?v=20261101-favorite-swipe-cue-1" data-site-global defer></script>
   <script src="{% static 'accounts/site-navigation.js' %}?v=20261104-sbo-cleanup-1" data-site-global defer></script>
   {% endif %}
@@ -140,9 +140,9 @@
               <div class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Faded Skip</strong><span>Fade on each track change.</span></span><button class="spcboy-long-play-toggle spcboy-boolean-toggle" id="spcboy-faded-skip" type="button" role="switch" aria-checked="false" aria-label="Faded Skip · No">No</button></div>
             </section>
             <section class="spcboy-settings-group" aria-labelledby="spcboy-play-speed-heading">
-              <h3 id="spcboy-play-speed-heading">Play Speed</h3>
-              <div class="spcboy-settings-field-row spcboy-speed-field" id="spcboy-speed-setting"><span class="spcboy-settings-copy"><strong>Native format speed</strong><span>Source decoder rate.</span></span><button class="spcboy-long-play-toggle spcboy-boolean-toggle" id="spcboy-speed-enabled" type="button" role="switch" aria-checked="false" aria-label="Native format speed · No">No</button></div>
-              <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Speed fraction</strong><span id="spcboy-speed-help">Fractions down to 1/64 (64th-note steps), from 1/2× to 2×.</span><span class="spcboy-setting-error" id="spcboy-speed-error" aria-live="polite"></span></span><div class="spcboy-speed-controls"><input class="spcboy-settings-input" id="spcboy-speed" type="text" inputmode="text" size="6" maxlength="15" value="1/1" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Native format speed fraction" aria-describedby="spcboy-speed-help spcboy-speed-error"></div></label>
+              <h3 id="spcboy-play-speed-heading">Slow Play</h3>
+              <div class="spcboy-settings-field-row spcboy-speed-field" id="spcboy-speed-setting"><span class="spcboy-settings-copy"><strong>Slow Play</strong><span>Source decoder rate.</span></span><button class="spcboy-long-play-toggle spcboy-boolean-toggle" id="spcboy-speed-enabled" type="button" role="switch" aria-checked="false" aria-label="Slow Play · No">No</button></div>
+              <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Speed fraction</strong><span id="spcboy-speed-help">Fractions down to 1/64 (64th-note steps), from 1/2× to 2×.</span><span class="spcboy-setting-error" id="spcboy-speed-error" aria-live="polite"></span></span><div class="spcboy-speed-controls"><input class="spcboy-settings-input" id="spcboy-speed" type="text" inputmode="text" size="6" maxlength="15" value="1/1" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Slow Play speed fraction" aria-describedby="spcboy-speed-help spcboy-speed-error"></div></label>
             </section>
           </section>
           <section class="spcboy-settings-page" id="spcboy-settings-page-audio" role="tabpanel" tabindex="0" data-settings-page="audio" aria-labelledby="spcboy-mobile-tab-audio" hidden>

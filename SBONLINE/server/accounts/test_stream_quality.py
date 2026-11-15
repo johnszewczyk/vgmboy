@@ -37,9 +37,11 @@ class StreamQualityTests(TestCase):
         from .models import MonthlyUsage
         from .usage import claim_audio_stream_bytes, MONTHLY_AUDIO_STREAM_LIMIT_BYTES, _month_start
         user = get_user_model().objects.create_user(username="quota")
-        self.assertEqual(claim_audio_stream_bytes(user.pk,4096),4096)
-        usage = MonthlyUsage.objects.get(user=user,period=_month_start())
-        usage.audio_bytes = MONTHLY_AUDIO_STREAM_LIMIT_BYTES-100
+        self.assertEqual(claim_audio_stream_bytes(user.pk, 32768), 32768)
+        with self.assertNumQueries(1):
+            self.assertEqual(claim_audio_stream_bytes(user.pk, 32768), 32768)
+        usage = MonthlyUsage.objects.get(user=user, period=_month_start())
+        usage.audio_bytes = MONTHLY_AUDIO_STREAM_LIMIT_BYTES - 100
         usage.save()
-        self.assertEqual(claim_audio_stream_bytes(user.pk,4096),100)
-        self.assertEqual(claim_audio_stream_bytes(user.pk,4096),0)
+        self.assertEqual(claim_audio_stream_bytes(user.pk, 32768), 100)
+        self.assertEqual(claim_audio_stream_bytes(user.pk, 32768), 0)

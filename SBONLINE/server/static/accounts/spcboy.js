@@ -287,6 +287,7 @@
     if (page.isConnected) {
       favoritesChangedExternally = false;
       if (view === "favorites") loadFavoritePlaylist();
+      else if (!isDesktop()) loadFavoritePlaylist({ allPages: true }).then(() => { if (!isDesktop()) renderMobileFavorites(); }).catch(() => {});
       applyFilters();
     }
   });
@@ -1145,6 +1146,7 @@
       .filter(Boolean);
     buttons.push(...playlistContent.querySelectorAll(`.spcboy-track-row[data-id="${CSS.escape(id)}"] .spcboy-favorite`));
     buttons.push(...cardList.querySelectorAll(`.spcboy-media-card[data-id="${CSS.escape(id)}"] .spcboy-media-card-favorite`));
+    buttons.push(...document.querySelectorAll(`#spcboy-mobile-app .spcboy-mobile-track-favorite[data-favorite-id="${CSS.escape(id)}"]`));
     if (button && !buttons.includes(button)) buttons.push(button);
     for (const target of buttons) {
       const card = target.closest(".spcboy-media-card");
@@ -2552,9 +2554,20 @@
               loadingEl.className = "spcboy-mobile-track";
               loadingEl.textContent = "Loading tracks…";
               trackItems.append(loadingEl);
-              ensureAlbumTracks(gameEntry).then(() => {
+              ensureAlbumTracks(gameEntry).then((tracks) => {
                 if (renderToken !== mobileLibraryRenderToken || !trackItems.isConnected) return;
                 trackItems.replaceChildren();
+                if (!tracks.length && gameEntry.loadFailed) {
+                  const retryBtn = document.createElement("button");
+                  retryBtn.type = "button";
+                  retryBtn.className = "spcboy-mobile-track spcboy-mobile-track-retry";
+                  retryBtn.textContent = "Could not load tracks · Tap to retry";
+                  retryBtn.addEventListener("click", () => {
+                    ensureAlbumTracks(gameEntry, { retry: true }).then(() => renderMobileLibrary());
+                  });
+                  trackItems.append(retryBtn);
+                  return;
+                }
                 renderInlineTrackList(gameEntry, trackItems, query);
               });
             }
@@ -2584,23 +2597,82 @@
     tree.replaceChildren(frag);
   }
 
+  function createMobileTrackFavoriteButton(track) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "site-favorite-toggle spcboy-mobile-track-favorite";
+    button.dataset.siteFavoriteToggle = "";
+    button.dataset.favoriteKind = "track";
+    button.dataset.favoriteId = track.id;
+    button.dataset.favoriteTitle = track.title || track.id;
+    button.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-star"/></svg>';
+    setTrackFavoriteButton(button, favorites.has(track.id));
+    return button;
+  }
+
+  function createMobileTrackRowItem(track, idx, { detail = false, subtitle = null, isPlaying = false, onPlay } = {}) {
+    const row = document.createElement("li");
+    row.className = "spcboy-mobile-track-item" + (isPlaying ? " is-playing" : "");
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "spcboy-mobile-track-row"
+      + (detail ? " spcboy-mobile-detail-track-row" : " spcboy-mobile-recent-track-row")
+      + (isPlaying ? " is-playing" : "");
+    btn.dataset.trackId = track.id;
+
+    const num = document.createElement("span");
+    num.className = detail ? "spcboy-mobile-track-num spcboy-mobile-detail-number" : "spcboy-mobile-track-num";
+    num.textContent = String(idx + 1).padStart(2, "0");
+
+    if (subtitle !== null && !detail) {
+      const info = document.createElement("div");
+      info.className = "spcboy-mobile-recent-info";
+      const title = document.createElement("span");
+      title.className = "spcboy-mobile-track-title";
+      title.textContent = track.title || track.id;
+      const meta = document.createElement("span");
+      meta.className = "spcboy-mobile-recent-meta";
+      meta.textContent = subtitle;
+      info.append(title, meta);
+      btn.append(num, info);
+    } else {
+      const title = document.createElement("span");
+      title.className = detail ? "spcboy-mobile-track-title spcboy-mobile-detail-title" : "spcboy-mobile-track-title";
+      title.textContent = track.title || track.id;
+      btn.append(num, title);
+    }
+
+    btn.onclick = (e) => {
+      e.preventDefault();
+      onPlay?.(btn, num);
+    };
+
+    row.append(btn, createMobileTrackFavoriteButton(track));
+    return row;
+  }
+
   function renderInlineTrackList(gameEntry, container, query) {
     const activeTrack = window.SitePlayer?.getCurrentTrack?.() || currentTrack;
     gameEntry.tracks.forEach((track, idx) => {
       if (query && !track.title.toLowerCase().includes(query) && !gameEntry.gameName.toLowerCase().includes(query)) return;
+      const row = document.createElement("div");
+      row.className = "spcboy-mobile-inline-track-row" + (activeTrack?.id === track.id ? " is-playing" : "");
       const trackBtn = document.createElement("button");
       trackBtn.type = "button";
       trackBtn.className = "spcboy-mobile-track" + (activeTrack?.id === track.id ? " is-playing" : "");
       const num = document.createElement("span");
       num.textContent = String(idx + 1).padStart(2, "0");
       const titleSpan = document.createElement("span");
+      titleSpan.className = "spcboy-mobile-track-title";
       titleSpan.textContent = track.title || track.id;
       trackBtn.append(num, titleSpan);
       trackBtn.addEventListener("click", () => {
         selectTrack(track, true, { source: "album", group: gameEntry, tracks: gameEntry.tracks });
         setMobileAppPage("playing");
       });
-      container.append(trackBtn);
+      row.append(trackBtn, createMobileTrackFavoriteButton(track));
+      container.append(row);
     });
   }
 
@@ -2707,10 +2779,13 @@
     if (playAlbumBtn) {
       playAlbumBtn.onclick = async () => {
         showMobileLoadingIndicator(`Loading ${entry.gameName}…`);
-        const tracks = await ensureAlbumTracks(entry);
+        const tracks = await ensureAlbumTracks(entry, { retry: entry.loadFailed });
         if (tracks.length) {
           window.SitePlayer?.playPlaylist?.(tracks, { startTrackId: tracks[0]?.id, toggle: false });
           setMobileAppPage("playing");
+        } else {
+          hideMobileLoadingIndicator();
+          showMobileToast("Could not load album tracks.");
         }
       };
     }
@@ -2721,37 +2796,37 @@
         statusEl.textContent = "Loading tracks…";
         statusEl.classList.remove("is-hidden");
       }
-      ensureAlbumTracks(entry).then((tracks) => {
+      ensureAlbumTracks(entry, { retry: entry.loadFailed }).then((tracks) => {
         if (mobileDetailEntry !== entry) return;
-        if (statusEl) statusEl.classList.add("is-hidden");
+        if (!tracks.length && entry.loadFailed) {
+          if (statusEl) {
+            statusEl.textContent = "Failed to load album tracks. Tap to retry.";
+            statusEl.classList.remove("is-hidden");
+            statusEl.onclick = () => {
+              statusEl.onclick = null;
+              openMobileAlbumDetail(entry, returnPage);
+            };
+          }
+          return;
+        }
+        if (statusEl) {
+          statusEl.onclick = null;
+          statusEl.classList.add("is-hidden");
+        }
         const activeTrack = window.SitePlayer?.getCurrentTrack?.() || currentTrack;
         const frag = document.createDocumentFragment();
         tracks.forEach((track, idx) => {
-          const row = document.createElement("li");
-          const btn = document.createElement("button");
-          btn.type = "button";
           const isPlaying = activeTrack?.id === track.id;
-          btn.className = "spcboy-mobile-track-row spcboy-mobile-detail-track-row" + (isPlaying ? " is-playing" : "");
-          const num = document.createElement("span");
-          num.className = "spcboy-mobile-track-num spcboy-mobile-detail-number";
-          num.textContent = String(idx + 1).padStart(2, "0");
-          const title = document.createElement("span");
-          title.className = "spcboy-mobile-track-title spcboy-mobile-detail-title";
-          title.textContent = track.title || track.id;
-          const len = document.createElement("span");
-          len.className = "spcboy-mobile-track-len spcboy-mobile-detail-length";
-          len.textContent = formatMobileTime(track.durationSeconds || window.SitePlayer?.getDuration?.(track));
-          btn.append(num, title, len);
-          btn.dataset.trackId = track.id;
-          btn.onclick = (e) => {
-            e.preventDefault();
-            btn.classList.add("is-loading");
-            showMobileLoadingIndicator(track.title || "Loading track…");
-            selectTrack(track, true, { source: "album", group: entry });
-            setMobileAppPage("playing");
-          };
-          row.append(btn);
-          frag.append(row);
+          frag.append(createMobileTrackRowItem(track, idx, {
+            detail: true,
+            isPlaying,
+            onPlay: (btn) => {
+              btn.classList.add("is-loading");
+              showMobileLoadingIndicator(track.title || "Loading track…");
+              selectTrack(track, true, { source: "album", group: entry });
+              setMobileAppPage("playing");
+            },
+          }));
         });
         tracklistEl.replaceChildren(frag);
       }).catch(() => {
@@ -2932,6 +3007,7 @@
       for (const row of rows) {
         const isPlaying = row.dataset.trackId === activeTrack.id;
         row.classList.toggle("is-playing", isPlaying);
+        row.closest(".spcboy-mobile-track-item")?.classList.toggle("is-playing", isPlaying);
         if (isPlaying) row.classList.remove("is-loading");
       }
       return;
@@ -2941,35 +3017,36 @@
 
     if (group) {
       if (countEl) countEl.textContent = `${group.trackCount || group.tracks?.length || ""} tracks`;
-      ensureAlbumTracks(group).then((tracks) => {
+      ensureAlbumTracks(group, { retry: group.loadFailed }).then((tracks) => {
         if (currentRenderedNowAlbumKey !== albumKey) return;
-        if (statusEl) statusEl.classList.add("is-hidden");
+        if (!tracks.length && group.loadFailed) {
+          currentRenderedNowAlbumKey = null;
+          if (statusEl) {
+            statusEl.textContent = "Could not load album tracks. Tap to retry.";
+            statusEl.classList.remove("is-hidden");
+            statusEl.onclick = () => {
+              statusEl.onclick = null;
+              renderMobileNowAlbumTracks(activeTrack);
+            };
+          }
+          return;
+        }
+        if (statusEl) {
+          statusEl.onclick = null;
+          statusEl.classList.add("is-hidden");
+        }
         listEl.replaceChildren();
         tracks.forEach((track, idx) => {
-          const row = document.createElement("li");
-          const btn = document.createElement("button");
-          btn.type = "button";
           const isPlaying = track.id === activeTrack.id;
-          btn.className = "spcboy-mobile-track-row spcboy-mobile-detail-track-row" + (isPlaying ? " is-playing" : "");
-          btn.dataset.trackId = track.id;
-          const num = document.createElement("span");
-          num.className = "spcboy-mobile-track-num spcboy-mobile-detail-number";
-          num.textContent = String(idx + 1).padStart(2, "0");
-          const title = document.createElement("span");
-          title.className = "spcboy-mobile-track-title spcboy-mobile-detail-title";
-          title.textContent = track.title || track.id;
-          const len = document.createElement("span");
-          len.className = "spcboy-mobile-track-len spcboy-mobile-detail-length";
-          len.textContent = formatMobileTime(track.durationSeconds || window.SitePlayer?.getDuration?.(track));
-          btn.append(num, title, len);
-          btn.onclick = (e) => {
-            e.preventDefault();
-            btn.classList.add("is-loading");
-            showMobileLoadingIndicator(track.title || "Loading track…");
-            selectTrack(track, true, { source: "album", group });
-          };
-          row.append(btn);
-          listEl.append(row);
+          listEl.append(createMobileTrackRowItem(track, idx, {
+            detail: true,
+            isPlaying,
+            onPlay: (btn) => {
+              btn.classList.add("is-loading");
+              showMobileLoadingIndicator(track.title || "Loading track…");
+              selectTrack(track, true, { source: "album", group, tracks });
+            },
+          }));
         });
       }).catch(() => {
         if (statusEl) {
@@ -2984,30 +3061,16 @@
     if (countEl) countEl.textContent = `${queueTracks.length} tracks`;
     listEl.replaceChildren();
     queueTracks.forEach((track, idx) => {
-      const row = document.createElement("li");
-      const btn = document.createElement("button");
-      btn.type = "button";
       const isPlaying = track.id === activeTrack.id;
-      btn.className = "spcboy-mobile-track-row spcboy-mobile-detail-track-row" + (isPlaying ? " is-playing" : "");
-      btn.dataset.trackId = track.id;
-      const num = document.createElement("span");
-      num.className = "spcboy-mobile-track-num spcboy-mobile-detail-number";
-      num.textContent = String(idx + 1).padStart(2, "0");
-      const title = document.createElement("span");
-      title.className = "spcboy-mobile-track-title spcboy-mobile-detail-title";
-      title.textContent = track.title || track.id;
-      const len = document.createElement("span");
-      len.className = "spcboy-mobile-track-len spcboy-mobile-detail-length";
-      len.textContent = formatMobileTime(track.durationSeconds || window.SitePlayer?.getDuration?.(track));
-      btn.append(num, title, len);
-      btn.onclick = (e) => {
-        e.preventDefault();
-        btn.classList.add("is-loading");
-        showMobileLoadingIndicator(track.title || "Loading track…");
-        selectTrack(track, true, { source: "queue", tracks: queueTracks });
-      };
-      row.append(btn);
-      listEl.append(row);
+      listEl.append(createMobileTrackRowItem(track, idx, {
+        detail: true,
+        isPlaying,
+        onPlay: (btn) => {
+          btn.classList.add("is-loading");
+          showMobileLoadingIndicator(track.title || "Loading track…");
+          selectTrack(track, true, { source: "queue", tracks: queueTracks });
+        },
+      }));
     });
   }
 
@@ -3060,43 +3123,18 @@
     const activeTrack = currentTrack || window.SitePlayer?.getCurrentTrack?.();
 
     tracks.forEach((track, idx) => {
-      const row = document.createElement("li");
-      const btn = document.createElement("button");
-      btn.type = "button";
       const isPlaying = Boolean(activeTrack && track.id === activeTrack.id);
-      btn.className = "spcboy-mobile-track-row spcboy-mobile-recent-track-row" + (isPlaying ? " is-playing" : "");
-      btn.dataset.trackId = track.id;
-
-      const num = document.createElement("span");
-      num.className = "spcboy-mobile-track-num";
-      num.textContent = String(idx + 1).padStart(2, "0");
-
-      const info = document.createElement("div");
-      info.className = "spcboy-mobile-recent-info";
-
-      const title = document.createElement("span");
-      title.className = "spcboy-mobile-track-title";
-      title.textContent = track.title || track.id;
-
-      const meta = document.createElement("span");
-      meta.className = "spcboy-mobile-recent-meta";
-      meta.textContent = `${track.game || "Unknown Game"}${track.timestamp ? " · " + track.timestamp : ""}`;
-
-      info.append(title, meta);
-
-      const len = document.createElement("span");
-      len.className = "spcboy-mobile-track-len";
-      len.textContent = formatMobileTime(track.durationSeconds || window.SitePlayer?.getDuration?.(track));
-
-      btn.append(num, info, len);
-      btn.onclick = (e) => {
-        e.preventDefault();
-        btn.classList.add("is-loading");
-        showMobileLoadingIndicator(track.title || "Loading track…");
-        selectTrack(track, true, { source: "recent", tracks });
-      };
-      row.append(btn);
-      listEl.append(row);
+      const subtitle = `${track.game || "Unknown Game"}${track.timestamp ? " · " + track.timestamp : ""}`;
+      listEl.append(createMobileTrackRowItem(track, idx, {
+        detail: false,
+        subtitle,
+        isPlaying,
+        onPlay: (btn) => {
+          btn.classList.add("is-loading");
+          showMobileLoadingIndicator(track.title || "Loading track…");
+          selectTrack(track, true, { source: "recent", tracks });
+        },
+      }));
     });
 
     if (moreBtn) {
@@ -3155,50 +3193,24 @@
     const activeTrack = currentTrack || window.SitePlayer?.getCurrentTrack?.();
 
     tracks.forEach((track, idx) => {
-      const row = document.createElement("li");
-      const btn = document.createElement("button");
-      btn.type = "button";
       const isPlaying = Boolean(activeTrack && track.id === activeTrack.id);
-      btn.className = "spcboy-mobile-track-row spcboy-mobile-recent-track-row" + (isPlaying ? " is-playing" : "");
-      btn.dataset.trackId = track.id;
-
-      const num = document.createElement("span");
-      num.className = "spcboy-mobile-track-num";
-      num.textContent = String(idx + 1).padStart(2, "0");
-
-      const info = document.createElement("div");
-      info.className = "spcboy-mobile-recent-info";
-
-      const title = document.createElement("span");
-      title.className = "spcboy-mobile-track-title";
-      title.textContent = track.title || track.id;
-
-      const meta = document.createElement("span");
-      meta.className = "spcboy-mobile-recent-meta";
-      const metaParts = [track.game || track.gameTitle, track.console || track.system].filter(Boolean);
-      meta.textContent = metaParts.join(" · ");
-
-      info.append(title, meta);
-
-      const len = document.createElement("span");
-      len.className = "spcboy-mobile-track-len";
-      len.textContent = formatMobileTime(track.durationSeconds || window.SitePlayer?.getDuration?.(track));
-
-      btn.append(num, info, len);
-      btn.onclick = (e) => {
-        e.preventDefault();
-        btn.classList.add("is-loading");
-        num.textContent = "⏳";
-        showMobileLoadingIndicator(track.title || "Loading track…");
-        window.SitePlayer?.playPlaylist(tracks, {
-          startTrackId: track.id,
-          startTrack: track,
-          startIndex: idx,
-          toggle: false,
-        });
-      };
-      row.append(btn);
-      frag.append(row);
+      const subtitle = [track.game || track.gameTitle, track.console || track.system].filter(Boolean).join(" · ");
+      frag.append(createMobileTrackRowItem(track, idx, {
+        detail: false,
+        subtitle,
+        isPlaying,
+        onPlay: (btn, num) => {
+          btn.classList.add("is-loading");
+          num.textContent = "⏳";
+          showMobileLoadingIndicator(track.title || "Loading track…");
+          window.SitePlayer?.playPlaylist(tracks, {
+            startTrackId: track.id,
+            startTrack: track,
+            startIndex: idx,
+            toggle: false,
+          });
+        },
+      }));
     });
 
     listEl.replaceChildren(frag);
@@ -3363,7 +3375,6 @@
           duration: 240,
           onComplete: async () => {
             await window.SitePlayer?.applyEqualizerPreset?.(presetIdx);
-            targetGains.forEach((g, i) => window.SitePlayer?.setEqualizerBandGain?.(i, g));
             updateMobileEqToolbar(presetIdx);
             showMobileToast(preset?.saved ? `Preset ${presetIdx + 1} loaded` : `Preset ${presetIdx + 1} (Flat)`);
           },

@@ -253,31 +253,24 @@
       const output = document.querySelector(`[data-equalizer-value="${index}"]`);
       if (output) output.textContent = formatEqualizerGain(gain);
     });
-    if (!AudioContextClass || equalizerGraphFailed) {
-      if (!equalizerGraphFailed) equalizerError.textContent = "Equalizer is not supported by this browser.";
-      equalizerToggle.disabled = true;
-      equalizerBandInputs.forEach((input) => { input.disabled = true; });
-      equalizerResetButton.disabled = true;
-    }
   }
   function syncEqualizerPresetControls() {
-    const eqUnavailable = !AudioContextClass || equalizerGraphFailed;
     equalizerPresetApplyButtons.forEach((button) => {
       const index = Number(button.dataset.equalizerPresetApply);
       const saved = Boolean(equalizerPresets[index]);
-      button.disabled = !saved || eqUnavailable;
+      button.disabled = !saved;
       button.setAttribute("aria-label", `${button.textContent.trim()}${saved ? ", saved" : ", empty"}`);
       const state = document.querySelector(`[data-equalizer-preset-state="${index}"]`);
       if (state) state.textContent = saved ? "Saved" : "Empty";
     });
-    equalizerPresetSaveButtons.forEach((button) => { button.disabled = eqUnavailable; });
+    equalizerPresetSaveButtons.forEach((button) => { button.disabled = false; });
     equalizerModeButtons.forEach((button) => {
       const mode = button.dataset.equalizerMode;
       const isOff = mode === "off";
       const isActive = isOff ? !equalizerEnabled : (equalizerEnabled && Number(mode) === selectedEqualizerPresetIndex);
       button.classList.toggle("is-active", isActive);
       button.setAttribute("aria-pressed", String(isActive));
-      button.disabled = eqUnavailable;
+      button.disabled = false;
     });
     equalizerMobileProfileButtons.forEach((button) => {
       const index = Number(button.dataset.equalizerMobileProfile);
@@ -290,26 +283,45 @@
       if (state) state.textContent = saved ? "Saved" : "Empty";
     });
     if (equalizerMobileSaveButton) {
-      equalizerMobileSaveButton.disabled = eqUnavailable;
+      equalizerMobileSaveButton.disabled = false;
       equalizerMobileSaveButton.textContent = `Save to Preset ${selectedEqualizerPresetIndex + 1}`;
     }
+  }
+  function supportsClientAudioGraph() {
+    if (!AudioContextClass || equalizerGraphFailed) return false;
+    if (typeof window !== "undefined") {
+      if (!window.MediaSource && Boolean(window.ManagedMediaSource)) return false;
+      if (typeof navigator !== "undefined" && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1))) {
+        return false;
+      }
+    }
+    if (typeof document !== "undefined" && typeof testAudioVolumeSupport === "function" && !testAudioVolumeSupport()) {
+      return false;
+    }
+    return true;
   }
   function updateEqualizerGraph() {
     if (!equalizerGraphReady) return;
     const immediate = arguments[0]?.immediate === true;
     const smoothing = immediate ? 0.001 : 0.035;
+    const now = audioContext.currentTime;
     const activeGains = equalizerEnabled ? equalizerBandGains : equalizerBandGains.map(() => 0);
     activeGains.forEach((gain, index) => {
       const parameter = equalizerFilters[index]?.gain;
       if (!parameter) return;
-      parameter.setTargetAtTime(gain, audioContext.currentTime, smoothing);
+      parameter.cancelScheduledValues?.(now);
+      parameter.setTargetAtTime(gain, now, smoothing);
     });
     // Baseline output level is unattenuated; live Web Audio EQ keeps playback continuous.
-    equalizerOutput.gain.setTargetAtTime(volumeStep / 20, audioContext.currentTime, smoothing);
+    equalizerOutput.gain.cancelScheduledValues?.(now);
+    equalizerOutput.gain.setTargetAtTime(volumeStep / 20, now, smoothing);
   }
   function ensureEqualizerGraph() {
     if (equalizerGraphReady) return true;
-    if (equalizerGraphFailed || !AudioContextClass) return false;
+    const clientGraphAllowed = typeof supportsClientAudioGraph === "function"
+      ? supportsClientAudioGraph()
+      : Boolean(AudioContextClass && !equalizerGraphFailed);
+    if (equalizerGraphFailed || !clientGraphAllowed) return false;
     try {
       audioContext = new AudioContextClass();
       equalizerSource = audioContext.createMediaElementSource(audio);
@@ -396,8 +408,10 @@
       streamOffsetSeconds = audio.ended && !streamNeedsRetry ? 0 : sourcePositionSeconds();
       setAudioSource(audioURL(currentTrack, streamOffsetSeconds));
     }
-    const clientVolume = AudioContextClass && !equalizerGraphFailed;
-    if ((equalizerEnabled || clientVolume) && !ensureEqualizerGraph()) {
+    const clientVolume = typeof supportsClientAudioGraph === "function"
+      ? supportsClientAudioGraph()
+      : Boolean(AudioContextClass && !equalizerGraphFailed);
+    if (clientVolume && (equalizerEnabled || clientVolume) && !ensureEqualizerGraph()) {
       equalizerEnabled = false;
       syncEqualizerControls();
       if (clientVolume) {
@@ -408,9 +422,12 @@
     }
     const source = audio.src;
     try {
-      // Start both within the click gesture; resume() can remain pending in WebKit.
-      const resume = audioContext && audioContext.state !== "running" ? audioContext.resume() : Promise.resolve();
-      await Promise.all([audio.play(), resume]);
+      // Do not block audio.play() on resume() in WebKit when async chains lose user activation.
+      if (audioContext && audioContext.state !== "running") {
+        const resumeResult = audioContext.resume();
+        if (resumeResult && typeof resumeResult.catch === "function") resumeResult.catch(() => {});
+      }
+      await audio.play();
       return true;
     } catch (error) {
       // Track switches and Stop legitimately abort an outstanding play request.
@@ -465,6 +482,7 @@
   function saveEqualizerGains() {
     storage.set("equalizerBandGains", equalizerBandGains);
     syncEqualizerControls();
+    if (equalizerEnabled && typeof ensureEqualizerGraph === "function") ensureEqualizerGraph();
     updateEqualizerGraph();
     window.dispatchEvent(new CustomEvent("siteplayer:settings-changed", { detail: { equalizerBandGains } }));
   }
@@ -508,13 +526,13 @@
   }
   function updateFadedSkipToggle() {
     updateBooleanSettingsToggle(fadedSkipToggle, fadedSkipsEnabled, "Faded Skip");
-    if (!AudioContextClass || equalizerGraphFailed) {
+    if (!supportsClientAudioGraph()) {
       fadedSkipToggle.disabled = true;
       fadedSkipToggle.title = "Faded Skip requires working browser audio processing.";
     }
   }
   function updateSpeedEnabledToggle() {
-    updateBooleanSettingsToggle(speedEnabledToggle, playbackSpeedEnabled, "Native format speed");
+    updateBooleanSettingsToggle(speedEnabledToggle, playbackSpeedEnabled, "Slow Play");
   }
   updateLongPlayToggle();
   syncEqualizerControls();
@@ -833,7 +851,9 @@
     params.set("speedDenominator", speedDenominator);
     params.set("fade", String(spcFadeSeconds));
     if (longPlayEnabled) params.set("longPlay", String(longPlaySeconds));
-    const usesClientAudioGraph = Boolean(AudioContextClass && !equalizerGraphFailed);
+    const usesClientAudioGraph = typeof supportsClientAudioGraph === "function"
+      ? supportsClientAudioGraph()
+      : Boolean(AudioContextClass && !equalizerGraphFailed);
     if (!usesClientAudioGraph && equalizerEnabled && equalizerBandGains.some((g) => g !== 0)) {
       params.set("eq", equalizerBandGains.map((g) => (Math.round(g * 2) / 2).toFixed(1)).join(","));
     }
@@ -1025,7 +1045,7 @@
       const button = document.querySelector(`[data-sbonline-command="${command}"]`);
       button?.setAttribute("aria-pressed", String(active));
       if (command === "playback-speed" && button) {
-        const label = `Native format speed ${playbackRateFraction}× ${active ? "enabled" : "disabled"}`;
+        const label = `Slow Play ${playbackRateFraction}× ${active ? "enabled" : "disabled"}`;
         button.setAttribute("aria-label", label);
         button.title = label;
       }
@@ -1691,7 +1711,7 @@
     playbackRateFraction = selected.fraction;
     speedInput.value = playbackRateFraction;
     speedInput.removeAttribute("aria-invalid");
-    speedInput.title = "Native format speed as a fraction. Use 1/64 increments from 1/2 to 2.";
+    speedInput.title = "Slow Play speed as a fraction. Use 1/64 increments from 1/2 to 2.";
     speedError.textContent = "";
     storage.set("playbackRateFraction", playbackRateFraction);
     storage.set("playbackRate", playbackRate);
@@ -1727,7 +1747,9 @@
   });
   const audioProcessingGestureSelector = [
     "#spcboy-play", "#spcboy-next", "#spcboy-previous", "#spcboy-gallery-play",
-    "#spcboy-faded-skip", "#spcboy-equalizer-enabled", "[data-equalizer-mode]", "[data-equalizer-mobile-save]", "#site-player-volume",
+    "#spcboy-faded-skip", "#spcboy-equalizer-enabled", "[data-equalizer-mode]", "[data-equalizer-band]",
+    "[data-equalizer-preset-apply]", "[data-equalizer-mobile-profile]", "#spcboy-equalizer-reset",
+    "[data-equalizer-mobile-save]", "#site-player-volume",
     ".spcboy-track", ".spcboy-media-card", "[data-site-play-track]", "[data-site-play-album-url]",
     "#spcboy-mobile-play", "#spcboy-mobile-next", "#spcboy-mobile-previous",
     "#spcboy-mobile-dock-play", ".spcboy-mobile-dock", "#spcboy-mobile-equalizer",
@@ -1737,6 +1759,7 @@
     ".spcboy-mobile-detail-track-row", ".spcboy-mobile-album-card",
   ].join(",");
   function prepareAudioGraphFromGesture(event) {
+    if (!supportsClientAudioGraph()) return;
     const target = event.target instanceof Element ? event.target : event.target?.parentElement;
     const matchesGesture = Boolean(target?.closest(audioProcessingGestureSelector));
     if (!equalizerEnabled && !fadedSkipsEnabled && !matchesGesture) return;
@@ -1797,12 +1820,14 @@
       const index = Number(input.dataset.equalizerBand);
       if (!Number.isInteger(index) || index < 0 || index >= equalizerBandGains.length) return;
       equalizerBandGains[index] = Math.max(-12, Math.min(12, Math.round(Number(input.value) * 2) / 2));
+      const wasDisabled = !equalizerEnabled;
       if (!equalizerEnabled) setEqualizerEnabled(true);
-      if (equalizerEnabled && ensureEqualizerGraph() && audioContext?.state !== "running") {
+      const graphReady = ensureEqualizerGraph();
+      if (equalizerEnabled && graphReady && audioContext?.state !== "running") {
         audioContext?.resume().catch(() => {});
       }
       saveEqualizerGains();
-      if (!equalizerGraphReady && equalizerEnabled && currentTrack) {
+      if (!graphReady && equalizerEnabled && !wasDisabled && currentTrack) {
         window.clearTimeout(eqRestartTimer);
         eqRestartTimer = window.setTimeout(() => restartCurrentStream(sourcePositionSeconds()), 250);
       }
@@ -1812,12 +1837,13 @@
     const flatGains = equalizerBandGains.map(() => 0);
     animateEqualizerBandSliders(flatGains, () => {
       equalizerBandGains = flatGains;
-      if (equalizerEnabled && ensureEqualizerGraph() && audioContext?.state !== "running") {
+      const graphReady = ensureEqualizerGraph();
+      if (equalizerEnabled && graphReady && audioContext?.state !== "running") {
         audioContext?.resume().catch(() => {});
       }
       saveEqualizerGains();
       if (equalizerPresetStatus) equalizerPresetStatus.textContent = "Equalizer reset to Flat.";
-      if (!equalizerGraphReady && equalizerEnabled && currentTrack) {
+      if (!graphReady && equalizerEnabled && currentTrack) {
         restartCurrentStream(sourcePositionSeconds());
       }
     });
@@ -1827,8 +1853,13 @@
     if (typeof selectedEqualizerPresetIndex !== "undefined") selectedEqualizerPresetIndex = index;
     const preset = equalizerPresets[index];
     equalizerBandGains = preset?.gains ? [...preset.gains] : equalizerFrequencies.map(() => 0);
+    const wasEnabled = equalizerEnabled;
     saveEqualizerGains();
-    const enabled = equalizerEnabled || await setEqualizerEnabled(true);
+    const enabled = wasEnabled ? true : await setEqualizerEnabled(true);
+    if (wasEnabled && !(typeof ensureEqualizerGraph === "function" && ensureEqualizerGraph()) && typeof currentTrack !== "undefined" && currentTrack && typeof restartCurrentStream === "function") {
+      if (typeof window !== "undefined") window.clearTimeout?.(typeof eqRestartTimer !== "undefined" ? eqRestartTimer : 0);
+      restartCurrentStream(sourcePositionSeconds());
+    }
     syncEqualizerPresetControls();
     if (equalizerPresetStatus) {
       equalizerPresetStatus.textContent = enabled
@@ -2185,7 +2216,7 @@
       const rounded = Math.max(-12, Math.min(12, Math.round(Number(gain) * 2) / 2));
       equalizerBandGains[index] = rounded;
       if (equalizerBandInputs[index]) equalizerBandInputs[index].value = String(rounded);
-      const graphReady = equalizerEnabled ? ensureEqualizerGraph() : equalizerGraphReady;
+      const graphReady = ensureEqualizerGraph();
       if (equalizerEnabled && graphReady && audioContext && audioContext.state !== "running") {
         audioContext.resume().catch(() => {});
       }
@@ -2200,7 +2231,7 @@
     resetEqualizer() {
       equalizerBandGains = equalizerFrequencies.map(() => 0);
       equalizerBandInputs.forEach(input => { input.value = "0"; });
-      const graphReady = equalizerEnabled ? ensureEqualizerGraph() : equalizerGraphReady;
+      const graphReady = ensureEqualizerGraph();
       saveEqualizerGains();
       if (!graphReady && equalizerEnabled && currentTrack) {
         restartCurrentStream(sourcePositionSeconds());

@@ -1899,7 +1899,7 @@ def spcboy_audio(request, track_id):
                     readable, _, _ = select.select([encoder.stdout], [], [], min(.5, max(0, time_remaining)))
                     if not readable:
                         continue
-                    chunk = encoder.stdout.read(4096)
+                    chunk = encoder.stdout.read(32768)
                     if not chunk or time.time() - page_loaded_at >= page_session_limit_seconds:
                         playback_session_expired = time.time() - page_loaded_at >= page_session_limit_seconds
                         break

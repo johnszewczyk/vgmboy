@@ -450,6 +450,18 @@
     gap: var(--sb-mobile-row-gap, 4px);
   }
 
+  .spcboy-mobile-inline-track-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+  }
+
+  .spcboy-mobile-inline-track-row .spcboy-mobile-track {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
   .spcboy-mobile-track {
     width: 100%;
     display: flex;
@@ -464,6 +476,11 @@
     text-align: left;
     cursor: pointer;
     box-sizing: border-box;
+  }
+
+  .spcboy-mobile-track-retry {
+    color: var(--sb-m-accent);
+    justify-content: center;
   }
 
   .spcboy-mobile-track:active {
@@ -673,23 +690,41 @@
     width: 100%;
   }
 
-  .spcboy-mobile-track-row,
-  .spcboy-mobile-detail-track-row {
-    width: 100%;
+  .spcboy-mobile-track-item {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: 11px 13px;
     background: var(--sb-m-card);
     border: 1px solid var(--sb-m-line);
     border-radius: 8px;
+    overflow: hidden;
+    box-sizing: border-box;
+    transition: background 0.12s ease, border-color 0.12s ease;
+  }
+
+  .spcboy-mobile-track-item.is-playing {
+    background: rgba(56, 170, 255, 0.15);
+    border-color: var(--sb-m-accent);
+  }
+
+  .spcboy-mobile-track-row,
+  .spcboy-mobile-detail-track-row {
+    width: 100%;
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 11px 8px 11px 13px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
     color: var(--sb-m-ink);
     font-size: var(--sb-mobile-playlist-font-size, 14px);
     text-align: left;
     cursor: pointer;
     box-sizing: border-box;
     touch-action: manipulation;
-    transition: background 0.12s ease, border-color 0.12s ease;
+    transition: background 0.12s ease, color 0.12s ease;
   }
 
   .spcboy-mobile-track-row:active,
@@ -699,8 +734,6 @@
 
   .spcboy-mobile-track-row.is-playing,
   .spcboy-mobile-detail-track-row.is-playing {
-    background: rgba(56, 170, 255, 0.15);
-    border-color: var(--sb-m-accent);
     color: var(--sb-m-accent);
     font-weight: 600;
   }
@@ -708,12 +741,53 @@
   .spcboy-mobile-track-row.is-loading,
   .spcboy-mobile-detail-track-row.is-loading {
     background: rgba(100, 210, 255, 0.12) !important;
-    border-color: rgba(100, 210, 255, 0.45) !important;
   }
 
-  .spcboy-mobile-track-row.is-loading .spcboy-mobile-track-len::after,
-  .spcboy-mobile-detail-track-row.is-loading .spcboy-mobile-detail-length::after {
+  .spcboy-mobile-track-row.is-loading .spcboy-mobile-track-title::after,
+  .spcboy-mobile-detail-track-row.is-loading .spcboy-mobile-detail-title::after {
     content: " ⏳";
+  }
+
+  #spcboy-mobile-app .spcboy-mobile-track-favorite {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--sb-m-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: color 0.12s ease, transform 0.1s ease;
+  }
+
+  #spcboy-mobile-app .spcboy-mobile-track-favorite svg {
+    width: 19px;
+    height: 19px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  #spcboy-mobile-app .spcboy-mobile-track-favorite.is-favorite,
+  #spcboy-mobile-app .spcboy-mobile-track-favorite[aria-pressed="true"] {
+    color: var(--sb-m-accent);
+  }
+
+  #spcboy-mobile-app .spcboy-mobile-track-favorite.is-favorite svg,
+  #spcboy-mobile-app .spcboy-mobile-track-favorite[aria-pressed="true"] svg {
+    fill: currentColor;
+  }
+
+  #spcboy-mobile-app .spcboy-mobile-track-favorite:active {
+    transform: scale(0.92);
   }
 
   /* Recent Plays Screen */

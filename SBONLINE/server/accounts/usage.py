@@ -71,12 +71,16 @@ def claim_audio_stream_bytes(user_id, byte_count, period=None):
     if byte_count <= 0:
         return 0
     period = period or _month_start()
-    usage, _ = MonthlyUsage.objects.get_or_create(user_id=user_id, period=period)
-    # The common path is one atomic UPDATE, not a read/compare/write race.
-    # Concurrent tabs must not exhaust retries and look like an empty quota.
+    # Fast path avoids get_or_create transaction overhead on every streamed audio chunk.
     if MonthlyUsage.objects.filter(
-        pk=usage.pk, audio_bytes__lte=MONTHLY_AUDIO_STREAM_LIMIT_BYTES-byte_count,
-    ).update(audio_bytes=F("audio_bytes")+byte_count, updated_at=timezone.now()):
+        user_id=user_id, period=period, audio_bytes__lte=MONTHLY_AUDIO_STREAM_LIMIT_BYTES - byte_count,
+    ).update(audio_bytes=F("audio_bytes") + byte_count, updated_at=timezone.now()):
+        return byte_count
+    usage, _ = MonthlyUsage.objects.get_or_create(user_id=user_id, period=period)
+    # Retry once against the newly created row or claim remaining headroom under cap.
+    if MonthlyUsage.objects.filter(
+        pk=usage.pk, audio_bytes__lte=MONTHLY_AUDIO_STREAM_LIMIT_BYTES - byte_count,
+    ).update(audio_bytes=F("audio_bytes") + byte_count, updated_at=timezone.now()):
         return byte_count
     for _ in range(8):
         current = MonthlyUsage.objects.filter(pk=usage.pk).values_list("audio_bytes", flat=True).first()
