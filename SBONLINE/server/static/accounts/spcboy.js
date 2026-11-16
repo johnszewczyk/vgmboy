@@ -334,18 +334,30 @@
     const gap = parseFloat(getComputedStyle(playlistColumnHeadCells).columnGap) || 0;
     const inset = parseFloat(getComputedStyle(playlistContent).paddingLeft) || 0;
     const favoriteWidth = playlistColumnVisibility.favorite
-      ? playlistColumnHead.querySelector('[data-column="favorite"]').getBoundingClientRect().height : 0;
+      ? playlistColumnHead.querySelector('[data-column="favorite"]').getBoundingClientRect().width : 0;
     const available = Math.max(0, playlistContent.clientWidth - 2*inset - favoriteWidth - 2*gap);
-    const totalWeight = columns.reduce((sum, column) => sum + column.weight, 0);
-    const widths = columns.map(column => {
+    const columnSpace = Math.max(0, available - gap*(columns.length-1));
+    const minimums = columns.map(column => {
       const header = playlistColumnHeadCells.querySelector(`[data-column="${column.id}"]`);
-      const minimum = Math.ceil(Math.max(column.id === 'index' ? header.getBoundingClientRect().height : 0,
+      return Math.ceil(Math.max(column.id === 'index' ? header.getBoundingClientRect().height : 0,
         measurePlaylistColumnText(header, header.dataset.label || column.label) + 2*gap + 1));
-      const savedWidth = Number(playlistColumnWidths[column.id]);
-      return Math.max(minimum, Number.isFinite(savedWidth) && savedWidth > 0 ? savedWidth
-        : (available-gap*(columns.length-1))*column.weight/totalWeight);
     });
-    // Keep default widths independent of track text; users may save explicit widths.
+    const savedWidths = columns.map(column => Number(playlistColumnWidths[column.id]));
+    const hasSavedWidth = savedWidths.map(width => Number.isFinite(width) && width > 0);
+    const allWidthsSaved = hasSavedWidth.every(Boolean);
+    const preferences = columns.map((column, index) => allWidthsSaved
+      ? Math.max(1, savedWidths[index] - minimums[index]) : column.weight);
+    const flexibleIndices = columns.map((_column, index) => index).filter(index => allWidthsSaved || !hasSavedWidth[index]);
+    const pinnedWidth = columns.reduce((sum, _column, index) =>
+      sum + (hasSavedWidth[index] && !allWidthsSaved ? Math.max(minimums[index], savedWidths[index]) : 0), 0);
+    const flexibleSpace = Math.max(0, columnSpace - pinnedWidth
+      - minimums.reduce((sum, minimum, index) => sum + (flexibleIndices.includes(index) ? minimum : 0), 0));
+    const totalPreference = flexibleIndices.reduce((sum, index) => sum + preferences[index], 0);
+    const widths = columns.map((column, index) => {
+      if (hasSavedWidth[index] && !allWidthsSaved) return Math.max(minimums[index], savedWidths[index]);
+      return minimums[index] + (totalPreference ? flexibleSpace*preferences[index]/totalPreference : 0);
+    });
+    // Saved manual widths retain their proportions while following viewport changes.
     library.style.setProperty('--sb-column-template', widths.map(width => `${width}px`).join(' '));
     const total = widths.reduce((sum, width) => sum + width, 0) + gap*(columns.length-1) + favoriteWidth + 2*gap + 2*inset;
     library.style.setProperty('--sb-playlist-width', `${Math.ceil(total)}px`);
@@ -1887,6 +1899,7 @@
   playlistContentObserver.observe(playlistContent, { childList: true, subtree: true });
   const playlistResizeObserver = new ResizeObserver(schedulePlaylistColumnLayout);
   playlistResizeObserver.observe(playlistPane);
+  playlistResizeObserver.observe(playlistContent);
   playlistContent.addEventListener("scroll", syncPlaylistHeaderScroll, {passive:true});
   document.fonts.ready.then(schedulePlaylistColumnLayout);
   window.addEventListener("resize", schedulePlaylistColumnLayout, { passive: true });

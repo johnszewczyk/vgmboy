@@ -7,7 +7,7 @@ const { test } = require('node:test');
 const source = readFileSync(`${__dirname}/../static/accounts/spcboy.js`, 'utf8');
 const layout = source.slice(source.indexOf('  function updatePlaylistColumnLayout()'), source.indexOf('  function syncPlaylistHeaderScroll()'));
 
-function fixture({ view = 'all', rowValues = [], columnWidths = {} } = {}) {
+function fixture({ view = 'all', rowValues = [], columnWidths = {}, width = 900, favorite = false } = {}) {
   const definitions = [
     { id: 'index', label: '#', weight: 0.15 },
     { id: 'title', label: 'TITLE', weight: 1.45 },
@@ -21,6 +21,12 @@ function fixture({ view = 'all', rowValues = [], columnWidths = {} } = {}) {
     style: {},
     getBoundingClientRect: () => ({ height: 14 }),
   }]));
+  const favoriteHeader = {
+    dataset: { column: 'favorite', label: 'Favorites' },
+    hidden: !favorite,
+    style: {},
+    getBoundingClientRect: () => ({ width: 27, height: 14 }),
+  };
   const rows = rowValues.map(values => {
     const cells = new Map(definitions.map(column => [column.id, {
       dataset: { column: column.id },
@@ -37,7 +43,7 @@ function fixture({ view = 'all', rowValues = [], columnWidths = {} } = {}) {
   });
   const style = new Map();
   const playlistContent = {
-    clientWidth: 900,
+    clientWidth: width,
     scrollLeft: 0,
     querySelectorAll: () => rows,
   };
@@ -50,10 +56,10 @@ function fixture({ view = 'all', rowValues = [], columnWidths = {} } = {}) {
     playlistPane: { hidden: false },
     playlistContent,
     playlistColumnHeadCells: headCells,
-    playlistColumnHead: { querySelector: () => ({ getBoundingClientRect: () => ({ height: 0 }) }) },
+    playlistColumnHead: { querySelector: () => favoriteHeader },
     playlistColumnOrder: order,
     PLAYLIST_COLUMN_DEFINITIONS: definitions,
-    playlistColumnVisibility: { index: true, title: true, game: true, timestamp: true, favorite: false },
+    playlistColumnVisibility: { index: true, title: true, game: true, timestamp: true, favorite },
     playlistColumnWidths: columnWidths,
     view,
     library: { style: { setProperty: (key, value) => style.set(key, value) } },
@@ -64,7 +70,7 @@ function fixture({ view = 'all', rowValues = [], columnWidths = {} } = {}) {
     syncPlaylistHeaderScroll() {},
   });
   vm.runInContext(layout, context);
-  return { context, headers, rows, style };
+  return { context, headers, rows, style, playlistContent };
 }
 
 test('empty metadata headings hide while row number and populated columns remain', () => {
@@ -105,4 +111,28 @@ test('default widths ignore track text and saved manual widths still apply', () 
 
   const manuallySized = readWidths({ rowValues: [{ ...shared, title: 'Short' }], columnWidths: { title: 220 } });
   assert.equal(manuallySized[1], 220);
+});
+
+test('saved manual column widths keep their proportions when the viewport changes', () => {
+  const columnWidths = { index: 40, title: 300, game: 220, timestamp: 180 };
+  const { context, style, playlistContent } = fixture({ columnWidths, width: 900 });
+  const readWidths = () => style.get('--sb-column-template').split(' ').map(value => Number.parseFloat(value));
+  context.updatePlaylistColumnLayout();
+  const initialWidths = readWidths();
+  playlistContent.clientWidth = 1200;
+  context.updatePlaylistColumnLayout();
+  const expandedWidths = readWidths();
+  assert.ok(expandedWidths[1] > initialWidths[1]);
+  assert.ok(Math.abs(expandedWidths.reduce((sum, width) => sum + width, 0) - 1170) < 0.01);
+  playlistContent.clientWidth = 600;
+  context.updatePlaylistColumnLayout();
+  const compactWidths = readWidths();
+  assert.ok(compactWidths[1] < expandedWidths[1]);
+  assert.ok(Math.abs(compactWidths.reduce((sum, width) => sum + width, 0) - 570) < 0.01);
+});
+
+test('favorite column width is included in the playlist sizing calculation', () => {
+  const { context, style } = fixture({ favorite: true });
+  context.updatePlaylistColumnLayout();
+  assert.equal(Number.parseFloat(style.get('--sb-playlist-width')), 900);
 });
