@@ -23,6 +23,8 @@
   .spcboy-playlist-content { padding: .45rem 1rem .8rem; }
   .spcboy-playlist-content .spcboy-track { min-height: 1.9rem; }
   .spcboy-playlist-content .spcboy-track-title { font-size: .68rem; }
+  .spcboy-body .spcboy-album-favorite svg { width: .82rem; height: .82rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .spcboy-body .spcboy-album-favorite.is-favorite svg { fill: currentColor; }
 }
 
 @media (min-width: 781px) {

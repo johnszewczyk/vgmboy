@@ -72,6 +72,7 @@ body.spcboy-body .spcboy-media-card-title { color: var(--ink); }
   body.spcboy-body #spcboy-library .spcboy-stage { display: grid; grid-area: 1/2; grid-template-rows: var(--sb-toolbar-height) minmax(0,1fr); height: 100%; min-height: 0; background: var(--paper); }
   body.spcboy-body #spcboy-stage > .sbonline-playlist-heading { display: flex; grid-area: 1/1; height: var(--sb-toolbar-height); min-width: 0; background: var(--paper); }
   body.spcboy-body #spcboy-stage > .sbonline-playlist-heading .site-player-actions-slot { display: contents; }
+  body.spcboy-body #spcboy-stage > :is(.spcboy-playlist-pane,.spcboy-card-panel) { grid-area: 2/1; height: 100%; min-height: 0; }
   body.spcboy-body .spcboy-playlist-pane { grid-template-rows: var(--sb-toolbar-height) minmax(0,1fr); }
   body.spcboy-body .spcboy-column-head { height: var(--sb-toolbar-height); min-height: 0; border: 0; background: var(--paper); color: var(--muted); font: 11px/1 var(--sb-font); }
   body.spcboy-body .spcboy-column-head > div { gap: var(--sb-gap); }
