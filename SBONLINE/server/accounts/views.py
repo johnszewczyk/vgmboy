@@ -1123,10 +1123,7 @@ def spcboy_catalog(request):
     public_consoles = []
     cached_artwork = _spcboy_gallery_index()
     for console in catalog["consoles"]:
-        console_name = str(console.get("name", ""))
-        if "atari" in console_name.casefold():
-            continue
-        public_console = {"name": console_name, "games": []}
+        public_console = {"name": str(console.get("name", "")), "games": []}
         for game in console.get("games", []):
             game_name = str(game.get("name", ""))
             album_id = spcboy_album_id(public_console["name"], game_name)
