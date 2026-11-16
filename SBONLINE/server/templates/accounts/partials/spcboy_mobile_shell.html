@@ -8,7 +8,7 @@
     <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="recent">Recent</button>
     <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="favorites">Favorites</button>
     <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="sound">Sound</button>
-    {% if request.user.is_superuser %}<button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="admin">Admin</button>{% endif %}
+    <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="nav">Nav</button>
   </nav>
 
   <!-- 1. Now Playing Screen -->
@@ -25,16 +25,10 @@
         <div class="spcboy-mobile-now-title" id="spcboy-mobile-now-title">Nothing playing</div>
         <div class="spcboy-mobile-now-album" id="spcboy-mobile-now-album">Select a track from Library or Gallery</div>
       </div>
-      <div class="spcboy-mobile-scrub-section">
-        <div class="spcboy-mobile-progress-wrap" id="spcboy-mobile-progress-wrap" role="slider" aria-label="Seek position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
-          <div class="spcboy-mobile-progress-track">
-            <span class="spcboy-mobile-progress-fill" id="spcboy-mobile-progress-fill"></span>
-          </div>
-        </div>
-        <div class="spcboy-mobile-times">
-          <span id="spcboy-mobile-elapsed">0:00</span>
-          <span id="spcboy-mobile-duration">0:00</span>
-        </div>
+      <div class="spcboy-mobile-times" aria-label="Playback time">
+        <span id="spcboy-mobile-elapsed">0:00</span>
+        <span aria-hidden="true">/</span>
+        <span id="spcboy-mobile-duration">0:00</span>
       </div>
       <div class="spcboy-mobile-now-controls" aria-label="Playback controls">
         <button type="button" class="spcboy-mobile-ctrl-btn" id="spcboy-mobile-previous" aria-label="Previous track" title="Previous track">|◀</button>
@@ -172,18 +166,18 @@
         </div>
       </section>
 
-      <!-- Fade Out -->
+      <!-- Long Play -->
       <section class="spcboy-mobile-card">
         <div class="spcboy-mobile-row">
           <div>
-            <strong>Faded Skips</strong>
-            <small class="spcboy-mobile-dim">Fade audio on track change</small>
+            <strong>Long Play</strong>
+            <small class="spcboy-mobile-dim">Override track loop cutoff</small>
           </div>
-          <button class="spcboy-mobile-switch" id="spcboy-mobile-faded-skip" type="button" role="switch" aria-checked="false">No</button>
+          <button class="spcboy-mobile-switch" id="spcboy-mobile-long-play" type="button" role="switch" aria-checked="false">No</button>
         </div>
         <label class="spcboy-mobile-field">
-          <span>Fade duration (seconds)</span>
-          <input id="spcboy-mobile-fade-seconds" type="number" min="0" max="30" step="1" value="5" aria-label="Fade duration">
+          <span>Duration (0 = unlimited)</span>
+          <input id="spcboy-mobile-long-play-duration" type="text" value="3:00" aria-label="Long play duration">
         </label>
       </section>
 
@@ -202,26 +196,89 @@
         </label>
       </section>
 
-      <!-- Long Play -->
+      <!-- Fade Out -->
       <section class="spcboy-mobile-card">
         <div class="spcboy-mobile-row">
           <div>
-            <strong>Long Play</strong>
-            <small class="spcboy-mobile-dim">Override track loop cutoff</small>
+            <strong>Faded Skips</strong>
+            <small class="spcboy-mobile-dim">Fade audio on track change</small>
           </div>
-          <button class="spcboy-mobile-switch" id="spcboy-mobile-long-play" type="button" role="switch" aria-checked="false">No</button>
+          <button class="spcboy-mobile-switch" id="spcboy-mobile-faded-skip" type="button" role="switch" aria-checked="false">No</button>
         </div>
         <label class="spcboy-mobile-field">
-          <span>Duration (0 = unlimited)</span>
-          <input id="spcboy-mobile-long-play-duration" type="text" value="3:00" aria-label="Long play duration">
+          <span>Fade duration (seconds)</span>
+          <input id="spcboy-mobile-fade-seconds" type="number" min="0" max="30" step="1" value="5" aria-label="Fade duration">
         </label>
       </section>
+    </div>
+  </section>
+
+  <!-- Deeper Vertical Nav Screen -->
+  <section class="spcboy-mobile-screen spcboy-mobile-screen-nav is-hidden" id="spcboy-mobile-screen-nav" aria-label="Site navigation">
+    <div class="spcboy-mobile-sound-layout">
+      {% with profile=request.user.member_profile %}
+      <section class="spcboy-mobile-card spcboy-mobile-identity-card">
+        <div class="spcboy-mobile-card-header">
+          <a class="spcboy-mobile-identity-name" href="{% url 'member_profile' %}">{{ profile.display_name }}</a>
+          <div class="spcboy-mobile-identity-stats" role="group" aria-label="Site activity">
+            <span class="spcboy-mobile-badge"><strong>{{ player_total_plays }}</strong> plays</span>
+            <span class="spcboy-mobile-badge spcboy-mobile-badge--online"><strong>{{ player_online_users }}</strong> online</span>
+          </div>
+        </div>
+      </section>
+      {% endwith %}
+
+      <section class="spcboy-mobile-card" aria-labelledby="spcboy-mobile-vnav-site-heading">
+        <div class="spcboy-mobile-card-header">
+          <h3 id="spcboy-mobile-vnav-site-heading">Site &amp; Account</h3>
+        </div>
+        <nav class="spcboy-mobile-vnav" aria-label="Site and account">
+          <button type="button" class="spcboy-mobile-vnav-item" data-mobile-app-page="playing"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-home"></use></svg><span>Back to player</span></button>
+          <a class="spcboy-mobile-vnav-item" href="{% url 'playback_history' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-recent"></use></svg><span>Listening</span></a>
+          <button type="button" class="spcboy-mobile-vnav-item" data-mobile-app-page="favorites"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-star"></use></svg><span>Favorites</span></button>
+          <button type="button" class="spcboy-mobile-vnav-item" data-mobile-app-page="recent"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-recent"></use></svg><span>Recent plays</span></button>
+          <a class="spcboy-mobile-vnav-item" href="{% url 'member_profile' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-user-round"></use></svg><span>Profile</span></a>
+          <a class="spcboy-mobile-vnav-item" href="{% url 'member_profile' %}?tab=security"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-log-in"></use></svg><span>Sign-in</span></a>
+        </nav>
+        <form class="spcboy-mobile-admin-logout" method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="spcboy-mobile-btn-secondary spcboy-mobile-admin-danger-btn">Sign Out</button>
+        </form>
+      </section>
+
+      {% if request.user.is_superuser %}
+      <section class="spcboy-mobile-card" aria-labelledby="spcboy-mobile-vnav-admin-heading">
+        <div class="spcboy-mobile-card-header">
+          <h3 id="spcboy-mobile-vnav-admin-heading">Admin</h3>
+        </div>
+        <nav class="spcboy-mobile-vnav" aria-label="Admin">
+          {% if request.user.is_superuser %}<button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="admin">Admin</button>{% endif %}
+          <a class="spcboy-mobile-vnav-item" href="{% url 'accounts' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-settings"></use></svg><span>Accounts &amp; Invites</span></a>
+          <a class="spcboy-mobile-vnav-item" href="{% url 'usage' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-database"></use></svg><span>Site details</span></a>
+          <a class="spcboy-mobile-vnav-item" href="{% url 'site_log' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-scroll-text"></use></svg><span>Log</span></a>
+        </nav>
+      </section>
+
+      <section class="spcboy-mobile-card" aria-labelledby="spcboy-mobile-vnav-other-heading">
+        <div class="spcboy-mobile-card-header">
+          <h3 id="spcboy-mobile-vnav-other-heading">Other sites</h3>
+        </div>
+        <nav class="spcboy-mobile-vnav" aria-label="Other sites">
+          <a class="spcboy-mobile-vnav-item" href="{% url 'bom_home' %}" target="_blank" rel="noopener noreferrer" data-full-navigation aria-label="Book of Mormon, opens in a new tab"><svg class="site-ui-icon" aria-hidden="true" viewBox="0 0 20 20"><path d="M11 3h6v6M17 3l-8 8M15 11v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Book of Mormon</span></a>
+        </nav>
+      </section>
+      {% endif %}
     </div>
   </section>
 
   {% if request.user.is_superuser %}
   <!-- Admin Screen (Owner Mobile) -->
   <section class="spcboy-mobile-screen spcboy-mobile-screen-admin is-hidden" id="spcboy-mobile-screen-admin" data-admin-url="{% url 'spcboy_admin' %}" aria-label="Admin">
+    <div class="spcboy-mobile-detail-top">
+      <button type="button" class="spcboy-mobile-back-button" data-mobile-app-page="nav">
+        <span aria-hidden="true">‹</span> <span>Nav</span>
+      </button>
+    </div>
     <div class="spcboy-mobile-sound-layout">
       <section class="spcboy-mobile-card">
         <div class="spcboy-mobile-card-header">
@@ -234,7 +291,7 @@
         </label>
         <label class="spcboy-mobile-field">
           <span>Session limit (min)</span>
-          <input id="spcboy-mobile-admin-session-limit" type="number" min="1" max="1440" step="1" inputmode="numeric" value="60" aria-label="Playback session limit in minutes">
+          <input id="spcboy-mobile-admin-session-limit" type="number" min="1" max="1440" step="1" inputmode="numeric" value="120" aria-label="Playback session limit in minutes">
         </label>
         <div class="spcboy-mobile-eq-actions">
           <button type="button" class="spcboy-mobile-btn-secondary" id="spcboy-mobile-admin-save-settings">Save Controls</button>

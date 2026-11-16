@@ -17,4 +17,7 @@ release behavior.
 VGMMan is the only Git repository for family work. Do not initialize a nested
 repository here. Deployment uploads a VGMMan-built release to the existing
 webspace; do not make the rented host's previous app checkout a source of truth
-or retain old app files as a rollback copy.
+or retain old app files as a rollback copy. After every SBONLINE update,
+commit the task-owned changes, `git push`, and deploy with
+`bash SBONLINE/ops/server/sbonline-deploy.sh` so the live site immediately
+reflects the update.

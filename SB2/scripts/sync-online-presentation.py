@@ -7,7 +7,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--check', action='store_true')
 args = parser.parse_args()
 sb2 = Path(__file__).resolve().parents[1]
-target = sb2.parents[1] / 'MathBook/private-admin/static/accounts'
+target = sb2.parent / 'SBONLINE/server/static/accounts'
 for name in ('sb-presentation.css', 'sb-presentation.js'):
     source = sb2 / 'Sources/SB2/Resources' / name
     destination = target / name

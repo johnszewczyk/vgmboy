@@ -44,7 +44,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_http_methods, require_POST, require_safe
 from django.views.generic import TemplateView
 
-from .forms import MAX_PROFILE_IMAGE_BYTES, EnrollmentForm, MemberProfileForm, SiteSettingsForm
+from .forms import EnrollmentForm, MemberProfileForm, SiteSettingsForm
 from .catalog_search import adjacent_catalog_track, build_catalog_index, catalog_index_is_current, query_catalog_index, search_terms
 from .spcboy_timing import (
     DEFAULT_SPC_FADE_MS,
@@ -276,39 +276,6 @@ def _record_invite_failure(request):
         Q(blocked_until__lt=now) | Q(blocked_until__isnull=True),
     ).delete()
     return attempt.blocked_until
-
-
-def _normalized_profile_image(upload):
-    if upload.size > MAX_PROFILE_IMAGE_BYTES:
-        raise ValueError("Choose an image no larger than 10 MB.")
-    try:
-        upload.seek(0)
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", Image.DecompressionBombWarning)
-            with Image.open(upload) as checked:
-                if checked.format not in {"BMP", "GIF", "HEIC", "HEIF", "ICO", "JPEG", "PNG", "PPM", "TIFF", "WEBP"}:
-                    raise ValueError("Choose a standard image file such as JPEG, PNG, WebP, or HEIC.")
-                checked.verify()
-                width, height = checked.size
-                if width < 1 or height < 1 or width * height > MAX_PROFILE_IMAGE_PIXELS:
-                    raise ValueError("That image is too large to process.")
-        upload.seek(0)
-        with Image.open(upload) as source:
-            source.draft("RGB", (512, 512))
-            source.seek(0)
-            image = ImageOps.exif_transpose(source.copy())
-        edge = min(image.width, image.height)
-        left = (image.width - edge) // 2
-        top = (image.height - edge) // 2
-        image = image.crop((left, top, left + edge, top + edge))
-        image = image.resize((512, 512), Image.Resampling.LANCZOS)
-        if image.mode not in {"RGB", "RGBA"}:
-            image = image.convert("RGBA" if "A" in image.getbands() else "RGB")
-        output = io.BytesIO()
-        image.save(output, format="WEBP", quality=84, method=5)
-        return ContentFile(output.getvalue(), name="image.webp")
-    except (UnidentifiedImageError, OSError, Image.DecompressionBombError, Image.DecompressionBombWarning) as error:
-        raise ValueError("That file could not be read as a safe image.") from error
 
 
 def _member_profile(user):
@@ -897,8 +864,6 @@ def listening_now_playing(request):
         members.append({
             "userId": active.user_id,
             "displayName": profile.display_name,
-            "avatarUrl": profile.avatar_url,
-            "initials": profile.initials,
             "profileUrl": reverse("member_public_profile", args=[active.user_id]),
             "nowPlaying": current_play,
             "cardHtml": render_to_string("accounts/partials/track_card.html", {
@@ -971,7 +936,6 @@ def member_profile(request):
         profile_tab = "account"
     form = MemberProfileForm(
         request.POST if request.method == "POST" and not site_action else None,
-        request.FILES or None,
         user=request.user,
         initial={
             "display_name": profile.display_name,
@@ -979,32 +943,16 @@ def member_profile(request):
         },
     )
     if request.method == "POST" and not site_action and form.is_valid():
-        avatar = form.cleaned_data["avatar"]
-        remove_avatar = form.cleaned_data["remove_avatar"]
-        old_avatar = profile.avatar.name
-        if avatar:
-            try:
-                normalized = _normalized_profile_image(avatar)
-            except ValueError as error:
-                form.add_error("avatar", str(error))
-            else:
-                profile.avatar.save("profile.webp", normalized, save=False)
-        if not form.errors:
-            profile.display_name = form.cleaned_data["display_name"]
-            profile.theme_preference = form.cleaned_data["theme_preference"]
-            if not avatar and remove_avatar:
-                profile.avatar = ""
-            profile.updated_at = timezone.now()
-            profile.save(update_fields=[
-                "display_name",
-                "avatar",
-                "theme_preference",
-                "updated_at",
-            ])
-            if old_avatar and old_avatar != profile.avatar.name:
-                default_storage.delete(old_avatar)
-            messages.success(request, "Profile saved.")
-            return redirect("member_profile")
+        profile.display_name = form.cleaned_data["display_name"]
+        profile.theme_preference = form.cleaned_data["theme_preference"]
+        profile.updated_at = timezone.now()
+        profile.save(update_fields=[
+            "display_name",
+            "theme_preference",
+            "updated_at",
+        ])
+        messages.success(request, "Profile saved.")
+        return redirect("member_profile")
     catalog_data = _spcboy_catalog_data() or {}
     catalog = _catalog_track_index(catalog_data)
     favorite_rows = [
@@ -1163,19 +1111,7 @@ def _profile_bandwidth(user):
 @login_required
 @require_GET
 def community_media(request, object_path):
-    if ".." in object_path or not object_path.startswith("avatars/"):
-        raise PermissionDenied
-    is_profile_image = MemberProfile.objects.filter(avatar=object_path, user__is_active=True).exists()
-    if not is_profile_image or not default_storage.exists(object_path):
-        return HttpResponseGone("That community image is no longer available.")
-    try:
-        image_file = default_storage.open(object_path, "rb")
-    except OSError:
-        return HttpResponseGone("That community image is no longer available.")
-    response = FileResponse(image_file, content_type="image/webp")
-    response["Cache-Control"] = "private, max-age=300"
-    response["X-Content-Type-Options"] = "nosniff"
-    return response
+    return HttpResponseGone("That community image is no longer available.")
 
 
 @login_required
@@ -1742,23 +1678,21 @@ def spcboy_audio(request, track_id):
     try:
         track_index = int(track["trackIndex"])
         start_ms = int(request.GET.get("start", "0"))
-        if member_suffix == ".spc":
-            try:
-                fade_seconds = int(request.GET.get("spcFade", str(DEFAULT_SPC_FADE_MS // 1000)))
-            except (TypeError, ValueError):
-                materialized_track.cleanup()
-                return HttpResponseBadRequest("Invalid SPC fade duration.")
-            if fade_seconds < 0 or fade_seconds > 30:
-                materialized_track.cleanup()
-                return HttpResponseBadRequest("SPC fade must be 0 to 30 whole seconds.")
-            fade_ms = fade_seconds * 1000
-            play_ms = DEFAULT_SPC_TOTAL_MS - fade_ms
-        else:
-            play_ms = int(track["playMilliseconds"])
-            fade_ms = int(track.get("fadeMilliseconds", 0))
+        play_ms = DEFAULT_SPC_TOTAL_MS if member_suffix == ".spc" else int(track["playMilliseconds"])
     except (KeyError, TypeError, ValueError):
         materialized_track.cleanup()
         return HttpResponse(status=404)
+    # Match SB2: the playback fade applies to every format, not only SPC.
+    try:
+        requested_fade = int(request.GET.get("fade", request.GET.get("spcFade", str(DEFAULT_SPC_FADE_MS // 1000))))
+        if not 0 <= requested_fade <= 30:
+            raise ValueError
+    except (TypeError, ValueError):
+        materialized_track.cleanup()
+        return HttpResponseBadRequest("Fade must be 0 to 30 whole seconds.")
+    fade_ms = requested_fade * 1000
+    if member_suffix == ".spc":
+        play_ms = DEFAULT_SPC_TOTAL_MS - fade_ms
     if (
         track_index < 0
         or play_ms <= 0
@@ -1769,18 +1703,6 @@ def spcboy_audio(request, track_id):
     ):
         materialized_track.cleanup()
         return HttpResponseBadRequest("Invalid playback position.")
-
-    # Match SB2: the playback fade applies to every format, not only SPC.
-    try:
-        requested_fade = int(request.GET.get("fade", request.GET.get("spcFade", "5")))
-        if not 0 <= requested_fade <= 30:
-            raise ValueError
-    except (TypeError, ValueError):
-        materialized_track.cleanup()
-        return HttpResponseBadRequest("Fade must be 0 to 30 whole seconds.")
-    fade_ms = requested_fade * 1000
-    if member_suffix == ".spc":
-        play_ms = DEFAULT_SPC_TOTAL_MS - fade_ms
 
     long_play_enabled = False
     if "longPlay" in request.GET:

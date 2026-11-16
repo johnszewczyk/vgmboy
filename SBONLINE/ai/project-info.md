@@ -19,9 +19,13 @@ state.
 ## Task Routing
 
 - Product and route: `AGENTS.md` and this file.
-- Hosted UI, app APIs, and account behavior: `server/` and
+- Hosted player UI and split-skin behavior: `server/` and
   [site-player.md](subsystem-human/site-player.md).
-- Server/source boundaries, state, and deployment: [integration boundaries](subsystem-agent/integration-boundaries.md).
+- Accounts, listening, usage, and administration:
+  [site-admin.md](subsystem-human/site-admin.md) and
+  [agent site-admin note](subsystem-agent/site-admin.md).
+- Server/source boundaries, state, and deployment:
+  [integration boundaries](subsystem-agent/integration-boundaries.md).
 - Hosted release: `ops/server/sbonline-deploy.sh`.
 - Shared archive preparation and decoding: [VGMBoy](../../VGMBoy/AGENTS.md).
 - Catalog publication: [ScanSong](../../ScanSong/AGENTS.md).
@@ -29,6 +33,10 @@ state.
 
 ## Local Rules
 
+- **Push & Deploy After Every Update**: After every SBONLINE update, commit the
+  task-owned files, run `git push`, and deploy to the live host with
+  `bash SBONLINE/ops/server/sbonline-deploy.sh` so changes are immediately
+  live on `admin.pre-calc.com`.
 - Keep the app source and deploy package in this repository. The rented
   webspace is a hosting target only; do not source production files from
   MathBook or maintain an app copy there.
@@ -42,4 +50,7 @@ state.
 
 ## Human Docs
 
-- `subsystem-human/site-player.md` describes current hosted player behavior.
+- [site-player.md](subsystem-human/site-player.md) describes current hosted
+  player behavior across the desktop and mobile skins.
+- [site-admin.md](subsystem-human/site-admin.md) describes accounts,
+  listening/community views, usage accounting, and owner administration.

@@ -1,10 +1,11 @@
 /* Player geometry. Shared site chrome, controls, and motion live in sb-theme.css. */
 body.spcboy-body {
-  --site-navigation-height: 24px;
+  --site-navigation-height: 0px;
   --site-player-height: 24px;
   --sb-sidebar-width: clamp(260px, 27vw, 360px);
   overflow: hidden;
 }
+body.spcboy-body .topbar { display: none !important; }
 body.spcboy-body .page-shell { width: 100%; height: calc(100dvh - var(--site-navigation-height) - var(--site-player-height) - env(safe-area-inset-top)); margin: 0; }
 body.spcboy-body .spcboy-page { height: 100%; background: var(--paper); }
 .sbonline-transport-toolbar, .sbonline-playlist-heading { display: none; }
@@ -80,6 +81,7 @@ body.spcboy-body .spcboy-media-card-title { color: var(--ink); }
   body.spcboy-body #spcboy-library .spcboy-tree { display: block; grid-area: 3/1; padding: 0 var(--sb-inset) var(--sb-inset); border: 0; }
   body.spcboy-body #spcboy-library .spcboy-stage { display: grid; grid-area: 1/2; grid-template-rows: var(--sb-toolbar-height) minmax(0,1fr); height: 100%; min-height: 0; background: var(--paper); }
   body.spcboy-body #spcboy-stage > .sbonline-playlist-heading { display: flex; grid-area: 1/1; height: var(--sb-toolbar-height); min-width: 0; background: var(--paper); }
+  body.spcboy-body #spcboy-stage > .sbonline-playlist-heading .site-player-actions-slot { display: contents; }
   body.spcboy-body #spcboy-stage > :is(.spcboy-playlist-pane,.spcboy-card-panel,.spcboy-gallery-panel) { grid-area: 2/1; height: 100%; min-height: 0; }
   body.spcboy-body .spcboy-playlist-pane { grid-template-rows: var(--sb-toolbar-height) minmax(0,1fr); }
   body.spcboy-body .spcboy-column-head { height: var(--sb-toolbar-height); min-height: 0; border: 0; background: var(--paper); color: var(--muted); font: 11px/1 var(--sb-font); }
@@ -102,39 +104,6 @@ body.spcboy-body .spcboy-media-card-title { color: var(--ink); }
   body.spcboy-body .spcboy-player-status { padding-left: 12px; }
   body.spcboy-body .spcboy-playback-clock { padding-right: 8px; }
   body.spcboy-body #site-player-transport-slot { display: none; }
-}
-@media (max-width: 780px) {
-  body.spcboy-body {
-    --sb-playlist-font-size: var(--sb-mobile-playlist-font-size,13px);
-    --sb-sidebar-font-size: var(--sb-mobile-sidebar-font-size,13px);
-    --sb-row-gap: var(--sb-mobile-row-gap,0px);
-  }
-  body.spcboy-body { --site-navigation-height: 48px; --site-player-height: calc(46px + env(safe-area-inset-bottom)); }
-  body.spcboy-body .topbar { padding-inline: 5px; gap: 4px; }
-  body.spcboy-body .sbonline-context { display: none; }
-  body.spcboy-body .spcboy-system > summary, body.spcboy-body .spcboy-game > summary { min-height: 36px; margin-bottom: var(--sb-gap); padding: 0 8px; font-size: var(--sb-sidebar-font-size); }
-  body.spcboy-body .spcboy-track-title { font-size: var(--sb-playlist-font-size); }
-  body.spcboy-body .spcboy-library-state { display: none; }
-  body.spcboy-body .spcboy-toolbar { padding: 4px; gap: 4px; }
-  body.spcboy-body .spcboy-search-wrap input { height: 36px; }
-  body.spcboy-body .spcboy-tabs button, body.spcboy-body .spcboy-fold-all { min-height: 36px; }
-  body.spcboy-body #spcboy-library .spcboy-stage > .sbonline-playlist-heading { display: flex; grid-row: 1; height: 36px; }
-  body.spcboy-body .spcboy-stage { display: flex; flex-direction: column; }
-  body.spcboy-body .spcboy-stage > :is(.spcboy-card-panel,.spcboy-gallery-panel,.spcboy-playlist-pane) { flex: 1; min-height: 0; }
-  body.spcboy-body .spcboy-stage:has(.spcboy-playlist-pane[hidden]):has(.spcboy-card-panel[hidden]):has(.spcboy-gallery-panel[hidden]) { display: none; }
-  body.spcboy-body .spcboy-card-list { gap: 6px; padding: 6px; }
-}
-@media (max-width: 780px) {
-  body.spcboy-body #spcboy-library { grid-template: 40px 36px minmax(0,1fr) / minmax(0,1fr); }
-  body.spcboy-body #spcboy-library .spcboy-sidebar { display: contents; }
-  body.spcboy-body #spcboy-library .spcboy-toolbar { grid-area: 1/1; height: 40px; min-height: 0; }
-  body.spcboy-body #spcboy-library > .sbonline-playlist-heading { display: flex; grid-area: 2/1; height: 36px; }
-  body.spcboy-body #spcboy-library .spcboy-tree { grid-area: 3/1; }
-  body.spcboy-body #spcboy-library .spcboy-stage { display: contents; }
-  body.spcboy-body #spcboy-stage > :is(.spcboy-playlist-pane,.spcboy-card-panel,.spcboy-gallery-panel) { grid-area: 3/1; height: 100%; min-height: 0; padding-top: 0; overflow: auto; }
-  body.spcboy-body .spcboy-tree .spcboy-track { min-height: 40px; padding-block: 6px; }
-  body.spcboy-body .spcboy-tree .spcboy-favorite { min-height: 36px; }
-  body.spcboy-body .sbonline-workspace-tab .sbonline-tab-close { flex-basis: 30px; width: 30px; }
 }
 @media (min-width: 781px) {
   body.spcboy-body .spcboy-system > summary,
@@ -173,11 +142,10 @@ body.spcboy-body .spcboy-game.is-leaf > summary { pointer-events: none; }
 .sbonline-site .profile-editor { display: block; padding: 16px; }
 .sbonline-site .profile-form { display: block; width: min(100%,700px); }
 .sbonline-site #profile-form { display: grid; grid-template-columns: minmax(0,1fr); gap: 20px; }
-.sbonline-site .member-avatar--profile { --member-avatar-size: 96px; }
 .sbonline-site .profile-fields { gap: 8px; }
 .sbonline-site .profile-fields > label { margin: 0; font-weight: 500; }
 .sbonline-site .profile-fields input[type="text"], .sbonline-site .profile-fields select { min-height: 32px; padding: 6px 10px; }
-.sbonline-site .profile-side-note { margin: 8px 0 0 116px; font-size: 12px; color: var(--muted); }
+.sbonline-site .profile-side-note { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
 .sbonline-site .profile-library-section { margin-top: 12px; }
 body.sbonline-site.spcboy-body select { appearance: none; background-image: none; padding-right: 10px !important; }
 

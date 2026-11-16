@@ -186,6 +186,14 @@
       if (!await navigate(new URL("/spcboy/", window.location.href))) return false;
     }
     for (let frame = 0; frame < 4; frame += 1) {
+      const mobileButton = window.matchMedia?.("(max-width: 780px)")?.matches
+        ? document.querySelector(`#spcboy-mobile-app [data-mobile-app-page="${view === "all" ? "library" : view}"]`)
+        : null;
+      if (mobileButton && !mobileButton.disabled) {
+        mobileButton.click();
+        document.dispatchEvent(new Event("site:close-player-overlays"));
+        return true;
+      }
       const button = document.querySelector(`#spcboy-view-row [data-view="${view}"]`);
       if (button && !button.disabled) {
         button.click();

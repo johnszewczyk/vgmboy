@@ -241,7 +241,7 @@
   function syncEqualizerControls() {
     updateEqualizerToggle(equalizerEnabled);
     equalizerBandInputs.forEach((input, index) => {
-      const gain = equalizerBandGains[index] || 0;
+      const gain = equalizerEnabled ? (equalizerBandGains[index] || 0) : 0;
       input.value = String(gain);
       const slider = input.closest(".spcboy-equalizer-slider");
       if (slider) {
@@ -461,6 +461,7 @@
   }
   function selectSettingsPage(pageName, { focus = false } = {}) {
     if (pageName === "playlist") pageName = "interface";
+    if (pageName === "interface" && window.matchMedia?.("(max-width: 780px)")?.matches) pageName = "playback";
     const validPage = settingsPages.some((page) => page.dataset.settingsPage === pageName);
     if (!validPage) return;
     settingsPageButtons.forEach((button) => {
@@ -471,6 +472,7 @@
     syncSettingsPageVisibility(pageName);
     syncMobileSettingsTabState();
     storage.set("optionsPage", pageName);
+    if (pageName === "admin" && typeof loadDrawerAdmin === "function") void loadDrawerAdmin();
     requestAnimationFrame(positionSettingsTabIndicator);
     if (focus) settingsPageButtons.find((button) => button.dataset.settingsPageTarget === pageName)?.focus();
   }
@@ -1089,6 +1091,7 @@
 
   function moveTransportForViewport() {
     const toolbar = document.querySelector("#sbonline-transport-toolbar");
+    const playlistHeading = document.querySelector(".sbonline-playlist-heading");
     if (toolbar && !mobileControlsQuery.matches) {
       toolbar.prepend(transport);
     } else if (mobileControlsQuery.matches || document.body.classList.contains("spcboy-body")) {
@@ -1096,7 +1099,11 @@
     } else {
       transportHome.insertBefore(transport, transportHomeNextSibling);
     }
-    actionsHome.insertBefore(actionsSlot, actionsHomeNextSibling);
+    if (playlistHeading && !mobileControlsQuery.matches) {
+      playlistHeading.append(actionsSlot);
+    } else {
+      actionsHome.insertBefore(actionsSlot, actionsHomeNextSibling);
+    }
     syncOnlineControls();
   }
   moveTransportForViewport();
@@ -1735,9 +1742,278 @@
   });
   settingsPageButtons.forEach((button) => {
     button.addEventListener("click", () => {
-      if (button.closest(".spcboy-mobile-settings-nav")) selectDrawerMode("options");
+      if (button.closest(".spcboy-mobile-settings-nav, #drawer-navigation")) selectDrawerMode("options");
       selectSettingsPage(button.dataset.settingsPageTarget);
     });
+  });
+
+  // In-Drawer Admin Console (Desktop & Shared Drawer)
+  const drawerAdminPage = document.querySelector("#spcboy-settings-page-admin");
+  let drawerAdminPendingDeleteId = null;
+  let drawerAdminBusy = false;
+  function makeDrawerNode(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    return node;
+  }
+  async function copyDrawerAdminText(value, label) {
+    if (!value) return;
+    const statusBadge = document.querySelector("#sbo-drawer-admin-status");
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        if (statusBadge) statusBadge.textContent = `${label} copied`;
+        return;
+      }
+    } catch {}
+    if (statusBadge) statusBadge.textContent = "Copy failed";
+  }
+  function renderDrawerAdmin(data) {
+    if (!drawerAdminPage || !data) return;
+    const bitrateSelect = document.querySelector("#sbo-drawer-admin-bitrate");
+    const limitInput = document.querySelector("#sbo-drawer-admin-session-limit");
+    const statusBadge = document.querySelector("#sbo-drawer-admin-status");
+    const inviteCount = document.querySelector("#sbo-drawer-admin-invite-count");
+    const createdInviteBox = document.querySelector("#sbo-drawer-admin-created-invite");
+    const invitesList = document.querySelector("#sbo-drawer-admin-invites-list");
+    const accountCount = document.querySelector("#sbo-drawer-admin-account-count");
+    const accountsList = document.querySelector("#sbo-drawer-admin-accounts-list");
+    const displayNameInput = document.querySelector("#sbo-drawer-admin-display-name");
+    const passwordState = document.querySelector("#sbo-drawer-admin-password-state");
+    const createdPasswordBox = document.querySelector("#sbo-drawer-admin-created-password");
+    const genPasswordBtn = document.querySelector("#sbo-drawer-admin-gen-password");
+    const revokePasswordBtn = document.querySelector("#sbo-drawer-admin-revoke-password");
+    const metricsGrid = document.querySelector("#sbo-drawer-admin-server-metrics");
+    const loginsList = document.querySelector("#sbo-drawer-admin-logins-list");
+
+    if (statusBadge) statusBadge.textContent = data.message || "";
+    if (bitrateSelect && Array.isArray(data.siteSettings?.aacChoices)) {
+      bitrateSelect.replaceChildren();
+      for (const choice of data.siteSettings.aacChoices) {
+        const option = makeDrawerNode("option", "", choice.label);
+        option.value = String(choice.value);
+        if (Number(choice.value) === Number(data.siteSettings.aacBitrate)) option.selected = true;
+        bitrateSelect.appendChild(option);
+      }
+    }
+    if (limitInput && data.siteSettings?.sessionLimitMinutes !== undefined) {
+      limitInput.value = String(data.siteSettings.sessionLimitMinutes);
+    }
+    if (createdInviteBox) {
+      if (data.createdInvite) {
+        createdInviteBox.replaceChildren();
+        createdInviteBox.hidden = false;
+        const heading = makeDrawerNode("strong", "", data.createdInvite.isRecovery ? `Recovery invite for ${data.createdInvite.username}` : "New one-time member invite ready");
+        const codeBox = makeDrawerNode("div", "sbo-drawer-admin-code", data.createdInvite.code);
+        const actions = makeDrawerNode("div", "sbo-drawer-admin-actions");
+        const copyCodeBtn = makeDrawerNode("button", "sbo-drawer-btn-secondary", "Copy Code");
+        copyCodeBtn.type = "button";
+        copyCodeBtn.onclick = () => void copyDrawerAdminText(data.createdInvite.code, "Invite code");
+        const copyLinkBtn = makeDrawerNode("button", "sbo-drawer-btn-secondary", "Copy Link");
+        copyLinkBtn.type = "button";
+        copyLinkBtn.onclick = () => void copyDrawerAdminText(data.createdInvite.joinUrl, "Invite link");
+        actions.append(copyCodeBtn, copyLinkBtn);
+        createdInviteBox.append(heading, codeBox, actions);
+      } else {
+        createdInviteBox.hidden = true;
+        createdInviteBox.replaceChildren();
+      }
+    }
+    const invites = Array.isArray(data.invitations) ? data.invitations : [];
+    if (inviteCount) inviteCount.textContent = String(invites.length);
+    if (invitesList) {
+      invitesList.replaceChildren();
+      if (!invites.length) {
+        invitesList.appendChild(makeDrawerNode("p", "sbo-drawer-empty", "No open invitations."));
+      } else {
+        for (const inv of invites) {
+          const item = makeDrawerNode("div", "sbo-drawer-admin-item");
+          const head = makeDrawerNode("div", "sbo-drawer-admin-item-head");
+          head.append(
+            makeDrawerNode("h4", "sbo-drawer-admin-item-title", inv.isRecovery ? `Recovery · ${inv.username}` : "Member invitation"),
+            makeDrawerNode("span", "sbo-drawer-admin-pill is-active", "Open"),
+          );
+          item.append(head, makeDrawerNode("small", "sbo-drawer-dim", `Expires ${inv.expiresAt}`));
+          if (inv.visibleCode) item.appendChild(makeDrawerNode("div", "sbo-drawer-admin-code", inv.visibleCode));
+          const actions = makeDrawerNode("div", "sbo-drawer-admin-actions");
+          if (inv.visibleCode) {
+            const copyBtn = makeDrawerNode("button", "sbo-drawer-btn-secondary", "Copy Code");
+            copyBtn.type = "button";
+            copyBtn.onclick = () => void copyDrawerAdminText(inv.visibleCode, "Invite code");
+            actions.appendChild(copyBtn);
+          }
+          if (inv.joinUrl) {
+            const linkBtn = makeDrawerNode("button", "sbo-drawer-btn-secondary", "Copy Link");
+            linkBtn.type = "button";
+            linkBtn.onclick = () => void copyDrawerAdminText(inv.joinUrl, "Invite link");
+            actions.appendChild(linkBtn);
+          }
+          const revokeBtn = makeDrawerNode("button", "sbo-drawer-btn-secondary sbo-drawer-btn-danger", "Revoke");
+          revokeBtn.type = "button";
+          revokeBtn.onclick = () => void postDrawerAdminAction({ action: "revoke-invite", selector: inv.selector });
+          actions.appendChild(revokeBtn);
+          item.appendChild(actions);
+          invitesList.appendChild(item);
+        }
+      }
+    }
+    const accounts = Array.isArray(data.accounts) ? data.accounts : [];
+    if (accountCount) accountCount.textContent = String(accounts.length);
+    if (accountsList) {
+      accountsList.replaceChildren();
+      for (const account of accounts) {
+        const item = makeDrawerNode("div", "sbo-drawer-admin-item");
+        const head = makeDrawerNode("div", "sbo-drawer-admin-item-head");
+        const pillText = !account.isActive ? "Suspended" : account.isSitePersona ? "Persona" : account.setupPending ? "Setup pending" : "Active";
+        const pillClass = !account.isActive ? "sbo-drawer-admin-pill is-suspended" : account.isActive && !account.setupPending && !account.isSitePersona ? "sbo-drawer-admin-pill is-active" : "sbo-drawer-admin-pill";
+        head.append(makeDrawerNode("h4", "sbo-drawer-admin-item-title", account.displayName || account.username), makeDrawerNode("span", pillClass, pillText));
+        item.append(head, makeDrawerNode("small", "sbo-drawer-dim", `${account.roleLabel} · ${account.activeSessionCount} active · ${account.audioQuota}`));
+        if (account.lastLoginAt) item.appendChild(makeDrawerNode("small", "sbo-drawer-dim", `Last sign-in ${account.lastLoginAt}`));
+        if (account.canManage) {
+          const actions = makeDrawerNode("div", "sbo-drawer-admin-actions");
+          const toggleBtn = makeDrawerNode("button", "sbo-drawer-btn-secondary", account.isActive ? "Suspend" : "Reactivate");
+          toggleBtn.type = "button";
+          toggleBtn.onclick = () => { drawerAdminPendingDeleteId = null; void postDrawerAdminAction({ action: "toggle-user", userId: account.id }); };
+          actions.appendChild(toggleBtn);
+          if (account.isActive) {
+            const recoveryBtn = makeDrawerNode("button", "sbo-drawer-btn-secondary", "Recovery");
+            recoveryBtn.type = "button";
+            recoveryBtn.onclick = () => { drawerAdminPendingDeleteId = null; void postDrawerAdminAction({ action: "recovery-invite", userId: account.id }); };
+            actions.appendChild(recoveryBtn);
+          }
+          if (drawerAdminPendingDeleteId === account.id) {
+            const confirmBtn = makeDrawerNode("button", "sbo-drawer-btn-secondary sbo-drawer-btn-danger is-confirming", "Confirm Delete");
+            confirmBtn.type = "button";
+            confirmBtn.onclick = () => { drawerAdminPendingDeleteId = null; void postDrawerAdminAction({ action: "delete-user", userId: account.id }); };
+            const cancelBtn = makeDrawerNode("button", "sbo-drawer-btn-secondary", "Cancel");
+            cancelBtn.type = "button";
+            cancelBtn.onclick = () => { drawerAdminPendingDeleteId = null; renderDrawerAdmin(data); };
+            actions.append(confirmBtn, cancelBtn);
+          } else {
+            const deleteBtn = makeDrawerNode("button", "sbo-drawer-btn-secondary sbo-drawer-btn-danger", "Delete");
+            deleteBtn.type = "button";
+            deleteBtn.onclick = () => { drawerAdminPendingDeleteId = account.id; renderDrawerAdmin(data); };
+            actions.appendChild(deleteBtn);
+          }
+          item.appendChild(actions);
+        }
+        accountsList.appendChild(item);
+      }
+    }
+    if (displayNameInput && data.selfAccount?.displayName !== undefined) {
+      displayNameInput.value = data.selfAccount.displayName;
+      const headerName = document.querySelector("#spcboy-settings-heading");
+      if (headerName) headerName.textContent = data.selfAccount.displayName;
+    }
+    if (passwordState && genPasswordBtn && revokePasswordBtn) {
+      const hasPassword = Boolean(data.selfAccount?.hasLoginPassword);
+      passwordState.textContent = hasPassword ? "A generated password is active for devices without passkeys." : "For devices without passkeys.";
+      genPasswordBtn.textContent = hasPassword ? "Replace Password" : "Generate Password";
+      revokePasswordBtn.hidden = !hasPassword;
+    }
+    if (createdPasswordBox) {
+      if (data.createdLoginPassword) {
+        createdPasswordBox.replaceChildren();
+        createdPasswordBox.hidden = false;
+        createdPasswordBox.appendChild(makeDrawerNode("strong", "", "One-time login password (shown once)"));
+        createdPasswordBox.appendChild(makeDrawerNode("div", "sbo-drawer-admin-code", data.createdLoginPassword));
+        const actions = makeDrawerNode("div", "sbo-drawer-admin-actions");
+        const copyPwBtn = makeDrawerNode("button", "sbo-drawer-btn-secondary", "Copy Password");
+        copyPwBtn.type = "button";
+        copyPwBtn.onclick = () => void copyDrawerAdminText(data.createdLoginPassword, "Login password");
+        actions.appendChild(copyPwBtn);
+        createdPasswordBox.appendChild(actions);
+      } else if (!data.selfAccount?.hasLoginPassword) {
+        createdPasswordBox.hidden = true;
+        createdPasswordBox.replaceChildren();
+      }
+    }
+    if (metricsGrid && data.server) {
+      metricsGrid.replaceChildren();
+      for (const [label, value] of [
+        ["Memory", `${data.server.memory} (${data.server.memoryPercent}%)`],
+        ["Disk", `${data.server.disk} (${data.server.diskPercent}%)`],
+        ["Load", data.server.load || "Unavailable"],
+        ["Uptime", data.server.uptime || "0d 0h"],
+      ]) {
+        const box = makeDrawerNode("div", "sbo-drawer-admin-metric");
+        box.append(makeDrawerNode("span", "", label), makeDrawerNode("strong", "", value));
+        metricsGrid.appendChild(box);
+      }
+    }
+    if (loginsList) {
+      loginsList.replaceChildren();
+      const events = Array.isArray(data.recentLogins) ? data.recentLogins : [];
+      if (!events.length) {
+        loginsList.appendChild(makeDrawerNode("p", "sbo-drawer-empty", "No recent sign-in events."));
+      } else {
+        for (const ev of events) {
+          const item = makeDrawerNode("div", "sbo-drawer-admin-item");
+          const head = makeDrawerNode("div", "sbo-drawer-admin-item-head");
+          const ok = ev.eventType === "success";
+          head.append(makeDrawerNode("h4", "sbo-drawer-admin-item-title", ev.username), makeDrawerNode("span", `sbo-drawer-admin-pill ${ok ? "is-active" : "is-suspended"}`, ok ? "Success" : "Failed"));
+          item.append(head, makeDrawerNode("small", "sbo-drawer-dim", `${ev.occurredAt} · ${ev.ipAddress}`));
+          loginsList.appendChild(item);
+        }
+      }
+    }
+  }
+  async function loadDrawerAdmin() {
+    const adminUrl = drawerAdminPage?.dataset?.adminUrl;
+    if (!adminUrl) return;
+    const statusBadge = document.querySelector("#sbo-drawer-admin-status");
+    if (statusBadge) statusBadge.textContent = "Loading…";
+    try {
+      const response = await fetch(adminUrl, { credentials: "same-origin" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Error");
+      renderDrawerAdmin(data);
+    } catch {
+      if (statusBadge) statusBadge.textContent = "Error";
+    }
+  }
+  async function postDrawerAdminAction(payload) {
+    const adminUrl = drawerAdminPage?.dataset?.adminUrl;
+    if (!adminUrl || drawerAdminBusy) return;
+    drawerAdminBusy = true;
+    const statusBadge = document.querySelector("#sbo-drawer-admin-status");
+    try {
+      const response = await fetch(adminUrl, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken() },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Action failed");
+      renderDrawerAdmin(data);
+    } catch (error) {
+      if (statusBadge) statusBadge.textContent = error.message || "Error";
+    } finally {
+      drawerAdminBusy = false;
+    }
+  }
+  document.querySelector("#sbo-drawer-admin-save-settings")?.addEventListener("click", () => {
+    const aacBitrate = document.querySelector("#sbo-drawer-admin-bitrate")?.value;
+    const sessionLimitMinutes = document.querySelector("#sbo-drawer-admin-session-limit")?.value;
+    void postDrawerAdminAction({ action: "save-site-settings", aacBitrate, sessionLimitMinutes });
+  });
+  document.querySelector("#sbo-drawer-admin-create-invite")?.addEventListener("click", () => {
+    void postDrawerAdminAction({ action: "create-invite" });
+  });
+  document.querySelector("#sbo-drawer-admin-save-name")?.addEventListener("click", () => {
+    const displayName = document.querySelector("#sbo-drawer-admin-display-name")?.value || "";
+    void postDrawerAdminAction({ action: "update-display-name", displayName });
+  });
+  document.querySelector("#sbo-drawer-admin-gen-password")?.addEventListener("click", () => {
+    void postDrawerAdminAction({ action: "generate-login-password" });
+  });
+  document.querySelector("#sbo-drawer-admin-revoke-password")?.addEventListener("click", () => {
+    void postDrawerAdminAction({ action: "revoke-login-password" });
+  });
+  document.querySelector("#sbo-drawer-admin-refresh")?.addEventListener("click", () => {
+    void loadDrawerAdmin();
   });
   settingsTabList?.addEventListener("scroll", positionSettingsTabIndicator, { passive: true });
   window.addEventListener("resize", () => {
@@ -1808,10 +2084,12 @@
   }
   equalizerToggle.addEventListener("click", () => setEqualizerEnabled(equalizerToggle.getAttribute("aria-checked") !== "true"));
   equalizerModeButtons.filter((button) => button.dataset.equalizerMode === "off").forEach((button) => {
-    button.addEventListener("click", async () => {
-      cancelEqualizerFaderAnimation();
-      await setEqualizerEnabled(false);
-      if (equalizerPresetStatus) equalizerPresetStatus.textContent = "Equalizer OFF.";
+    button.addEventListener("click", () => {
+      const flatGains = equalizerFrequencies.map(() => 0);
+      animateEqualizerBandSliders(flatGains, async () => {
+        await setEqualizerEnabled(false);
+        if (equalizerPresetStatus) equalizerPresetStatus.textContent = "Equalizer OFF.";
+      });
     });
   });
   equalizerBandInputs.forEach((input) => {

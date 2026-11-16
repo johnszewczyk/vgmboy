@@ -8,7 +8,6 @@ from .models import (
     SiteSettings,
 )
 
-MAX_PROFILE_IMAGE_BYTES = 10 * 1024 * 1024
 
 class EnrollmentForm(forms.Form):
     invitation_code = forms.CharField(max_length=64, label="One-time invitation code", strip=True)
@@ -23,13 +22,12 @@ class MemberProfileForm(forms.Form):
         label="Display name",
         widget=forms.TextInput(attrs={"autocomplete": "nickname", "maxlength": 40}),
     )
-    avatar = forms.FileField(required=False, widget=forms.ClearableFileInput(attrs={"accept": "image/*,.heic,.heif"}))
-    remove_avatar = forms.BooleanField(required=False, label="Use display-name initial instead")
     theme_preference = forms.ChoiceField(
         required=True,
         choices=THEME_PREFERENCES,
         label="Appearance",
     )
+
     def __init__(self, *args, user, **kwargs):
         self.user = user
         super().__init__(*args, **kwargs)
@@ -44,12 +42,6 @@ class MemberProfileForm(forms.Form):
         if profiles.exists():
             raise forms.ValidationError("That display name is already in use.")
         return display_name
-
-    def clean_avatar(self):
-        avatar = self.cleaned_data.get("avatar")
-        if avatar and avatar.size > MAX_PROFILE_IMAGE_BYTES:
-            raise forms.ValidationError("Choose an image no larger than 10 MB.")
-        return avatar
 
 
 class SiteSettingsForm(forms.ModelForm):

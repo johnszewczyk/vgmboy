@@ -105,12 +105,6 @@
 .profile-track-list { display: grid; align-content: start; max-height: 36rem; overflow: auto; margin: 0; padding: 0; list-style: none; }
 .profile-project-links { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--line); }
 .profile-track-list > li { display: block; padding: 0; border: 0; }
-.avatar-cropper { display: grid; justify-items: center; gap: .45rem; width: min(100%, 16rem); }
-.avatar-cropper[hidden] { display: none; }
-.avatar-cropper canvas { width: min(100%, 12rem); height: auto; touch-action: none; border-radius: .6rem; cursor: grab; }
-.avatar-cropper canvas:active { cursor: grabbing; }
-.avatar-cropper label, .avatar-cropper p { margin: 0; color: var(--muted); font-size: .68rem; }
-.avatar-cropper input { width: 100%; accent-color: var(--blue); }
 .visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; clip-path: inset(50%) !important; white-space: nowrap !important; }
 
 @media (max-width: 780px) {

@@ -33,7 +33,6 @@
       {% for member in account_rows %}
       <article class="account-card">
         <header class="account-card-heading">
-          <a class="account-avatar-link" href="{% url 'member_public_profile' member.pk %}" aria-label="{{ member.display_name }}’s profile">{% include "accounts/partials/member_avatar.html" with avatar_profile=member.account_profile avatar_variant="member-avatar--account" %}</a>
           <div class="account-card-identity">
             <div class="account-card-name-line">
               <h3><a href="{% url 'member_public_profile' member.pk %}">{{ member.display_name }}</a></h3>

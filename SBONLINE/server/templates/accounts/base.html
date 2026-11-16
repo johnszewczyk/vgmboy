@@ -15,26 +15,26 @@
       if (themeColor) themeColor.content = "#090b0f";
     })();
   </script>
-  <link rel="stylesheet" href="{% static 'accounts/admin.css' %}?v=20261031-shared-desktop-toolbar-1">
-  {% if request.user.is_authenticated %}<link rel="stylesheet" href="{% static 'accounts/site-components.css' %}?v=20261104-sbo-cleanup-1">{% endif %}
+  <link rel="stylesheet" href="{% static 'accounts/admin.css' %}?v=20261116-sbo-drawer-2">
+  {% if request.user.is_authenticated %}<link rel="stylesheet" href="{% static 'accounts/site-components.css' %}?v=20261116-sbo-drawer-2">{% endif %}
   {% if request.user.is_authenticated %}
   {{ request.user.member_profile.spcboy_preferences|json_script:"spcboy-profile-preferences" }}
   <script src="{% static 'accounts/activity-badges.js' %}?v=20261104-sbo-cleanup-1" data-site-global defer></script>
-  <script src="{% static 'accounts/site-components.js' %}?v=20261023-refine-3" data-site-global defer></script>
+  <script src="{% static 'accounts/site-components.js' %}?v=20261116-sbo-drawer-2" data-site-global defer></script>
   <script src="{% static 'accounts/sb-presentation.js' %}?v=20261026-collections-1" data-site-global defer></script>
   <script src="{% static 'accounts/aac-stream.js' %}?v=20261115-v1" data-site-global defer></script>
   <script src="{% static 'accounts/site-preferences.js' %}?v=20261031-profile-cloud-1" data-preferences-url="{% url 'spcboy_preferences' %}" data-site-global defer></script>
-  <script src="{% static 'accounts/site-player.js' %}?v=20261115-v2" data-site-global defer></script>
+  <script src="{% static 'accounts/site-player.js' %}?v=20261116-sbo-drawer-2" data-site-global defer></script>
   <script src="{% static 'accounts/site-favorites.js' %}?v=20261101-favorite-swipe-cue-1" data-site-global defer></script>
-  <script src="{% static 'accounts/site-navigation.js' %}?v=20261104-sbo-cleanup-1" data-site-global defer></script>
+  <script src="{% static 'accounts/site-navigation.js' %}?v=20261116-sbo-drawer-2" data-site-global defer></script>
   {% endif %}
   {% block extra_head %}{% endblock %}
   {% if request.user.is_authenticated %}<link rel="stylesheet" href="{% static 'accounts/player.css' %}?v=20261103-gallery-ux-1">{% endif %}
-  <link rel="stylesheet" href="{% static 'accounts/sbonline.css' %}?v=20261114-v11">
-  <link rel="stylesheet" href="{% static 'accounts/sb-theme.css' %}?v=20261114-v11">
-  <script src="{% static 'accounts/sb-interface.js' %}?v=20261114-v10" data-site-global defer></script>
+  <link rel="stylesheet" href="{% static 'accounts/sbonline.css' %}?v=20261116-sbo-drawer-2">
+  <link rel="stylesheet" href="{% static 'accounts/sb-theme.css' %}?v=20261116-sbo-drawer-2">
+  <script src="{% static 'accounts/sb-interface.js' %}?v=20261116-sbo-drawer-2" data-site-global defer></script>
 <link rel="stylesheet" href="{% static 'accounts/sb-presentation.css' %}?v=20261026-collections-1">
-  <link rel="stylesheet" href="{% static 'accounts/sb-mobile.css' %}?v=20261114-v11" media="(max-width: 780px)">
+  <link rel="stylesheet" href="{% static 'accounts/sb-mobile.css' %}?v=20261116-sbo-drawer-2" media="(max-width: 780px)">
   {% block mobile_head %}{% endblock %}
 </head>
 <body class="sbonline-site {% block body_class %}{% endblock %}{% if request.user.is_authenticated %} has-site-player{% endif %}">
@@ -63,7 +63,7 @@
       {% if request.user.is_authenticated %}
       <span class="site-player-transport-slot" id="site-player-transport-slot"></span><form class="mobile-header-search" id="mobile-header-search" role="search" action="{% url 'spcboy' %}" method="get"><input id="mobile-header-search-input" type="search" name="q" placeholder="Search games" aria-label="Search game titles" autocomplete="off"></form>
       <span class="site-player-actions-slot" id="site-player-actions-slot">
-        <button class="site-player-queue-toggle" id="site-player-queue-toggle" type="button" aria-expanded="false" aria-controls="site-player-queue-panel" aria-label="Queue, 0 tracks" title="Queue"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h9M3 15h6"/><path d="m14 12 3 3-3 3"/></svg><span id="site-player-queue-count">0</span></button>
+        <button class="site-player-queue-toggle" id="site-player-queue-toggle" type="button" aria-expanded="false" aria-controls="site-player-queue-panel" aria-label="Queue, 0 tracks" title="Queue" hidden><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h9M3 15h6"/><path d="m14 12 3 3-3 3"/></svg><span id="site-player-queue-count">0</span></button>
         <button class="spcboy-settings-toggle" id="spcboy-settings-toggle" type="button" aria-expanded="false" aria-controls="spcboy-settings-panel" aria-label="Menu" title="Menu"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14"/></svg></button>
       </span>
       {% endif %}
@@ -95,30 +95,24 @@
     <button class="site-player-drawer-scrim" id="site-player-drawer-scrim" type="button" aria-label="Close playback drawer" hidden></button>
     <section class="site-player-settings-panel" id="spcboy-settings-panel" hidden role="dialog" aria-modal="true" aria-labelledby="spcboy-settings-heading" tabindex="-1">
       <header class="spcboy-settings-header">
-        <div><span class="spcboy-settings-kicker">SPCBOY · PLAYER</span><strong id="spcboy-settings-heading">Menu</strong></div>
-        <button class="spcboy-settings-close" id="spcboy-settings-close" type="button" aria-label="Close menu"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
-      </header>
-      {% with profile=request.user.member_profile %}
-      <header class="drawer-identity">
-        <a class="drawer-identity-avatar" href="{% url 'member_profile' %}" aria-label="Your profile">{% include "accounts/partials/member_avatar_content.html" with avatar_profile=profile %}</a>
-        <div class="drawer-identity-content">
-          <div class="drawer-identity-heading">
-            <span class="drawer-identity-kicker">PROFILE</span>
-            <a class="drawer-identity-name" href="{% url 'member_profile' %}">{{ profile.display_name }}</a>
-          </div>
+        {% with profile=request.user.member_profile %}
+        <div class="spcboy-settings-header-main">
+          <a class="drawer-identity-name" id="spcboy-settings-heading" href="{% url 'member_profile' %}">{{ profile.display_name }}</a>
           <div class="drawer-identity-stats" role="group" aria-label="Site activity">
-            <span class="drawer-identity-stat"><strong>{{ player_total_plays }}</strong><span>Total plays</span></span>
-            <span class="drawer-identity-stat drawer-identity-stat--online"><strong>{{ player_online_users }}</strong><span>Online now</span></span>
+            <span class="drawer-identity-stat"><strong>{{ player_total_plays }}</strong><span>plays</span></span>
+            <span class="drawer-identity-stat drawer-identity-stat--online"><strong>{{ player_online_users }}</strong><span>online</span></span>
           </div>
         </div>
+        {% endwith %}
+        <button class="spcboy-settings-close" id="spcboy-settings-close" type="button" aria-label="Close menu"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
       </header>
-      {% endwith %}
       <nav class="spcboy-mobile-settings-nav" role="tablist" aria-label="Navigation and options">
         <span class="spcboy-settings-tab-indicator" aria-hidden="true"></span>
-        <button type="button" id="spcboy-mobile-tab-navigation" role="tab" aria-selected="false" aria-controls="drawer-navigation" tabindex="-1" data-mobile-settings-page="navigation">Navigation</button>
+        <button type="button" id="spcboy-mobile-tab-navigation" role="tab" aria-selected="false" aria-controls="drawer-navigation" tabindex="-1" data-mobile-settings-page="navigation">Nav</button>
         <button type="button" id="spcboy-mobile-tab-audio" role="tab" aria-selected="false" aria-controls="spcboy-settings-page-audio" tabindex="-1" data-mobile-settings-page="audio" data-settings-page-target="audio">Sound</button>
-        <button type="button" id="spcboy-mobile-tab-interface" role="tab" aria-selected="false" aria-controls="spcboy-settings-page-interface" tabindex="-1" data-mobile-settings-page="interface" data-settings-page-target="interface">Interface</button>
         <button type="button" id="spcboy-mobile-tab-playback" role="tab" aria-selected="true" aria-controls="spcboy-settings-page-playback" tabindex="0" data-mobile-settings-page="playback" data-settings-page-target="playback">Playback</button>
+        <button type="button" id="spcboy-mobile-tab-interface" role="tab" aria-selected="false" aria-controls="spcboy-settings-page-interface" tabindex="-1" data-mobile-settings-page="interface" data-settings-page-target="interface">Interface</button>
+        {% if request.user.is_superuser %}<button type="button" id="spcboy-mobile-tab-admin" role="tab" aria-selected="false" aria-controls="spcboy-settings-page-admin" tabindex="-1" data-mobile-settings-page="admin" data-settings-page-target="admin">Admin</button>{% endif %}
       </nav>
       {% include "accounts/partials/drawer_navigation.html" %}
       <div class="spcboy-settings-layout" id="drawer-options" role="region" aria-label="Player options">
@@ -131,18 +125,18 @@
                 <div class="spcboy-settings-copy"><strong>Extend track playback</strong><span>Override normal track ending.</span></div>
                 <button class="spcboy-long-play-toggle" id="spcboy-long-play" type="button" role="switch" aria-checked="false" aria-label="Long Play · No · 3:00" title="Long Play · 3:00">No</button>
               </div>
-              <label class="spcboy-settings-field-row spcboy-settings-duration"><span class="spcboy-settings-copy"><strong>Duration</strong><span class="spcboy-settings-helper" id="spcboy-long-play-policy">M:SS · 0 = unlimited · 60-minute page limit.</span><span class="spcboy-setting-error" id="spcboy-long-play-error" aria-live="polite"></span></span><input class="spcboy-settings-input" id="spcboy-long-play-duration" type="text" inputmode="text" maxlength="12" value="3:00" aria-label="Long Play duration" aria-describedby="spcboy-long-play-policy spcboy-long-play-error" autocomplete="off" spellcheck="false"></label>
+              <label class="spcboy-settings-field-row spcboy-settings-duration"><span class="spcboy-settings-copy"><strong>Duration</strong><span class="spcboy-settings-helper" id="spcboy-long-play-policy">M:SS · 0 = unlimited · bounded by page session limit.</span><span class="spcboy-setting-error" id="spcboy-long-play-error" aria-live="polite"></span></span><input class="spcboy-settings-input" id="spcboy-long-play-duration" type="text" inputmode="text" maxlength="12" value="3:00" aria-label="Long Play duration" aria-describedby="spcboy-long-play-policy spcboy-long-play-error" autocomplete="off" spellcheck="false"></label>
+            </section>
+            <section class="spcboy-settings-group" aria-labelledby="spcboy-play-speed-heading">
+              <h3 id="spcboy-play-speed-heading">Slow Play</h3>
+              <div class="spcboy-settings-field-row spcboy-speed-field" id="spcboy-speed-setting"><span class="spcboy-settings-copy"><strong>Slow Play</strong><span>Source decoder rate.</span></span><button class="spcboy-long-play-toggle spcboy-boolean-toggle" id="spcboy-speed-enabled" type="button" role="switch" aria-checked="false" aria-label="Slow Play · No">No</button></div>
+              <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Speed fraction</strong><span id="spcboy-speed-help">Fractions down to 1/64 (64th-note steps), from 1/2× to 2×.</span><span class="spcboy-setting-error" id="spcboy-speed-error" aria-live="polite"></span></span><div class="spcboy-speed-controls"><input class="spcboy-settings-input" id="spcboy-speed" type="text" inputmode="text" size="6" maxlength="15" value="1/1" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Slow Play speed fraction" aria-describedby="spcboy-speed-help spcboy-speed-error"></div></label>
             </section>
             <section class="spcboy-settings-group" aria-labelledby="spcboy-fade-out-heading">
               <h3 id="spcboy-fade-out-heading">Fade Out</h3>
               <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Duration (seconds)</strong></span><input class="spcboy-settings-input" id="spcboy-spc-fade-seconds" type="number" inputmode="numeric" min="0" max="30" step="1" value="5" aria-label="Fade-out duration in seconds" aria-describedby="spcboy-spc-fade-error"></label>
               <span class="spcboy-setting-error" id="spcboy-spc-fade-error" aria-live="polite"></span>
               <div class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Faded Skip</strong><span>Fade on each track change.</span></span><button class="spcboy-long-play-toggle spcboy-boolean-toggle" id="spcboy-faded-skip" type="button" role="switch" aria-checked="false" aria-label="Faded Skip · No">No</button></div>
-            </section>
-            <section class="spcboy-settings-group" aria-labelledby="spcboy-play-speed-heading">
-              <h3 id="spcboy-play-speed-heading">Slow Play</h3>
-              <div class="spcboy-settings-field-row spcboy-speed-field" id="spcboy-speed-setting"><span class="spcboy-settings-copy"><strong>Slow Play</strong><span>Source decoder rate.</span></span><button class="spcboy-long-play-toggle spcboy-boolean-toggle" id="spcboy-speed-enabled" type="button" role="switch" aria-checked="false" aria-label="Slow Play · No">No</button></div>
-              <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Speed fraction</strong><span id="spcboy-speed-help">Fractions down to 1/64 (64th-note steps), from 1/2× to 2×.</span><span class="spcboy-setting-error" id="spcboy-speed-error" aria-live="polite"></span></span><div class="spcboy-speed-controls"><input class="spcboy-settings-input" id="spcboy-speed" type="text" inputmode="text" size="6" maxlength="15" value="1/1" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Slow Play speed fraction" aria-describedby="spcboy-speed-help spcboy-speed-error"></div></label>
             </section>
           </section>
           <section class="spcboy-settings-page" id="spcboy-settings-page-audio" role="tabpanel" tabindex="0" data-settings-page="audio" aria-labelledby="spcboy-mobile-tab-audio" hidden>
@@ -188,8 +182,8 @@
           <section class="spcboy-settings-page" id="spcboy-settings-page-interface" role="tabpanel" tabindex="0" data-settings-page="interface" aria-labelledby="spcboy-mobile-tab-interface" hidden>
             <div class="spcboy-settings-page-heading"><h2 id="sb-interface-heading">Interface</h2></div>
             <section class="spcboy-settings-group"><h3>Fonts &amp; Spacing</h3>
-              <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Mobile track text size</strong><span>Track row font size on mobile (px).</span></span><input class="spcboy-settings-input" type="number" min="10" max="20" step="1" value="13" data-sb-preference="playlistFontSize" aria-label="Mobile track text size"></label>
-              <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Mobile game list text size</strong><span>Library list font size on mobile (px).</span></span><input class="spcboy-settings-input" type="number" min="10" max="20" step="1" value="13" data-sb-preference="sidebarFontSize" aria-label="Mobile game list text size"></label>
+              <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Track text size</strong><span>Playlist track row font size (px).</span></span><input class="spcboy-settings-input" type="number" min="10" max="20" step="1" value="13" data-sb-preference="playlistFontSize" aria-label="Track text size"></label>
+              <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Game list text size</strong><span>Library list font size (px).</span></span><input class="spcboy-settings-input" type="number" min="10" max="20" step="1" value="13" data-sb-preference="sidebarFontSize" aria-label="Game list text size"></label>
               <label class="spcboy-settings-field-row"><span class="spcboy-settings-copy"><strong>Row spacing</strong><span>Extra vertical padding per row (px).</span></span><input class="spcboy-settings-input" type="number" min="0" max="32" step="1" value="0" data-sb-preference="rowGap" aria-label="Row spacing"></label>
             </section>
             <section class="spcboy-settings-group"><h3>Motion</h3>
@@ -211,6 +205,87 @@
               </div>
             </section>
           </section>
+          {% if request.user.is_superuser %}
+          <section class="spcboy-settings-page" id="spcboy-settings-page-admin" role="tabpanel" tabindex="0" data-settings-page="admin" data-admin-url="{% url 'spcboy_admin' %}" aria-labelledby="spcboy-mobile-tab-admin" hidden>
+            <div class="spcboy-settings-page-heading"><h2 id="sbo-drawer-admin-heading">Admin</h2></div>
+            <section class="spcboy-settings-group">
+              <div class="spcboy-settings-group-heading">
+                <h3>Site Controls</h3>
+                <span class="sbo-drawer-badge" id="sbo-drawer-admin-status"></span>
+              </div>
+              <label class="spcboy-settings-field-row">
+                <span class="spcboy-settings-copy"><strong>AAC bitrate</strong><span>Global stream bitrate.</span></span>
+                <select id="sbo-drawer-admin-bitrate" class="spcboy-settings-input sbo-drawer-select" aria-label="Global AAC bitrate"></select>
+              </label>
+              <label class="spcboy-settings-field-row">
+                <span class="spcboy-settings-copy"><strong>Session limit (min)</strong><span>Page session cutoff (1–1,440).</span></span>
+                <input id="sbo-drawer-admin-session-limit" class="spcboy-settings-input" type="number" min="1" max="1440" step="1" inputmode="numeric" value="120" aria-label="Playback session limit in minutes">
+              </label>
+              <div class="spcboy-equalizer-footer">
+                <button type="button" class="sbo-drawer-btn-secondary" id="sbo-drawer-admin-save-settings">Save Controls</button>
+              </div>
+            </section>
+            <section class="spcboy-settings-group">
+              <div class="spcboy-settings-group-heading">
+                <h3>Invitations</h3>
+                <span class="sbo-drawer-badge" id="sbo-drawer-admin-invite-count">0</span>
+              </div>
+              <button type="button" class="sbo-drawer-btn-primary" id="sbo-drawer-admin-create-invite">+ Create Invite</button>
+              <div class="sbo-drawer-admin-created" id="sbo-drawer-admin-created-invite" hidden aria-live="polite"></div>
+              <div class="sbo-drawer-admin-list" id="sbo-drawer-admin-invites-list">
+                <p class="sbo-drawer-empty">Loading invitations…</p>
+              </div>
+            </section>
+            <section class="spcboy-settings-group">
+              <div class="spcboy-settings-group-heading">
+                <h3>Accounts</h3>
+                <span class="sbo-drawer-badge" id="sbo-drawer-admin-account-count">0</span>
+              </div>
+              <div class="sbo-drawer-admin-list" id="sbo-drawer-admin-accounts-list">
+                <p class="sbo-drawer-empty">Loading accounts…</p>
+              </div>
+            </section>
+            <section class="spcboy-settings-group">
+              <div class="spcboy-settings-group-heading">
+                <h3>Account &amp; Sign-In</h3>
+              </div>
+              <label class="spcboy-settings-field-row sbo-drawer-field-wide">
+                <span class="spcboy-settings-copy"><strong>Display name</strong></span>
+                <input id="sbo-drawer-admin-display-name" class="spcboy-settings-input" type="text" maxlength="40" autocomplete="nickname" aria-label="Display name">
+              </label>
+              <div class="spcboy-equalizer-footer">
+                <button type="button" class="sbo-drawer-btn-secondary" id="sbo-drawer-admin-save-name">Save Name</button>
+              </div>
+              <div class="sbo-drawer-admin-divider"></div>
+              <div class="spcboy-settings-field-row">
+                <div class="spcboy-settings-copy">
+                  <strong>Login Password</strong>
+                  <span id="sbo-drawer-admin-password-state">For devices without passkeys.</span>
+                </div>
+              </div>
+              <div class="sbo-drawer-admin-created" id="sbo-drawer-admin-created-password" hidden aria-live="polite"></div>
+              <div class="spcboy-equalizer-footer" id="sbo-drawer-admin-password-actions">
+                <button type="button" class="sbo-drawer-btn-secondary" id="sbo-drawer-admin-gen-password">Generate Password</button>
+                <button type="button" class="sbo-drawer-btn-secondary sbo-drawer-btn-danger" id="sbo-drawer-admin-revoke-password" hidden>Revoke</button>
+              </div>
+              <form class="drawer-navigation-logout" method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="sbo-drawer-btn-secondary sbo-drawer-btn-danger">Sign Out</button>
+              </form>
+            </section>
+            <section class="spcboy-settings-group">
+              <div class="spcboy-settings-group-heading">
+                <h3>Server &amp; Sign-In Log</h3>
+                <button type="button" class="sbo-drawer-btn-text" id="sbo-drawer-admin-refresh">Refresh</button>
+              </div>
+              <div class="sbo-drawer-admin-metrics" id="sbo-drawer-admin-server-metrics"></div>
+              <details class="sbo-drawer-admin-log-details">
+                <summary>Recent sign-in events</summary>
+                <div class="sbo-drawer-admin-list" id="sbo-drawer-admin-logins-list"></div>
+              </details>
+            </section>
+          </section>
+          {% endif %}
         </div>
       </div>
     </section>

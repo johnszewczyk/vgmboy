@@ -1,23 +1,4 @@
 (() => {
-  function memberAvatar(profile, variant = "") {
-    const avatar = document.createElement("span");
-    avatar.className = `member-avatar ${variant}`.trim();
-    avatar.setAttribute("aria-hidden", "true");
-    if (profile?.avatarUrl) {
-      const image = document.createElement("img");
-      image.src = profile.avatarUrl;
-      image.alt = "";
-      image.loading = "lazy";
-      image.decoding = "async";
-      avatar.append(image);
-    } else {
-      const initials = document.createElement("span");
-      initials.textContent = profile?.initials || "?";
-      avatar.append(initials);
-    }
-    return avatar;
-  }
-
   function trackControls(track, playerUrl) {
     const id = String(track?.trackId || track?.id || "");
     if (!id) return null;
@@ -91,5 +72,5 @@
     return time;
   }
 
-  window.SiteComponents = Object.freeze({ memberAvatar, trackControls, trackDisplay, formatSiteTime, recordTime });
+  window.SiteComponents = Object.freeze({ trackControls, trackDisplay, formatSiteTime, recordTime });
 })();

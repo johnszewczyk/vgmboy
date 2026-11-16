@@ -5,7 +5,7 @@
 {% block content %}
 <section class="community-page profile-page">
   {% url 'playback_history' as identity_action_url %}
-  {% include "accounts/partials/profile_identity.html" with identity_heading="Account" identity_action_url=identity_action_url identity_action_label="Listening" identity_avatar_id="profile-avatar-current" %}
+  {% include "accounts/partials/profile_identity.html" with identity_heading="Account" identity_action_url=identity_action_url identity_action_label="Listening" %}
 
   <nav class="profile-tabs" data-profile-tabs data-active-tab="{{ profile_tab }}" role="tablist" aria-label="Profile sections">
     <a role="tab" data-profile-tab="account" aria-controls="profile-account" aria-selected="{% if profile_tab == 'account' %}true{% else %}false{% endif %}" href="?tab=account">Profile</a>
@@ -14,25 +14,13 @@
     <a role="tab" data-profile-tab="security" aria-controls="profile-security" aria-selected="{% if profile_tab == 'security' %}true{% else %}false{% endif %}" href="?tab=security">Sign-in</a>
   </nav>
 
-
-
   <section class="profile-tab-panel" id="profile-account" role="tabpanel" tabindex="0"{% if profile_tab != 'account' %} hidden{% endif %}>
     <section class="profile-editor">
-      <form id="profile-form" method="post" enctype="multipart/form-data" class="profile-form" data-max-image-bytes="10485760">
+      <form id="profile-form" method="post" class="profile-form">
         {% csrf_token %}
-        <div class="avatar-cropper" id="avatar-cropper" hidden>
-            <canvas id="avatar-crop-canvas" width="256" height="256" aria-label="Drag to choose the square crop"></canvas>
-            <label for="avatar-zoom">Zoom</label><input id="avatar-zoom" type="range" min="100" max="300" value="100">
-            <p>Drag the picture to choose the crop.</p>
-        </div>
         <div class="profile-fields">
           <label for="id_display_name">Display name</label>{{ form.display_name }}
           {% if form.display_name.errors %}<span class="field-error">{{ form.display_name.errors|join:", " }}</span>{% endif %}
-          <label for="avatar-source">Profile picture</label><input id="avatar-source" name="avatar" type="file" accept="image/*,.heic,.heif">
-          <input id="id_avatar" type="file" class="visually-hidden" tabindex="-1" aria-hidden="true">
-          <span class="security-note">Optional. Without a picture, your avatar uses the first letter of your display name. Image limit: 10 MB.</span>
-          {% if member_profile.avatar_url %}<label class="profile-avatar-remove"><input type="checkbox" name="remove_avatar" value="1"> Use display-name initial instead</label>{% endif %}
-          {% if form.avatar.errors %}<span class="field-error">{{ form.avatar.errors|join:", " }}</span>{% endif %}
           <input type="hidden" name="theme_preference" value="dark">
           {% if form.theme_preference.errors %}<span class="field-error">{{ form.theme_preference.errors|join:", " }}</span>{% endif %}
           <button class="primary-button" type="submit">Save profile</button>

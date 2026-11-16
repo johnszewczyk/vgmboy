@@ -18,8 +18,13 @@ test('mobile shell CSS defeats shared theme/online specificity clashes and keeps
   assert.match(mobileCss, /#spcboy-mobile-app \.spcboy-mobile-eq-btn\.is-active/);
   assert.match(mobileCss, /#spcboy-mobile-app \.spcboy-mobile-switch\[aria-checked="true"\]/);
   assert.match(mobileCss, /\.spcboy-mobile-load-more\s*\{/);
-  assert.match(mobileCss, /\.spcboy-mobile-progress-fill[\s\S]*transform:\s*scaleX\(0\)/);
-  assert.doesNotMatch(mobileCss, /\.spcboy-mobile-progress-fill[\s\S]*transition:\s*width/);
+  assert.match(mobileCss, /#spcboy-mobile-dock-progress-fill[\s\S]*transform:\s*scaleX\(0\)/);
+  assert.doesNotMatch(mobileCss, /#spcboy-mobile-dock-progress-fill[\s\S]*transition:\s*width/);
+  assert.doesNotMatch(mobileCss, /\.spcboy-mobile-progress-wrap\b/);
+  const mobileShellHtml = readFileSync(`${__dirname}/../templates/accounts/partials/spcboy_mobile_shell.html`, 'utf8');
+  assert.doesNotMatch(mobileShellHtml, /id="spcboy-mobile-progress-wrap"/);
+  assert.doesNotMatch(mobileShellHtml, /role="slider"/);
+  assert.doesNotMatch(spcboyJs, /handleMobileProgressSeek/);
 });
 
 test('mobile player JS avoids duplicate nav binding, full tracklist re-renders on timeupdate, and linear album lookup', () => {

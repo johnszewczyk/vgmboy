@@ -129,6 +129,9 @@ set -a
 source /etc/precalc-admin.env
 set +a
 cd "$APP_DIR"
+# Stop the live Gunicorn process before index/gallery rebuilds so the 458 MiB
+# droplet does not hold two copies of the catalog in memory simultaneously.
+systemctl stop private-admin.service || true
 "$VENV_DIR/bin/python" manage.py migrate --noinput
 "$VENV_DIR/bin/python" manage.py build_spcboy_search_index
 "$VENV_DIR/bin/python" manage.py build_spcboy_gallery_cache

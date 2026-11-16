@@ -12,7 +12,6 @@
   <footer class="track-card-status">
     <div class="track-card-byline">
       {% if card_profile %}<a class="track-card-member" href="{{ card_profile_url }}" aria-label="{{ card_profile.display_name }}’s profile">
-        {% include "accounts/partials/member_avatar.html" with avatar_profile=card_profile avatar_variant="member-avatar--micro" %}
         <span>{{ card_profile.display_name }}</span>
       </a>{% endif %}
       {% if card_time %}{% include "accounts/partials/record_time.html" with record_time=card_time record_label=card_time_label time_class="track-card-time" %}{% endif %}

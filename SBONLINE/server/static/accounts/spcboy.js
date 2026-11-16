@@ -11,11 +11,11 @@
   const mobileScreenFavorites = document.querySelector("#spcboy-mobile-screen-favorites");
   const mobileScreenDetail = document.querySelector("#spcboy-mobile-screen-detail");
   const mobileScreenSound = document.querySelector("#spcboy-mobile-screen-sound");
+  const mobileScreenNav = document.querySelector("#spcboy-mobile-screen-nav");
   const mobileScreenAdmin = document.querySelector("#spcboy-mobile-screen-admin");
   const mobileNowArtwork = document.querySelector("#spcboy-mobile-now-art");
   const mobileNowTitle = document.querySelector("#spcboy-mobile-now-title");
   const mobileNowAlbum = document.querySelector("#spcboy-mobile-now-album");
-  const mobileProgressFill = document.querySelector("#spcboy-mobile-progress-fill");
   const mobileElapsed = document.querySelector("#spcboy-mobile-elapsed");
   const mobileDuration = document.querySelector("#spcboy-mobile-duration");
   const mobilePlayButton = document.querySelector("#spcboy-mobile-play");
@@ -2295,7 +2295,15 @@
     scheduleSelectionIndicators();
   });
   foldAllButton?.addEventListener("click", () => {
-    trackList.querySelectorAll(".spcboy-system, .spcboy-game").forEach((details) => { details.open = false; });
+    const systems = [...trackList.querySelectorAll(".spcboy-system")];
+    const games = [...trackList.querySelectorAll(".spcboy-game")];
+    const anyOpen = systems.some((d) => d.open) || games.some((d) => d.open);
+    if (anyOpen) {
+      systems.forEach((d) => { d.open = false; });
+      games.forEach((d) => { d.open = false; });
+    } else {
+      systems.filter((d) => !d.hidden).forEach((d) => { d.open = true; });
+    }
     hoveredSidebarItem = null;
     scheduleSelectionIndicators();
   });
@@ -2415,7 +2423,7 @@
 
   function setMobileAppPage(nextPage, { syncView = true } = {}) {
     if (!mobileAppNav) return;
-    if (!["playing", "library", "gallery", "recent", "favorites", "sound", "detail", "admin"].includes(nextPage)) return;
+    if (!["playing", "library", "gallery", "recent", "favorites", "sound", "detail", "nav", "admin"].includes(nextPage)) return;
     mobileAppPage = nextPage;
     if (syncView && !isDesktop()) {
       const mobileViewMap = { library: "all", gallery: "gallery", recent: "recent", favorites: "favorites" };
@@ -2427,7 +2435,8 @@
     }
     const navButtons = mobileAppNav.querySelectorAll("[data-mobile-app-page]");
     for (const button of navButtons) {
-      const selected = button.dataset.mobileAppPage === nextPage;
+      const targetPage = button.dataset.mobileAppPage;
+      const selected = targetPage === nextPage || (targetPage === "nav" && nextPage === "admin");
       if (selected) button.setAttribute("aria-current", "page");
       else button.removeAttribute("aria-current");
     }
@@ -2438,6 +2447,7 @@
     if (mobileScreenFavorites) mobileScreenFavorites.classList.toggle("is-hidden", nextPage !== "favorites");
     if (mobileScreenDetail) mobileScreenDetail.classList.toggle("is-hidden", nextPage !== "detail");
     if (mobileScreenSound) mobileScreenSound.classList.toggle("is-hidden", nextPage !== "sound");
+    if (mobileScreenNav) mobileScreenNav.classList.toggle("is-hidden", nextPage !== "nav");
     if (mobileScreenAdmin) mobileScreenAdmin.classList.toggle("is-hidden", nextPage !== "admin");
 
     if (mobileDock) {
@@ -2930,7 +2940,8 @@
     const activePreset = typeof currentMobileEqPreset === "number" ? currentMobileEqPreset : 0;
     updateMobileEqToolbar(eqEnabled ? activePreset : "off");
 
-    const gains = window.SitePlayer.getEqualizerBands?.() || [];
+    const rawGains = window.SitePlayer.getEqualizerBands?.() || [];
+    const gains = eqEnabled ? rawGains : Array(10).fill(0);
     gains.forEach((gain, idx) => {
       const input = document.querySelector(`[data-mobile-eq-band="${idx}"]`);
       const output = document.querySelector(`[data-mobile-eq-value="${idx}"]`);
@@ -3241,7 +3252,6 @@
     const duration = parseMobileTime(durationText);
     const ratio = Number.isFinite(duration) && duration > 0 ? Math.max(0, Math.min(1, elapsed / duration)) : 0;
     const transform = `scaleX(${ratio})`;
-    if (mobileProgressFill) mobileProgressFill.style.transform = transform;
     if (mobileDockProgressFill) mobileDockProgressFill.style.transform = transform;
   }
 
@@ -3286,7 +3296,7 @@
     renderMobileNowAlbumTracks(activeTrack);
   }
 
-  mobileAppNav?.addEventListener("click", (event) => {
+  mobileApp?.addEventListener("click", (event) => {
     const rawTarget = event.target && event.target.nodeType === 3 ? event.target.parentElement : event.target;
     const btn = rawTarget && typeof rawTarget.closest === "function" ? rawTarget.closest("[data-mobile-app-page]") : null;
     if (!btn) return;
@@ -3294,21 +3304,6 @@
     const nextPage = btn.dataset.mobileAppPage;
     if (nextPage) setMobileAppPage(nextPage);
   });
-
-  const mobileProgressWrap = document.querySelector("#spcboy-mobile-progress-wrap");
-  function handleMobileProgressSeek(event) {
-    if (!mobileProgressWrap || !window.SitePlayer) return;
-    const rect = mobileProgressWrap.getBoundingClientRect();
-    const clientX = event.touches && event.touches[0] ? event.touches[0].clientX : event.clientX;
-    if (typeof clientX !== "number") return;
-    const fraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    const activeTrack = window.SitePlayer.getCurrentTrack?.() || currentTrack;
-    const duration = window.SitePlayer.getDuration?.(activeTrack) || 0;
-    if (duration > 0) {
-      window.SitePlayer.seekTo?.(duration * fraction);
-    }
-  }
-  mobileProgressWrap?.addEventListener("click", handleMobileProgressSeek);
 
   document.querySelector("#spcboy-mobile-detail-back")?.addEventListener("click", (event) => {
     event.preventDefault();
@@ -3369,9 +3364,14 @@
     btn.addEventListener("click", async () => {
       const mode = btn.dataset.mobileEqMode;
       if (mode === "off") {
-        await window.SitePlayer?.setEqualizerEnabled?.(false);
         updateMobileEqToolbar("off");
-        showMobileToast("Equalizer OFF");
+        animateMobileFaders(Array(10).fill(0), {
+          duration: 240,
+          onComplete: async () => {
+            await window.SitePlayer?.setEqualizerEnabled?.(false);
+            showMobileToast("Equalizer OFF");
+          },
+        });
       } else {
         const presetIdx = Number(mode);
         currentMobileEqPreset = presetIdx;

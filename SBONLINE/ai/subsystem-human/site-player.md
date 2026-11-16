@@ -1,43 +1,65 @@
 # Hosted Site Player
 
-## Player
+## Split-Skin Player Architecture
 
-SBONLINE is the authenticated hosted SPCBOY player. Desktop keeps the
-wide-library layout with console/game browsing, aligned playlist columns,
-gallery, site navigation, and the persistent player. Mobile uses one app shell
-with Playing, Library, Gallery, Sound, and Options pages. Playing keeps a
-centered square artwork area, track details, progress, a centered three-button
-transport row, and the current album track list. Library and Gallery keep their
-catalog and album browsing behavior inside the same shell.
+SBONLINE uses an intentional split-skin setup over one shared audio engine
+(`site-player.js`) and account preference store (`site-preferences.js`):
 
-Sound groups volume, the ten-band equalizer and presets, long play, fade-out and
-faded skips, and native-format playback speed. Options contains site interface
-preferences such as playlist and sidebar font size, row gap, and motion. Sound
-and Options use the same account-backed controls as the rest of the app, so
-their saved values follow the signed-in user across clients. Range sliders have
-large phone touch targets; mobile EQ and Volume values stack below their labels
-to leave more horizontal room for each slider. The mobile Equalizer toggle is a
-full-width “Equalizer ON/OFF” button and uses the existing SB2/SBO accent token.
-Numeric controls have clear labels and no trailing unit text.
+- **Desktop / Landscape Skin (`min-width: 781px`)**: Uses the two-pane
+  `#spcboy-library` workspace (`partials/spcboy_catalog_workspace.html`),
+  remembered workspace tabs with the Settings/Menu button nested right next to
+  the New Tab (`+`) button at the top-most rightmost corner (no separate
+  top-most `.topbar` on `/spcboy/`), draggable/resizable playlist columns,
+  bottom `#site-player` status dock, and slide-over `#spcboy-settings-panel`
+  drawer (`Navigation`, `Sound`, `Interface`, `Playback`).
+- **Mobile / Portrait Skin (`max-width: 780px`)**: Uses the dedicated
+  `#spcboy-mobile-app` shell (`partials/spcboy_mobile_shell.html` and
+  `spcboy-mobile.css`) with core playback tabs (`Playing`, `Library`, `Gallery`,
+  `Recent`, `Favorites`, `Sound`) plus `Nav` (a deeper vertical navigation
+  screen for site/account links and owner `Admin`), and a persistent mini-player
+  dock (`#spcboy-mobile-dock`) on non-`Playing` tabs.
 
-The persistent player keeps audio active while users change site pages. On
-mobile, the app pages provide the primary transport and the bottom status dock
-remains visible. The navigation drawer remains available for account, site,
-and administrative links.
+### Playing & Navigation
 
-## Audio and account behavior
+- **Mobile Playing**: Shows centered square artwork, track/album metadata, an
+  elapsed / duration time readout (`0:00 / 0:00`), a centered three-button
+  transport row (`|◀`, `▶`, `▶|`), and the current album track list with inline
+  favorite toggles. There is no seek slider on either skin because seeking can
+  interrupt live transcoded streams.
+- **Desktop Workspace**: Sidebar Row 1 houses transport, EQ, Long Play, Slow
+  Play, and Volume; Sidebar Row 2 houses game-title search, view tabs (`All`,
+  `Favorites`, `Recent`, `Gallery`), and Fold/Unfold All. Main Row 1 houses
+  remembered workspace tabs, New Tab (`+`), and the rightmost Settings/Menu
+  button.
 
-Selected tracks stream as 128 kbps AAC. Source packages stay compressed on the
-server; only the requested member is materialized for playback. Browser EQ and
-fractional playback speed use the hosted audio engine. A saved non-1× rate
-remains enabled when upgrading; new 1× settings start disabled. Long Play
-supports seconds or M:SS/H:MM:SS durations; zero means unlimited within the
-hosted session limit. Favorites, Recent, Gallery, and playback history use the
-authenticated account APIs.
+### Sound, Playback, and Desktop Interface Options
 
-The web UI is a hosted browser application, not the SB2 macOS host: native
-window controls, local filesystem browsing, catalog maintenance, and native
-decoder routing are not browser controls.
+- **Sound**: Groups Volume (20 steps of 5%), the 10-band Equalizer (−12 to
+  +12 dB in 0.5 dB steps) with a segmented `OFF / 1 / 2 / 3` preset bar, `Reset
+  to Flat`, and `Save to Preset N`. Both skins share the same saved presets and
+  smoothly animate fader transitions; selecting `OFF` moves all sliders to their
+  default (`0.0`) positions.
+- **Playback**: Ordered `Long Play`, `Slow Play`, and `Fade Out` across the
+  drawer and mobile Sound screen:
+  1. **Long Play** (seconds, `M:SS`, or `H:MM:SS`; `0` means unlimited up to the
+     page session limit).
+  2. **Slow Play** (source-decoder speed fractions from `1/2×` to `2×` in `1/64`
+     increments).
+  3. **Fade Out** (0–30 s) with Faded Skips.
+- **Desktop Interface (`Options → Interface`)**: Desktop-only UI preferences for
+  `Track text size` (`--sb-playlist-font-size`, 10–20 px), `Game list text size`
+  (`--sb-sidebar-font-size`, 10–20 px), `Row spacing` (`--sb-row-gap`, 0–32 px),
+  interface animation toggle/duration (`--site-motion-duration`, 0–600 ms), and
+  playlist column visibility. Mobile does not expose font or column settings.
+
+## Audio and Account Behavior
+
+Selected tracks stream as live ADTS AAC at the owner-configured global bitrate
+(default 192 kbps). Source packages stay compressed on the server; only the
+requested member is materialized for a playback request through VGMBoy's
+preparation helper. Web Audio processes volume, 10-band EQ, and faded skips in
+the browser when supported; iOS / `ManagedMediaSource` clients automatically
+fall back to server-encoded `?eq=` and `?volume=` stream parameters.
 
 ## Prototype
 
@@ -45,14 +67,17 @@ decoder routing are not browser controls.
 sample-data design fixture. It is not connected to the hosted catalog, account,
 or audio stream and is not playback evidence.
 
-## Production source
+## Production Source
 
 - [Player template](../../server/templates/accounts/spcboy.html)
+- [Desktop workspace partial](../../server/templates/accounts/partials/spcboy_catalog_workspace.html)
 - [Mobile shell partial](../../server/templates/accounts/partials/spcboy_mobile_shell.html)
-- [Base account template and shared settings](../../server/templates/accounts/base.html)
+- [Base account template and shared drawer](../../server/templates/accounts/base.html)
 - [Hosted theme](../../server/static/accounts/sb-theme.css)
-- [Hosted mobile player stylesheet](../../server/static/accounts/spcboy-mobile.css)
-- [Hosted site mobile stylesheet](../../server/static/accounts/sb-mobile.css)
+- [Desktop player stylesheet](../../server/static/accounts/sbonline.css)
+- [Mobile player stylesheet](../../server/static/accounts/spcboy-mobile.css)
+- [Site mobile stylesheet](../../server/static/accounts/sb-mobile.css)
 - [Player page adapter](../../server/static/accounts/spcboy.js)
 - [Audio engine](../../server/static/accounts/site-player.js)
+- [Desktop interface preferences](../../server/static/accounts/sb-interface.js)
 - [Account and site administration](site-admin.md)
