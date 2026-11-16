@@ -11,6 +11,11 @@ from .spcboy_gallery import THUMBNAIL_EXTENSION, read_gallery_index, spcboy_albu
 from .spcboy_timing import catalog_duration_seconds
 
 
+def _is_online_console(console):
+    """Keep Atari platforms out of the hosted selection until their UACs are ready."""
+    return "atari" not in str(console.get("name", "")).casefold()
+
+
 def spcboy_catalog_data():
     catalog_path = settings.SPCBOY_MEDIA_ROOT / "catalog.json"
     try:
@@ -40,7 +45,16 @@ def _read_spcboy_catalog(source_size, source_mtime_ns):
         or not isinstance(catalog.get("tracks"), dict)
     ):
         return None
-    return catalog
+    # Read and expose a filtered view. ScanSong's published source and media
+    # stay untouched; Atari platforms simply are not selectable in SBO yet.
+    return {
+        **catalog,
+        "consoles": [
+            console
+            for console in catalog["consoles"]
+            if isinstance(console, dict) and _is_online_console(console)
+        ],
+    }
 
 
 def spcboy_gallery_index():

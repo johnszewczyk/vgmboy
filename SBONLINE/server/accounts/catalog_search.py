@@ -10,7 +10,7 @@ from .spcboy_timing import catalog_duration_seconds
 
 _INDEX_LOCK = threading.Lock()
 _TOKEN_PATTERN = re.compile(r"[^\W_]+", re.UNICODE)
-_INDEX_VERSION = 2
+_INDEX_VERSION = 3
 
 
 def normalize_search_text(value):
