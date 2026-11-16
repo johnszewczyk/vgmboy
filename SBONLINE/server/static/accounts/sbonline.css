@@ -50,7 +50,7 @@ body.spcboy-body .spcboy-media-card { border-color: var(--line); background: var
 body.spcboy-body .spcboy-media-card-title { color: var(--ink); }
 .sbonline-workspace-tabs { display: flex; flex: 1; min-width: 0; height: 100%; gap: var(--sb-gap); overflow-x: auto; scrollbar-width: none; }
 .sbonline-workspace-tabs::-webkit-scrollbar { display: none; }
-.sbonline-workspace-tab { display: flex; flex: 1 1 160px; min-width: 90px; max-width: 240px; overflow: hidden; background: var(--sb-button-surface); border-radius: var(--sb-radius); }
+.sbonline-workspace-tab { display: flex; flex: 1 1 160px; min-width: 90px; overflow: hidden; background: var(--sb-button-surface); border-radius: var(--sb-radius); }
 .sbonline-workspace-tab.is-active { background: var(--sb-button-selected-surface); }
 .sbonline-workspace-tab button { height: 100%; min-height: 0; border: 0; background: transparent; color: var(--sb-button-ink); padding: 0; font: 11px/1 var(--sb-font); }
 .sbonline-workspace-tab [role="tab"] { flex: 1; min-width: 0; padding-inline: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
