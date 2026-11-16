@@ -181,7 +181,7 @@
   }
 
   async function openSPCBoyView(view) {
-    if (!["all", "favorites", "recent", "gallery"].includes(view)) return;
+    if (!["all", "favorites", "recent"].includes(view)) return;
     if (!window.location.pathname.endsWith("/spcboy/")) {
       if (!await navigate(new URL("/spcboy/", window.location.href))) return false;
     }

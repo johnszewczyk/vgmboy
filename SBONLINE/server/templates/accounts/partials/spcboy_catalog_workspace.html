@@ -28,7 +28,6 @@
           <nav class="spcboy-tabs" aria-label="Library views">
             <span class="spcboy-tabs-indicator" aria-hidden="true"></span>
             <button type="button" class="is-active" data-view="all" aria-label="Library" title="Library" aria-pressed="true"><svg aria-hidden="true"><use href="#icon-sidebar-views"/></svg><span>Library</span></button>
-            <button type="button" data-view="gallery" aria-label="Album gallery" title="Album gallery" aria-pressed="false"><svg aria-hidden="true"><use href="#icon-gallery"/></svg><span>Gallery</span></button>
             <button type="button" data-view="recent" aria-label="Recent plays" title="Recent plays" aria-pressed="false"><svg aria-hidden="true"><use href="#icon-history"/></svg><span>Recent</span></button>
             <button type="button" data-view="favorites" aria-label="Favorites" title="Favorites" aria-pressed="false"><svg aria-hidden="true"><use href="#icon-star"/></svg><span>Favorites</span></button>
           </nav>
@@ -65,38 +64,6 @@
           <button class="spcboy-card-more" id="spcboy-favorite-more" type="button" hidden>Load more favorites</button>
           <button class="spcboy-card-more" id="spcboy-recent-more" type="button" hidden>Load older</button>
         </div>
-      </section>
-      <section class="spcboy-gallery-panel" id="spcboy-gallery-panel" aria-label="Album gallery" hidden>
-        <div class="spcboy-gallery-toolbar sb-toolbar">
-          <label class="spcboy-gallery-console-picker"><span class="visually-hidden">Gallery console</span><select id="spcboy-gallery-console-select" aria-label="Gallery console"></select></label>
-          <div class="spcboy-gallery-zoom" aria-label="Gallery tile zoom">
-            <span aria-hidden="true">Zoom</span>
-            <button class="spcboy-gallery-zoom-step" id="spcboy-gallery-zoom-out" type="button" aria-label="Zoom gallery tiles out">−</button>
-            <label class="visually-hidden" for="spcboy-gallery-zoom">Gallery tile zoom</label>
-            <input id="spcboy-gallery-zoom" type="range" min="50" max="150" step="10" value="100" aria-valuetext="100 percent">
-            <output id="spcboy-gallery-zoom-value" for="spcboy-gallery-zoom">100%</output>
-            <button class="spcboy-gallery-zoom-step" id="spcboy-gallery-zoom-in" type="button" aria-label="Zoom gallery tiles in">+</button>
-          </div>
-        </div>
-        <div class="spcboy-gallery-grid" id="spcboy-gallery-grid"></div>
-        <p class="spcboy-empty" id="spcboy-gallery-empty" role="status" hidden></p>
-        <button class="spcboy-search-more" id="spcboy-gallery-more" type="button" hidden>Load more albums</button>
-        <section class="spcboy-gallery-detail" id="spcboy-gallery-detail" aria-label="Album details" hidden>
-          <header class="spcboy-gallery-detail-header">
-            <button class="spcboy-gallery-detail-back" id="spcboy-gallery-detail-back" type="button">‹ Gallery</button>
-            <button class="spcboy-gallery-detail-play" id="spcboy-gallery-detail-play" type="button">Play album</button>
-          </header>
-          <div class="spcboy-gallery-detail-summary">
-            <img id="spcboy-gallery-detail-artwork" alt="" width="240" height="240" decoding="async">
-            <div>
-              <h2 id="spcboy-gallery-detail-title"></h2>
-              <p id="spcboy-gallery-detail-console"></p>
-              <p id="spcboy-gallery-detail-count"></p>
-            </div>
-          </div>
-          <ol class="spcboy-gallery-detail-tracks" id="spcboy-gallery-detail-tracks" aria-label="Album tracks"></ol>
-          <p class="spcboy-gallery-detail-status" id="spcboy-gallery-detail-status" role="status" aria-live="polite" hidden></p>
-        </section>
       </section>
     </div>
   </section>

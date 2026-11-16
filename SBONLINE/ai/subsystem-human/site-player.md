@@ -11,24 +11,28 @@ SBONLINE uses an intentional split-skin setup over one shared audio engine
   the New Tab (`+`) button at the top-most rightmost corner (no separate
   top-most `.topbar` on `/spcboy/`), draggable/resizable playlist columns,
   bottom `#site-player` status dock, and slide-over `#spcboy-settings-panel`
-  drawer (`Navigation`, `Sound`, `Interface`, `Playback`).
+  drawer (`Navigation`, `Sound`, `Interface`, `Playback`). The desktop sidebar
+  browses the library, recent plays, and favorites; it has no Gallery view.
 - **Mobile / Portrait Skin (`max-width: 780px`)**: Uses the dedicated
   `#spcboy-mobile-app` shell (`partials/spcboy_mobile_shell.html` and
-  `spcboy-mobile.css`) with core playback tabs (`Playing`, `Library`, `Gallery`,
-  `Recent`, `Favorites`, `Sound`) plus `Nav` (a deeper vertical navigation
+  `spcboy-mobile.css`) with core playback tabs (`Playing`, `Library`, `Recent`,
+  `Favorites`, `Sound`) plus `Nav` (a deeper vertical navigation
   screen for site/account links and owner `Admin`), and a persistent mini-player
-  dock (`#spcboy-mobile-dock`) on non-`Playing` tabs.
+  dock (`#spcboy-mobile-dock`) on non-`Playing` tabs. Mobile Library browses
+  consoles and games; there is no Gallery or separate album-detail page.
 
 ### Playing & Navigation
 
-- **Mobile Playing**: Shows centered square artwork, track/album metadata, an
+- **Now Playing (both skins)**: Retains the current track's album artwork from
+  the catalog artwork URL. **Mobile Playing** shows centered square artwork,
+  track/album metadata, an
   elapsed / duration time readout (`0:00 / 0:00`), a centered three-button
   transport row (`|◀`, `▶`, `▶|`), and the current album track list with inline
   favorite toggles. There is no seek slider on either skin because seeking can
   interrupt live transcoded streams.
 - **Desktop Workspace**: Sidebar Row 1 houses transport, EQ, Long Play, Slow
   Play, and Volume; Sidebar Row 2 houses game-title search, view tabs (`All`,
-  `Favorites`, `Recent`, `Gallery`), and Fold/Unfold All. Main Row 1 houses
+  `Favorites`, `Recent`), and Fold/Unfold All. Main Row 1 houses
   remembered workspace tabs, New Tab (`+`), and the rightmost Settings/Menu
   button.
 

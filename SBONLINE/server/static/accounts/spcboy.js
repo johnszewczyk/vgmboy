@@ -6,10 +6,8 @@
   const mobileAppButtons = [...document.querySelectorAll("[data-mobile-app-page]")];
   const mobileScreenPlaying = document.querySelector("#spcboy-mobile-screen-playing");
   const mobileScreenLibrary = document.querySelector("#spcboy-mobile-screen-library");
-  const mobileScreenGallery = document.querySelector("#spcboy-mobile-screen-gallery");
   const mobileScreenRecent = document.querySelector("#spcboy-mobile-screen-recent");
   const mobileScreenFavorites = document.querySelector("#spcboy-mobile-screen-favorites");
-  const mobileScreenDetail = document.querySelector("#spcboy-mobile-screen-detail");
   const mobileScreenSound = document.querySelector("#spcboy-mobile-screen-sound");
   const mobileScreenNav = document.querySelector("#spcboy-mobile-screen-nav");
   const mobileScreenAdmin = document.querySelector("#spcboy-mobile-screen-admin");
@@ -40,29 +38,9 @@
   const cardList = document.querySelector("#spcboy-card-list");
   const cardEmpty = document.querySelector("#spcboy-card-empty");
   const recentMore = document.querySelector("#spcboy-recent-more");
-  const galleryPanel = document.querySelector("#spcboy-gallery-panel");
-  const galleryConsoleSelect = document.querySelector("#spcboy-gallery-console-select");
-  const galleryGrid = document.querySelector("#spcboy-gallery-grid");
-  const galleryDetail = document.querySelector("#spcboy-gallery-detail");
-  const galleryDetailBack = document.querySelector("#spcboy-gallery-detail-back");
-  const galleryDetailPlay = document.querySelector("#spcboy-gallery-detail-play");
-  const galleryDetailArtwork = document.querySelector("#spcboy-gallery-detail-artwork");
-  const galleryDetailTitle = document.querySelector("#spcboy-gallery-detail-title");
-  const galleryDetailConsole = document.querySelector("#spcboy-gallery-detail-console");
-  const galleryDetailCount = document.querySelector("#spcboy-gallery-detail-count");
-  const galleryDetailTracks = document.querySelector("#spcboy-gallery-detail-tracks");
-  const galleryDetailStatus = document.querySelector("#spcboy-gallery-detail-status");
-  const galleryZoom = document.querySelector("#spcboy-gallery-zoom");
-  const galleryZoomValue = document.querySelector("#spcboy-gallery-zoom-value");
-  const galleryZoomOut = document.querySelector("#spcboy-gallery-zoom-out");
-  const galleryZoomIn = document.querySelector("#spcboy-gallery-zoom-in");
-  const galleryEmpty = document.querySelector("#spcboy-gallery-empty");
-  const galleryMore = document.querySelector("#spcboy-gallery-more");
   const shuffleFavoritesButton = document.querySelector("#spcboy-shuffle-favorites");
   const favoriteMore = document.querySelector("#spcboy-favorite-more");
   if (!page || !library) return;
-
-  galleryConsoleSelect?.addEventListener("change", () => selectGalleryConsole(galleryConsoleSelect.value));
 
   const search = document.querySelector("#spcboy-search");
   const empty = document.querySelector("#spcboy-empty");
@@ -149,7 +127,6 @@
   const gameGroupsByKey = new Map();
   const gameGroupsByAlbumId = new Map();
   const gameGroupsByConsoleGame = new Map();
-  const galleryCards = [];
   let recentEntries = [];
   let collectionSidebarView = null;
   const recentHiddenEventIds = new Set();
@@ -171,9 +148,6 @@
   let catalogLoadingPhase = "idle";
   let catalogLoadingStartedAt = 0;
   let catalogLoadingTimer = null;
-  let galleryLoadingGeneration = 0;
-  let galleryPrefetchStart = 0;
-  let galleryPrefetchCount = 0;
   let resolveCatalogReady;
   const catalogReady = new Promise((resolve) => { resolveCatalogReady = resolve; });
   let currentTrack = null;
@@ -184,10 +158,10 @@
   let announcedPlaybackId = null;
   let streamOffsetSeconds = 0;
   const savedView = storage.get("view", "all");
-  let view = ["all", "favorites", "recent", "gallery"].includes(savedView) ? savedView : "all";
-  let mobileAppPage = view === "gallery" ? "gallery" : "playing";
+  let view = ["all", "favorites", "recent"].includes(savedView) ? savedView : "all";
+  let mobileAppPage = "playing";
   function syncWorkspaceHeading(name) {
-    const viewLabel = ({ all: "Library", favorites: "Favorites", recent: "Recent", gallery: "Gallery" })[view] || "Library";
+    const viewLabel = ({ all: "Library", favorites: "Favorites", recent: "Recent" })[view] || "Library";
     const heading = document.querySelector("#sbonline-playlist-title");
     if (heading) heading.textContent = name || viewLabel;
     const context = document.querySelector("#sbonline-context");
@@ -202,23 +176,6 @@
       if (mobile && workspaceToolbar.parentElement !== library) library.insertBefore(workspaceToolbar,stage);
       else if (!mobile && workspaceToolbar.parentElement !== stage) stage.prepend(workspaceToolbar);
     }
-    const activeGalleryConsoles = typeof galleryConsoles !== "undefined" ? galleryConsoles : document.querySelector('.spcboy-gallery-consoles');
-    if (activeGalleryConsoles) {
-      const desktop = window.matchMedia('(min-width: 781px)').matches;
-      if (view === "gallery") {
-        if (desktop) {
-          const sidebar = document.querySelector('.spcboy-tree');
-          if (sidebar && activeGalleryConsoles.parentElement !== sidebar) sidebar.append(activeGalleryConsoles);
-          activeGalleryConsoles.setAttribute('aria-orientation', 'vertical');
-          if (typeof trackList !== "undefined" && trackList) trackList.hidden = true;
-        } else {
-          const galleryToolbar = document.querySelector('.spcboy-gallery-toolbar');
-          if (galleryToolbar && activeGalleryConsoles.parentElement !== galleryToolbar) galleryToolbar.prepend(activeGalleryConsoles);
-          activeGalleryConsoles.setAttribute('aria-orientation', 'horizontal');
-          if (typeof trackList !== "undefined" && trackList) trackList.hidden = false;
-        }
-      }
-    }
     for (const tab of tabs) {
       const selected = tab.dataset.view === view;
       tab.classList.toggle("is-active", selected);
@@ -226,20 +183,6 @@
     }
   }
   let selectedGameKey = null;
-  let galleryConsoleName = "";
-  let galleryVisibleCount = 80;
-  let galleryZoomPercent = Math.max(50, Math.min(150, Number(storage.get("galleryZoomPercent", 100)) || 100));
-  let galleryDetailEntry = null;
-  let galleryDetailRequest = 0;
-  function selectGalleryConsole(consoleName) {
-    if (!consoleName) return;
-    galleryVisibleCount = 80;
-    galleryConsoleName = consoleName;
-    if (galleryConsoleSelect) galleryConsoleSelect.value = consoleName;
-    captureWorkspace();
-    if (view === "gallery") renderGalleryWithLoading();
-    else applyFilters();
-  }
   let nowPlayingTimer = null;
   const desktopLayout = window.matchMedia("(min-width: 781px)");
   let selectionIndicatorFrame = 0;
@@ -501,7 +444,6 @@
     if (!loadingNotice || !loadingMessage) return;
     loadingNotice.hidden = false;
     loadingNotice.dataset.loadingType = "catalog";
-    loadingNotice.classList.remove("is-gallery-loading");
     loadingNotice.classList.remove("is-error");
     loadingProgress.hidden = true;
     loadingProgress.value = 0;
@@ -539,7 +481,6 @@
     catalogLoadingPhase = errorMessage ? "error" : "done";
     library.removeAttribute("aria-busy");
     if (!loadingNotice) return;
-    loadingNotice.classList.remove("is-gallery-loading");
     if (errorMessage) {
       loadingNotice.classList.add("is-error");
       loadingProgress.hidden = true;
@@ -550,105 +491,6 @@
       delete loadingNotice.dataset.loadingType;
     }
   }
-
-  function beginGalleryLoading(message, total = null) {
-    if (!loadingNotice || !loadingMessage || !galleryPanel) return;
-    loadingNotice.hidden = false;
-    loadingNotice.dataset.loadingType = "gallery";
-    loadingNotice.classList.remove("is-error");
-    loadingNotice.classList.add("is-gallery-loading");
-    loadingMessage.textContent = message;
-    loadingProgress.hidden = !Number.isInteger(total) || total <= 0;
-    loadingProgress.max = Math.max(Number(total) || 1, 1);
-    loadingProgress.value = 0;
-    galleryPanel.setAttribute("aria-busy", "true");
-    library.setAttribute("aria-busy", "true");
-  }
-
-  function updateGalleryLoading(completed, total) {
-    if (!loadingMessage || !loadingProgress) return;
-    loadingMessage.textContent = `Loading gallery artwork · ${completed} / ${total}`;
-    loadingProgress.max = Math.max(total, 1);
-    loadingProgress.value = completed;
-    loadingProgress.hidden = false;
-  }
-
-  function finishGalleryLoading(generation) {
-    if (generation !== galleryLoadingGeneration || loadingNotice?.dataset.loadingType !== "gallery") return;
-    galleryPanel?.removeAttribute("aria-busy");
-    library.removeAttribute("aria-busy");
-    loadingNotice.hidden = true;
-    loadingNotice.classList.remove("is-gallery-loading", "is-error");
-    delete loadingNotice.dataset.loadingType;
-  }
-
-  function waitForGalleryImage(image) {
-    const loaded = image.complete ? Promise.resolve() : new Promise((resolve) => {
-      let timeout;
-      const finish = () => {
-        window.clearTimeout(timeout);
-        resolve();
-      };
-      timeout = window.setTimeout(finish, 10000);
-      image.addEventListener("load", finish, { once: true });
-      image.addEventListener("error", finish, { once: true });
-    });
-    return loaded.then(async () => {
-      if (image.naturalWidth && typeof image.decode === "function") {
-        await Promise.race([
-          image.decode().catch(() => {}),
-          new Promise((resolve) => window.setTimeout(resolve, 1500)),
-        ]);
-      }
-    });
-  }
-
-  async function renderGalleryWithLoading({ start = 0, count = 8, message = "Loading gallery…" } = {}) {
-    if (!catalogLoaded || view !== "gallery") return;
-    const generation = ++galleryLoadingGeneration;
-    galleryPrefetchStart = Math.max(0, start);
-    galleryPrefetchCount = Math.max(0, count);
-    beginGalleryLoading(message);
-    applyFilters();
-    galleryPrefetchCount = 0;
-    const images = [...galleryGrid.querySelectorAll("img")].slice(start, start + count);
-    if (!images.length) {
-      await new Promise((resolve) => requestAnimationFrame(resolve));
-      finishGalleryLoading(generation);
-      return;
-    }
-    let completed = 0;
-    updateGalleryLoading(0, images.length);
-    await Promise.all(images.map((image) => waitForGalleryImage(image).then(() => {
-      completed += 1;
-      if (generation === galleryLoadingGeneration) updateGalleryLoading(completed, images.length);
-    })));
-    finishGalleryLoading(generation);
-  }
-
-  function applyGalleryZoom() {
-    if (!galleryZoom || !galleryZoomValue || !galleryGrid) return;
-    const zoom = Math.max(Number(galleryZoom.min), Math.min(Number(galleryZoom.max), galleryZoomPercent));
-    galleryZoomPercent = zoom;
-    galleryZoom.value = String(zoom);
-    galleryZoom.setAttribute("aria-valuetext", `${zoom} percent`);
-    galleryZoomValue.value = `${zoom}%`;
-    galleryZoomValue.textContent = `${zoom}%`;
-    const baseTileRem = isDesktop() ? 8.5 : 6.6;
-    galleryGrid.style.setProperty("--spcboy-gallery-tile-min", `${baseTileRem * zoom / 100}rem`);
-  }
-
-  function setGalleryZoom(value) {
-    galleryZoomPercent = Math.max(50, Math.min(150, Math.round(Number(value) / 10) * 10));
-    storage.set("galleryZoomPercent", galleryZoomPercent);
-    applyGalleryZoom();
-  }
-
-  galleryZoom?.addEventListener("input", () => setGalleryZoom(galleryZoom.value));
-  galleryZoomOut?.addEventListener("click", () => setGalleryZoom(galleryZoomPercent - 10));
-  galleryZoomIn?.addEventListener("click", () => setGalleryZoom(galleryZoomPercent + 10));
-  desktopLayout.addEventListener("change", applyGalleryZoom);
-  applyGalleryZoom();
 
   function positionSelectionIndicators() {
     selectionIndicatorFrame = 0;
@@ -1210,189 +1052,6 @@
     button.title = `${active ? "Remove" : "Add"} ${albumName} ${active ? "from" : "to"} favorites`;
   }
 
-  function makeGalleryCard(entry) {
-    if (entry.galleryCard) return entry.galleryCard;
-    const card = document.createElement("article");
-    card.className = "spcboy-gallery-card";
-    card.dataset.albumKey = entry.key;
-    const open = document.createElement("button");
-    open.className = "spcboy-gallery-open";
-    open.type = "button";
-    open.setAttribute("aria-label", `Open ${entry.gameName} album`);
-    const image = document.createElement("img");
-    image.src = entry.artworkUrl;
-    image.alt = "";
-    image.width = 240;
-    image.height = 240;
-    image.loading = "lazy";
-    image.decoding = "async";
-    const cover = document.createElement("span");
-    cover.className = "spcboy-gallery-cover";
-    cover.append(image);
-    const name = document.createElement("button");
-    name.className = "spcboy-gallery-name";
-    name.type = "button";
-    name.textContent = entry.gameName;
-    open.append(cover);
-    open.addEventListener("click", () => openGalleryAlbum(entry));
-    name.addEventListener("click", () => openGalleryAlbum(entry));
-    const meta = document.createElement("div");
-    meta.className = "spcboy-gallery-meta";
-    meta.append(name, makeAlbumFavoriteButton(entry.albumId, entry.gameName));
-    card.append(open, meta);
-    entry.galleryCard = card;
-    return card;
-  }
-
-  function releaseGalleryCard(entry) {
-    if (!entry.galleryCard) return;
-    entry.galleryCard.querySelector("img")?.removeAttribute("src");
-    entry.galleryCard.remove();
-    entry.galleryCard = null;
-  }
-
-  function releaseGalleryCards() {
-    for (const entry of galleryCards) releaseGalleryCard(entry);
-    galleryGrid.replaceChildren();
-    galleryVisibleCount = 80;
-  }
-
-  function renderGallery() {
-    if (galleryConsoleSelect) galleryConsoleSelect.value = galleryConsoleName;
-    for (const system of trackList.querySelectorAll(".spcboy-system")) {
-      const selected = view === "gallery" && system.dataset.console === galleryConsoleName;
-      system.classList.toggle("is-gallery-selected", selected);
-      const summary = system.querySelector("summary");
-      if (selected) summary?.setAttribute("aria-current", "true");
-      else summary?.removeAttribute("aria-current");
-    }
-    const matchingAlbums = galleryCards.filter((entry) => entry.consoleName === galleryConsoleName && !entry.row.hidden);
-    const shownAlbums = new Set(matchingAlbums.slice(0, galleryVisibleCount));
-    for (const entry of galleryCards) {
-      if (!shownAlbums.has(entry)) releaseGalleryCard(entry);
-    }
-    let visibleAlbums = 0;
-    for (const entry of shownAlbums) {
-      const card = makeGalleryCard(entry);
-      if (card.parentElement !== galleryGrid) galleryGrid.append(card);
-      card.hidden = false;
-      const image = card.querySelector("img");
-      image.loading = visibleAlbums >= galleryPrefetchStart
-        && visibleAlbums < galleryPrefetchStart + galleryPrefetchCount
-        ? "eager"
-        : "lazy";
-      visibleAlbums += 1;
-    }
-    galleryMore.hidden = matchingAlbums.length <= galleryVisibleCount;
-    galleryMore.textContent = `Load more albums (${visibleAlbums.toLocaleString()} / ${matchingAlbums.length.toLocaleString()})`;
-    galleryGrid.hidden = false;
-    galleryEmpty.hidden = visibleAlbums > 0;
-    galleryEmpty.textContent = search.value.trim()
-      ? "No matching albums with artwork."
-      : "No artwork is available for this console yet.";
-    return visibleAlbums;
-  }
-
-  function clearGalleryDetailTracks() {
-    for (const row of galleryDetailTracks?.querySelectorAll(".spcboy-track-row") ?? []) {
-      const rows = trackRowsById.get(row.dataset.id) ?? [];
-      const remaining = rows.filter((candidate) => candidate !== row);
-      if (remaining.length) trackRowsById.set(row.dataset.id, remaining);
-      else trackRowsById.delete(row.dataset.id);
-    }
-    galleryDetailTracks?.replaceChildren();
-  }
-
-  function showGalleryAlbumDetails(entry) {
-    if (!entry || !galleryDetail) return;
-    const request = ++galleryDetailRequest;
-    galleryDetailEntry = entry;
-    galleryPanel.classList.add("is-detail-open");
-    galleryGrid.hidden = true;
-    galleryMore.hidden = true;
-    galleryEmpty.hidden = true;
-    galleryDetail.hidden = false;
-    galleryDetailTitle.textContent = entry.gameName;
-    galleryDetailConsole.textContent = entry.consoleName;
-    galleryDetailCount.textContent = `${entry.trackCount.toLocaleString()} tracks`;
-    galleryDetailArtwork.src = entry.detailArtworkUrl || entry.artworkUrl;
-    galleryDetailArtwork.alt = `${entry.gameName} album artwork`;
-    galleryDetailStatus.replaceChildren();
-    galleryDetailStatus.textContent = "Loading tracks…";
-    galleryDetailStatus.hidden = false;
-    galleryDetailPlay.disabled = true;
-    clearGalleryDetailTracks();
-
-    ensureAlbumTracks(entry).then((albumTracks) => {
-      if (request !== galleryDetailRequest || galleryDetailEntry !== entry) return;
-      galleryDetailCount.textContent = `${albumTracks.length.toLocaleString()} tracks`;
-      galleryDetailPlay.disabled = albumTracks.length === 0;
-      if (!albumTracks.length) {
-        galleryDetailStatus.textContent = "Tracks could not be loaded.";
-        const retry = document.createElement("button");
-        retry.className = "spcboy-gallery-detail-retry";
-        retry.type = "button";
-        retry.textContent = "Retry";
-        retry.addEventListener("click", () => showGalleryAlbumDetails(entry));
-        galleryDetailStatus.append(" ", retry);
-        return;
-      }
-      galleryDetailStatus.hidden = true;
-      albumTracks.forEach((track, index) => {
-        const row = makeTrackRow(track, index, { source: "album", group: entry });
-        row.classList.add("spcboy-gallery-detail-row");
-        galleryDetailTracks.append(row);
-        const rows = trackRowsById.get(track.id) ?? [];
-        rows.push(row);
-        trackRowsById.set(track.id, rows);
-      });
-    });
-  }
-
-  function closeGalleryAlbumDetails() {
-    if (!galleryDetail || !galleryDetailEntry) return;
-    galleryDetailRequest += 1;
-    galleryDetailEntry = null;
-    clearGalleryDetailTracks();
-    galleryDetailArtwork.removeAttribute("src");
-    galleryDetailStatus.replaceChildren();
-    galleryDetailStatus.hidden = true;
-    galleryDetail.hidden = true;
-    galleryPanel.classList.remove("is-detail-open");
-    renderGallery();
-  }
-
-  async function playGalleryDetailAlbum() {
-    const entry = galleryDetailEntry;
-    if (!entry) return;
-    const albumTracks = await ensureAlbumTracks(entry);
-    if (galleryDetailEntry === entry && albumTracks.length) {
-      window.SitePlayer?.playPlaylist(albumTracks);
-    }
-  }
-
-  function openGalleryAlbum(entry) {
-    if (!entry) return;
-    if (typeof isDesktop === "function" && !isDesktop()) {
-      showGalleryAlbumDetails(entry);
-      return;
-    }
-    if (view === "gallery") {
-      releaseGalleryCards();
-      view = "all";
-      storage.set("view", view);
-      search.value = "";
-      if (headerSearch) headerSearch.value = "";
-      pendingHeaderSearch = null;
-      syncViewButtons();
-      scheduleCatalogSearch();
-    }
-    selectedGameKey = entry.key;
-    selectGame(entry.key);
-    entry.details.scrollIntoView?.({ block: "nearest" });
-    scheduleSelectionIndicators();
-  }
-
   function syncTrackContainers() {
     const desktop = isDesktop();
     const mobileAggregate = !desktop && view === "favorites";
@@ -1527,25 +1186,12 @@
     gameGroupsByKey.clear();
     gameGroupsByAlbumId.clear();
     gameGroupsByConsoleGame.clear();
-    galleryCards.length = 0;
-    galleryVisibleCount = 80;
-    galleryConsoleSelect?.replaceChildren();
-    galleryGrid.replaceChildren();
-    galleryConsoleName = "";
     const consoles = Array.isArray(catalog.consoles) ? catalog.consoles : [];
-    if (galleryConsoleSelect) galleryConsoleSelect.disabled = consoles.length === 0;
     const totalGames = consoles.reduce((total, consoleData) => total + (Array.isArray(consoleData.games) ? consoleData.games.length : 0), 0);
     let renderedGames = 0;
     updateCatalogBuildProgress(0, totalGames);
     for (const [consoleIndex, consoleData] of consoles.entries()) {
       const consoleName = canonicalConsoleName(consoleData.name);
-      if (!galleryConsoleName) galleryConsoleName = consoleName;
-      if (galleryConsoleSelect) {
-        const option = document.createElement("option");
-        option.value = consoleName;
-        option.textContent = consoleName;
-        galleryConsoleSelect.append(option);
-      }
       const games = Array.isArray(consoleData.games) ? consoleData.games : [];
       const system = makeDetails("spcboy-system", consoleName, games.length);
       system.dataset.console = consoleName;
@@ -1555,10 +1201,6 @@
       trackList.append(system);
       system.querySelector("summary").addEventListener("click", (event) => {
         if (event.isTrusted) searchOpenedSystems.delete(system);
-        if (view === "gallery" && isDesktop()) {
-          event.preventDefault();
-          selectGalleryConsole(consoleName);
-        }
       });
       system.addEventListener("toggle", (event) => {
         if (!event.isTrusted || !system.open || isDesktop()) return;
@@ -1574,7 +1216,6 @@
         if (!trackCount) group.classList.add("is-leaf");
         const albumId = typeof gameData.albumId === "string" ? gameData.albumId : "";
         const artworkUrl = typeof gameData.artworkUrl === "string" ? gameData.artworkUrl : "";
-        const detailArtworkUrl = typeof gameData.detailArtworkUrl === "string" ? gameData.detailArtworkUrl : artworkUrl;
         const gameKey = `${consoleIndex}:${gameIndex}`;
         group.dataset.gameKey = gameKey;
         const gameRow = document.createElement("div");
@@ -1604,7 +1245,6 @@
           key: gameKey,
           albumId,
           artworkUrl,
-          detailArtworkUrl,
           consoleName,
           gameName: gameData.name,
           trackCount,
@@ -1632,7 +1272,6 @@
         gameGroupsByKey.set(gameKey, entry);
         if (albumId) gameGroupsByAlbumId.set(albumId, entry);
         gameGroupsByConsoleGame.set(`${consoleName}\u0000${gameData.name}`, entry);
-        if (artworkUrl) galleryCards.push(entry);
         renderedGames += 1;
         if (renderedGames % 32 === 0 && isDesktop()) {
           updateCatalogBuildProgress(renderedGames, totalGames);
@@ -1642,7 +1281,6 @@
     }
     updateCatalogBuildProgress(renderedGames, totalGames);
     setCatalogFinishing();
-    if (galleryConsoleSelect) galleryConsoleSelect.value = galleryConsoleName;
     syncSidebarAlbumFavorites();
     trackList.append(empty);
     catalogLoaded = true;
@@ -1653,7 +1291,6 @@
       renderMobileUpNext();
       if (!isDesktop()) {
         if (mobileAppPage === "library") renderMobileLibrary();
-        else if (mobileAppPage === "gallery") renderMobileGallery();
       }
     } catch (err) {
       console.warn("Mobile initial render warning:", err);
@@ -1876,7 +1513,7 @@
 
   function renderDesktopPlaylist() {
     const mobileAggregate = !isDesktop() && view === "favorites";
-    if ((!isDesktop() && !mobileAggregate) || view === "gallery") return;
+    if (!isDesktop() && !mobileAggregate) return;
     playlistContent.replaceChildren();
     const query = search.value.trim().toLocaleLowerCase();
     if (isDesktop() && (view === "favorites" || view === "recent")) {
@@ -2063,7 +1700,6 @@
   function applyFilters() {
     syncTrackContainers();
     const showingRecent = view === "recent";
-    const showingGallery = view === "gallery";
     const showingCards = !isDesktop() && (showingRecent || view === "favorites");
     const query = search.value.trim();
     const titleOnlySearch = Boolean(query);
@@ -2071,12 +1707,10 @@
     library.classList.toggle("is-mobile-results", mobileAggregate);
     library.classList.toggle("is-card-view", showingCards);
     library.classList.toggle("is-recent", showingRecent);
-    library.classList.toggle("is-gallery", showingGallery);
     library.classList.toggle("is-favorites", view === "favorites");
-    trackList.hidden = showingCards || (showingGallery && !isDesktop()) || mobileAggregate;
-    playlistPane.hidden = showingCards || showingGallery || (!isDesktop() && !mobileAggregate);
+    trackList.hidden = showingCards || mobileAggregate;
+    playlistPane.hidden = showingCards || (!isDesktop() && !mobileAggregate);
     cardPanel.hidden = !showingCards;
-    galleryPanel.hidden = !showingGallery;
     shuffleFavoritesButton.hidden = view !== "favorites";
     if (isDesktop() && (view === "favorites" || showingRecent)) {
       renderDesktopCollection();
@@ -2106,7 +1740,7 @@
     for (const [id, matchingRows] of trackRowsById) {
       const track = tracksById.get(id);
       const isFavorite = favorites.has(id) || Boolean(track?.albumId && favoriteAlbums.has(track.albumId));
-      const isVisibleInView = view === "all" || showingGallery
+      const isVisibleInView = view === "all"
         || (view === "favorites" && isFavorite);
       for (const row of matchingRows) {
         const track = tracksById.get(id);
@@ -2122,13 +1756,12 @@
       const titleMatch = titleOnlySearch && matchesSearchText(entry.gameName, query);
       const shown = query
         ? titleMatch
-        : view === "all" || (view === "favorites" && (hasVisibleRows || favoriteAlbums.has(entry.albumId)))
-          || (showingGallery && entry.artworkUrl);
+        : view === "all" || (view === "favorites" && (hasVisibleRows || favoriteAlbums.has(entry.albumId)));
       entry.row.hidden = !shown;
       entry.details.classList.toggle("is-selected", entry.key === selectedGameKey);
       if (shown) visibleGames += 1;
     }
-    if (titleOnlySearch && !showingGallery) {
+    if (titleOnlySearch) {
       for (const system of trackList.querySelectorAll(".spcboy-system")) {
         const containsMatch = gameGroups.some((entry) =>
           entry.details.closest(".spcboy-system") === system && !entry.row.hidden);
@@ -2143,9 +1776,9 @@
     }
     for (const system of library.querySelectorAll(".spcboy-system")) {
       const shown = gameGroups.some((entry) => entry.details.closest(".spcboy-system") === system && !entry.row.hidden);
-      system.hidden = !(showingGallery && !query) && !shown;
+      system.hidden = !shown;
     }
-    empty.hidden = (titleOnlySearch ? visibleGames !== 0 : visibleTracks !== 0) || (view === "all" && !query) || (showingGallery && !query)
+    empty.hidden = (titleOnlySearch ? visibleGames !== 0 : visibleTracks !== 0) || (view === "all" && !query)
       || (view === "favorites" && favoritePlaylistLoading);
     const hasFavorites = favorites.size > 0 || favoriteAlbums.size > 0;
     empty.textContent = view === "favorites" && !hasFavorites
@@ -2158,13 +1791,8 @@
     else if (view === "favorites" && favoritePlaylistLoading) playlistEmpty.textContent = "Loading your favorites…";
     else if (view === "favorites" && favoritePlaylistFailed) playlistEmpty.textContent = "Favorites could not load. Switch tabs and try again.";
     else playlistEmpty.textContent = "No matching tracks.";
-    if (showingGallery) {
-      const galleryCount = renderGallery();
-      libraryState.textContent = `${galleryCount.toLocaleString()} albums`;
-    } else {
-      if (isDesktop() || mobileAggregate) renderDesktopPlaylist();
-      libraryState.textContent = gameCountLabel(visibleGames);
-    }
+    if (isDesktop() || mobileAggregate) renderDesktopPlaylist();
+    libraryState.textContent = gameCountLabel(visibleGames);
     if (favoriteMore) {
       favoriteMore.hidden = view !== "favorites" || !favoritePlaylistNextPage || favoritePlaylistLoading || !favoritePlaylistTracks.length;
       favoriteMore.disabled = favoritePlaylistLoading;
@@ -2177,7 +1805,6 @@
 
   function scheduleCatalogSearch() {
     captureWorkspace();
-    if (view === "gallery") galleryVisibleCount = 80;
     applyFilters();
   }
 
@@ -2264,13 +1891,6 @@
   document.fonts.ready.then(schedulePlaylistColumnLayout);
   window.addEventListener("resize", schedulePlaylistColumnLayout, { passive: true });
   document.addEventListener("sb:interface-changed", schedulePlaylistColumnLayout);
-  galleryMore?.addEventListener("click", () => {
-    const start = galleryVisibleCount;
-    galleryVisibleCount += 80;
-    renderGalleryWithLoading({ start, message: "Loading more gallery artwork…" });
-  });
-  galleryDetailBack?.addEventListener("click", closeGalleryAlbumDetails);
-  galleryDetailPlay?.addEventListener("click", playGalleryDetailAlbum);
   shuffleFavoritesButton.addEventListener("click", async () => {
     const playlist = await loadFavoritePlaylist({ allPages: true });
     if (!playlist.length) {
@@ -2282,7 +1902,6 @@
   desktopLayout.addEventListener("change", () => {
     placeMobileSettingsPages();
     setMobileAppPage(mobileAppPage, { syncView: false });
-    if (isDesktop() && galleryDetailEntry) closeGalleryAlbumDetails();
     syncSidebarAlbumFavorites();
     syncViewButtons();
     hoveredSidebarItem = null;
@@ -2290,7 +1909,6 @@
     lastPlaylistIndicatorTrackId = null;
     syncResponsiveLists();
     if (search.value.trim()) scheduleCatalogSearch();
-    applyGalleryZoom();
     schedulePlaylistColumnLayout();
     scheduleSelectionIndicators();
   });
@@ -2343,19 +1961,13 @@
   window.addEventListener("resize", scheduleSelectionIndicators);
   for (const tab of tabs) {
     tab.addEventListener("click", () => {
-      const previousView = view;
       view = tab.dataset.view;
       storage.set("view", view);
       if (view === "favorites" || view === "recent") selectedGameKey = null;
-      if (previousView === "gallery" && view !== "gallery") {
-        closeGalleryAlbumDetails();
-        releaseGalleryCards();
-      }
       syncViewButtons();
       captureWorkspace();
       scheduleSelectionIndicators();
-      if (view === "gallery") renderGalleryWithLoading();
-      else if (search.value.trim()) scheduleCatalogSearch();
+      if (search.value.trim()) scheduleCatalogSearch();
       else applyFilters();
       if (view === "recent") loadRecents(true);
       if (view === "favorites") loadFavoritePlaylist();
@@ -2379,9 +1991,6 @@
   }
   let mobileTrackListAlbumId = "";
   let mobileTrackListGeneration = 0;
-  let mobilePreviousPage = "gallery";
-  let mobileGallerySelectedConsole = "";
-  let mobileGalleryLimit = 100;
   let mobileLibraryRenderToken = 0;
   let mobileToastTimer = null;
   let openMobileConsole = "";
@@ -2423,10 +2032,10 @@
 
   function setMobileAppPage(nextPage, { syncView = true } = {}) {
     if (!mobileAppNav) return;
-    if (!["playing", "library", "gallery", "recent", "favorites", "sound", "detail", "nav", "admin"].includes(nextPage)) return;
+    if (!["playing", "library", "recent", "favorites", "sound", "nav", "admin"].includes(nextPage)) return;
     mobileAppPage = nextPage;
     if (syncView && !isDesktop()) {
-      const mobileViewMap = { library: "all", gallery: "gallery", recent: "recent", favorites: "favorites" };
+      const mobileViewMap = { library: "all", recent: "recent", favorites: "favorites" };
       if (nextPage in mobileViewMap && view !== mobileViewMap[nextPage]) {
         view = mobileViewMap[nextPage];
         storage.set("view", view);
@@ -2442,10 +2051,8 @@
     }
     if (mobileScreenPlaying) mobileScreenPlaying.classList.toggle("is-hidden", nextPage !== "playing");
     if (mobileScreenLibrary) mobileScreenLibrary.classList.toggle("is-hidden", nextPage !== "library");
-    if (mobileScreenGallery) mobileScreenGallery.classList.toggle("is-hidden", nextPage !== "gallery");
     if (mobileScreenRecent) mobileScreenRecent.classList.toggle("is-hidden", nextPage !== "recent");
     if (mobileScreenFavorites) mobileScreenFavorites.classList.toggle("is-hidden", nextPage !== "favorites");
-    if (mobileScreenDetail) mobileScreenDetail.classList.toggle("is-hidden", nextPage !== "detail");
     if (mobileScreenSound) mobileScreenSound.classList.toggle("is-hidden", nextPage !== "sound");
     if (mobileScreenNav) mobileScreenNav.classList.toggle("is-hidden", nextPage !== "nav");
     if (mobileScreenAdmin) mobileScreenAdmin.classList.toggle("is-hidden", nextPage !== "admin");
@@ -2457,7 +2064,6 @@
     try {
       if (nextPage === "playing") renderMobileNowPlaying();
       else if (nextPage === "library") renderMobileLibrary();
-      else if (nextPage === "gallery") renderMobileGallery();
       else if (nextPage === "recent") renderMobileRecents();
       else if (nextPage === "favorites") renderMobileFavorites();
       else if (nextPage === "sound") syncMobileSoundControls();
@@ -2589,13 +2195,6 @@
               });
             }
 
-            const detailsLink = document.createElement("button");
-            detailsLink.type = "button";
-            detailsLink.className = "spcboy-mobile-album-detail-link";
-            detailsLink.textContent = "Album artwork";
-            detailsLink.addEventListener("click", () => openMobileAlbumDetail(gameEntry, "library"));
-            inlineTracks.append(detailsLink);
-
             albumEntry.append(inlineTracks);
           }
           albumsContainer.append(albumEntry);
@@ -2627,22 +2226,20 @@
     return button;
   }
 
-  function createMobileTrackRowItem(track, idx, { detail = false, subtitle = null, isPlaying = false, onPlay } = {}) {
+  function createMobileTrackRowItem(track, idx, { subtitle = null, isPlaying = false, onPlay } = {}) {
     const row = document.createElement("li");
     row.className = "spcboy-mobile-track-item" + (isPlaying ? " is-playing" : "");
 
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "spcboy-mobile-track-row"
-      + (detail ? " spcboy-mobile-detail-track-row" : " spcboy-mobile-recent-track-row")
-      + (isPlaying ? " is-playing" : "");
+    btn.className = "spcboy-mobile-track-row spcboy-mobile-recent-track-row" + (isPlaying ? " is-playing" : "");
     btn.dataset.trackId = track.id;
 
     const num = document.createElement("span");
-    num.className = detail ? "spcboy-mobile-track-num spcboy-mobile-detail-number" : "spcboy-mobile-track-num";
+    num.className = "spcboy-mobile-track-num";
     num.textContent = String(idx + 1).padStart(2, "0");
 
-    if (subtitle !== null && !detail) {
+    if (subtitle !== null) {
       const info = document.createElement("div");
       info.className = "spcboy-mobile-recent-info";
       const title = document.createElement("span");
@@ -2655,7 +2252,7 @@
       btn.append(num, info);
     } else {
       const title = document.createElement("span");
-      title.className = detail ? "spcboy-mobile-track-title spcboy-mobile-detail-title" : "spcboy-mobile-track-title";
+      title.className = "spcboy-mobile-track-title";
       title.textContent = track.title || track.id;
       btn.append(num, title);
     }
@@ -2691,172 +2288,6 @@
       row.append(trackBtn, createMobileTrackFavoriteButton(track));
       container.append(row);
     });
-  }
-
-  function renderMobileGallery() {
-    const grid = document.querySelector("#spcboy-mobile-gallery-grid");
-    const picker = document.querySelector("#spcboy-mobile-gallery-console-select");
-    const searchInput = document.querySelector("#spcboy-mobile-gallery-search");
-    const moreBtn = document.querySelector("#spcboy-mobile-gallery-more");
-    if (!grid) return;
-    if (!catalogAvailable && !gameGroups.length) {
-      grid.innerHTML = '<p class="spcboy-mobile-empty" style="grid-column: 1 / -1;">Loading album artwork…</p>';
-      if (moreBtn) moreBtn.classList.add("is-hidden");
-      return;
-    }
-    let consoles = Array.isArray(rawCatalog?.consoles) ? rawCatalog.consoles : [];
-    if (!consoles.length && gameGroups.length) {
-      const names = [...new Set(gameGroups.map((g) => g.consoleName))];
-      consoles = names.map((name) => ({ name }));
-    }
-    if (picker && !picker.options.length) {
-      const allOpt = document.createElement("option");
-      allOpt.value = "";
-      allOpt.textContent = "All Consoles";
-      picker.append(allOpt);
-      consoles.forEach((c) => {
-        const cName = canonicalConsoleName(c.name);
-        const opt = document.createElement("option");
-        opt.value = cName;
-        opt.textContent = cName;
-        picker.append(opt);
-      });
-      picker.value = mobileGallerySelectedConsole || "";
-    }
-    const activeConsole = picker?.value || mobileGallerySelectedConsole || "";
-    const query = (searchInput?.value || "").trim().toLowerCase();
-
-    const matches = galleryCards.filter((entry) => {
-      const matchConsole = !activeConsole || entry.consoleName === activeConsole;
-      const matchQuery = !query || entry.gameName.toLowerCase().includes(query);
-      return matchConsole && matchQuery;
-    });
-
-    const frag = document.createDocumentFragment();
-    matches.slice(0, mobileGalleryLimit).forEach((entry) => {
-      const card = document.createElement("button");
-      card.type = "button";
-      card.className = "spcboy-mobile-album-card";
-      card.setAttribute("aria-label", `Open ${entry.gameName}`);
-
-      const coverWrap = document.createElement("span");
-      coverWrap.className = "spcboy-mobile-cover-wrap";
-
-      const img = document.createElement("img");
-      img.src = entry.artworkUrl;
-      img.alt = "";
-      img.loading = "lazy";
-      img.decoding = "async";
-      coverWrap.append(img);
-
-      const name = document.createElement("span");
-      name.className = "spcboy-mobile-album-name";
-      name.textContent = entry.gameName;
-
-      const meta = document.createElement("span");
-      meta.className = "spcboy-mobile-album-meta";
-      meta.textContent = `${entry.trackCount} track${entry.trackCount === 1 ? "" : "s"}`;
-
-      card.append(coverWrap, name, meta);
-      card.addEventListener("click", () => openMobileAlbumDetail(entry, "gallery"));
-      frag.append(card);
-    });
-
-    if (!matches.length) {
-      const empty = document.createElement("p");
-      empty.className = "spcboy-mobile-empty";
-      empty.style.gridColumn = "1 / -1";
-      empty.textContent = "No albums found.";
-      frag.append(empty);
-    }
-    grid.replaceChildren(frag);
-    if (moreBtn) moreBtn.classList.toggle("is-hidden", matches.length <= mobileGalleryLimit);
-  }
-
-  function openMobileAlbumDetail(entry, returnPage = "gallery") {
-    mobileDetailEntry = entry;
-    mobilePreviousPage = returnPage;
-    const backLabel = document.querySelector("#spcboy-mobile-back-label");
-    if (backLabel) backLabel.textContent = returnPage === "library" ? "Library" : "Gallery";
-
-    const heroArt = document.querySelector("#spcboy-mobile-detail-artwork");
-    const heroTitle = document.querySelector("#spcboy-mobile-detail-title");
-    const heroMeta = document.querySelector("#spcboy-mobile-detail-meta");
-    const playAlbumBtn = document.querySelector("#spcboy-mobile-detail-play");
-    const tracklistEl = document.querySelector("#spcboy-mobile-detail-tracks");
-    const statusEl = document.querySelector("#spcboy-mobile-detail-status");
-
-    if (heroArt) {
-      heroArt.src = entry.detailArtworkUrl || entry.artworkUrl || "";
-      heroArt.alt = `${entry.gameName} artwork`;
-    }
-    if (heroTitle) heroTitle.textContent = entry.gameName;
-    if (heroMeta) heroMeta.textContent = `${entry.consoleName} · ${entry.trackCount} tracks`;
-
-    if (playAlbumBtn) {
-      playAlbumBtn.onclick = async () => {
-        showMobileLoadingIndicator(`Loading ${entry.gameName}…`);
-        const tracks = await ensureAlbumTracks(entry, { retry: entry.loadFailed });
-        if (tracks.length) {
-          window.SitePlayer?.playPlaylist?.(tracks, { startTrackId: tracks[0]?.id, toggle: false });
-          setMobileAppPage("playing");
-        } else {
-          hideMobileLoadingIndicator();
-          showMobileToast("Could not load album tracks.");
-        }
-      };
-    }
-
-    if (tracklistEl) {
-      tracklistEl.replaceChildren();
-      if (statusEl) {
-        statusEl.textContent = "Loading tracks…";
-        statusEl.classList.remove("is-hidden");
-      }
-      ensureAlbumTracks(entry, { retry: entry.loadFailed }).then((tracks) => {
-        if (mobileDetailEntry !== entry) return;
-        if (!tracks.length && entry.loadFailed) {
-          if (statusEl) {
-            statusEl.textContent = "Failed to load album tracks. Tap to retry.";
-            statusEl.classList.remove("is-hidden");
-            statusEl.onclick = () => {
-              statusEl.onclick = null;
-              openMobileAlbumDetail(entry, returnPage);
-            };
-          }
-          return;
-        }
-        if (statusEl) {
-          statusEl.onclick = null;
-          statusEl.classList.add("is-hidden");
-        }
-        const activeTrack = window.SitePlayer?.getCurrentTrack?.() || currentTrack;
-        const frag = document.createDocumentFragment();
-        tracks.forEach((track, idx) => {
-          const isPlaying = activeTrack?.id === track.id;
-          frag.append(createMobileTrackRowItem(track, idx, {
-            detail: true,
-            isPlaying,
-            onPlay: (btn) => {
-              btn.classList.add("is-loading");
-              showMobileLoadingIndicator(track.title || "Loading track…");
-              selectTrack(track, true, { source: "album", group: entry });
-              setMobileAppPage("playing");
-            },
-          }));
-        });
-        tracklistEl.replaceChildren(frag);
-      }).catch(() => {
-        if (mobileDetailEntry !== entry) return;
-        if (statusEl) {
-          statusEl.textContent = "Failed to load album tracks.";
-          statusEl.classList.remove("is-hidden");
-        }
-      });
-    }
-
-    setMobileAppPage("detail");
-    if (mobileScreenDetail) mobileScreenDetail.scrollTop = 0;
   }
 
   let activeFaderAnimationId = null;
@@ -3057,8 +2488,7 @@
         tracks.forEach((track, idx) => {
           const isPlaying = track.id === activeTrack.id;
           listEl.append(createMobileTrackRowItem(track, idx, {
-            detail: true,
-            isPlaying,
+                        isPlaying,
             onPlay: (btn) => {
               btn.classList.add("is-loading");
               showMobileLoadingIndicator(track.title || "Loading track…");
@@ -3081,8 +2511,7 @@
     queueTracks.forEach((track, idx) => {
       const isPlaying = track.id === activeTrack.id;
       listEl.append(createMobileTrackRowItem(track, idx, {
-        detail: true,
-        isPlaying,
+                isPlaying,
         onPlay: (btn) => {
           btn.classList.add("is-loading");
           showMobileLoadingIndicator(track.title || "Loading track…");
@@ -3144,8 +2573,7 @@
       const isPlaying = Boolean(activeTrack && track.id === activeTrack.id);
       const subtitle = `${track.game || "Unknown Game"}${track.timestamp ? " · " + track.timestamp : ""}`;
       listEl.append(createMobileTrackRowItem(track, idx, {
-        detail: false,
-        subtitle,
+                subtitle,
         isPlaying,
         onPlay: (btn) => {
           btn.classList.add("is-loading");
@@ -3199,7 +2627,7 @@
       if (emptyEl) {
         emptyEl.textContent = query
           ? "No favorites matched your search."
-          : "No favorite tracks yet. Star tracks in Library or Gallery to build your Favorites.";
+          : "No favorite tracks yet. Star tracks in Library to build your Favorites.";
         emptyEl.classList.remove("is-hidden");
       }
       listEl.replaceChildren();
@@ -3214,8 +2642,7 @@
       const isPlaying = Boolean(activeTrack && track.id === activeTrack.id);
       const subtitle = [track.game || track.gameTitle, track.console || track.system].filter(Boolean).join(" · ");
       frag.append(createMobileTrackRowItem(track, idx, {
-        detail: false,
-        subtitle,
+                subtitle,
         isPlaying,
         onPlay: (btn, num) => {
           btn.classList.add("is-loading");
@@ -3259,7 +2686,7 @@
     const activeTrack = track || window.SitePlayer?.getCurrentTrack?.() || null;
     const matchingGroup = mobileGroupForTrack(activeTrack);
     const artworkURL = activeTrack
-      ? (matchingGroup?.detailArtworkUrl || activeTrack.artworkUrl || tracksById.get(activeTrack.id)?.artworkUrl || matchingGroup?.artworkUrl || "")
+      ? (activeTrack.artworkUrl || tracksById.get(activeTrack.id)?.artworkUrl || matchingGroup?.artworkUrl || "")
       : "";
 
     if (mobileNowTitle) mobileNowTitle.textContent = activeTrack?.title || "Nothing playing";
@@ -3305,12 +2732,7 @@
     if (nextPage) setMobileAppPage(nextPage);
   });
 
-  document.querySelector("#spcboy-mobile-detail-back")?.addEventListener("click", (event) => {
-    event.preventDefault();
-    setMobileAppPage(mobilePreviousPage || "gallery");
-  });
-
-  const dockMain = document.querySelector("#spcboy-mobile-dock-main");
+    const dockMain = document.querySelector("#spcboy-mobile-dock-main");
   if (dockMain) {
     dockMain.onclick = (event) => {
       const rawTarget = event.target && event.target.nodeType === 3 ? event.target.parentElement : event.target;
@@ -3863,15 +3285,7 @@
   document.querySelector("#spcboy-mobile-library-search")?.addEventListener("input", debounceMobileInput(() => {
     renderMobileLibrary();
   }));
-  document.querySelector("#spcboy-mobile-gallery-search")?.addEventListener("input", debounceMobileInput(() => {
-    mobileGalleryLimit = 100;
-    renderMobileGallery();
-  }));
-  document.querySelector("#spcboy-mobile-gallery-more")?.addEventListener("click", () => {
-    mobileGalleryLimit += 100;
-    renderMobileGallery();
-  });
-  document.querySelector("#spcboy-mobile-recent-search")?.addEventListener("input", debounceMobileInput(() => {
+    document.querySelector("#spcboy-mobile-recent-search")?.addEventListener("input", debounceMobileInput(() => {
     renderMobileRecents();
   }));
   document.querySelector("#spcboy-mobile-recent-more")?.addEventListener("click", () => {
@@ -3886,11 +3300,6 @@
       showMobileLoadingIndicator("Shuffling Favorites…");
       window.SitePlayer?.playPlaylist(tracks, { shuffle: true, toggle: false });
     }
-  });
-  document.querySelector("#spcboy-mobile-gallery-console-select")?.addEventListener("change", (e) => {
-    mobileGallerySelectedConsole = e.target.value;
-    mobileGalleryLimit = 100;
-    renderMobileGallery();
   });
 
   window.addEventListener("siteplayer:settings-changed", () => {
@@ -3983,7 +3392,7 @@
   const workspaceStrip = document.querySelector('#sbonline-workspace-tabs');
   const addWorkspaceButton = document.querySelector('#sbonline-add-tab');
   const workspaceMenu = document.querySelector('#sbonline-context-menu');
-  const workspaceViews = ['all','gallery','favorites','recent'];
+  const workspaceViews = ['all','favorites','recent'];
   const savedWorkspace = storage.get('workspaceTabs', null);
   const hasSavedWorkspace = savedWorkspace?.version === 1 && Array.isArray(savedWorkspace.tabs) && savedWorkspace.tabs.length > 0;
   const seenWorkspaceIds = new Set();
@@ -3993,12 +3402,11 @@
     return [{ id: tab.id, view: workspaceViews.includes(tab.view) ? tab.view : 'all',
       albumId: typeof tab.albumId === 'string' && /^[0-9a-f]{32}$/.test(tab.albumId) ? tab.albumId : null,
       query: typeof tab.query === 'string' ? tab.query.slice(0,256) : '',
-      console: typeof tab.console === 'string' ? tab.console.slice(0,160) : '',
       sidebarScroll: Math.max(0,Math.min(1000000,Number(tab.sidebarScroll)||0)),
       playlistScroll: Math.max(0,Math.min(1000000,Number(tab.playlistScroll)||0)),
     }];
   });
-  if (!workspaceTabs.length) workspaceTabs = [{ id: crypto.randomUUID(), view, albumId: null, query: '', console: '' }];
+  if (!workspaceTabs.length) workspaceTabs = [{ id: crypto.randomUUID(), view, albumId: null, query: '' }];
   let activeWorkspaceId = workspaceTabs.some(tab => tab.id === savedWorkspace?.activeId) ? savedWorkspace.activeId : workspaceTabs[0].id;
   let restoringWorkspace = false;
   let workspaceScrollTimer = 0;
@@ -4007,7 +3415,7 @@
   function activeWorkspace() { return workspaceTabs.find(tab => tab.id === activeWorkspaceId); }
   function workspaceLabel(tab) {
     if (tab.query) return `Search: ${tab.query}`;
-    if (tab.view !== 'all') return ({gallery:'Gallery',favorites:'Favorites',recent:'Recent'})[tab.view];
+    if (tab.view !== 'all') return ({favorites:'Favorites',recent:'Recent'})[tab.view];
     return gameGroups.find(entry => entry.albumId === tab.albumId)?.gameName || 'Library';
   }
   function persistWorkspaces() {
@@ -4017,7 +3425,7 @@
     if (restoringWorkspace || !catalogAvailable || !page.isConnected) return;
     const tab = activeWorkspace();
     if (!tab) return;
-    Object.assign(tab, { view, query:search.value.slice(0,256), console:galleryConsoleName,
+    Object.assign(tab, { view, query:search.value.slice(0,256),
       albumId: gameGroupsByKey.get(selectedGameKey)?.albumId || null,
       sidebarScroll: sidebarTree.scrollTop,
       playlistScroll: playlistContent.scrollTop });
@@ -4062,14 +3470,12 @@
   function restoreWorkspace(id, { initial = false } = {}) {
     if (!workspaceTabs.some(tab => tab.id === id)) return;
     if (!initial) captureWorkspace({render:false});
-    closeGalleryAlbumDetails();
     restoringWorkspace = true;
     closeWorkspaceMenu();
     activeWorkspaceId = id;
     const tab = activeWorkspace();
     view = tab.view;
     search.value = tab.query;
-    galleryConsoleName = tab.console || gameGroups[0]?.consoleName || '';
     const selectedAlbumId = tab.albumId;
     const entry = gameGroups.find(entry => entry.albumId === selectedAlbumId);
     selectedGameKey = entry?.key || null;
@@ -4078,7 +3484,6 @@
     if (entry) selectGame(entry.key);
     // Clearing a search also aborts the previous tab's pending search request.
     scheduleCatalogSearch();
-    if (view === 'gallery') renderGalleryWithLoading();
     if (view === 'favorites') loadFavoritePlaylist();
     if (view === 'recent') loadRecents();
     restoringWorkspace = false;
@@ -4097,7 +3502,7 @@
   function openWorkspace(entry = null, { background = false } = {}) {
     if (workspaceTabs.length >= 24) { playerState.textContent = 'Close a tab before opening another (24 maximum).'; return; }
     captureWorkspace({render:false});
-    const tab = { id:crypto.randomUUID(), view:'all', albumId:entry?.albumId || null, query:'', console:entry?.consoleName || '', sidebarScroll:0, playlistScroll:0 };
+    const tab = { id:crypto.randomUUID(), view:'all', albumId:entry?.albumId || null, query:'', sidebarScroll:0, playlistScroll:0 };
     workspaceTabs.push(tab);
     if (!background) restoreWorkspace(tab.id, {initial:true});
     else { persistWorkspaces(); renderWorkspaces(); }
@@ -4106,7 +3511,8 @@
     const entry = gameGroups.find(candidate => candidate.albumId === albumId);
     if (!entry) return false;
     if (!isDesktop()) {
-      openMobileAlbumDetail(entry, "gallery");
+      setMobileAppPage("library");
+      selectGame(entry.key);
       return true;
     }
     const existing = workspaceTabs.find(tab => tab.albumId === albumId);
@@ -4114,7 +3520,6 @@
       if (existing.id === activeWorkspaceId) captureWorkspace({render:false});
       existing.view = "all";
       existing.query = "";
-      existing.console = entry.consoleName;
       restoreWorkspace(existing.id, {initial:existing.id === activeWorkspaceId});
     } else {
       if (workspaceTabs.length >= 24) {
@@ -4142,7 +3547,7 @@
     if (index < 0) return;
     captureWorkspace({render:false});
     workspaceTabs.splice(index,1);
-    if (!workspaceTabs.length) workspaceTabs.push({id:crypto.randomUUID(),view:'all',albumId:null,query:'',console:''});
+    if (!workspaceTabs.length) workspaceTabs.push({id:crypto.randomUUID(),view:'all',albumId:null,query:''});
     if (id === activeWorkspaceId) restoreWorkspace(workspaceTabs[Math.min(index,workspaceTabs.length-1)].id, {initial:true});
     else { persistWorkspaces(); renderWorkspaces(); }
     document.getElementById(`workspace-${activeWorkspaceId}`)?.focus();
@@ -4169,7 +3574,7 @@
     workspaceMenu.querySelector('button').focus();
   });
   page.addEventListener('click', event => {
-    if (!(event.metaKey || event.ctrlKey) || !event.target.closest('summary,.spcboy-track,.spcboy-gallery-open,.spcboy-gallery-name')) return;
+    if (!(event.metaKey || event.ctrlKey) || !event.target.closest('summary,.spcboy-track')) return;
     const entry = entryForWorkspaceTarget(event.target);
     if (!entry) return;
     event.preventDefault(); event.stopPropagation(); openWorkspace(entry,{background:true});
@@ -4226,7 +3631,6 @@
       if (headerSearch) headerSearch.value = search.value;
       finishCatalogLoading();
       if (view === "recent") loadRecents(true);
-      if (view === "gallery") renderGalleryWithLoading();
       if (!new URLSearchParams(window.location.search).has("play") && !new URLSearchParams(window.location.search).has("album")) {
         const activeTrack = window.SitePlayer?.getCurrentTrack();
         if (activeTrack) window.dispatchEvent(new CustomEvent("siteplayer:track", { detail: { track: activeTrack } }));

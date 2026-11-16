@@ -2,13 +2,12 @@
 {% load static %}
 {% block title %}SPCBOY{% endblock %}
 {% block body_class %}spcboy-body{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/spcboy.css' %}?v=20261111-v9"><link rel="stylesheet" href="{% static 'accounts/spcboy-desktop.css' %}?v=20261111-v9" media="(min-width: 781px)">{% endblock %}
-{% block mobile_head %}<link rel="stylesheet" href="{% static 'accounts/spcboy-mobile.css' %}?v=20261116-sbo-drawer-2" media="(max-width: 780px)">{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/spcboy.css' %}?v=20261116-sbo-no-gallery-1"><link rel="stylesheet" href="{% static 'accounts/spcboy-desktop.css' %}?v=20261111-v9" media="(min-width: 781px)">{% endblock %}
+{% block mobile_head %}<link rel="stylesheet" href="{% static 'accounts/spcboy-mobile.css' %}?v=20261116-sbo-no-gallery-1" media="(max-width: 780px)">{% endblock %}
 {% block content %}
 <section class="spcboy-page" aria-label="SPCBOY player" data-user-id="{{ request.user.pk }}" data-catalog-url="{% url 'spcboy_catalog' %}" data-recents-url="{% url 'spcboy_recents' %}" data-now-playing-url="{% url 'spcboy_now_playing' %}" data-favorites-url="{% url 'spcboy_favorites' %}" data-favorite-playlist-url="{% url 'spcboy_favorite_playlist' %}" data-album-url="{% url 'spcboy_album_playlist' album_id='ALBUM_ID' %}" data-track-url="{% url 'spcboy_track_detail' track_id='TRACK_ID' %}" data-audio-url="{% url 'spcboy_audio' track_id='TRACK_ID' %}">
   <svg class="spcboy-icon-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
     <symbol id="icon-sidebar-views" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M12 8h6M12 12h6M12 16h6M5.5 8h1M5.5 12h1M5.5 16h1"/></symbol>
-    <symbol id="icon-gallery" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21m9 0-5-5"/></symbol>
     <symbol id="icon-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z"/></symbol>
     <symbol id="icon-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5m4-1v5l3 2"/></symbol>
     <symbol id="icon-shuffle" viewBox="0 0 24 24"><path d="m16 3 5 5-5 5M3 8h2.7c5.8 0 7.8 8 13.3 8H21M16 16l5 5-5 0M3 16h2.7c1.7 0 3-.9 4.2-2.2M14.1 10.2C15.1 9 16.3 8 19 8h2"/></symbol>
@@ -17,5 +16,5 @@
   {% include "accounts/partials/spcboy_mobile_shell.html" %}
   {% include "accounts/partials/spcboy_catalog_workspace.html" %}
 </section>
-<script src="{% static 'accounts/spcboy.js' %}?v=20261116-sbo-drawer-2" defer></script>
+<script src="{% static 'accounts/spcboy.js' %}?v=20261116-sbo-no-gallery-1" defer></script>
 {% endblock %}

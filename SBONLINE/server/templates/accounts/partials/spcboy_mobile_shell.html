@@ -4,7 +4,6 @@
   <nav class="spcboy-mobile-app-nav" id="spcboy-mobile-app-nav" aria-label="Player pages">
     <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="playing" aria-current="page">Playing</button>
     <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="library">Library</button>
-    <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="gallery">Gallery</button>
     <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="recent">Recent</button>
     <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="favorites">Favorites</button>
     <button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="sound">Sound</button>
@@ -23,7 +22,7 @@
       </div>
       <div class="spcboy-mobile-track-meta">
         <div class="spcboy-mobile-now-title" id="spcboy-mobile-now-title">Nothing playing</div>
-        <div class="spcboy-mobile-now-album" id="spcboy-mobile-now-album">Select a track from Library or Gallery</div>
+        <div class="spcboy-mobile-now-album" id="spcboy-mobile-now-album">Select a track from Library</div>
       </div>
       <div class="spcboy-mobile-times" aria-label="Playback time">
         <span id="spcboy-mobile-elapsed">0:00</span>
@@ -41,7 +40,7 @@
           <span class="spcboy-mobile-badge" id="spcboy-mobile-now-album-count"></span>
         </div>
         <ol class="spcboy-mobile-tracklist" id="spcboy-mobile-now-tracklist" aria-label="Album tracks"></ol>
-        <p class="spcboy-mobile-detail-status is-hidden" id="spcboy-mobile-now-tracklist-status" role="status"></p>
+        <p class="spcboy-mobile-tracklist-status is-hidden" id="spcboy-mobile-now-tracklist-status" role="status"></p>
       </div>
     </div>
   </section>
@@ -56,43 +55,6 @@
     </div>
   </section>
 
-  <!-- 3. Gallery Screen -->
-  <section class="spcboy-mobile-screen spcboy-mobile-screen-gallery is-hidden" id="spcboy-mobile-screen-gallery" aria-label="Gallery">
-    <div class="spcboy-mobile-search-row">
-      <input id="spcboy-mobile-gallery-search" type="search" placeholder="Search albums..." autocomplete="off" aria-label="Search gallery albums">
-    </div>
-    <div class="spcboy-mobile-picker-wrap">
-      <label class="spcboy-gallery-console-picker"><span class="visually-hidden">Gallery console</span>
-        <select class="spcboy-mobile-console-picker" id="spcboy-mobile-gallery-console-select" aria-label="Console"></select>
-      </label>
-    </div>
-    <div class="spcboy-mobile-album-grid" id="spcboy-mobile-gallery-grid" aria-live="polite"></div>
-    <div class="spcboy-mobile-gallery-footer">
-      <button type="button" class="spcboy-mobile-load-more is-hidden" id="spcboy-mobile-gallery-more">Load more albums</button>
-    </div>
-  </section>
-
-  <!-- 4. Album Detail Screen -->
-  <section class="spcboy-mobile-screen spcboy-mobile-screen-detail is-hidden" id="spcboy-mobile-screen-detail" aria-label="Album details">
-    <div class="spcboy-mobile-detail-top">
-      <button type="button" class="spcboy-mobile-back-button" id="spcboy-mobile-detail-back">
-        <span aria-hidden="true">‹</span> <span id="spcboy-mobile-back-label">Gallery</span>
-      </button>
-    </div>
-    <div class="spcboy-mobile-album-hero">
-      <img class="spcboy-mobile-hero-art" id="spcboy-mobile-detail-artwork" alt="" decoding="async">
-      <div class="spcboy-mobile-hero-copy">
-        <h2 id="spcboy-mobile-detail-title"></h2>
-        <p class="spcboy-mobile-hero-meta" id="spcboy-mobile-detail-meta"></p>
-      </div>
-    </div>
-    <button type="button" class="spcboy-mobile-play-album-button" id="spcboy-mobile-detail-play">
-      <span aria-hidden="true">▶</span> Play Album
-    </button>
-    <ol class="spcboy-mobile-tracklist spcboy-mobile-detail-tracklist" id="spcboy-mobile-detail-tracks" aria-label="Album tracks"></ol>
-    <p class="spcboy-mobile-detail-status is-hidden" id="spcboy-mobile-detail-status" role="status"></p>
-  </section>
-
   <!-- Recent Screen -->
   <section class="spcboy-mobile-screen spcboy-mobile-screen-recent is-hidden" id="spcboy-mobile-screen-recent" aria-label="Recent plays">
     <div class="spcboy-mobile-search-row">
@@ -104,7 +66,7 @@
     </div>
     <ol class="spcboy-mobile-tracklist" id="spcboy-mobile-recent-tracks" aria-label="Recently played tracks"></ol>
     <p class="spcboy-mobile-empty is-hidden" id="spcboy-mobile-recent-empty">No recently played tracks yet.</p>
-    <div class="spcboy-mobile-gallery-footer">
+    <div class="spcboy-mobile-recent-footer">
       <button type="button" class="spcboy-mobile-load-more is-hidden" id="spcboy-mobile-recent-more">Load more recent plays</button>
     </div>
   </section>
@@ -122,7 +84,7 @@
       <button type="button" class="spcboy-mobile-btn-text spcboy-mobile-btn-shuffle" id="spcboy-mobile-shuffle-favs">🔀 Shuffle</button>
     </div>
     <ol class="spcboy-mobile-tracklist" id="spcboy-mobile-favorites-tracks" aria-label="Favorite tracks"></ol>
-    <p class="spcboy-mobile-empty is-hidden" id="spcboy-mobile-favorites-empty">No favorite tracks yet. Star tracks in Library or Gallery to build your Favorites.</p>
+    <p class="spcboy-mobile-empty is-hidden" id="spcboy-mobile-favorites-empty">No favorite tracks yet. Star tracks in Library to build your Favorites.</p>
   </section>
 
   <!-- Sound Screen -->
@@ -274,7 +236,7 @@
   {% if request.user.is_superuser %}
   <!-- Admin Screen (Owner Mobile) -->
   <section class="spcboy-mobile-screen spcboy-mobile-screen-admin is-hidden" id="spcboy-mobile-screen-admin" data-admin-url="{% url 'spcboy_admin' %}" aria-label="Admin">
-    <div class="spcboy-mobile-detail-top">
+    <div class="spcboy-mobile-admin-top">
       <button type="button" class="spcboy-mobile-back-button" data-mobile-app-page="nav">
         <span aria-hidden="true">‹</span> <span>Nav</span>
       </button>
@@ -364,7 +326,7 @@
   </section>
   {% endif %}
 
-  <!-- Persistent Mini-Player Dock (visible on Library, Gallery, Detail, Sound) -->
+  <!-- Persistent Mini-Player Dock -->
   <footer class="spcboy-mobile-dock" id="spcboy-mobile-dock" aria-label="Mini player">
     <div class="spcboy-mobile-dock-progress" id="spcboy-mobile-dock-progress" aria-hidden="true">
       <span id="spcboy-mobile-dock-progress-fill"></span>

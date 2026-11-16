@@ -34,16 +34,6 @@ body.spcboy-body .spcboy-search-wrap svg { display: none; }
 body.spcboy-body .spcboy-tabs, body.spcboy-body .spcboy-view-row { gap: var(--sb-gap); }
 body.spcboy-body .spcboy-tabs-indicator { display: none; }
 body.spcboy-body .spcboy-empty { color: var(--muted); font: 12px/1.6 var(--sb-font); padding: 16px; }
-body.spcboy-body .spcboy-gallery-card { padding: 4px; background: var(--surface-raised); border: 1px solid var(--line); border-radius: var(--sb-radius); box-shadow: none; }
-body.spcboy-body .spcboy-gallery-card img { border-radius: 3px; }
-body.spcboy-body .spcboy-gallery-name { color: var(--ink); font: var(--sb-playlist-font-size)/1.25 var(--sb-font); }
-body.spcboy-body .spcboy-gallery-toolbar { background: var(--paper); border-bottom: 0; padding: var(--sb-inset); gap: var(--sb-gap); }
-body.spcboy-body .spcboy-gallery-consoles button { border: 0; border-radius: var(--sb-radius); background: var(--sb-button-surface); color: var(--sb-button-ink); font: 12px/1.2 var(--sb-font); }
-body.spcboy-body .spcboy-gallery-consoles button:hover { color: var(--sb-button-hover-ink); background: var(--sb-button-hover-surface); }
-body.spcboy-body .spcboy-gallery-consoles button[aria-selected="true"] { color: var(--sb-button-selected-ink); background: var(--sb-button-selected-surface); }
-body.sbonline-site .spcboy-gallery-console-picker { display: none; flex: 0 1 20rem; min-width: min(100%,14rem); }
-body.sbonline-site .spcboy-gallery-console-picker select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 34px; padding: 6px 10px; border: 1px solid var(--input-line); border-radius: var(--sb-radius); background-color: var(--input-bg); color: var(--ink); font: 12px/1.2 var(--sb-font); }
-body.sbonline-site .spcboy-gallery-toolbar .spcboy-gallery-consoles { display: none; }
 body.spcboy-body .spcboy-library-loading { background: var(--scrim); backdrop-filter: blur(5px); }
 body.spcboy-body .spcboy-library-loading-card { padding: 16px 24px; border: 1px solid var(--line); border-radius: var(--sb-radius); background: var(--surface-heading); color: var(--ink); box-shadow: 0 16px 70px var(--shadow-strong); font-family: var(--sb-font); }
 body.spcboy-body .spcboy-media-card { border-color: var(--line); background: var(--white); border-radius: var(--sb-radius); }
@@ -82,7 +72,6 @@ body.spcboy-body .spcboy-media-card-title { color: var(--ink); }
   body.spcboy-body #spcboy-library .spcboy-stage { display: grid; grid-area: 1/2; grid-template-rows: var(--sb-toolbar-height) minmax(0,1fr); height: 100%; min-height: 0; background: var(--paper); }
   body.spcboy-body #spcboy-stage > .sbonline-playlist-heading { display: flex; grid-area: 1/1; height: var(--sb-toolbar-height); min-width: 0; background: var(--paper); }
   body.spcboy-body #spcboy-stage > .sbonline-playlist-heading .site-player-actions-slot { display: contents; }
-  body.spcboy-body #spcboy-stage > :is(.spcboy-playlist-pane,.spcboy-card-panel,.spcboy-gallery-panel) { grid-area: 2/1; height: 100%; min-height: 0; }
   body.spcboy-body .spcboy-playlist-pane { grid-template-rows: var(--sb-toolbar-height) minmax(0,1fr); }
   body.spcboy-body .spcboy-column-head { height: var(--sb-toolbar-height); min-height: 0; border: 0; background: var(--paper); color: var(--muted); font: 11px/1 var(--sb-font); }
   body.spcboy-body .spcboy-column-head > div { gap: var(--sb-gap); }
@@ -95,9 +84,6 @@ body.spcboy-body .spcboy-media-card-title { color: var(--ink); }
   body.spcboy-body .spcboy-tree .spcboy-album-favorite { min-height: 0; height: 1.15em; width: 100%; padding: 0; border: 0; background: transparent; font-size: var(--sb-playlist-font-size); }
   body.spcboy-body .spcboy-playlist-content .spcboy-favorite svg { width: 11px; height: 11px; }
   body.spcboy-body .spcboy-playlist-group-title { margin: var(--sb-gap) 0; padding: 3px 5px; border-radius: var(--sb-radius); background: var(--surface-raised); color: var(--muted); font: 11px/1.3 var(--sb-font); }
-  body.spcboy-body .spcboy-tree > .spcboy-gallery-consoles { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 0; overflow: visible; border: 0; background: transparent; }
-  body.spcboy-body .spcboy-tree > .spcboy-gallery-consoles button { width: 100%; min-height: 0; padding: 2px 4px; border-radius: 0; background: transparent; text-align: left; font: var(--sb-sidebar-font-size)/1.15 var(--sb-font); }
-  body.spcboy-body .spcboy-gallery-panel, body.spcboy-body .spcboy-card-panel { overflow: auto; }
   body.spcboy-body .spcboy-library-state { position: static; grid-area: library; display: flex; align-items: center; width: auto; height: 100%; min-width: 0; clip: auto; clip-path: none; margin: 0; padding: 0 6px; overflow: hidden; white-space: nowrap; border-right: 1px solid var(--line); color: var(--muted); font: 10px/1 var(--sb-font); text-transform: uppercase; }
   body.spcboy-body .spcboy-player.site-player-dock { grid-template-columns: calc(var(--sb-sidebar-width) + 1px) auto minmax(0,1fr) auto; grid-template-areas: "library status main clock"; padding: 0; column-gap: 0; }
   body.spcboy-body .spcboy-player-main { padding-inline: 8px; }

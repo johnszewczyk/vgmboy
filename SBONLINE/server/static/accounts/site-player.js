@@ -2022,7 +2022,7 @@
     positionSettingsTabIndicator();
   });
   const audioProcessingGestureSelector = [
-    "#spcboy-play", "#spcboy-next", "#spcboy-previous", "#spcboy-gallery-play",
+    "#spcboy-play", "#spcboy-next", "#spcboy-previous",
     "#spcboy-faded-skip", "#spcboy-equalizer-enabled", "[data-equalizer-mode]", "[data-equalizer-band]",
     "[data-equalizer-preset-apply]", "[data-equalizer-mobile-profile]", "#spcboy-equalizer-reset",
     "[data-equalizer-mobile-save]", "#site-player-volume",
@@ -2031,8 +2031,7 @@
     "#spcboy-mobile-dock-play", ".spcboy-mobile-dock", "#spcboy-mobile-equalizer",
     "#spcboy-mobile-volume", "#spcboy-mobile-reset-flat", "[data-mobile-eq-band]",
     "[data-mobile-eq-mode]", "#spcboy-mobile-save-preset", "#spcboy-mobile-shuffle-favs",
-    "#spcboy-mobile-detail-play", ".spcboy-mobile-track", ".spcboy-mobile-track-row",
-    ".spcboy-mobile-detail-track-row", ".spcboy-mobile-album-card",
+    ".spcboy-mobile-track", ".spcboy-mobile-track-row",
   ].join(",");
   function prepareAudioGraphFromGesture(event) {
     if (!supportsClientAudioGraph()) return;

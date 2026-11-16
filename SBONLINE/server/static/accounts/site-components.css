@@ -60,4 +60,4 @@ body.sbonline-site .track-card-action { width: 32px; height: 32px; flex-basis: 3
 }
 
 /* Cover artwork follows the same no-upscaling policy in browsing views. */
-body.sbonline-site :is(.spcboy-gallery-open,.spcboy-media-card-cover) img { object-fit: scale-down; }
+body.sbonline-site :is(.spcboy-media-card-cover) img { object-fit: scale-down; }

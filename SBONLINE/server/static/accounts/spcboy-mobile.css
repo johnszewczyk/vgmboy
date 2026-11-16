@@ -469,18 +469,6 @@
     font-weight: 600;
   }
 
-  .spcboy-mobile-album-detail-link {
-    margin-top: 4px;
-    padding: 6px 10px;
-    font-size: 12px;
-    color: var(--sb-m-accent);
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-weight: 600;
-    text-align: left;
-  }
-
   .spcboy-mobile-empty {
     padding: 24px;
     text-align: center;
@@ -488,12 +476,7 @@
     font-size: 14px;
   }
 
-  /* Gallery */
-  body.sbonline-site #spcboy-mobile-app .spcboy-gallery-console-picker { display:grid;
-    margin-bottom: 12px;
-  }
-
-  .spcboy-mobile-gallery-footer {
+  .spcboy-mobile-recent-footer {
     margin-top: 16px;
     display: flex;
     justify-content: center;
@@ -528,61 +511,7 @@
     outline: none;
   }
 
-  .spcboy-mobile-album-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-  }
-
-  .spcboy-mobile-album-card {
-    display: flex;
-    flex-direction: column;
-    background: var(--sb-m-card);
-    border: 1px solid var(--sb-m-line);
-    border-radius: 8px;
-    overflow: hidden;
-    padding: 8px;
-    cursor: pointer;
-    text-align: left;
-    color: var(--sb-m-ink);
-  }
-
-  .spcboy-mobile-album-card:active {
-    background: var(--sb-m-card-active);
-  }
-
-  .spcboy-mobile-cover-wrap {
-    aspect-ratio: 1/1;
-    width: 100%;
-    border-radius: 6px;
-    overflow: hidden;
-    background: #1c2227;
-    margin-bottom: 6px;
-  }
-
-  .spcboy-mobile-cover-wrap img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-
-  .spcboy-mobile-album-name {
-    font-size: 13px;
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .spcboy-mobile-album-meta {
-    font-size: 11px;
-    color: var(--sb-m-muted);
-    margin-top: 2px;
-  }
-
-  /* Album Detail */
-  .spcboy-mobile-detail-top {
+  .spcboy-mobile-admin-top {
     margin-bottom: 12px;
   }
 
@@ -596,59 +525,9 @@
     padding: 6px 0;
   }
 
-  .spcboy-mobile-album-hero {
-    display: flex;
-    gap: 14px;
-    align-items: center;
-    margin-bottom: 14px;
-    background: var(--sb-m-card);
-    border: 1px solid var(--sb-m-line);
-    border-radius: 10px;
-    padding: 12px;
-  }
+  /* Tracklists */
 
-  .spcboy-mobile-hero-art {
-    width: 80px;
-    height: 80px;
-    border-radius: 8px;
-    object-fit: cover;
-    flex-shrink: 0;
-    background: #1c2227;
-  }
-
-  .spcboy-mobile-hero-copy h2 {
-    font-size: 16px;
-    font-weight: 700;
-    margin: 0;
-    color: var(--sb-m-ink);
-  }
-
-  .spcboy-mobile-hero-meta {
-    font-size: 12px;
-    color: var(--sb-m-muted);
-    margin: 4px 0 0;
-  }
-
-  .spcboy-mobile-play-album-button {
-    width: 100%;
-    padding: 12px;
-    background: var(--sb-m-accent);
-    border: none;
-    border-radius: 8px;
-    color: #000;
-    font-size: 15px;
-    font-weight: 700;
-    cursor: pointer;
-    margin-bottom: 16px;
-  }
-
-  .spcboy-mobile-play-album-button:active {
-    opacity: 0.9;
-  }
-
-  /* Tracklists (Parity between Now Playing Album View and Gallery Detail View) */
-  .spcboy-mobile-tracklist,
-  .spcboy-mobile-detail-tracklist {
+  .spcboy-mobile-tracklist {
     list-style: none;
     padding: 0;
     margin: 0;
@@ -658,8 +537,7 @@
     width: 100%;
   }
 
-  .spcboy-mobile-tracklist > li,
-  .spcboy-mobile-detail-tracklist > li {
+  .spcboy-mobile-tracklist > li {
     list-style: none;
     margin: 0;
     padding: 0;
@@ -682,8 +560,7 @@
     border-color: var(--sb-m-accent);
   }
 
-  .spcboy-mobile-track-row,
-  .spcboy-mobile-detail-track-row {
+  .spcboy-mobile-track-row {
     width: 100%;
     flex: 1 1 auto;
     min-width: 0;
@@ -703,24 +580,20 @@
     transition: background 0.12s ease, color 0.12s ease;
   }
 
-  .spcboy-mobile-track-row:active,
-  .spcboy-mobile-detail-track-row:active {
+  .spcboy-mobile-track-row:active {
     background: var(--sb-m-card-active);
   }
 
-  .spcboy-mobile-track-row.is-playing,
-  .spcboy-mobile-detail-track-row.is-playing {
+  .spcboy-mobile-track-row.is-playing {
     color: var(--sb-m-accent);
     font-weight: 600;
   }
 
-  .spcboy-mobile-track-row.is-loading,
-  .spcboy-mobile-detail-track-row.is-loading {
+  .spcboy-mobile-track-row.is-loading {
     background: rgba(100, 210, 255, 0.12) !important;
   }
 
-  .spcboy-mobile-track-row.is-loading .spcboy-mobile-track-title::after,
-  .spcboy-mobile-detail-track-row.is-loading .spcboy-mobile-detail-title::after {
+  .spcboy-mobile-track-row.is-loading .spcboy-mobile-track-title::after {
     content: " ⏳";
   }
 
@@ -790,8 +663,7 @@
     white-space: nowrap;
   }
 
-  .spcboy-mobile-track-num,
-  .spcboy-mobile-detail-number {
+  .spcboy-mobile-track-num {
     font-family: var(--sb-m-mono);
     color: var(--sb-m-dim);
     margin-right: 10px;
@@ -799,13 +671,11 @@
     font-size: 13px;
   }
 
-  .spcboy-mobile-track-row.is-playing .spcboy-mobile-track-num,
-  .spcboy-mobile-detail-track-row.is-playing .spcboy-mobile-detail-number {
+  .spcboy-mobile-track-row.is-playing .spcboy-mobile-track-num {
     color: var(--sb-m-accent);
   }
 
-  .spcboy-mobile-track-title,
-  .spcboy-mobile-detail-title {
+  .spcboy-mobile-track-title {
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
@@ -813,8 +683,7 @@
     white-space: nowrap;
   }
 
-  .spcboy-mobile-track-len,
-  .spcboy-mobile-detail-length {
+  .spcboy-mobile-track-len {
     font-family: var(--sb-m-mono);
     color: var(--sb-m-muted);
     font-size: 12px;

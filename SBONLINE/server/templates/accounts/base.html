@@ -16,7 +16,7 @@
     })();
   </script>
   <link rel="stylesheet" href="{% static 'accounts/admin.css' %}?v=20261116-sbo-drawer-2">
-  {% if request.user.is_authenticated %}<link rel="stylesheet" href="{% static 'accounts/site-components.css' %}?v=20261116-sbo-drawer-2">{% endif %}
+  {% if request.user.is_authenticated %}<link rel="stylesheet" href="{% static 'accounts/site-components.css' %}?v=20261116-sbo-no-gallery-1">{% endif %}
   {% if request.user.is_authenticated %}
   {{ request.user.member_profile.spcboy_preferences|json_script:"spcboy-profile-preferences" }}
   <script src="{% static 'accounts/activity-badges.js' %}?v=20261104-sbo-cleanup-1" data-site-global defer></script>
@@ -24,13 +24,13 @@
   <script src="{% static 'accounts/sb-presentation.js' %}?v=20261026-collections-1" data-site-global defer></script>
   <script src="{% static 'accounts/aac-stream.js' %}?v=20261115-v1" data-site-global defer></script>
   <script src="{% static 'accounts/site-preferences.js' %}?v=20261031-profile-cloud-1" data-preferences-url="{% url 'spcboy_preferences' %}" data-site-global defer></script>
-  <script src="{% static 'accounts/site-player.js' %}?v=20261116-sbo-drawer-2" data-site-global defer></script>
+  <script src="{% static 'accounts/site-player.js' %}?v=20261116-sbo-no-gallery-1" data-site-global defer></script>
   <script src="{% static 'accounts/site-favorites.js' %}?v=20261101-favorite-swipe-cue-1" data-site-global defer></script>
-  <script src="{% static 'accounts/site-navigation.js' %}?v=20261116-sbo-drawer-2" data-site-global defer></script>
+  <script src="{% static 'accounts/site-navigation.js' %}?v=20261116-sbo-no-gallery-1" data-site-global defer></script>
   {% endif %}
   {% block extra_head %}{% endblock %}
-  {% if request.user.is_authenticated %}<link rel="stylesheet" href="{% static 'accounts/player.css' %}?v=20261103-gallery-ux-1">{% endif %}
-  <link rel="stylesheet" href="{% static 'accounts/sbonline.css' %}?v=20261116-sbo-tabfill-1">
+  {% if request.user.is_authenticated %}<link rel="stylesheet" href="{% static 'accounts/player.css' %}?v=20261116-sbo-no-gallery-1">{% endif %}
+  <link rel="stylesheet" href="{% static 'accounts/sbonline.css' %}?v=20261116-sbo-no-gallery-1">
   <link rel="stylesheet" href="{% static 'accounts/sb-theme.css' %}?v=20261116-sbo-drawer-2">
   <script src="{% static 'accounts/sb-interface.js' %}?v=20261116-sbo-drawer-2" data-site-global defer></script>
 <link rel="stylesheet" href="{% static 'accounts/sb-presentation.css' %}?v=20261026-collections-1">
