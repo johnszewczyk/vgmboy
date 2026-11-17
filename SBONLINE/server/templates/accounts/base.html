@@ -24,14 +24,14 @@
   <script src="{% static 'accounts/sb-presentation.js' %}?v=20261026-collections-1" data-site-global defer></script>
   <script src="{% static 'accounts/aac-stream.js' %}?v=20261115-v1" data-site-global defer></script>
   <script src="{% static 'accounts/site-preferences.js' %}?v=20261117-eq-perf-2" data-preferences-url="{% url 'spcboy_preferences' %}" data-site-global defer></script>
-  <script src="{% static 'accounts/site-player.js' %}?v=20261117-eq-server-2" data-site-global defer></script>
+  <script src="{% static 'accounts/site-player.js' %}?v=20261117-eq-toggle-1" data-site-global defer></script>
   <script src="{% static 'accounts/site-favorites.js' %}?v=20261101-favorite-swipe-cue-1" data-site-global defer></script>
   <script src="{% static 'accounts/site-navigation.js' %}?v=20261116-sbo-no-gallery-1" data-site-global defer></script>
   {% endif %}
   {% block extra_head %}{% endblock %}
   {% if request.user.is_authenticated %}<link rel="stylesheet" href="{% static 'accounts/player.css' %}?v=20261116-sbo-no-gallery-1">{% endif %}
   <link rel="stylesheet" href="{% static 'accounts/sbonline.css' %}?v=20261116-sbo-no-gallery-fix-1">
-  <link rel="stylesheet" href="{% static 'accounts/sb-theme.css' %}?v=20261116-sbo-drawer-2">
+  <link rel="stylesheet" href="{% static 'accounts/sb-theme.css' %}?v=20261117-eq-toggle-1">
   <script src="{% static 'accounts/sb-interface.js' %}?v=20261116-sbo-drawer-2" data-site-global defer></script>
 <link rel="stylesheet" href="{% static 'accounts/sb-presentation.css' %}?v=20261026-collections-1">
   <link rel="stylesheet" href="{% static 'accounts/sb-mobile.css' %}?v=20261116-sbo-drawer-2" media="(max-width: 780px)">
@@ -151,13 +151,14 @@
             <section class="spcboy-settings-group spcboy-equalizer-group" aria-labelledby="spcboy-equalizer-heading">
               <div class="spcboy-settings-group-heading">
                 <div><h3 id="spcboy-equalizer-heading">Equalizer</h3></div>
-                <div class="sbo-drawer-eq-toolbar" role="toolbar" aria-label="Equalizer Presets">
-                  <button type="button" class="sbo-drawer-eq-btn is-active" data-equalizer-mode="off" aria-pressed="true" aria-label="Turn equalizer off">OFF</button>
-                  {% for preset in "123" %}
-                  <button type="button" class="sbo-drawer-eq-btn" data-equalizer-mode="{{ forloop.counter0 }}" data-equalizer-mobile-profile="{{ forloop.counter0 }}" aria-pressed="false" aria-label="Preset {{ forloop.counter }}">{{ forloop.counter }}</button>
-                  {% endfor %}
+                <div class="sbo-eq-header-controls">
+                  <div class="sbo-drawer-eq-toolbar" role="toolbar" aria-label="Equalizer Presets">
+                    {% for preset in "123" %}
+                    <button type="button" class="sbo-drawer-eq-btn" data-equalizer-mode="{{ forloop.counter0 }}" data-equalizer-mobile-profile="{{ forloop.counter0 }}" aria-pressed="false" aria-label="Preset {{ forloop.counter }}">{{ forloop.counter }}</button>
+                    {% endfor %}
+                  </div>
+                  <button class="spcboy-long-play-toggle spcboy-boolean-toggle spcboy-equalizer-toggle sbo-drawer-eq-power" id="spcboy-equalizer-enabled" type="button" role="switch" aria-checked="false" aria-label="Equalizer">OFF</button>
                 </div>
-                <button class="spcboy-long-play-toggle spcboy-boolean-toggle spcboy-equalizer-toggle" id="spcboy-equalizer-enabled" type="button" role="switch" aria-checked="false" aria-label="Equalizer" hidden tabindex="-1"><span class="spcboy-equalizer-toggle-desktop">No</span><span class="spcboy-equalizer-toggle-mobile">Equalizer OFF</span></button>
               </div>
               <div class="spcboy-equalizer-bands" id="spcboy-equalizer-bands">
                 <label class="spcboy-equalizer-band"><span class="spcboy-equalizer-label-stack"><span>31 Hz</span><output data-equalizer-value="0">0.0</output></span><input class="sbo-drawer-slider" type="range" min="-12" max="12" step="0.5" value="0" data-equalizer-band="0" aria-label="31 Hz equalizer gain"></label>

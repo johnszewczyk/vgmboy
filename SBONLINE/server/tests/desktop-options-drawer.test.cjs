@@ -10,11 +10,12 @@ const sitePlayerJs = readFileSync(`${serverDir}/static/accounts/site-player.js`,
 
 test('desktop options drawer imports mobile card, switch, and segmented EQ design', () => {
   assert.match(baseHtml, /class="sbo-drawer-eq-toolbar"[^>]*aria-label="Equalizer Presets"/);
-  assert.match(baseHtml, /data-equalizer-mode="off"/);
+  assert.doesNotMatch(baseHtml, /data-equalizer-mode="off"/);
   assert.match(baseHtml, /data-equalizer-mobile-profile="\{\{ forloop\.counter0 \}\}"/);
   assert.doesNotMatch(baseHtml, /data-equalizer-mobile-save|Save to Preset/);
   assert.match(baseHtml, /id="site-player-volume-value"[^>]*>100%</);
-  assert.match(baseHtml, /id="spcboy-equalizer-enabled"[^>]*hidden/);
+  assert.match(baseHtml, /id="spcboy-equalizer-enabled"[^>]*role="switch"/);
+  assert.doesNotMatch(baseHtml, /id="spcboy-equalizer-enabled"[^>]*hidden/);
 
   assert.match(sbThemeCss, /--sb-drawer-card:\s*#181d22;/);
   assert.match(sbThemeCss, /--sb-drawer-accent:\s*#38aaff;/);
@@ -33,8 +34,7 @@ test('desktop speed validation error is visible and decimal fractions are allowe
 test('site-player syncs segmented OFF/1/2/3 EQ toolbar and percentage volume badge', () => {
   assert.match(sitePlayerJs, /volumeValue\.textContent = `\$\{percent\}%`;/);
   assert.match(sitePlayerJs, /equalizerModeButtons\.forEach\(\(button\) =>/);
-  assert.match(sitePlayerJs, /const isActive = isOff \? !equalizerEnabled : \(equalizerEnabled && Number\(mode\) === selectedEqualizerPresetIndex\);/);
-  assert.match(sitePlayerJs, /if \(!equalizerEnabled\) setEqualizerEnabled\(true(?:,\s*\{\s*deferRestart:\s*true\s*\})?\);/);
+  assert.match(sitePlayerJs, /const isActive = Number\(mode\) === selectedEqualizerPresetIndex;/);
   assert.match(sitePlayerJs, /animateEqualizerBandSliders/);
 
   const catalogWorkspaceHtml = readFileSync(`${serverDir}/templates/accounts/partials/spcboy_catalog_workspace.html`, 'utf8');
@@ -81,11 +81,11 @@ test('playback options order is Long Play, Slow Play, Fade Out, EQ OFF resets fa
   const mobileFadeOutIdx = mobileShellHtml.indexOf('id="spcboy-mobile-faded-skip"');
   assert.ok(mobileLongPlayIdx > 0 && mobileSlowPlayIdx > mobileLongPlayIdx && mobileFadeOutIdx > mobileSlowPlayIdx);
 
-  // EQ OFF moves sliders to default (0.0) positions on desktop and mobile
-  assert.match(sitePlayerJs, /const gain = equalizerEnabled \? \(equalizerBandGains\[index\] \|\| 0\) : 0;/);
-  assert.match(sitePlayerJs, /animateEqualizerBandSliders\(flatGains,\s*async\s*\(\)\s*=>\s*\{\s*await setEqualizerEnabled\(false\);/);
-  assert.match(spcboyJs, /const gains = eqEnabled \? rawGains : Array\(10\)\.fill\(0\);/);
-  assert.match(spcboyJs, /animateMobileFaders\(Array\(10\)\.fill\(0\)/);
+  // EQ uses an independent ON/OFF switch while sliders preserve and allow editing the selected preset curve
+  assert.match(sitePlayerJs, /const gain = equalizerBandGains\[index\] \|\| 0;/);
+  assert.match(sitePlayerJs, /equalizerToggle\.addEventListener\("click",\s*\(\)\s*=>\s*setEqualizerEnabled\(equalizerToggle\.getAttribute\("aria-checked"\)\s*!==\s*"true"\)\)/);
+  assert.match(spcboyJs, /const gains = window\.SitePlayer\.getEqualizerBands\?\.\(\) \|\| \[\];/);
+  assert.match(spcboyJs, /const mobileEqToggleBtn = document\.querySelector\("#spcboy-mobile-equalizer"\);/);
 
   // Desktop top-most toolbar eliminated on spcboy-body, settings button nested in playlist heading, queue button discarded
   assert.match(sbonlineCss, /body\.spcboy-body\s*\{[\s\S]*--site-navigation-height:\s*0px;/);

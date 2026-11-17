@@ -12,7 +12,7 @@ test('desktop EQ toolbar is wired cleanly with gesture support and immediate pre
   assert.match(sitePreferencesJs, /"selectedEqualizerPresetIndex"/);
   assert.match(sitePlayerJs, /'\[data-sbonline-command="equalizer"\]'/);
   assert.match(sitePlayerJs, /'\[data-sbonline-command="volume"\]'/);
-  assert.match(sitePlayerJs, /if \(command === "equalizer"\) \{[\s\S]*activePreset\?\.gains[\s\S]*setEqualizerEnabled\(!equalizerEnabled\)/);
+  assert.match(sitePlayerJs, /if \(command === "equalizer"\) \{\s*setEqualizerEnabled\(!equalizerEnabled\);/);
   assert.match(sitePlayerJs, /void applyEqualizerPreset\(index\);/);
   assert.match(sitePlayerJs, /if \(equalizerGraphReady && audioContext && audioContext\.state === "suspended"\)/);
 });
@@ -164,8 +164,9 @@ test('EQ presets automatically save when bands change or reset without a save bu
   assert.doesNotMatch(mobileHtml, /spcboy-mobile-save-preset|Save to Preset/);
 
   const stored = new Map();
+  const loadedUrls = [];
   const audioEl = {
-    playbackRate: 1, volume: 1, paused: false, ended: false, error: null, src: '', currentTime: 0,
+    playbackRate: 1, volume: 1, paused: false, ended: false, error: null, src: '', currentTime: 12,
     addEventListener() {}, removeEventListener() {}, dispatchEvent() { return true; },
     removeAttribute() {}, load() {}, pause() {}, play: async () => {},
   };
@@ -202,7 +203,7 @@ test('EQ presets automatically save when bands change or reset without a save bu
       get(_scope, key, fallback) { return stored.has(key) ? JSON.parse(JSON.stringify(stored.get(key))) : fallback; },
       remove(_scope, key) { stored.delete(key); },
     },
-    SBAACStream: { attach: () => ({ supported: true, load() {}, cancel() {} }) },
+    SBAACStream: { attach: () => ({ supported: true, load(u) { loadedUrls.push(String(u)); }, cancel() {} }) },
     MediaSource: function MediaSource() {},
     addEventListener() {}, dispatchEvent() { return true; },
     matchMedia: () => ({ matches: false, addEventListener() {} }),
@@ -233,14 +234,29 @@ test('EQ presets automatically save when bands change or reset without a save bu
   vm.runInContext(sitePlayerJs, ctx);
   const player = fakeWindow.SitePlayer;
 
+  await player.play({ id: 'chrono-1', title: 'Chrono', game: 'Chrono Trigger', durationSeconds: 120 });
+  assert.equal(loadedUrls.length, 1);
+  assert.equal(player.isEqualizerEnabled(), false);
+
+  // Adjusting presets and bands while EQ is OFF does not enable EQ or restart playback.
   await player.applyEqualizerPreset(1);
   player.setEqualizerBandGain(3, 6.5);
+  assert.equal(player.isEqualizerEnabled(), false);
+  assert.equal(loadedUrls.length, 1);
   assert.equal(player.getEqualizerPresets()[1].saved, true);
   assert.equal(player.getEqualizerPresets()[1].gains[3], 6.5);
 
   await player.applyEqualizerPreset(0);
   assert.equal(player.getEqualizerBands()[3], 0);
   await player.applyEqualizerPreset(1);
+  assert.equal(player.getEqualizerBands()[3], 6.5);
+  assert.equal(loadedUrls.length, 1);
+
+  // Toggling EQ ON sends preset curve to server; toggling OFF drops ?eq= without flattening sliders.
+  await player.setEqualizerEnabled(true);
+  assert.equal(loadedUrls.at(-1).includes('eq='), true);
+  await player.setEqualizerEnabled(false);
+  assert.equal(loadedUrls.at(-1).includes('eq='), false);
   assert.equal(player.getEqualizerBands()[3], 6.5);
 
   player.resetEqualizer();

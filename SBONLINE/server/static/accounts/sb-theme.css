@@ -130,11 +130,14 @@ body.sbonline-site {
 .sbonline-site #spcboy-settings-panel .spcboy-long-play-toggle:is(.is-enabled,[aria-checked="true"]) { background: var(--sb-drawer-accent); border-color: var(--sb-drawer-accent); color: #081317; }
 .sbonline-site #spcboy-settings-panel .sbo-drawer-badge { font: 600 13px/1 var(--sb-font); font-variant-numeric: tabular-nums; color: var(--sb-drawer-accent); }
 .sbonline-site #spcboy-settings-panel .sbo-drawer-slider { width: 100%; height: 24px; margin: 0; accent-color: var(--sb-drawer-accent); cursor: pointer; background: transparent; }
+.sbonline-site #spcboy-settings-panel .sbo-eq-header-controls { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.sbonline-site #spcboy-settings-panel .sbo-drawer-eq-power { width: 68px; min-width: 68px; flex: 0 0 68px; height: 34px; min-height: 34px; font-size: 13px; }
 .sbonline-site #spcboy-settings-panel .sbo-drawer-eq-toolbar { display: flex; align-items: center; gap: 4px; padding: 2px; border: 1px solid var(--sb-drawer-card-line); border-radius: 6px; background: #14181c; }
 .sbonline-site #spcboy-settings-panel .sbo-drawer-eq-btn { min-width: 38px; height: 28px; min-height: 28px; padding: 0 8px; border: 0; border-radius: 4px; background: transparent; color: var(--sb-drawer-muted); font: 700 12px/1 var(--sb-ui-font); cursor: pointer; transition: background-color var(--site-motion-duration) var(--site-motion-ease), color var(--site-motion-duration) var(--site-motion-ease); }
 .sbonline-site #spcboy-settings-panel .sbo-drawer-eq-btn:hover:not(:disabled) { color: var(--sb-drawer-ink); background: #1d242a; }
 .sbonline-site #spcboy-settings-panel .sbo-drawer-eq-btn:is(.is-active,[aria-pressed="true"]) { background: var(--sb-drawer-accent); color: #081317; }
-.sbonline-site #spcboy-settings-panel .spcboy-equalizer-bands { display: flex; flex-direction: column; gap: 8px; }
+.sbonline-site #spcboy-settings-panel .spcboy-equalizer-bands { display: flex; flex-direction: column; gap: 8px; transition: opacity 150ms ease; }
+.sbonline-site #spcboy-settings-panel .spcboy-equalizer-bands.is-inactive { opacity: 0.72; }
 .sbonline-site #spcboy-settings-panel .spcboy-equalizer-band { display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-height: 0; color: var(--sb-drawer-muted); font: 12px/1.2 var(--sb-font); }
 .sbonline-site #spcboy-settings-panel .spcboy-equalizer-label-stack { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .sbonline-site #spcboy-settings-panel .spcboy-equalizer-label-stack > span { font-weight: 700; color: var(--sb-drawer-muted); }

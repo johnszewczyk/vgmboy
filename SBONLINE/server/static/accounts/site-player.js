@@ -238,16 +238,21 @@
     equalizerToggle.setAttribute("aria-checked", String(enabled));
     const desktopLabel = equalizerToggle.querySelector(".spcboy-equalizer-toggle-desktop");
     const mobileLabel = equalizerToggle.querySelector(".spcboy-equalizer-toggle-mobile");
-    if (desktopLabel) desktopLabel.textContent = enabled ? "Yes" : "No";
-    if (mobileLabel) mobileLabel.textContent = `Equalizer ${enabled ? "ON" : "OFF"}`;
+    if (desktopLabel || mobileLabel) {
+      if (desktopLabel) desktopLabel.textContent = enabled ? "ON" : "OFF";
+      if (mobileLabel) mobileLabel.textContent = `Equalizer ${enabled ? "ON" : "OFF"}`;
+    } else {
+      equalizerToggle.textContent = enabled ? "ON" : "OFF";
+    }
     equalizerToggle.classList.toggle("is-enabled", enabled);
     if (typeof syncEqualizerPresetControls === "function") syncEqualizerPresetControls();
   }
   function syncEqualizerControls() {
     updateEqualizerToggle(equalizerEnabled);
+    document.querySelector("#spcboy-equalizer-bands")?.classList?.toggle("is-inactive", !equalizerEnabled);
     if (typeof equalizerFaderAnimationId === "number" && equalizerFaderAnimationId !== null) return;
     equalizerBandInputs.forEach((input, index) => {
-      const gain = equalizerEnabled ? (equalizerBandGains[index] || 0) : 0;
+      const gain = equalizerBandGains[index] || 0;
       input.value = String(gain);
       const slider = input.closest(".spcboy-equalizer-slider");
       if (slider) {
@@ -272,8 +277,7 @@
     equalizerPresetSaveButtons.forEach((button) => { button.disabled = false; });
     equalizerModeButtons.forEach((button) => {
       const mode = button.dataset.equalizerMode;
-      const isOff = mode === "off";
-      const isActive = isOff ? !equalizerEnabled : (equalizerEnabled && Number(mode) === selectedEqualizerPresetIndex);
+      const isActive = Number(mode) === selectedEqualizerPresetIndex;
       button.classList.toggle("is-active", isActive);
       button.setAttribute("aria-pressed", String(isActive));
       button.disabled = false;
@@ -281,10 +285,10 @@
     equalizerMobileProfileButtons.forEach((button) => {
       const index = Number(button.dataset.equalizerMobileProfile);
       const saved = Boolean(equalizerPresets[index]);
-      const selected = equalizerEnabled && index === selectedEqualizerPresetIndex;
+      const selected = index === selectedEqualizerPresetIndex;
       button.classList.toggle("is-selected", selected);
       button.setAttribute("aria-pressed", String(selected));
-      button.setAttribute("aria-label", `Preset ${index + 1}, ${saved ? "saved" : "empty"}${selected ? ", active" : ""}`);
+      button.setAttribute("aria-label", `Preset ${index + 1}, ${saved ? "saved" : "empty"}${selected ? ", selected" : ""}`);
       const state = document.querySelector(`[data-equalizer-mobile-state="${index}"]`);
       if (state) state.textContent = saved ? "Saved" : "Empty";
     });
@@ -1071,13 +1075,6 @@
   document.addEventListener("click", (event) => {
     const command = event.target.closest("[data-sbonline-command]")?.dataset.sbonlineCommand;
     if (command === "equalizer") {
-      if (!equalizerEnabled && equalizerBandGains.every((gain) => gain === 0)) {
-        const activePreset = equalizerPresets[selectedEqualizerPresetIndex];
-        if (activePreset?.gains) {
-          equalizerBandGains = [...activePreset.gains];
-          saveEqualizerGains();
-        }
-      }
       setEqualizerEnabled(!equalizerEnabled);
     }
     if (command === "long-play") longPlayToggle.click();
@@ -2104,32 +2101,12 @@
     equalizerFaderAnimationId = requestAnimationFrame(step);
   }
   equalizerToggle.addEventListener("click", () => setEqualizerEnabled(equalizerToggle.getAttribute("aria-checked") !== "true"));
-  equalizerModeButtons.filter((button) => button.dataset.equalizerMode === "off").forEach((button) => {
-    button.addEventListener("click", () => {
-      const flatGains = equalizerFrequencies.map(() => 0);
-      if (supportsClientAudioGraph() && ensureEqualizerGraph()) {
-        if (audioContext && audioContext.state !== "running") {
-          audioContext.resume().catch(() => {});
-        }
-        const now = audioContext.currentTime;
-        equalizerFilters.forEach((filter) => {
-          filter?.gain?.cancelScheduledValues?.(now);
-          filter?.gain?.setTargetAtTime(0, now, 0.035);
-        });
-      }
-      animateEqualizerBandSliders(flatGains, async () => {
-        await setEqualizerEnabled(false);
-        if (equalizerPresetStatus) equalizerPresetStatus.textContent = "Equalizer OFF.";
-      });
-    });
-  });
   equalizerBandInputs.forEach((input) => {
     input.addEventListener("input", () => {
       cancelEqualizerFaderAnimation();
       const index = Number(input.dataset.equalizerBand);
       if (!Number.isInteger(index) || index < 0 || index >= equalizerBandGains.length) return;
       equalizerBandGains[index] = Math.max(-12, Math.min(12, Math.round(Number(input.value) * 2) / 2));
-      if (!equalizerEnabled) setEqualizerEnabled(true, { deferRestart: true });
       saveEqualizerGains();
       saveEqualizerPreset(selectedEqualizerPresetIndex, { announce: false });
       if (equalizerEnabled && currentTrack) {
@@ -2161,18 +2138,17 @@
     }
     const preset = equalizerPresets[index];
     equalizerBandGains = preset?.gains ? [...preset.gains] : equalizerFrequencies.map(() => 0);
-    const wasEnabled = equalizerEnabled;
     saveEqualizerGains();
-    const enabled = wasEnabled ? true : await setEqualizerEnabled(true);
-    if (wasEnabled && !(typeof ensureEqualizerGraph === "function" && ensureEqualizerGraph()) && typeof currentTrack !== "undefined" && currentTrack && typeof restartCurrentStream === "function") {
+    if (equalizerEnabled && !(typeof ensureEqualizerGraph === "function" && ensureEqualizerGraph()) && typeof currentTrack !== "undefined" && currentTrack && typeof restartCurrentStream === "function") {
       if (typeof window !== "undefined") window.clearTimeout?.(typeof eqRestartTimer !== "undefined" ? eqRestartTimer : 0);
       restartCurrentStream(sourcePositionSeconds());
     }
     syncEqualizerPresetControls();
     if (equalizerPresetStatus) {
-      equalizerPresetStatus.textContent = enabled
-        ? (preset?.gains ? `${preset?.name || `Preset ${index + 1}`} applied.` : `Preset ${index + 1} (Flat) active.`)
-        : `${preset?.name || `Preset ${index + 1}`} loaded, but audio processing could not be enabled.`;
+      const label = preset?.name || `Preset ${index + 1}`;
+      equalizerPresetStatus.textContent = equalizerEnabled
+        ? (preset?.gains ? `${label} applied.` : `${label} (Flat) active.`)
+        : `${label} selected (EQ OFF).`;
     }
     if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
       window.dispatchEvent(new CustomEvent("siteplayer:settings-changed"));

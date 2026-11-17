@@ -167,10 +167,10 @@ test('Equalizer saves and reapplies all three browser presets', async () => {
     context.equalizerEnabled = false;
     await applyButtons[index].listeners.click();
     assert.deepEqual(Array.from(context.equalizerBandGains), Array.from(context.equalizerPresets[index].gains));
-    assert.equal(context.equalizerEnabled, true);
+    assert.equal(context.equalizerEnabled, false);
   }
   assert.equal(savedCurves.length, 3);
-  assert.equal(context.equalizerPresetStatus.textContent, 'Preset 3 applied.');
+  assert.equal(context.equalizerPresetStatus.textContent, 'Preset 3 selected (EQ OFF).');
 });
 
 test('A volume adjustment updates gain without restarting the stream', () => {

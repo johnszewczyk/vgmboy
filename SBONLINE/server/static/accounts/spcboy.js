@@ -2504,16 +2504,21 @@
     if (volInput && typeof vol === "number") volInput.value = String(vol);
     if (volValue && typeof vol === "number") volValue.textContent = `${Math.round(vol * 5)}%`;
 
-    const eqEnabled = window.SitePlayer.isEqualizerEnabled?.();
+    const eqEnabled = Boolean(window.SitePlayer.isEqualizerEnabled?.());
     const sharedPreset = window.SitePlayer.getSelectedEqualizerPresetIndex?.();
     if (typeof sharedPreset === "number" && Number.isInteger(sharedPreset)) {
       currentMobileEqPreset = sharedPreset;
     }
     const activePreset = typeof currentMobileEqPreset === "number" ? currentMobileEqPreset : 0;
-    updateMobileEqToolbar(eqEnabled ? activePreset : "off");
+    updateMobileEqToolbar(activePreset);
+    const mobileEqToggle = document.querySelector("#spcboy-mobile-equalizer");
+    if (mobileEqToggle) {
+      mobileEqToggle.setAttribute("aria-checked", String(eqEnabled));
+      mobileEqToggle.textContent = eqEnabled ? "ON" : "OFF";
+    }
+    document.querySelector(".spcboy-mobile-eq-bands")?.classList?.toggle("is-inactive", !eqEnabled);
 
-    const rawGains = window.SitePlayer.getEqualizerBands?.() || [];
-    const gains = eqEnabled ? rawGains : Array(10).fill(0);
+    const gains = window.SitePlayer.getEqualizerBands?.() || [];
     gains.forEach((gain, idx) => {
       const input = document.querySelector(`[data-mobile-eq-band="${idx}"]`);
       const output = document.querySelector(`[data-mobile-eq-value="${idx}"]`);
@@ -2925,25 +2930,28 @@
 
   document.querySelectorAll("[data-mobile-eq-mode]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const mode = btn.dataset.mobileEqMode;
-      if (mode === "off") {
-        updateMobileEqToolbar("off");
-        animateMobileFaders(Array(10).fill(0), { duration: 240 });
-        await window.SitePlayer?.setEqualizerEnabled?.(false);
-        showMobileToast("Equalizer OFF");
-      } else {
-        const presetIdx = Number(mode);
-        currentMobileEqPreset = presetIdx;
-        const presets = window.SitePlayer?.getEqualizerPresets?.() || [];
-        const preset = presets[presetIdx];
-        const targetGains = preset?.gains && preset.saved ? preset.gains : Array(10).fill(0);
-        updateMobileEqToolbar(presetIdx);
-        animateMobileFaders(targetGains, { duration: 240 });
-        await window.SitePlayer?.applyEqualizerPreset?.(presetIdx);
-        showMobileToast(preset?.saved ? `Preset ${presetIdx + 1} loaded` : `Preset ${presetIdx + 1} (Flat)`);
-      }
+      const presetIdx = Number(btn.dataset.mobileEqMode);
+      if (!Number.isInteger(presetIdx) || presetIdx < 0 || presetIdx > 2) return;
+      currentMobileEqPreset = presetIdx;
+      const presets = window.SitePlayer?.getEqualizerPresets?.() || [];
+      const preset = presets[presetIdx];
+      const targetGains = preset?.gains && preset.saved ? preset.gains : Array(10).fill(0);
+      updateMobileEqToolbar(presetIdx);
+      animateMobileFaders(targetGains, { duration: 240 });
+      await window.SitePlayer?.applyEqualizerPreset?.(presetIdx);
+      showMobileToast(preset?.saved ? `Preset ${presetIdx + 1} loaded` : `Preset ${presetIdx + 1} (Flat)`);
     });
   });
+
+  const mobileEqToggleBtn = document.querySelector("#spcboy-mobile-equalizer");
+  if (mobileEqToggleBtn) {
+    mobileEqToggleBtn.addEventListener("click", async () => {
+      const nextEnabled = !window.SitePlayer?.isEqualizerEnabled?.();
+      await window.SitePlayer?.setEqualizerEnabled?.(nextEnabled);
+      syncMobileSoundControls();
+      showMobileToast(nextEnabled ? "Equalizer ON" : "Equalizer OFF");
+    });
+  }
 
   document.querySelectorAll("[data-mobile-eq-band]").forEach((input) => {
     input.addEventListener("input", () => {
@@ -2952,9 +2960,6 @@
       window.SitePlayer?.setEqualizerBandGain?.(idx, val);
       const output = document.querySelector(`[data-mobile-eq-value="${idx}"]`);
       if (output) output.textContent = (val > 0 ? "+" : "") + val.toFixed(1);
-      if (!window.SitePlayer?.isEqualizerEnabled?.()) {
-        window.SitePlayer?.setEqualizerEnabled?.(true, { deferRestart: true });
-      }
       updateMobileEqToolbar(currentMobileEqPreset);
     });
   });

@@ -743,6 +743,26 @@
     cursor: pointer;
   }
 
+  .spcboy-mobile-eq-header-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+
+  #spcboy-mobile-app #spcboy-mobile-equalizer.spcboy-mobile-switch {
+    width: 68px !important;
+    min-width: 68px !important;
+    max-width: 68px !important;
+    flex: 0 0 68px !important;
+    height: 34px !important;
+    font-size: 13px !important;
+  }
+
+  .spcboy-mobile-eq-bands.is-inactive {
+    opacity: 0.72;
+  }
+
   .spcboy-mobile-eq-toolbar {
     display: flex;
     align-items: center;

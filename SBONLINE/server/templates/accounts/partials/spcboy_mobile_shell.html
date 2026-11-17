@@ -103,11 +103,13 @@
       <section class="spcboy-mobile-card">
         <div class="spcboy-mobile-card-header">
           <h3>Equalizer</h3>
-          <div class="spcboy-mobile-eq-toolbar" role="toolbar" aria-label="Equalizer Presets">
-            <button type="button" class="spcboy-mobile-eq-btn is-active" data-mobile-eq-mode="off" aria-pressed="true">OFF</button>
-            <button type="button" class="spcboy-mobile-eq-btn" data-mobile-eq-mode="0" aria-pressed="false">1</button>
-            <button type="button" class="spcboy-mobile-eq-btn" data-mobile-eq-mode="1" aria-pressed="false">2</button>
-            <button type="button" class="spcboy-mobile-eq-btn" data-mobile-eq-mode="2" aria-pressed="false">3</button>
+          <div class="spcboy-mobile-eq-header-controls">
+            <div class="spcboy-mobile-eq-toolbar" role="toolbar" aria-label="Equalizer Presets">
+              <button type="button" class="spcboy-mobile-eq-btn is-active" data-mobile-eq-mode="0" aria-pressed="true">1</button>
+              <button type="button" class="spcboy-mobile-eq-btn" data-mobile-eq-mode="1" aria-pressed="false">2</button>
+              <button type="button" class="spcboy-mobile-eq-btn" data-mobile-eq-mode="2" aria-pressed="false">3</button>
+            </div>
+            <button id="spcboy-mobile-equalizer" type="button" class="spcboy-mobile-switch" role="switch" aria-checked="false" aria-label="Equalizer">OFF</button>
           </div>
         </div>
         <div class="spcboy-mobile-eq-bands" aria-label="Equalizer bands">
