@@ -24,14 +24,14 @@
   <script src="{% static 'accounts/sb-presentation.js' %}?v=20261026-collections-1" data-site-global defer></script>
   <script src="{% static 'accounts/aac-stream.js' %}?v=20261115-v1" data-site-global defer></script>
   <script src="{% static 'accounts/site-preferences.js' %}?v=20261117-eq-perf-2" data-preferences-url="{% url 'spcboy_preferences' %}" data-site-global defer></script>
-  <script src="{% static 'accounts/site-player.js' %}?v=20261117-eq-toggle-1" data-site-global defer></script>
+  <script src="{% static 'accounts/site-player.js' %}?v=20261117-admin-sweep-1" data-site-global defer></script>
   <script src="{% static 'accounts/site-favorites.js' %}?v=20261101-favorite-swipe-cue-1" data-site-global defer></script>
   <script src="{% static 'accounts/site-navigation.js' %}?v=20261116-sbo-no-gallery-1" data-site-global defer></script>
   {% endif %}
   {% block extra_head %}{% endblock %}
   {% if request.user.is_authenticated %}<link rel="stylesheet" href="{% static 'accounts/player.css' %}?v=20261116-sbo-no-gallery-1">{% endif %}
   <link rel="stylesheet" href="{% static 'accounts/sbonline.css' %}?v=20261116-sbo-no-gallery-fix-1">
-  <link rel="stylesheet" href="{% static 'accounts/sb-theme.css' %}?v=20261117-eq-toggle-1">
+  <link rel="stylesheet" href="{% static 'accounts/sb-theme.css' %}?v=20261117-admin-sweep-1">
   <script src="{% static 'accounts/sb-interface.js' %}?v=20261116-sbo-drawer-2" data-site-global defer></script>
 <link rel="stylesheet" href="{% static 'accounts/sb-presentation.css' %}?v=20261026-collections-1">
   <link rel="stylesheet" href="{% static 'accounts/sb-mobile.css' %}?v=20261116-sbo-drawer-2" media="(max-width: 780px)">
@@ -221,9 +221,7 @@
                 <span class="spcboy-settings-copy"><strong>Session limit (min)</strong><span>Page session cutoff (1–1,440).</span></span>
                 <input id="sbo-drawer-admin-session-limit" class="spcboy-settings-input" type="number" min="1" max="1440" step="1" inputmode="numeric" value="120" aria-label="Playback session limit in minutes">
               </label>
-              <div class="spcboy-equalizer-footer">
-                <button type="button" class="sbo-drawer-btn-secondary" id="sbo-drawer-admin-save-settings">Save Controls</button>
-              </div>
+              <span class="spcboy-setting-error" id="sbo-drawer-admin-error" role="status" aria-live="polite"></span>
             </section>
             <section class="spcboy-settings-group">
               <div class="spcboy-settings-group-heading">
@@ -253,9 +251,6 @@
                 <span class="spcboy-settings-copy"><strong>Display name</strong></span>
                 <input id="sbo-drawer-admin-display-name" class="spcboy-settings-input" type="text" maxlength="40" autocomplete="nickname" aria-label="Display name">
               </label>
-              <div class="spcboy-equalizer-footer">
-                <button type="button" class="sbo-drawer-btn-secondary" id="sbo-drawer-admin-save-name">Save Name</button>
-              </div>
               <div class="sbo-drawer-admin-divider"></div>
               <div class="spcboy-settings-field-row">
                 <div class="spcboy-settings-copy">
@@ -272,6 +267,12 @@
                 {% csrf_token %}
                 <button type="submit" class="sbo-drawer-btn-secondary sbo-drawer-btn-danger">Sign Out</button>
               </form>
+            </section>
+            <section class="spcboy-settings-group">
+              <div class="spcboy-settings-group-heading">
+                <h3>Site Stats</h3>
+              </div>
+              <div class="sbo-drawer-admin-metrics" id="sbo-drawer-admin-site-stats"></div>
             </section>
             <section class="spcboy-settings-group">
               <div class="spcboy-settings-group-heading">

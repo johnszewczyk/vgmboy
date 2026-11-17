@@ -1770,11 +1770,23 @@
   const drawerAdminPage = document.querySelector("#spcboy-settings-page-admin");
   let drawerAdminPendingDeleteId = null;
   let drawerAdminBusy = false;
+  const drawerAdminQueuedActions = new Map();
+  let drawerAdminSettingsTimer = null;
+  let drawerAdminNameTimer = null;
   function makeDrawerNode(tag, className, text) {
     const node = document.createElement(tag);
     if (className) node.className = className;
     if (text !== undefined && text !== null) node.textContent = String(text);
     return node;
+  }
+  function renderDrawerMetrics(container, entries) {
+    if (!container) return;
+    container.replaceChildren();
+    for (const [label, value] of entries) {
+      const box = makeDrawerNode("div", "sbo-drawer-admin-metric");
+      box.append(makeDrawerNode("span", "", label), makeDrawerNode("strong", "", value));
+      container.appendChild(box);
+    }
   }
   async function copyDrawerAdminText(value, label) {
     if (!value) return;
@@ -1803,20 +1815,29 @@
     const createdPasswordBox = document.querySelector("#sbo-drawer-admin-created-password");
     const genPasswordBtn = document.querySelector("#sbo-drawer-admin-gen-password");
     const revokePasswordBtn = document.querySelector("#sbo-drawer-admin-revoke-password");
+    const siteStatsGrid = document.querySelector("#sbo-drawer-admin-site-stats");
     const metricsGrid = document.querySelector("#sbo-drawer-admin-server-metrics");
     const loginsList = document.querySelector("#sbo-drawer-admin-logins-list");
+    const adminError = document.querySelector("#sbo-drawer-admin-error");
 
+    if (adminError) adminError.textContent = "";
     if (statusBadge) statusBadge.textContent = data.message || "";
     if (bitrateSelect && Array.isArray(data.siteSettings?.aacChoices)) {
-      bitrateSelect.replaceChildren();
-      for (const choice of data.siteSettings.aacChoices) {
-        const option = makeDrawerNode("option", "", choice.label);
-        option.value = String(choice.value);
-        if (Number(choice.value) === Number(data.siteSettings.aacBitrate)) option.selected = true;
-        bitrateSelect.appendChild(option);
+      const existingValues = [...bitrateSelect.options].map((opt) => opt.value).join(",");
+      const nextValues = data.siteSettings.aacChoices.map((choice) => String(choice.value)).join(",");
+      if (existingValues !== nextValues) {
+        bitrateSelect.replaceChildren();
+        for (const choice of data.siteSettings.aacChoices) {
+          const option = makeDrawerNode("option", "", choice.label);
+          option.value = String(choice.value);
+          bitrateSelect.appendChild(option);
+        }
+      }
+      if (document.activeElement !== bitrateSelect) {
+        bitrateSelect.value = String(data.siteSettings.aacBitrate);
       }
     }
-    if (limitInput && data.siteSettings?.sessionLimitMinutes !== undefined) {
+    if (limitInput && data.siteSettings?.sessionLimitMinutes !== undefined && document.activeElement !== limitInput) {
       limitInput.value = String(data.siteSettings.sessionLimitMinutes);
     }
     if (createdInviteBox) {
@@ -1890,38 +1911,40 @@
         item.append(head, makeDrawerNode("small", "sbo-drawer-dim", `${account.roleLabel} · ${account.activeSessionCount} active · ${account.audioQuota}`));
         if (account.lastLoginAt) item.appendChild(makeDrawerNode("small", "sbo-drawer-dim", `Last sign-in ${account.lastLoginAt}`));
         if (account.canManage) {
-          const actions = makeDrawerNode("div", "sbo-drawer-admin-actions");
-          const toggleBtn = makeDrawerNode("button", "sbo-drawer-btn-secondary", account.isActive ? "Suspend" : "Reactivate");
-          toggleBtn.type = "button";
-          toggleBtn.onclick = () => { drawerAdminPendingDeleteId = null; void postDrawerAdminAction({ action: "toggle-user", userId: account.id }); };
-          actions.appendChild(toggleBtn);
-          if (account.isActive) {
-            const recoveryBtn = makeDrawerNode("button", "sbo-drawer-btn-secondary", "Recovery");
-            recoveryBtn.type = "button";
-            recoveryBtn.onclick = () => { drawerAdminPendingDeleteId = null; void postDrawerAdminAction({ action: "recovery-invite", userId: account.id }); };
-            actions.appendChild(recoveryBtn);
-          }
+          const toolbar = makeDrawerNode("div", "sbo-drawer-admin-account-toolbar");
+          toolbar.setAttribute("role", "toolbar");
+          toolbar.setAttribute("aria-label", `Actions for ${account.displayName || account.username}`);
           if (drawerAdminPendingDeleteId === account.id) {
-            const confirmBtn = makeDrawerNode("button", "sbo-drawer-btn-secondary sbo-drawer-btn-danger is-confirming", "Confirm Delete");
+            const confirmBtn = makeDrawerNode("button", "sbo-drawer-btn-danger is-confirming", "Confirm Delete");
             confirmBtn.type = "button";
             confirmBtn.onclick = () => { drawerAdminPendingDeleteId = null; void postDrawerAdminAction({ action: "delete-user", userId: account.id }); };
-            const cancelBtn = makeDrawerNode("button", "sbo-drawer-btn-secondary", "Cancel");
+            const cancelBtn = makeDrawerNode("button", "", "Cancel");
             cancelBtn.type = "button";
             cancelBtn.onclick = () => { drawerAdminPendingDeleteId = null; renderDrawerAdmin(data); };
-            actions.append(confirmBtn, cancelBtn);
+            toolbar.append(confirmBtn, cancelBtn);
           } else {
-            const deleteBtn = makeDrawerNode("button", "sbo-drawer-btn-secondary sbo-drawer-btn-danger", "Delete");
+            const toggleBtn = makeDrawerNode("button", "", account.isActive ? "Suspend" : "Reactivate");
+            toggleBtn.type = "button";
+            toggleBtn.onclick = () => { drawerAdminPendingDeleteId = null; void postDrawerAdminAction({ action: "toggle-user", userId: account.id }); };
+            const recoveryBtn = makeDrawerNode("button", "", "Recover");
+            recoveryBtn.type = "button";
+            recoveryBtn.disabled = !account.isActive;
+            if (!account.isActive) recoveryBtn.title = "Reactivate account to create a recovery invite";
+            recoveryBtn.onclick = () => { drawerAdminPendingDeleteId = null; void postDrawerAdminAction({ action: "recovery-invite", userId: account.id }); };
+            const deleteBtn = makeDrawerNode("button", "sbo-drawer-btn-danger", "Delete");
             deleteBtn.type = "button";
             deleteBtn.onclick = () => { drawerAdminPendingDeleteId = account.id; renderDrawerAdmin(data); };
-            actions.appendChild(deleteBtn);
+            toolbar.append(toggleBtn, recoveryBtn, deleteBtn);
           }
-          item.appendChild(actions);
+          item.appendChild(toolbar);
         }
         accountsList.appendChild(item);
       }
     }
     if (displayNameInput && data.selfAccount?.displayName !== undefined) {
-      displayNameInput.value = data.selfAccount.displayName;
+      if (document.activeElement !== displayNameInput) {
+        displayNameInput.value = data.selfAccount.displayName;
+      }
       const headerName = document.querySelector("#spcboy-settings-heading");
       if (headerName) headerName.textContent = data.selfAccount.displayName;
     }
@@ -1948,18 +1971,21 @@
         createdPasswordBox.replaceChildren();
       }
     }
+    if (siteStatsGrid && data.siteStats) {
+      renderDrawerMetrics(siteStatsGrid, [
+        ["Total Plays", Number(data.siteStats.totalPlays || 0).toLocaleString()],
+        ["Avg Plays / Day", String(data.siteStats.avgPlaysPerDay ?? 0)],
+        ["Today", Number(data.siteStats.playsToday || 0).toLocaleString()],
+        ["Month Audio", data.siteStats.monthlyAudio || "0 B"],
+      ]);
+    }
     if (metricsGrid && data.server) {
-      metricsGrid.replaceChildren();
-      for (const [label, value] of [
+      renderDrawerMetrics(metricsGrid, [
         ["Memory", `${data.server.memory} (${data.server.memoryPercent}%)`],
         ["Disk", `${data.server.disk} (${data.server.diskPercent}%)`],
         ["Load", data.server.load || "Unavailable"],
         ["Uptime", data.server.uptime || "0d 0h"],
-      ]) {
-        const box = makeDrawerNode("div", "sbo-drawer-admin-metric");
-        box.append(makeDrawerNode("span", "", label), makeDrawerNode("strong", "", value));
-        metricsGrid.appendChild(box);
-      }
+      ]);
     }
     if (loginsList) {
       loginsList.replaceChildren();
@@ -1994,9 +2020,15 @@
   }
   async function postDrawerAdminAction(payload) {
     const adminUrl = drawerAdminPage?.dataset?.adminUrl;
-    if (!adminUrl || drawerAdminBusy) return;
+    if (!adminUrl) return;
+    if (drawerAdminBusy) {
+      if (payload?.action) drawerAdminQueuedActions.set(payload.action, payload);
+      return;
+    }
     drawerAdminBusy = true;
     const statusBadge = document.querySelector("#sbo-drawer-admin-status");
+    const adminError = document.querySelector("#sbo-drawer-admin-error");
+    if (statusBadge) statusBadge.textContent = "Saving…";
     try {
       const response = await fetch(adminUrl, {
         method: "POST",
@@ -2008,22 +2040,78 @@
       if (!response.ok) throw new Error(data.error || "Action failed");
       renderDrawerAdmin(data);
     } catch (error) {
-      if (statusBadge) statusBadge.textContent = error.message || "Error";
+      if (adminError) adminError.textContent = error.message || "Error";
+      if (statusBadge) statusBadge.textContent = "Error";
     } finally {
       drawerAdminBusy = false;
+      if (drawerAdminQueuedActions.size > 0) {
+        const nextEntry = drawerAdminQueuedActions.entries().next().value;
+        drawerAdminQueuedActions.delete(nextEntry[0]);
+        void postDrawerAdminAction(nextEntry[1]);
+      }
     }
   }
-  document.querySelector("#sbo-drawer-admin-save-settings")?.addEventListener("click", () => {
-    const aacBitrate = document.querySelector("#sbo-drawer-admin-bitrate")?.value;
-    const sessionLimitMinutes = document.querySelector("#sbo-drawer-admin-session-limit")?.value;
-    void postDrawerAdminAction({ action: "save-site-settings", aacBitrate, sessionLimitMinutes });
+  function commitDrawerSiteSettings({ immediate = false } = {}) {
+    const bitrateSelect = document.querySelector("#sbo-drawer-admin-bitrate");
+    const limitInput = document.querySelector("#sbo-drawer-admin-session-limit");
+    const adminError = document.querySelector("#sbo-drawer-admin-error");
+    if (!bitrateSelect || !limitInput) return;
+    const rawLimit = String(limitInput.value || "").trim();
+    const parsedLimit = Number(rawLimit);
+    if (!/^\d+$/.test(rawLimit) || !Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 1440) {
+      limitInput.setAttribute("aria-invalid", "true");
+      if (adminError) adminError.textContent = "Session limit must be a whole number from 1 to 1,440.";
+      window.clearTimeout(drawerAdminSettingsTimer);
+      return;
+    }
+    limitInput.removeAttribute("aria-invalid");
+    if (adminError) adminError.textContent = "";
+    const payload = { action: "save-site-settings", aacBitrate: bitrateSelect.value, sessionLimitMinutes: parsedLimit };
+    window.clearTimeout(drawerAdminSettingsTimer);
+    if (immediate) {
+      void postDrawerAdminAction(payload);
+    } else {
+      drawerAdminSettingsTimer = window.setTimeout(() => { void postDrawerAdminAction(payload); }, 450);
+    }
+  }
+  function commitDrawerDisplayName({ immediate = false } = {}) {
+    const input = document.querySelector("#sbo-drawer-admin-display-name");
+    if (!input) return;
+    const displayName = input.value;
+    window.clearTimeout(drawerAdminNameTimer);
+    if (immediate) {
+      void postDrawerAdminAction({ action: "update-display-name", displayName });
+    } else {
+      drawerAdminNameTimer = window.setTimeout(() => {
+        void postDrawerAdminAction({ action: "update-display-name", displayName: input.value });
+      }, 450);
+    }
+  }
+  document.querySelector("#sbo-drawer-admin-bitrate")?.addEventListener("change", () => {
+    commitDrawerSiteSettings({ immediate: true });
+  });
+  const drawerAdminLimitInput = document.querySelector("#sbo-drawer-admin-session-limit");
+  drawerAdminLimitInput?.addEventListener("input", () => commitDrawerSiteSettings({ immediate: false }));
+  drawerAdminLimitInput?.addEventListener("change", () => commitDrawerSiteSettings({ immediate: true }));
+  drawerAdminLimitInput?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitDrawerSiteSettings({ immediate: true });
+      drawerAdminLimitInput.blur();
+    }
+  });
+  const drawerAdminDisplayNameInput = document.querySelector("#sbo-drawer-admin-display-name");
+  drawerAdminDisplayNameInput?.addEventListener("input", () => commitDrawerDisplayName({ immediate: false }));
+  drawerAdminDisplayNameInput?.addEventListener("change", () => commitDrawerDisplayName({ immediate: true }));
+  drawerAdminDisplayNameInput?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitDrawerDisplayName({ immediate: true });
+      drawerAdminDisplayNameInput.blur();
+    }
   });
   document.querySelector("#sbo-drawer-admin-create-invite")?.addEventListener("click", () => {
     void postDrawerAdminAction({ action: "create-invite" });
-  });
-  document.querySelector("#sbo-drawer-admin-save-name")?.addEventListener("click", () => {
-    const displayName = document.querySelector("#sbo-drawer-admin-display-name")?.value || "";
-    void postDrawerAdminAction({ action: "update-display-name", displayName });
   });
   document.querySelector("#sbo-drawer-admin-gen-password")?.addEventListener("click", () => {
     void postDrawerAdminAction({ action: "generate-login-password" });

@@ -1198,6 +1198,59 @@
     font-size: 12px;
   }
 
+  .spcboy-mobile-admin-account-toolbar {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 3px;
+    width: 100%;
+    padding: 3px;
+    border: 1px solid var(--sb-m-line);
+    border-radius: 8px;
+    background: #0f1216;
+  }
+
+  .spcboy-mobile-admin-account-toolbar button {
+    min-height: 32px;
+    min-width: 0;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--sb-m-ink);
+    font: 600 12px/1 var(--sb-m-font);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .spcboy-mobile-admin-account-toolbar button:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .spcboy-mobile-admin-account-toolbar .spcboy-mobile-admin-danger-btn {
+    color: #ef7c84;
+  }
+
+  .spcboy-mobile-admin-account-toolbar .spcboy-mobile-admin-danger-btn.is-confirming {
+    background: #ef7c84;
+    color: #101316;
+  }
+
+  .spcboy-mobile-error:not(:empty) {
+    display: block;
+    margin-top: 8px;
+    color: #ef7c84;
+    font-size: 12px;
+  }
+
+  .spcboy-mobile-error:empty {
+    display: none;
+  }
+
   .spcboy-mobile-admin-danger-btn {
     color: #ef7c84;
     border-color: rgba(239, 124, 132, 0.35);

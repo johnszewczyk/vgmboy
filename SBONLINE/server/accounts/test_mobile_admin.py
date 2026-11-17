@@ -1,10 +1,13 @@
 import json
+import uuid
+from datetime import timedelta, timezone as datetime_timezone
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
-from .models import AccessKeyCredential, Invitation, MemberProfile, PasskeyCredential, SiteSettings
+from .models import AccessKeyCredential, Invitation, MemberProfile, MonthlyUsage, PasskeyCredential, SPCBOYPlaybackHistory, SiteSettings
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, ALLOWED_HOSTS=["testserver"])
@@ -152,3 +155,35 @@ class MobileAdminTests(TestCase):
         res = self.client.post(url, json.dumps({"action": "revoke-login-password"}), content_type="application/json")
         self.assertEqual(res.status_code, 200)
         self.assertFalse(AccessKeyCredential.objects.filter(user=self.owner).exists())
+
+    def test_spcboy_admin_site_stats_reports_totals_and_daily_average(self):
+        now = timezone.now()
+        SPCBOYPlaybackHistory.objects.create(
+            user=self.owner,
+            playback_id=uuid.uuid4(),
+            track_id="track-1",
+            title="Track 1",
+            game="Game",
+            console="SNES",
+            played_at=now - timedelta(days=3),
+        )
+        SPCBOYPlaybackHistory.objects.create(
+            user=self.owner,
+            playback_id=uuid.uuid4(),
+            track_id="track-2",
+            title="Track 2",
+            game="Game",
+            console="SNES",
+            played_at=now,
+        )
+        period = now.astimezone(datetime_timezone.utc).date().replace(day=1)
+        MonthlyUsage.objects.create(user=self.owner, period=period, audio_bytes=2 * 1024 * 1024)
+
+        self.client.force_login(self.owner)
+        res = self.client.get(reverse("spcboy_admin"))
+        self.assertEqual(res.status_code, 200)
+        stats = res.json()["siteStats"]
+        self.assertEqual(stats["totalPlays"], 2)
+        self.assertGreaterEqual(stats["playsToday"], 1)
+        self.assertAlmostEqual(stats["avgPlaysPerDay"], round(2 / 4, 1))
+        self.assertIn("2.0", stats["monthlyAudio"])

@@ -295,6 +295,13 @@ body.sbonline-site {
 .sbonline-site #spcboy-settings-panel .sbo-drawer-admin-code { padding: 8px 10px; border: 1px solid var(--sb-drawer-card-line); border-radius: 6px; background: #0d1013; color: var(--sb-drawer-accent); font: 700 13px/1.2 var(--sb-font); letter-spacing: .08em; text-align: center; user-select: all; word-break: break-all; }
 .sbonline-site #spcboy-settings-panel .sbo-drawer-admin-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .sbonline-site #spcboy-settings-panel .sbo-drawer-admin-actions .sbo-drawer-btn-secondary { flex: 1 1 auto; min-height: 32px; padding: 0 10px; font-size: 12px; }
+.sbonline-site #spcboy-settings-panel .sbo-drawer-admin-account-toolbar { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; width: 100%; padding: 3px; border: 1px solid var(--sb-drawer-card-line); border-radius: 8px; background: #0f1216; }
+.sbonline-site #spcboy-settings-panel .sbo-drawer-admin-account-toolbar button { min-height: 30px; min-width: 0; padding: 0 8px; border: 0; border-radius: 5px; background: transparent; color: var(--sb-drawer-ink); font: 600 12px/1 var(--sb-ui-font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; transition: background-color 120ms ease, color 120ms ease; }
+.sbonline-site #spcboy-settings-panel .sbo-drawer-admin-account-toolbar button:hover:not(:disabled) { background: var(--sb-drawer-control); }
+.sbonline-site #spcboy-settings-panel .sbo-drawer-admin-account-toolbar button:disabled { opacity: 0.35; cursor: default; }
+.sbonline-site #spcboy-settings-panel .sbo-drawer-admin-account-toolbar .sbo-drawer-btn-danger { width: auto; color: #ef7c84; }
+.sbonline-site #spcboy-settings-panel .sbo-drawer-admin-account-toolbar .sbo-drawer-btn-danger:hover:not(:disabled) { background: rgba(239, 124, 132, 0.16); color: #ffb3b8; }
+.sbonline-site #spcboy-settings-panel .sbo-drawer-admin-account-toolbar .sbo-drawer-btn-danger.is-confirming { background: #ef7c84; color: #101316; }
 .sbonline-site #spcboy-settings-panel .sbo-drawer-admin-divider { border-top: 1px solid var(--sb-drawer-card-line); margin: 4px 0; }
 .sbonline-site #spcboy-settings-panel .sbo-drawer-admin-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .sbonline-site #spcboy-settings-panel .sbo-drawer-admin-metric { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--sb-drawer-card-line); border-radius: 8px; background: #14181c; }

@@ -256,9 +256,7 @@
           <span>Session limit (min)</span>
           <input id="spcboy-mobile-admin-session-limit" type="number" min="1" max="1440" step="1" inputmode="numeric" value="120" aria-label="Playback session limit in minutes">
         </label>
-        <div class="spcboy-mobile-eq-actions">
-          <button type="button" class="spcboy-mobile-btn-secondary" id="spcboy-mobile-admin-save-settings">Save Controls</button>
-        </div>
+        <span class="spcboy-mobile-error" id="spcboy-mobile-admin-error" role="status" aria-live="polite"></span>
       </section>
 
       <section class="spcboy-mobile-card">
@@ -291,9 +289,6 @@
           <span>Display name</span>
           <input id="spcboy-mobile-admin-display-name" type="text" maxlength="40" autocomplete="nickname" aria-label="Display name">
         </label>
-        <div class="spcboy-mobile-eq-actions">
-          <button type="button" class="spcboy-mobile-btn-secondary" id="spcboy-mobile-admin-save-name">Save Name</button>
-        </div>
         <div class="spcboy-mobile-admin-divider"></div>
         <div class="spcboy-mobile-row">
           <div>
@@ -310,6 +305,13 @@
           {% csrf_token %}
           <button type="submit" class="spcboy-mobile-btn-secondary spcboy-mobile-admin-danger-btn">Sign Out</button>
         </form>
+      </section>
+
+      <section class="spcboy-mobile-card">
+        <div class="spcboy-mobile-card-header">
+          <h3>Site Stats</h3>
+        </div>
+        <div class="spcboy-mobile-admin-metrics" id="spcboy-mobile-admin-site-stats"></div>
       </section>
 
       <section class="spcboy-mobile-card">

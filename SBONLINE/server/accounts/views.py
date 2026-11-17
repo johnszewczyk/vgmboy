@@ -2297,6 +2297,25 @@ def _spcboy_admin_payload(request, *, message="", extra=None):
 
     profile = _member_profile(request.user)
     server = _server_stats()
+    now_local = timezone.localtime()
+    today_start = timezone.make_aware(
+        datetime.combine(now_local.date(), datetime_time.min),
+        timezone.get_current_timezone(),
+    )
+    play_stats = SPCBOYPlaybackHistory.objects.filter(user__is_active=True).aggregate(
+        total=Count("pk"),
+        today=Count("pk", filter=Q(played_at__gte=today_start)),
+        first_played=Min("played_at"),
+    )
+    total_plays = int(play_stats["total"] or 0)
+    plays_today = int(play_stats["today"] or 0)
+    first_played = play_stats["first_played"]
+    if total_plays and first_played:
+        days_active = max(1, (now_local.date() - timezone.localtime(first_played).date()).days + 1)
+        avg_plays_per_day = round(total_plays / days_active, 1)
+    else:
+        avg_plays_per_day = 0.0
+    month_audio_bytes = sum(row.audio_bytes for row in usage_by_user.values())
     recent_logins = []
     for event in LoginEvent.objects.order_by("-occurred_at", "-pk")[:10]:
         recent_logins.append({
@@ -2314,6 +2333,12 @@ def _spcboy_admin_payload(request, *, message="", extra=None):
                 for val, label in SiteSettings._meta.get_field("aac_bitrate").choices
             ],
             "sessionLimitMinutes": site_settings.player_session_limit_minutes,
+        },
+        "siteStats": {
+            "totalPlays": total_plays,
+            "playsToday": plays_today,
+            "avgPlaysPerDay": avg_plays_per_day,
+            "monthlyAudio": _bytes_label(month_audio_bytes),
         },
         "accounts": accounts_payload,
         "invitations": invitations_payload,

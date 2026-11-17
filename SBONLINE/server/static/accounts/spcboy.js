@@ -2533,7 +2533,7 @@
       skipToggle.setAttribute("aria-checked", String(skips.enabled));
       skipToggle.textContent = skips.enabled ? "Yes" : "No";
     }
-    if (fadeInput && skips) fadeInput.value = String(skips.seconds);
+    if (fadeInput && skips && document.activeElement !== fadeInput) fadeInput.value = String(skips.seconds);
 
     const speed = window.SitePlayer.getPlaybackSpeed?.();
     const speedToggle = document.querySelector("#spcboy-mobile-speed-enabled");
@@ -2542,7 +2542,7 @@
       speedToggle.setAttribute("aria-checked", String(speed.enabled));
       speedToggle.textContent = speed.enabled ? "Yes" : "No";
     }
-    if (speedFraction && speed) speedFraction.value = speed.fraction;
+    if (speedFraction && speed && document.activeElement !== speedFraction) speedFraction.value = speed.fraction;
 
     const longPlay = window.SitePlayer.getLongPlay?.();
     const lpToggle = document.querySelector("#spcboy-mobile-long-play");
@@ -2552,7 +2552,7 @@
       lpToggle.textContent = longPlay.enabled ? "Yes" : "No";
     }
     const fmt = window.SitePlayer?.formatPlaybackTime || formatMobileTime;
-    if (lpInput && longPlay) lpInput.value = fmt(longPlay.seconds);
+    if (lpInput && longPlay && document.activeElement !== lpInput) lpInput.value = fmt(longPlay.seconds);
   }
 
   let currentRenderedNowAlbumKey = null;
@@ -2977,12 +2977,25 @@
   // Native Mobile Admin Console
   let mobileAdminPendingDeleteId = null;
   let mobileAdminBusy = false;
+  const mobileAdminQueuedActions = new Map();
+  let mobileAdminSettingsTimer = null;
+  let mobileAdminNameTimer = null;
 
   function makeMobileNode(tag, className, text) {
     const node = document.createElement(tag);
     if (className) node.className = className;
     if (text !== undefined && text !== null) node.textContent = String(text);
     return node;
+  }
+
+  function renderMobileMetrics(container, entries) {
+    if (!container) return;
+    container.replaceChildren();
+    for (const [label, value] of entries) {
+      const box = makeMobileNode("div", "spcboy-mobile-admin-metric");
+      box.append(makeMobileNode("span", "", label), makeMobileNode("strong", "", value));
+      container.appendChild(box);
+    }
   }
 
   async function copyMobileAdminText(value, label) {
@@ -3012,21 +3025,30 @@
     const createdPasswordBox = document.querySelector("#spcboy-mobile-admin-created-password");
     const genPasswordBtn = document.querySelector("#spcboy-mobile-admin-gen-password");
     const revokePasswordBtn = document.querySelector("#spcboy-mobile-admin-revoke-password");
+    const siteStatsGrid = document.querySelector("#spcboy-mobile-admin-site-stats");
     const metricsGrid = document.querySelector("#spcboy-mobile-admin-server-metrics");
     const loginsList = document.querySelector("#spcboy-mobile-admin-logins-list");
+    const adminError = document.querySelector("#spcboy-mobile-admin-error");
 
-    if (statusBadge) statusBadge.textContent = "";
+    if (adminError) adminError.textContent = "";
+    if (statusBadge) statusBadge.textContent = data.message || "";
 
     if (bitrateSelect && Array.isArray(data.siteSettings?.aacChoices)) {
-      bitrateSelect.replaceChildren();
-      for (const choice of data.siteSettings.aacChoices) {
-        const option = makeMobileNode("option", "", choice.label);
-        option.value = String(choice.value);
-        if (Number(choice.value) === Number(data.siteSettings.aacBitrate)) option.selected = true;
-        bitrateSelect.appendChild(option);
+      const existingValues = [...bitrateSelect.options].map((opt) => opt.value).join(",");
+      const nextValues = data.siteSettings.aacChoices.map((choice) => String(choice.value)).join(",");
+      if (existingValues !== nextValues) {
+        bitrateSelect.replaceChildren();
+        for (const choice of data.siteSettings.aacChoices) {
+          const option = makeMobileNode("option", "", choice.label);
+          option.value = String(choice.value);
+          bitrateSelect.appendChild(option);
+        }
+      }
+      if (document.activeElement !== bitrateSelect) {
+        bitrateSelect.value = String(data.siteSettings.aacBitrate);
       }
     }
-    if (limitInput && data.siteSettings?.sessionLimitMinutes !== undefined) {
+    if (limitInput && data.siteSettings?.sessionLimitMinutes !== undefined && document.activeElement !== limitInput) {
       limitInput.value = String(data.siteSettings.sessionLimitMinutes);
     }
 
@@ -3133,60 +3155,58 @@
         }
 
         if (account.canManage) {
-          const actions = makeMobileNode("div", "spcboy-mobile-admin-actions");
-          const toggleBtn = makeMobileNode(
-            "button",
-            "spcboy-mobile-btn-secondary",
-            account.isActive ? "Suspend" : "Reactivate",
-          );
-          toggleBtn.type = "button";
-          toggleBtn.onclick = () => {
-            mobileAdminPendingDeleteId = null;
-            void postMobileAdminAction({ action: "toggle-user", userId: account.id });
-          };
-          actions.appendChild(toggleBtn);
-
-          if (account.isActive) {
-            const recoveryBtn = makeMobileNode("button", "spcboy-mobile-btn-secondary", "Recovery");
-            recoveryBtn.type = "button";
-            recoveryBtn.onclick = () => {
-              mobileAdminPendingDeleteId = null;
-              void postMobileAdminAction({ action: "recovery-invite", userId: account.id });
-            };
-            actions.appendChild(recoveryBtn);
-          }
-
+          const toolbar = makeMobileNode("div", "spcboy-mobile-admin-account-toolbar");
+          toolbar.setAttribute("role", "toolbar");
+          toolbar.setAttribute("aria-label", `Actions for ${account.displayName || account.username}`);
           if (mobileAdminPendingDeleteId === account.id) {
-            const confirmBtn = makeMobileNode("button", "spcboy-mobile-btn-secondary spcboy-mobile-admin-danger-btn is-confirming", "Confirm Delete");
+            const confirmBtn = makeMobileNode("button", "spcboy-mobile-admin-danger-btn is-confirming", "Confirm Delete");
             confirmBtn.type = "button";
             confirmBtn.onclick = () => {
               mobileAdminPendingDeleteId = null;
               void postMobileAdminAction({ action: "delete-user", userId: account.id });
             };
-            const cancelBtn = makeMobileNode("button", "spcboy-mobile-btn-secondary", "Cancel");
+            const cancelBtn = makeMobileNode("button", "", "Cancel");
             cancelBtn.type = "button";
             cancelBtn.onclick = () => {
               mobileAdminPendingDeleteId = null;
               renderMobileAdmin(data);
             };
-            actions.append(confirmBtn, cancelBtn);
+            toolbar.append(confirmBtn, cancelBtn);
           } else {
-            const deleteBtn = makeMobileNode("button", "spcboy-mobile-btn-secondary spcboy-mobile-admin-danger-btn", "Delete");
+            const toggleBtn = makeMobileNode("button", "", account.isActive ? "Suspend" : "Reactivate");
+            toggleBtn.type = "button";
+            toggleBtn.onclick = () => {
+              mobileAdminPendingDeleteId = null;
+              void postMobileAdminAction({ action: "toggle-user", userId: account.id });
+            };
+            const recoveryBtn = makeMobileNode("button", "", "Recover");
+            recoveryBtn.type = "button";
+            recoveryBtn.disabled = !account.isActive;
+            if (!account.isActive) recoveryBtn.title = "Reactivate account to create a recovery invite";
+            recoveryBtn.onclick = () => {
+              mobileAdminPendingDeleteId = null;
+              void postMobileAdminAction({ action: "recovery-invite", userId: account.id });
+            };
+            const deleteBtn = makeMobileNode("button", "spcboy-mobile-admin-danger-btn", "Delete");
             deleteBtn.type = "button";
             deleteBtn.onclick = () => {
               mobileAdminPendingDeleteId = account.id;
               renderMobileAdmin(data);
             };
-            actions.appendChild(deleteBtn);
+            toolbar.append(toggleBtn, recoveryBtn, deleteBtn);
           }
-          item.appendChild(actions);
+          item.appendChild(toolbar);
         }
         accountsList.appendChild(item);
       }
     }
 
     if (displayNameInput && data.selfAccount?.displayName !== undefined) {
-      displayNameInput.value = data.selfAccount.displayName;
+      if (document.activeElement !== displayNameInput) {
+        displayNameInput.value = data.selfAccount.displayName;
+      }
+      const identityName = document.querySelector(".spcboy-mobile-identity-name");
+      if (identityName) identityName.textContent = data.selfAccount.displayName;
     }
     if (passwordState && genPasswordBtn && revokePasswordBtn) {
       const hasPassword = Boolean(data.selfAccount?.hasLoginPassword);
@@ -3214,19 +3234,22 @@
       }
     }
 
+    if (siteStatsGrid && data.siteStats) {
+      renderMobileMetrics(siteStatsGrid, [
+        ["Total Plays", Number(data.siteStats.totalPlays || 0).toLocaleString()],
+        ["Avg Plays / Day", String(data.siteStats.avgPlaysPerDay ?? 0)],
+        ["Today", Number(data.siteStats.playsToday || 0).toLocaleString()],
+        ["Month Audio", data.siteStats.monthlyAudio || "0 B"],
+      ]);
+    }
+
     if (metricsGrid && data.server) {
-      metricsGrid.replaceChildren();
-      const metrics = [
+      renderMobileMetrics(metricsGrid, [
         ["Memory", `${data.server.memory} (${data.server.memoryPercent}%)`],
         ["Disk", `${data.server.disk} (${data.server.diskPercent}%)`],
         ["Load", data.server.load || "Unavailable"],
         ["Uptime", data.server.uptime || "0d 0h"],
-      ];
-      for (const [label, value] of metrics) {
-        const box = makeMobileNode("div", "spcboy-mobile-admin-metric");
-        box.append(makeMobileNode("span", "", label), makeMobileNode("strong", "", value));
-        metricsGrid.appendChild(box);
-      }
+      ]);
     }
 
     if (loginsList) {
@@ -3268,8 +3291,15 @@
 
   async function postMobileAdminAction(payload) {
     const adminUrl = mobileScreenAdmin?.dataset?.adminUrl;
-    if (!adminUrl || mobileAdminBusy) return;
+    if (!adminUrl) return;
+    if (mobileAdminBusy) {
+      if (payload?.action) mobileAdminQueuedActions.set(payload.action, payload);
+      return;
+    }
     mobileAdminBusy = true;
+    const statusBadge = document.querySelector("#spcboy-mobile-admin-status");
+    const adminError = document.querySelector("#spcboy-mobile-admin-error");
+    if (statusBadge) statusBadge.textContent = "Saving…";
     const csrf = document.querySelector("#spcboy-csrf-form [name='csrfmiddlewaretoken']")?.value;
     try {
       const response = await fetch(adminUrl, {
@@ -3281,25 +3311,85 @@
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Admin action failed.");
       renderMobileAdmin(data);
-      if (data.message) showMobileToast(data.message);
+      if (data.message && payload?.action !== "save-site-settings" && payload?.action !== "update-display-name") {
+        showMobileToast(data.message);
+      }
     } catch (error) {
+      if (adminError) adminError.textContent = error.message || "Admin action failed.";
+      if (statusBadge) statusBadge.textContent = "Error";
       showMobileToast(error.message || "Admin action failed.");
     } finally {
       mobileAdminBusy = false;
+      if (mobileAdminQueuedActions.size > 0) {
+        const nextEntry = mobileAdminQueuedActions.entries().next().value;
+        mobileAdminQueuedActions.delete(nextEntry[0]);
+        void postMobileAdminAction(nextEntry[1]);
+      }
     }
   }
 
-  document.querySelector("#spcboy-mobile-admin-save-settings")?.addEventListener("click", () => {
-    const aacBitrate = document.querySelector("#spcboy-mobile-admin-bitrate")?.value;
-    const sessionLimitMinutes = document.querySelector("#spcboy-mobile-admin-session-limit")?.value;
-    void postMobileAdminAction({ action: "save-site-settings", aacBitrate, sessionLimitMinutes });
+  function commitMobileSiteSettings({ immediate = false } = {}) {
+    const bitrateSelect = document.querySelector("#spcboy-mobile-admin-bitrate");
+    const limitInput = document.querySelector("#spcboy-mobile-admin-session-limit");
+    const adminError = document.querySelector("#spcboy-mobile-admin-error");
+    if (!bitrateSelect || !limitInput) return;
+    const rawLimit = String(limitInput.value || "").trim();
+    const parsedLimit = Number(rawLimit);
+    if (!/^\d+$/.test(rawLimit) || !Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 1440) {
+      limitInput.setAttribute("aria-invalid", "true");
+      if (adminError) adminError.textContent = "Session limit must be a whole number from 1 to 1,440.";
+      window.clearTimeout(mobileAdminSettingsTimer);
+      return;
+    }
+    limitInput.removeAttribute("aria-invalid");
+    if (adminError) adminError.textContent = "";
+    const payload = { action: "save-site-settings", aacBitrate: bitrateSelect.value, sessionLimitMinutes: parsedLimit };
+    window.clearTimeout(mobileAdminSettingsTimer);
+    if (immediate) {
+      void postMobileAdminAction(payload);
+    } else {
+      mobileAdminSettingsTimer = window.setTimeout(() => { void postMobileAdminAction(payload); }, 450);
+    }
+  }
+
+  function commitMobileDisplayName({ immediate = false } = {}) {
+    const input = document.querySelector("#spcboy-mobile-admin-display-name");
+    if (!input) return;
+    window.clearTimeout(mobileAdminNameTimer);
+    if (immediate) {
+      void postMobileAdminAction({ action: "update-display-name", displayName: input.value });
+    } else {
+      mobileAdminNameTimer = window.setTimeout(() => {
+        void postMobileAdminAction({ action: "update-display-name", displayName: input.value });
+      }, 450);
+    }
+  }
+
+  document.querySelector("#spcboy-mobile-admin-bitrate")?.addEventListener("change", () => {
+    commitMobileSiteSettings({ immediate: true });
+  });
+  const mobileAdminLimitInput = document.querySelector("#spcboy-mobile-admin-session-limit");
+  mobileAdminLimitInput?.addEventListener("input", () => commitMobileSiteSettings({ immediate: false }));
+  mobileAdminLimitInput?.addEventListener("change", () => commitMobileSiteSettings({ immediate: true }));
+  mobileAdminLimitInput?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitMobileSiteSettings({ immediate: true });
+      mobileAdminLimitInput.blur();
+    }
+  });
+  const mobileAdminDisplayNameInput = document.querySelector("#spcboy-mobile-admin-display-name");
+  mobileAdminDisplayNameInput?.addEventListener("input", () => commitMobileDisplayName({ immediate: false }));
+  mobileAdminDisplayNameInput?.addEventListener("change", () => commitMobileDisplayName({ immediate: true }));
+  mobileAdminDisplayNameInput?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitMobileDisplayName({ immediate: true });
+      mobileAdminDisplayNameInput.blur();
+    }
   });
   document.querySelector("#spcboy-mobile-admin-create-invite")?.addEventListener("click", () => {
     void postMobileAdminAction({ action: "create-invite" });
-  });
-  document.querySelector("#spcboy-mobile-admin-save-name")?.addEventListener("click", () => {
-    const displayName = document.querySelector("#spcboy-mobile-admin-display-name")?.value || "";
-    void postMobileAdminAction({ action: "update-display-name", displayName });
   });
   document.querySelector("#spcboy-mobile-admin-gen-password")?.addEventListener("click", () => {
     void postMobileAdminAction({ action: "generate-login-password" });
