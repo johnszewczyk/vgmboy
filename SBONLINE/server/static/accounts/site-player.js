@@ -185,6 +185,7 @@
   let transportFadeEnvelope = { startGain: 1, targetGain: 1, startTime: 0, endTime: 0 };
   let equalizerGraphReady = false;
   let equalizerGraphFailed = false;
+  let equalizerFaderAnimationId = null;
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   let supportsAudioVolume = null;
   function testAudioVolumeSupport() {
@@ -2061,7 +2062,6 @@
   document.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") prepareAudioGraphFromGesture(event);
   }, true);
-  let equalizerFaderAnimationId = null;
   function cancelEqualizerFaderAnimation() {
     if (equalizerFaderAnimationId !== null) {
       cancelAnimationFrame(equalizerFaderAnimationId);

@@ -1078,7 +1078,7 @@
     const mobileAggregate = !desktop && view === "favorites";
     for (const entry of materializedPlaylistEntries) {
       if (!entry.list) continue;
-      if (!desktop && !mobileAggregate && !entry.slot) ensureEntrySidebarDom(entry);
+      if (!desktop && !mobileAggregate && !entry.row) ensureEntrySidebarDom(entry);
       const destination = desktop || mobileAggregate ? entry.playlistGroup : entry.slot;
       if (destination && entry.list.parentElement !== destination) destination.append(entry.list);
       if (!desktop && !mobileAggregate) {
