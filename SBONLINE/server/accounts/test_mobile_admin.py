@@ -186,4 +186,4 @@ class MobileAdminTests(TestCase):
         self.assertEqual(stats["totalPlays"], 2)
         self.assertGreaterEqual(stats["playsToday"], 1)
         self.assertAlmostEqual(stats["avgPlaysPerDay"], round(2 / 4, 1))
-        self.assertIn("2.0", stats["monthlyAudio"])
+        self.assertEqual(stats["monthlyAudio"], "2.1 MB")
