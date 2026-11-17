@@ -455,8 +455,8 @@ test('Equalizer toggle applies live without restarting active playback when Web 
   assert.ok(calls.some((entry) => Array.isArray(entry) && entry[0] === 'update-graph' && entry[1] === true));
 });
 
-test('audioURL skips server eq and volume params when Web Audio client processing is available', () => {
-  const context = vm.createContext({
+test('audioURL always emits server eq params when EQ is enabled and omits volume when native audio.volume is supported', () => {
+  const desktopContext = vm.createContext({
     URLSearchParams,
     dock: { dataset: { audioUrl: '/audio/spcboy/TRACK_ID/', pageLoadToken: 'tok' } },
     currentPlaybackId: 'pb1',
@@ -468,18 +468,18 @@ test('audioURL skips server eq and volume params when Web Audio client processin
     equalizerEnabled: true,
     equalizerBandGains: [6, 0, 0, 0, 0, 0, 0, 0, 0, -3],
     volumeStep: 10,
-    equalizerGraphFailed: false,
-    AudioContextClass: function AudioContextMock() {},
+    testAudioVolumeSupport: () => true,
+    supportsClientAudioGraph: () => false,
   });
-  vm.runInContext(source.slice(source.indexOf('  function audioURL('), source.indexOf('  function nativeFormatPlaybackRate(')), context);
-  const clientUrl = context.audioURL({ id: 'guile' }, 0);
-  assert.equal(clientUrl.includes('eq='), false);
-  assert.equal(clientUrl.includes('volume='), false);
+  vm.runInContext(source.slice(source.indexOf('  function audioURL('), source.indexOf('  function nativeFormatPlaybackRate(')), desktopContext);
+  const desktopUrl = desktopContext.audioURL({ id: 'guile' }, 0);
+  assert.equal(desktopUrl.includes('eq=6.0'), true);
+  assert.equal(desktopUrl.includes('volume='), false);
 
-  context.AudioContextClass = null;
-  const legacyUrl = context.audioURL({ id: 'guile' }, 0);
-  assert.equal(legacyUrl.includes('eq=6.0'), true);
-  assert.equal(legacyUrl.includes('volume=10'), true);
+  desktopContext.testAudioVolumeSupport = () => false;
+  const iosUrl = desktopContext.audioURL({ id: 'guile' }, 0);
+  assert.equal(iosUrl.includes('eq=6.0'), true);
+  assert.equal(iosUrl.includes('volume=10'), true);
 });
 
 test('playPlaylist never falls back to playlist[0] when an explicit startTrackId is missing', async () => {

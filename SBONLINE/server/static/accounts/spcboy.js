@@ -2957,7 +2957,7 @@
       const output = document.querySelector(`[data-mobile-eq-value="${idx}"]`);
       if (output) output.textContent = (val > 0 ? "+" : "") + val.toFixed(1);
       if (!window.SitePlayer?.isEqualizerEnabled?.()) {
-        window.SitePlayer?.setEqualizerEnabled?.(true);
+        window.SitePlayer?.setEqualizerEnabled?.(true, { deferRestart: true });
       }
       updateMobileEqToolbar(currentMobileEqPreset);
     });

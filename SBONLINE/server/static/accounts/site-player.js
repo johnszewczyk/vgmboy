@@ -187,14 +187,6 @@
   let equalizerGraphFailed = false;
   let equalizerFaderAnimationId = null;
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  const ua = typeof navigator !== "undefined" ? (navigator.userAgent || "") : "";
-  const isAppleMobile = typeof navigator !== "undefined"
-    && (/iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
-  const isSafariDesktop = typeof navigator !== "undefined"
-    && !isAppleMobile
-    && /Safari\//.test(ua)
-    && !/Chrome\/|Chromium\/|CriOS\/|FxiOS\/|Edg\//.test(ua);
-  const useWebAudioEngine = Boolean(isSafariDesktop && window.SBWebAudioAACStream?.supported?.());
   let supportsAudioVolume = null;
   function testAudioVolumeSupport() {
     if (supportsAudioVolume !== null) return supportsAudioVolume;
@@ -303,21 +295,8 @@
     }
   }
   function supportsClientAudioGraph() {
-    if (!AudioContextClass || equalizerGraphFailed) return false;
-    if (typeof useWebAudioEngine === "boolean" && useWebAudioEngine) return true;
-    if (typeof window !== "undefined") {
-      if (!window.MediaSource && Boolean(window.ManagedMediaSource)) return false;
-      if (typeof navigator !== "undefined" && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1))) {
-        return false;
-      }
-      if (typeof isSafariDesktop === "boolean" && isSafariDesktop) {
-        return false;
-      }
-    }
-    if (typeof document !== "undefined" && typeof testAudioVolumeSupport === "function" && !testAudioVolumeSupport()) {
-      return false;
-    }
-    return true;
+    // Equalizer processing runs exclusively on the server so native <audio> playback never glitches.
+    return false;
   }
   function updateEqualizerGraph() {
     if (!equalizerGraphReady) return;
@@ -342,16 +321,8 @@
       : Boolean(AudioContextClass && !equalizerGraphFailed);
     if (equalizerGraphFailed || !clientGraphAllowed) return false;
     try {
-      if (typeof useWebAudioEngine === "boolean" && useWebAudioEngine) {
-        try {
-          audioContext = new AudioContextClass({ sampleRate: 44100 });
-        } catch {
-          audioContext = new AudioContextClass();
-        }
-      } else {
-        audioContext = new AudioContextClass();
-        equalizerSource = audioContext.createMediaElementSource(audio);
-      }
+      audioContext = new AudioContextClass();
+      equalizerSource = audioContext.createMediaElementSource(audio);
       equalizerFilters = equalizerFrequencies.map((frequency) => {
         const filter = audioContext.createBiquadFilter();
         filter.type = "peaking";
@@ -363,15 +334,9 @@
       transportFadeOutput = audioContext.createGain();
       transportFadeOutput.gain.value = 1;
       equalizerFilters.forEach((filter, index) => {
-        if (index === 0) {
-          if (equalizerSource && equalizerSource !== filter) equalizerSource.connect(filter);
-        } else {
-          equalizerFilters[index - 1].connect(filter);
-        }
+        if (index === 0) equalizerSource.connect(filter);
+        else equalizerFilters[index - 1].connect(filter);
       });
-      if (!equalizerSource && equalizerFilters.length) {
-        equalizerSource = equalizerFilters[0];
-      }
       equalizerFilters.at(-1).connect(equalizerOutput);
       equalizerOutput.connect(transportFadeOutput);
       transportFadeOutput.connect(audioContext.destination);
@@ -381,10 +346,8 @@
     } catch {
       // If graph setup fails after creating the media source, keep direct output connected.
       try {
-        if (equalizerSource && equalizerSource !== equalizerFilters[0]) {
-          equalizerSource.disconnect();
-          equalizerSource.connect(audioContext.destination);
-        }
+        equalizerSource?.disconnect();
+        equalizerSource?.connect(audioContext.destination);
       } catch { /* Keep the browser's native player path available when possible. */ }
       equalizerGraphFailed = true;
       equalizerEnabled = false;
@@ -439,9 +402,8 @@
       setPlayerStatus("AAC streaming requires an up-to-date browser.");
       return false;
     }
-    const playerTarget = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
-    if (streamNeedsRetry || aacTransport.interrupted || playerTarget.error || playerTarget.ended) {
-      streamOffsetSeconds = playerTarget.ended && !streamNeedsRetry ? 0 : sourcePositionSeconds();
+    if (streamNeedsRetry || aacTransport.interrupted || audio.error || audio.ended) {
+      streamOffsetSeconds = audio.ended && !streamNeedsRetry ? 0 : sourcePositionSeconds();
       setAudioSource(audioURL(currentTrack, streamOffsetSeconds));
     }
     const clientVolume = typeof supportsClientAudioGraph === "function"
@@ -456,18 +418,18 @@
         setAudioSource(audioURL(currentTrack, streamOffsetSeconds));
       }
     }
-    const source = playerTarget.src;
+    const source = audio.src;
     try {
       // Do not block audio.play() on resume() in WebKit when async chains lose user activation.
       if (audioContext && audioContext.state !== "running") {
         const resumeResult = audioContext.resume();
         if (resumeResult && typeof resumeResult.catch === "function") resumeResult.catch(() => {});
       }
-      await playerTarget.play();
+      await audio.play();
       return true;
     } catch (error) {
       // Track switches and Stop legitimately abort an outstanding play request.
-      if (source === playerTarget.src && error.name !== "AbortError") {
+      if (source === audio.src && error.name !== "AbortError") {
         playbackWanted = false;
         cancelStreamRecovery();
         setPlayerStatus(error.name === "NotAllowedError" ? "Press Play to resume audio." : `Audio could not start (${error.name || "unknown"}). Press Play to retry.`);
@@ -524,22 +486,40 @@
     updateEqualizerGraph();
     window.dispatchEvent(new CustomEvent("siteplayer:settings-changed", { detail: { equalizerBandGains } }));
   }
-  async function setEqualizerEnabled(enabled) {
+  function scheduleEqualizerRestart(delay = 300) {
+    if (typeof currentTrack === "undefined" || !currentTrack || !equalizerEnabled) return;
+    if (typeof window === "undefined") return;
+    window.clearTimeout?.(eqRestartTimer);
+    eqRestartTimer = window.setTimeout?.(() => {
+      eqRestartTimer = null;
+      if (typeof restartCurrentStream === "function") {
+        restartCurrentStream(sourcePositionSeconds());
+      }
+    }, delay) ?? null;
+  }
+  async function setEqualizerEnabled(enabled, { deferRestart = false } = {}) {
     equalizerEnabled = Boolean(enabled);
     updateEqualizerToggle(equalizerEnabled);
     storage.set("equalizerEnabled", equalizerEnabled);
     if (equalizerError) equalizerError.textContent = "";
-    const graphReady = ensureEqualizerGraph();
+    const graphReady = typeof ensureEqualizerGraph === "function" ? ensureEqualizerGraph() : false;
     updateEqualizerGraph();
     syncEqualizerControls();
     syncOnlineControls();
+    if (typeof window !== "undefined" && typeof eqRestartTimer !== "undefined") {
+      window.clearTimeout?.(eqRestartTimer);
+      eqRestartTimer = null;
+    }
     if (graphReady) {
       if (audioContext && audioContext.state !== "running") {
         audioContext.resume().catch(() => {});
       }
     } else if (currentTrack) {
-      // Legacy fallback when Web Audio graph cannot be initialized.
-      restartCurrentStream(sourcePositionSeconds());
+      if (deferRestart && equalizerEnabled && typeof scheduleEqualizerRestart === "function") {
+        scheduleEqualizerRestart(300);
+      } else {
+        restartCurrentStream(sourcePositionSeconds());
+      }
     }
     window.dispatchEvent(new CustomEvent("siteplayer:settings-changed", { detail: { equalizerEnabled } }));
     return true;
@@ -623,7 +603,7 @@
     clearFadedSkip();
     playbackWanted = false;
     cancelStreamRecovery(true);
-    (typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio).pause();
+    audio.pause();
   }
   function recoverStream(error = {}) {
     streamNeedsRetry = true;
@@ -652,21 +632,14 @@
       startAudioPlayback();
     }, delay);
   }
-  const onStreamTiming = (seconds) => {
+  const aacTransport = window.SBAACStream?.attach(audio, handleStreamFailure, (seconds) => {
     if (currentTrack && !longPlayEnabled && Number.isFinite(seconds) && seconds > 0) {
       // The response header reports the track endpoint in source time. Keep
       // it out of the catalog object so playlist labels stay canonical.
       streamDurationSeconds = seconds;
       updatePlaybackClock();
     }
-  };
-  const aacTransport = useWebAudioEngine && window.SBWebAudioAACStream
-    ? window.SBWebAudioAACStream.attach(audio, handleStreamFailure, onStreamTiming, {
-        ensureGraph: ensureEqualizerGraph,
-        getAudioContext: () => audioContext,
-        getFilterInput: () => equalizerFilters[0] || equalizerSource,
-      })
-    : window.SBAACStream?.attach(audio, handleStreamFailure, onStreamTiming);
+  });
   function setAudioSource(url) {
     changingAudioSource = true;
     streamNeedsRetry = false;
@@ -696,8 +669,7 @@
     statusTimer = null;
     const text = String(message || "");
     const desktopDock = document.body.classList.contains("spcboy-body") && window.matchMedia("(min-width: 781px)").matches;
-    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
-    const idleText = !currentTrack ? "Ready" : target.paused || target.ended ? "Paused" : "Playing";
+    const idleText = !currentTrack ? "Ready" : audio.paused || audio.ended ? "Paused" : "Playing";
     const isBusy = Boolean(text && busy);
     state.textContent = String(announcement || "");
     statusText.textContent = text || idleText;
@@ -773,12 +745,11 @@
   let lastPlaybackSignature = "";
   function savePlayback(force = false) {
     if (!currentTrack) return;
-    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
     const saved = {
       track: savedTrack(currentTrack), queue: queue.slice(0,500).map(savedTrack).filter(Boolean),
       history: playlistHistory.slice(-500).map(savedTrack).filter(Boolean), playlist: nowPlayingPlaylist,
       position: sourcePositionSeconds(),
-      playing: !target.paused && !target.ended, savedAt: Date.now()
+      playing: !audio.paused && !audio.ended, savedAt: Date.now()
     };
     const signature = JSON.stringify({
       track: saved.track, queue: saved.queue.map(track => track.id),
@@ -823,13 +794,12 @@
   }
 
   function fadedSkipDurationSeconds() {
-    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
     if (!fadedSkipsEnabled
         || !currentTrack
         || !playbackWanted
-        || target.paused
-        || target.ended
-        || target.error
+        || audio.paused
+        || audio.ended
+        || audio.error
         || streamNeedsRetry
         || spcFadeSeconds <= 0
         || !ensureEqualizerGraph()
@@ -871,8 +841,7 @@
       return;
     }
     const trackDuration = effectiveDuration(currentTrack);
-    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
-    const mediaTime = Number.isFinite(target.currentTime) ? target.currentTime : 0;
+    const mediaTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
     const elapsed = Math.min(trackDuration || Infinity, streamOffsetSeconds + mediaTime * nativeFormatPlaybackRate());
     const playlistDuration = trackDuration + queue.reduce(
       (total, queuedTrack) => total + effectiveDuration(queuedTrack),
@@ -900,13 +869,12 @@
     params.set("speedDenominator", speedDenominator);
     params.set("fade", String(spcFadeSeconds));
     if (longPlayEnabled) params.set("longPlay", String(longPlaySeconds));
-    const usesClientAudioGraph = typeof supportsClientAudioGraph === "function"
-      ? supportsClientAudioGraph()
-      : Boolean(AudioContextClass && !equalizerGraphFailed);
+    const usesClientAudioGraph = typeof supportsClientAudioGraph === "function" ? supportsClientAudioGraph() : false;
     if (!usesClientAudioGraph && equalizerEnabled && equalizerBandGains.some((g) => g !== 0)) {
       params.set("eq", equalizerBandGains.map((g) => (Math.round(g * 2) / 2).toFixed(1)).join(","));
     }
-    if (volumeStep < 20 && !usesClientAudioGraph) params.set("volume", String(volumeStep));
+    const usesNativeAudioVolume = typeof testAudioVolumeSupport === "function" ? testAudioVolumeSupport() : false;
+    if (volumeStep < 20 && !usesClientAudioGraph && !usesNativeAudioVolume) params.set("volume", String(volumeStep));
     return `${base}?${params}`;
   }
 
@@ -919,15 +887,13 @@
   }
 
   function sourcePositionSeconds() {
-    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
-    return Math.max(0, streamOffsetSeconds + (Number(target.currentTime) || 0) * nativeFormatPlaybackRate());
+    return Math.max(0, streamOffsetSeconds + (Number(audio.currentTime) || 0) * nativeFormatPlaybackRate());
   }
 
   function updateControls() {
     if (stopButton) stopButton.disabled = !currentTrack || playbackSessionExpired();
     syncOnlineControls();
-    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
-    const playing = Boolean(currentTrack && !target.paused && !target.ended && !target.error);
+    const playing = Boolean(currentTrack && !audio.paused && !audio.ended && !audio.error);
     playButton.disabled = !playbackSessionExpired() && !currentTrack;
     playButton.setAttribute("aria-label", playbackExpired ? "Reload player" : playing ? "Pause" : "Play");
     playButton.title = playbackExpired ? "Reload player to start a new session" : playing ? "Pause" : "Play";
@@ -950,9 +916,8 @@
   function emitTrack() {
     syncMediaSession();
     savePlayback();
-    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
     window.dispatchEvent(new CustomEvent("siteplayer:track", {
-      detail: { track: currentTrack, playbackId: currentPlaybackId, playing: Boolean(currentTrack && !target.paused && !target.ended && !target.error) },
+      detail: { track: currentTrack, playbackId: currentPlaybackId, playing: Boolean(currentTrack && !audio.paused && !audio.ended && !audio.error) },
     }));
   }
 
@@ -975,8 +940,7 @@
         title: currentTrack.title, artist: currentTrack.artist || "", album: currentTrack.game || "", artwork
       });
     }
-    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
-    navigator.mediaSession.playbackState = !currentTrack ? "none" : target.paused || target.ended ? "paused" : "playing";
+    navigator.mediaSession.playbackState = !currentTrack ? "none" : audio.paused || audio.ended ? "paused" : "playing";
     syncMediaPosition();
   }
   function seekToTrackOffset(seconds) {
@@ -1278,8 +1242,7 @@
   }
 
   function updateNowPlaying() {
-    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
-    if (target.paused || target.ended) return;
+    if (audio.paused || audio.ended) return;
     const payload = nowPlayingPayload("playing");
     if (!payload) return;
     fetch(dock.dataset.nowPlayingUrl, {
@@ -1387,18 +1350,17 @@
     const track = normalizeTrack(rawTrack);
     if (!track) return false;
     if (currentTrack?.id === track.id) {
-      const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
       if (options.toggle) {
         if (streamRecoveryTimer !== null) {
           pausePlayback(); setPlayerStatus("");
-        } else if (streamNeedsRetry || target.paused || target.error || target.ended) {
+        } else if (streamNeedsRetry || audio.paused || audio.error || audio.ended) {
           setPlayerStatus("Preparing audio…", { busy: true });
           await startAudioPlayback();
         } else {
           pausePlayback();
           setPlayerStatus("");
         }
-      } else if (streamNeedsRetry || target.paused || target.error || target.ended) {
+      } else if (streamNeedsRetry || audio.paused || audio.error || audio.ended) {
         setPlayerStatus("Preparing audio…", { busy: true });
         await startAudioPlayback();
       }
@@ -1651,10 +1613,9 @@
       return;
     }
     if (!currentTrack) return;
-    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
     if (streamRecoveryTimer !== null) {
       pausePlayback(); setPlayerStatus("");
-    } else if (streamNeedsRetry || target.paused || target.error || target.ended) {
+    } else if (streamNeedsRetry || audio.paused || audio.error || audio.ended) {
       setPlayerStatus("Preparing audio…", { busy: true });
       startAudioPlayback();
     }
@@ -1684,13 +1645,15 @@
   async function restartCurrentStream(sourcePosition = null) {
     if (playbackSessionExpired() || !currentTrack) return;
     clearFadedSkip();
-    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
-    const resume = !target.paused && !target.ended;
-    const seekTarget = Math.min(sourcePosition ?? sourcePositionSeconds(), Math.max(0, effectiveDuration() - 1));
-    streamOffsetSeconds = seekTarget;
+    const resume = playbackWanted || (!audio.paused && !audio.ended);
+    const knownDuration = effectiveDuration();
+    const maxOffset = knownDuration > 1 ? knownDuration - 1 : Infinity;
+    const target = Math.max(0, Math.min(sourcePosition ?? sourcePositionSeconds(), maxOffset));
+    streamOffsetSeconds = target;
     streamDurationSeconds = 0;
-    target.pause();
-    setAudioSource(audioURL(currentTrack, seekTarget));
+    changingAudioSource = true;
+    audio.pause();
+    setAudioSource(audioURL(currentTrack, target));
     if (resume) setPlayerStatus("Preparing audio…", { busy: true });
     else setPlayerStatus("");
     updateControls();
@@ -2171,16 +2134,10 @@
       const index = Number(input.dataset.equalizerBand);
       if (!Number.isInteger(index) || index < 0 || index >= equalizerBandGains.length) return;
       equalizerBandGains[index] = Math.max(-12, Math.min(12, Math.round(Number(input.value) * 2) / 2));
-      const wasDisabled = !equalizerEnabled;
-      if (!equalizerEnabled) setEqualizerEnabled(true);
-      const graphReady = ensureEqualizerGraph();
-      if (equalizerEnabled && graphReady && audioContext?.state !== "running") {
-        audioContext?.resume().catch(() => {});
-      }
+      if (!equalizerEnabled) setEqualizerEnabled(true, { deferRestart: true });
       saveEqualizerGains();
-      if (!graphReady && equalizerEnabled && !wasDisabled && currentTrack) {
-        window.clearTimeout(eqRestartTimer);
-        eqRestartTimer = window.setTimeout(() => restartCurrentStream(sourcePositionSeconds()), 250);
+      if (equalizerEnabled && currentTrack) {
+        scheduleEqualizerRestart(300);
       }
     });
   });
@@ -2279,13 +2236,14 @@
     applyVolumeStep();
     if (typeof syncVolumeControls === "function") syncVolumeControls();
     window.clearTimeout(volumeRestartTimer);
+    const hasNativeVolume = typeof testAudioVolumeSupport === "function" && testAudioVolumeSupport();
     if (ensureEqualizerGraph()) {
       updateEqualizerGraph();
       if (audioContext && audioContext.state !== "running") {
         audioContext.resume().catch(() => { setPlayerStatus("Press Play to resume audio processing."); });
       }
-    } else if (currentTrack) {
-      // Legacy browsers without Web Audio retain the server-volume fallback.
+    } else if (!hasNativeVolume && currentTrack) {
+      // Browsers without <audio>.volume support (e.g. iOS) apply volume on the server.
       volumeRestartTimer = window.setTimeout(() => restartCurrentStream(sourcePositionSeconds()), 350);
     }
   });
@@ -2344,10 +2302,9 @@
 
   let lastPlaybackSave = 0;
   audio.addEventListener("timeupdate", () => {
-    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
     updateControls();
     syncMediaPosition();
-    if (!target.paused && !target.ended && !target.error && healthyPlaybackSince && Date.now() - healthyPlaybackSince > 30000) streamRecoveryAttempts = 0;
+    if (!audio.paused && !audio.ended && !audio.error && healthyPlaybackSince && Date.now() - healthyPlaybackSince > 30000) streamRecoveryAttempts = 0;
     if (Date.now() - lastPlaybackSave > 2000) { savePlayback(); lastPlaybackSave = Date.now(); }
   });
   audio.addEventListener("playing", () => {
@@ -2369,8 +2326,7 @@
   });
   audio.addEventListener("pause", () => {
     // Device interruptions cancel intent; source replacement emits its own pause.
-    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
-    if (!changingAudioSource && !target.ended && !target.error) {
+    if (!changingAudioSource && !audio.ended && !audio.error) {
       clearFadedSkip();
       playbackWanted = false;
       cancelStreamRecovery();
@@ -2383,19 +2339,18 @@
     clearNowPlaying();
   });
   audio.addEventListener("waiting", () => {
-    if (currentTrack && !(typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio).paused) setPlayerStatus("Buffering audio…", { busy: true });
+    if (currentTrack && !audio.paused) setPlayerStatus("Buffering audio…", { busy: true });
   });
   audio.addEventListener("stalled", () => {
-    if (currentTrack && !(typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio).paused) setPlayerStatus("Buffering audio…", { busy: true });
+    if (currentTrack && !audio.paused) setPlayerStatus("Buffering audio…", { busy: true });
   });
   audio.addEventListener("ended", async () => {
-    const playerTarget = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
-    const source = playerTarget.src;
+    const source = audio.src;
     const expectedDuration = effectiveDuration();
     const streamEndedCleanly = typeof aacTransport !== "undefined" && Boolean(aacTransport?.streamEnded);
     if (!streamEndedCleanly && expectedDuration > 0 && sourcePositionSeconds() < expectedDuration - 1) {
       const quotaReached = await hasReachedStreamQuota();
-      if (source !== playerTarget.src || !playerTarget.ended) return;
+      if (source !== audio.src || !audio.ended) return;
       if (quotaReached) showStreamQuotaMessage();
       else recoverStream();
       updateControls();
@@ -2404,14 +2359,13 @@
     moveTrack(1, { completeQueuedTarget: true });
   });
   audio.addEventListener("error", async () => {
-    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
     const failedPlaybackId = currentPlaybackId;
-    const failedSource = target.src;
-    const stillFailed = () => failedPlaybackId === currentPlaybackId && failedSource === target.src && target.error;
+    const failedSource = audio.src;
+    const stillFailed = () => failedPlaybackId === currentPlaybackId && failedSource === audio.src && audio.error;
     if (currentTrack && await hasReachedStreamQuota()) {
       if (stillFailed()) showStreamQuotaMessage();
     } else if (currentTrack && stillFailed()) {
-      recoverStream({status: target.error?.code === 3 || target.error?.code === 4 ? 415 : 0});
+      recoverStream({status: audio.error.code === 3 || audio.error.code === 4 ? 415 : 0});
     }
     updateControls();
   });
@@ -2530,10 +2484,7 @@
     setLibraryNavigator(provider) { libraryNavigator = typeof provider === "function" ? provider : null; updateControls(); },
     getDuration(track) { return effectiveDuration(track); },
     getCurrentTrack() { return currentTrack; },
-    isPlaying() {
-      const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
-      return Boolean(currentTrack && !target.paused && !target.ended && !target.error);
-    },
+    isPlaying() { return Boolean(currentTrack && !audio.paused && !audio.ended && !audio.error); },
     getQueue() { return [...queue]; },
     togglePlayback() { playButton.click(); },
     previous() { return moveTrack(-1); },
@@ -2548,12 +2499,13 @@
       applyVolumeStep();
       syncVolumeControls();
       window.clearTimeout(volumeRestartTimer);
+      const hasNativeVolume = typeof testAudioVolumeSupport === "function" && testAudioVolumeSupport();
       if (ensureEqualizerGraph()) {
         updateEqualizerGraph();
         if (audioContext && audioContext.state !== "running") {
           audioContext.resume().catch(() => {});
         }
-      } else if (currentTrack) {
+      } else if (!hasNativeVolume && currentTrack) {
         volumeRestartTimer = window.setTimeout(() => restartCurrentStream(sourcePositionSeconds()), 350);
       }
     },
@@ -2575,7 +2527,7 @@
       return selectedEqualizerPresetIndex;
     },
     isEqualizerEnabled() { return equalizerEnabled; },
-    setEqualizerEnabled(enabled) { return setEqualizerEnabled(Boolean(enabled)); },
+    setEqualizerEnabled(enabled, options = {}) { return setEqualizerEnabled(Boolean(enabled), options); },
     getEqualizerBands() { return [...equalizerBandGains]; },
     getEqualizerFrequencies() { return [...equalizerFrequencies]; },
     setEqualizerBandGain(index, gain) {
@@ -2583,16 +2535,9 @@
       const rounded = Math.max(-12, Math.min(12, Math.round(Number(gain) * 2) / 2));
       equalizerBandGains[index] = rounded;
       if (equalizerBandInputs[index]) equalizerBandInputs[index].value = String(rounded);
-      const graphReady = ensureEqualizerGraph();
-      if (equalizerEnabled && graphReady && audioContext && audioContext.state !== "running") {
-        audioContext.resume().catch(() => {});
-      }
       saveEqualizerGains();
-      if (!graphReady && equalizerEnabled && currentTrack) {
-        window.clearTimeout(eqRestartTimer);
-        eqRestartTimer = window.setTimeout(() => {
-          restartCurrentStream(sourcePositionSeconds());
-        }, 250);
+      if (equalizerEnabled && currentTrack) {
+        scheduleEqualizerRestart(300);
       }
     },
     resetEqualizer() {

@@ -34,7 +34,7 @@ test('site-player syncs segmented OFF/1/2/3 EQ toolbar and percentage volume bad
   assert.match(sitePlayerJs, /volumeValue\.textContent = `\$\{percent\}%`;/);
   assert.match(sitePlayerJs, /equalizerModeButtons\.forEach\(\(button\) =>/);
   assert.match(sitePlayerJs, /const isActive = isOff \? !equalizerEnabled : \(equalizerEnabled && Number\(mode\) === selectedEqualizerPresetIndex\);/);
-  assert.match(sitePlayerJs, /if \(!equalizerEnabled\) setEqualizerEnabled\(true\);/);
+  assert.match(sitePlayerJs, /if \(!equalizerEnabled\) setEqualizerEnabled\(true(?:,\s*\{\s*deferRestart:\s*true\s*\})?\);/);
   assert.match(sitePlayerJs, /animateEqualizerBandSliders/);
 
   const catalogWorkspaceHtml = readFileSync(`${serverDir}/templates/accounts/partials/spcboy_catalog_workspace.html`, 'utf8');
