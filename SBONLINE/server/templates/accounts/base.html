@@ -24,7 +24,7 @@
   <script src="{% static 'accounts/sb-presentation.js' %}?v=20261026-collections-1" data-site-global defer></script>
   <script src="{% static 'accounts/aac-stream.js' %}?v=20261115-v1" data-site-global defer></script>
   <script src="{% static 'accounts/site-preferences.js' %}?v=20261117-eq-perf-2" data-preferences-url="{% url 'spcboy_preferences' %}" data-site-global defer></script>
-  <script src="{% static 'accounts/site-player.js' %}?v=20261117-eq-server-1" data-site-global defer></script>
+  <script src="{% static 'accounts/site-player.js' %}?v=20261117-eq-server-2" data-site-global defer></script>
   <script src="{% static 'accounts/site-favorites.js' %}?v=20261101-favorite-swipe-cue-1" data-site-global defer></script>
   <script src="{% static 'accounts/site-navigation.js' %}?v=20261116-sbo-no-gallery-1" data-site-global defer></script>
   {% endif %}
@@ -174,7 +174,6 @@
               <p class="spcboy-equalizer-preset-status" id="spcboy-equalizer-preset-status" role="status" aria-live="polite"></p>
               <div class="spcboy-equalizer-footer">
                 <button type="button" class="sbo-drawer-btn-secondary" id="spcboy-equalizer-reset">Reset to Flat</button>
-                <button type="button" class="sbo-drawer-btn-secondary" data-equalizer-mobile-save>Save to Preset 1</button>
               </div>
               <span class="spcboy-setting-error" id="spcboy-equalizer-error" role="status" aria-live="polite"></span>
             </section>

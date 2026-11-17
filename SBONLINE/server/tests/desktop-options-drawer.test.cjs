@@ -12,7 +12,7 @@ test('desktop options drawer imports mobile card, switch, and segmented EQ desig
   assert.match(baseHtml, /class="sbo-drawer-eq-toolbar"[^>]*aria-label="Equalizer Presets"/);
   assert.match(baseHtml, /data-equalizer-mode="off"/);
   assert.match(baseHtml, /data-equalizer-mobile-profile="\{\{ forloop\.counter0 \}\}"/);
-  assert.match(baseHtml, /data-equalizer-mobile-save>Save to Preset 1</);
+  assert.doesNotMatch(baseHtml, /data-equalizer-mobile-save|Save to Preset/);
   assert.match(baseHtml, /id="site-player-volume-value"[^>]*>100%</);
   assert.match(baseHtml, /id="spcboy-equalizer-enabled"[^>]*hidden/);
 

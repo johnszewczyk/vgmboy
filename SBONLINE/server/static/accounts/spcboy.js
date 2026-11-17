@@ -2441,10 +2441,6 @@
       btn.classList.toggle("is-active", isActive);
       btn.setAttribute("aria-pressed", String(isActive));
     });
-    const saveBtn = document.querySelector("#spcboy-mobile-save-preset");
-    if (saveBtn && typeof activeMode === "number") {
-      saveBtn.textContent = `Save to Preset ${activeMode + 1}`;
-    }
   }
 
   function animateMobileFaders(targetGains, { duration = 240, onComplete } = {}) {
@@ -2970,15 +2966,6 @@
       window.SitePlayer?.resetEqualizer?.();
       updateMobileEqToolbar(currentMobileEqPreset);
       showMobileToast("Equalizer reset to Flat");
-    };
-  }
-
-  const savePresetBtn = document.querySelector("#spcboy-mobile-save-preset");
-  if (savePresetBtn) {
-    savePresetBtn.onclick = () => {
-      const idx = typeof currentMobileEqPreset === "number" ? currentMobileEqPreset : 0;
-      window.SitePlayer?.saveEqualizerPreset?.(idx);
-      showMobileToast(`Preset ${idx + 1} saved!`);
     };
   }
 

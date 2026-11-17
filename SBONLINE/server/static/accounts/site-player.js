@@ -32,7 +32,6 @@
   const equalizerPresetSaveButtons = [...document.querySelectorAll("[data-equalizer-preset-save]")];
   const equalizerModeButtons = [...document.querySelectorAll("[data-equalizer-mode]")];
   const equalizerMobileProfileButtons = [...document.querySelectorAll("[data-equalizer-mobile-profile]")];
-  const equalizerMobileSaveButton = document.querySelector("[data-equalizer-mobile-save]");
   const equalizerPresetStatus = document.querySelector("#spcboy-equalizer-preset-status");
   const settingsPageButtons = [...document.querySelectorAll("[data-settings-page-target]")];
   const settingsPages = [...document.querySelectorAll("[data-settings-page]")];
@@ -289,10 +288,6 @@
       const state = document.querySelector(`[data-equalizer-mobile-state="${index}"]`);
       if (state) state.textContent = saved ? "Saved" : "Empty";
     });
-    if (equalizerMobileSaveButton) {
-      equalizerMobileSaveButton.disabled = false;
-      equalizerMobileSaveButton.textContent = `Save to Preset ${selectedEqualizerPresetIndex + 1}`;
-    }
   }
   function supportsClientAudioGraph() {
     // Equalizer processing runs exclusively on the server so native <audio> playback never glitches.
@@ -2052,13 +2047,13 @@
     "#spcboy-play", "#spcboy-next", "#spcboy-previous",
     "#spcboy-faded-skip", "#spcboy-equalizer-enabled", "[data-equalizer-mode]", "[data-equalizer-band]",
     "[data-equalizer-preset-apply]", "[data-equalizer-mobile-profile]", "#spcboy-equalizer-reset",
-    "[data-equalizer-mobile-save]", "#site-player-volume",
+    "#site-player-volume",
     '[data-sbonline-command="equalizer"]', '[data-sbonline-command="volume"]', "#sbonline-volume-input",
     ".spcboy-track", ".spcboy-media-card", "[data-site-play-track]", "[data-site-play-album-url]",
     "#spcboy-mobile-play", "#spcboy-mobile-next", "#spcboy-mobile-previous",
     "#spcboy-mobile-dock-play", ".spcboy-mobile-dock", "#spcboy-mobile-equalizer",
     "#spcboy-mobile-volume", "#spcboy-mobile-reset-flat", "[data-mobile-eq-band]",
-    "[data-mobile-eq-mode]", "#spcboy-mobile-save-preset", "#spcboy-mobile-shuffle-favs",
+    "[data-mobile-eq-mode]", "#spcboy-mobile-shuffle-favs",
     ".spcboy-mobile-track", ".spcboy-mobile-track-row",
   ].join(",");
   function prepareAudioGraphFromGesture(event) {
@@ -2136,6 +2131,7 @@
       equalizerBandGains[index] = Math.max(-12, Math.min(12, Math.round(Number(input.value) * 2) / 2));
       if (!equalizerEnabled) setEqualizerEnabled(true, { deferRestart: true });
       saveEqualizerGains();
+      saveEqualizerPreset(selectedEqualizerPresetIndex, { announce: false });
       if (equalizerEnabled && currentTrack) {
         scheduleEqualizerRestart(300);
       }
@@ -2150,6 +2146,7 @@
         audioContext?.resume().catch(() => {});
       }
       saveEqualizerGains();
+      saveEqualizerPreset(selectedEqualizerPresetIndex, { announce: false });
       if (equalizerPresetStatus) equalizerPresetStatus.textContent = "Equalizer reset to Flat.";
       if (!graphReady && equalizerEnabled && currentTrack) {
         restartCurrentStream(sourcePositionSeconds());
@@ -2181,12 +2178,12 @@
       window.dispatchEvent(new CustomEvent("siteplayer:settings-changed"));
     }
   }
-  function saveEqualizerPreset(index) {
+  function saveEqualizerPreset(index, { announce = true } = {}) {
     if (!Number.isInteger(index) || index < 0 || index >= equalizerPresets.length) return;
     equalizerPresets[index] = { name: `Preset ${index + 1}`, gains: [...equalizerBandGains] };
     storage.set("equalizerPresets", equalizerPresets);
     syncEqualizerPresetControls();
-    if (equalizerPresetStatus) {
+    if (announce && equalizerPresetStatus) {
       equalizerPresetStatus.textContent = `Preset ${index + 1} saved.`;
     }
     if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
@@ -2216,9 +2213,6 @@
         void applyEqualizerPreset(index);
       });
     });
-  }
-  if (typeof equalizerMobileSaveButton !== "undefined" && equalizerMobileSaveButton) {
-    equalizerMobileSaveButton.addEventListener("click", () => saveEqualizerPreset(selectedEqualizerPresetIndex));
   }
   queueToggle.addEventListener("click", () => {
     const open = queueToggle.getAttribute("aria-expanded") !== "true";
@@ -2536,6 +2530,7 @@
       equalizerBandGains[index] = rounded;
       if (equalizerBandInputs[index]) equalizerBandInputs[index].value = String(rounded);
       saveEqualizerGains();
+      saveEqualizerPreset(selectedEqualizerPresetIndex, { announce: false });
       if (equalizerEnabled && currentTrack) {
         scheduleEqualizerRestart(300);
       }
@@ -2545,6 +2540,7 @@
       equalizerBandInputs.forEach(input => { input.value = "0"; });
       const graphReady = ensureEqualizerGraph();
       saveEqualizerGains();
+      saveEqualizerPreset(selectedEqualizerPresetIndex, { announce: false });
       if (!graphReady && equalizerEnabled && currentTrack) {
         restartCurrentStream(sourcePositionSeconds());
       }
