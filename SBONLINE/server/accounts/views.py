@@ -33,7 +33,7 @@ from django.core.files.storage import default_storage
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Count, F, Max, Q, Value
 from django.db.models.functions import Greatest, TruncDate
-from django.http import FileResponse, Http404, HttpResponse, HttpResponseBadRequest, HttpResponseGone, JsonResponse, StreamingHttpResponse
+from django.http import FileResponse, Http404, HttpResponse, HttpResponseBadRequest, HttpResponseGone, HttpResponseNotModified, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -45,7 +45,21 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from django.views.generic import TemplateView
 
 from .forms import EnrollmentForm, MemberProfileForm, SiteSettingsForm
-from .catalog_search import adjacent_catalog_track, build_catalog_index, catalog_index_is_current, query_catalog_index, search_terms
+from .catalog_search import (
+    adjacent_catalog_track,
+    build_catalog_index,
+    catalog_index_is_current,
+    ensure_catalog_store,
+    get_album_playlist,
+    get_album_track_lists_for_tracks,
+    get_albums_by_ids,
+    get_favorite_playlist_page,
+    get_track_audio_source,
+    get_tracks_by_ids,
+    query_catalog_index,
+    read_catalog_manifest,
+    search_terms,
+)
 from .spcboy_timing import (
     DEFAULT_SPC_FADE_MS,
     DEFAULT_SPC_TOTAL_MS,
@@ -681,6 +695,38 @@ def spcboy_preferences(request):
     return JsonResponse({"preferences": preferences}, headers=headers)
 
 
+def _ensure_catalog_store():
+    source_path = settings.SPCBOY_MEDIA_ROOT / "catalog.json"
+    return ensure_catalog_store(
+        settings.SPCBOY_SEARCH_INDEX_PATH,
+        source_path,
+        _spcboy_catalog_data,
+        gallery_cache_root=settings.SPCBOY_GALLERY_CACHE_ROOT,
+    )
+
+
+def _favorite_album_rows_for_user(user):
+    favorites = list(FavoriteAlbum.objects.filter(user=user).order_by("-added_at", "pk"))
+    if not favorites:
+        return []
+    if _ensure_catalog_store():
+        albums = get_albums_by_ids(
+            settings.SPCBOY_SEARCH_INDEX_PATH,
+            [favorite.album_id for favorite in favorites],
+            require_tracks=True,
+        )
+        return [
+            {
+                **albums[favorite.album_id],
+                "added_at": favorite.added_at,
+                "play_url": reverse("spcboy_album_playlist", args=[favorite.album_id]),
+            }
+            for favorite in favorites
+            if favorite.album_id in albums
+        ]
+    return _favorite_album_rows(user, _spcboy_catalog_data() or {})
+
+
 @login_required
 @never_cache
 @require_http_methods(["GET", "POST"])
@@ -698,9 +744,9 @@ def spcboy_favorites(request):
         return JsonResponse({"error": "Favorite data could not be read."}, status=400)
     if not isinstance(payload, dict):
         return JsonResponse({"error": "Favorite data is invalid."}, status=400)
-    catalog = _spcboy_catalog_data()
-    if catalog is None:
+    if not _ensure_catalog_store():
         return JsonResponse({"error": "The SPCBOY library is not available."}, status=503)
+    index_path = settings.SPCBOY_SEARCH_INDEX_PATH
     if "removeTrackIds" in payload or "removeAlbumIds" in payload:
         requested = payload.get("removeTrackIds", [])
         requested_albums = payload.get("removeAlbumIds", [])
@@ -713,18 +759,18 @@ def spcboy_favorites(request):
         ) or not (requested or requested_albums):
             return JsonResponse({"error":"Select favorite tracks or albums to remove."},status=400)
         removed_albums=set(requested_albums)
-        if not removed_albums.issubset(_catalog_album_index(catalog)):
+        valid_removed_albums = get_albums_by_ids(index_path, removed_albums, require_tracks=True)
+        if len(valid_removed_albums) != len(removed_albums):
             return JsonResponse({"error":"A selected album is no longer available. Reload Favorites."},status=409)
         removed = set(requested)
-        if not removed.issubset(catalog["tracks"]):
+        valid_removed_tracks = get_tracks_by_ids(index_path, removed)
+        if len(valid_removed_tracks) != len(removed):
             return JsonResponse({"error": "A selected track is no longer available. Reload Favorites."}, status=409)
-        affected_albums = {}
-        for console in catalog["consoles"]:
-            for game in console.get("games", []):
-                ids = list(dict.fromkeys(str(track["id"]) for track in game.get("tracks", []) if isinstance(track, dict) and track.get("id")))
-                if set(ids) & removed:
-                    album_id = spcboy_album_id(str(console.get("name", "")), str(game.get("name", "")))
-                    affected_albums[album_id] = [track_id for track_id in ids if track_id not in removed]
+        album_track_lists = get_album_track_lists_for_tracks(index_path, removed)
+        affected_albums = {
+            album_id: [track_id for track_id in track_ids if track_id not in removed]
+            for album_id, track_ids in album_track_lists.items()
+        }
         with transaction.atomic():
             # Take SQLite's write lock before reading/converting album memberships.
             FavoriteTrack.objects.filter(user=request.user, track_id__in=removed).delete()
@@ -746,7 +792,7 @@ def spcboy_favorites(request):
         favorite = payload.get("favorite")
         if not isinstance(track_id, str) or len(track_id) > 64 or not isinstance(favorite, bool):
             return JsonResponse({"error": "Favorite action is invalid."}, status=400)
-        if track_id not in _catalog_track_index(catalog):
+        if not get_tracks_by_ids(index_path, [track_id]):
             return JsonResponse({"error": "That track is not in the hosted library."}, status=404)
         if favorite:
             FavoriteTrack.objects.get_or_create(user=request.user, track_id=track_id)
@@ -758,7 +804,7 @@ def spcboy_favorites(request):
         favorite = payload.get("favorite")
         if not isinstance(album_id, str) or len(album_id) != 32 or not isinstance(favorite, bool):
             return JsonResponse({"error": "Album favorite action is invalid."}, status=400)
-        if album_id not in _catalog_album_index(catalog):
+        if not get_albums_by_ids(index_path, [album_id], require_tracks=True):
             return JsonResponse({"error": "That album is not in the hosted library."}, status=404)
         if favorite:
             FavoriteAlbum.objects.get_or_create(user=request.user, album_id=album_id)
@@ -774,8 +820,7 @@ def spcboy_favorites(request):
             not isinstance(item, str) or len(item) > 64 for item in requested_tracks
         ):
             return JsonResponse({"error": "Favorite track list is too large or invalid."}, status=400)
-        valid_track_ids = _catalog_track_index(catalog)
-        target_tracks = {item for item in requested_tracks if item in valid_track_ids}
+        target_tracks = set(get_tracks_by_ids(index_path, requested_tracks).keys())
     target_albums = None
     if "albumIds" in payload:
         requested_albums = payload["albumIds"]
@@ -783,8 +828,7 @@ def spcboy_favorites(request):
             not isinstance(item, str) or len(item) != 32 for item in requested_albums
         ):
             return JsonResponse({"error": "Favorite album list is too large or invalid."}, status=400)
-        valid_album_ids = _catalog_album_index(catalog)
-        target_albums = {item for item in requested_albums if item in valid_album_ids}
+        target_albums = set(get_albums_by_ids(index_path, requested_albums, require_tracks=True).keys())
 
     with transaction.atomic():
         if target_tracks is not None:
@@ -842,10 +886,13 @@ def _active_now_playing():
 @never_cache
 @require_GET
 def listening_now_playing(request):
-    catalog = _catalog_track_index(_spcboy_catalog_data())
-    artwork_index = _spcboy_gallery_index()
     now_playing = _active_now_playing()
     now_playing.sort(key=lambda item: (-item.started_at.timestamp(), item.user_id))
+    if now_playing and _ensure_catalog_store():
+        catalog = get_tracks_by_ids(settings.SPCBOY_SEARCH_INDEX_PATH, [item.track_id for item in now_playing])
+    else:
+        catalog = _catalog_track_index(_spcboy_catalog_data()) if now_playing else {}
+    artwork_index = _spcboy_gallery_index() if now_playing else {}
     members = []
     for active in now_playing:
         active_track = catalog.get(active.track_id, {})
@@ -953,11 +1000,19 @@ def member_profile(request):
         ])
         messages.success(request, "Profile saved.")
         return redirect("member_profile")
-    catalog_data = _spcboy_catalog_data() or {}
-    catalog = _catalog_track_index(catalog_data)
+    favorite_list = list(FavoriteTrack.objects.filter(user=request.user).order_by("-added_at", "pk"))
+    recent_plays = Paginator(
+        SPCBOYPlaybackHistory.objects.filter(user=request.user).order_by("-played_at", "-pk"),
+        50,
+    ).get_page(request.GET.get("recent_page"))
+    needed_ids = [fav.track_id for fav in favorite_list] + [play.track_id for play in recent_plays]
+    if needed_ids and _ensure_catalog_store():
+        catalog = get_tracks_by_ids(settings.SPCBOY_SEARCH_INDEX_PATH, needed_ids)
+    else:
+        catalog = _catalog_track_index(_spcboy_catalog_data() or {}) if needed_ids else {}
     favorite_rows = [
         {"track": catalog[favorite.track_id], "added_at": favorite.added_at}
-        for favorite in FavoriteTrack.objects.filter(user=request.user).order_by("-added_at", "pk")
+        for favorite in favorite_list
         if favorite.track_id in catalog
     ]
     artwork_index = _spcboy_gallery_index()
@@ -967,13 +1022,9 @@ def member_profile(request):
         item["album_playlist_url"] = item["track"].get("albumPlaylistUrl", "")
     favorite_tracks = Paginator(favorite_rows, 50).get_page(request.GET.get("favorite_page"))
     favorite_albums = Paginator(
-        _favorite_album_rows(request.user, catalog_data),
+        _favorite_album_rows_for_user(request.user),
         50,
     ).get_page(request.GET.get("album_page"))
-    recent_plays = Paginator(
-        SPCBOYPlaybackHistory.objects.filter(user=request.user).order_by("-played_at", "-pk"),
-        50,
-    ).get_page(request.GET.get("recent_page"))
     bandwidth = _profile_bandwidth(request.user)
     for play in recent_plays:
         track = catalog.get(play.track_id, {})
@@ -1044,11 +1095,19 @@ def member_public_profile(request, user_id):
     profile_tab = request.GET.get("tab", "favorites")
     if profile_tab not in {"favorites", "recents"}:
         profile_tab = "favorites"
-    catalog_data = _spcboy_catalog_data() or {}
-    catalog = _catalog_track_index(catalog_data)
+    favorite_list = list(FavoriteTrack.objects.filter(user=user).order_by("-added_at", "pk"))
+    recent_plays = Paginator(
+        SPCBOYPlaybackHistory.objects.filter(user=user).order_by("-played_at", "-pk"),
+        50,
+    ).get_page(request.GET.get("recent_page"))
+    needed_ids = [fav.track_id for fav in favorite_list] + [play.track_id for play in recent_plays]
+    if needed_ids and _ensure_catalog_store():
+        catalog = get_tracks_by_ids(settings.SPCBOY_SEARCH_INDEX_PATH, needed_ids)
+    else:
+        catalog = _catalog_track_index(_spcboy_catalog_data() or {}) if needed_ids else {}
     favorite_rows = [
         {"track": catalog[favorite.track_id], "added_at": favorite.added_at}
-        for favorite in FavoriteTrack.objects.filter(user=user).order_by("-added_at", "pk")
+        for favorite in favorite_list
         if favorite.track_id in catalog
     ]
     artwork_index = _spcboy_gallery_index()
@@ -1056,10 +1115,6 @@ def member_public_profile(request, user_id):
     for item in favorite_rows:
         item["track"] = _attach_track_artwork(item["track"], artwork_index, album_artwork_urls)
         item["album_playlist_url"] = item["track"].get("albumPlaylistUrl", "")
-    recent_plays = Paginator(
-        SPCBOYPlaybackHistory.objects.filter(user=user).order_by("-played_at", "-pk"),
-        50,
-    ).get_page(request.GET.get("recent_page"))
     bandwidth = _profile_bandwidth(user)
     for play in recent_plays:
         track = catalog.get(play.track_id, {})
@@ -1073,7 +1128,7 @@ def member_public_profile(request, user_id):
         "joined_at": user.date_joined,
         "favorite_tracks": Paginator(favorite_rows, 50).get_page(request.GET.get("favorite_page")),
         "favorite_albums": Paginator(
-            _favorite_album_rows(user, catalog_data),
+            _favorite_album_rows_for_user(user),
             50,
         ).get_page(request.GET.get("album_page")),
         "recent_plays": recent_plays,
@@ -1117,26 +1172,16 @@ def community_media(request, object_path):
 @login_required
 @require_GET
 def spcboy_catalog(request):
-    catalog = _spcboy_catalog_data()
-    if catalog is None:
+    if not _ensure_catalog_store():
         return JsonResponse({"error": "The SPCBOY trial library is not installed yet."}, status=503)
-    public_consoles = []
-    cached_artwork = _spcboy_gallery_index()
-    for console in catalog["consoles"]:
-        public_console = {"name": str(console.get("name", "")), "games": []}
-        for game in console.get("games", []):
-            game_name = str(game.get("name", ""))
-            album_id = spcboy_album_id(public_console["name"], game_name)
-            public_game = {
-                "name": game_name,
-                "albumId": album_id,
-                "artworkUrl": _spcboy_artwork_url(album_id, cached_artwork),
-                "detailArtworkUrl": _spcboy_artwork_url(album_id, cached_artwork, detail=True),
-                "trackCount": sum(1 for track in game.get("tracks", []) if isinstance(track, dict) and track.get("id")),
-            }
-            public_console["games"].append(public_game)
-        public_consoles.append(public_console)
-    return JsonResponse({"consoles": public_consoles}, headers={"Cache-Control": "private, no-store"})
+    etag, payload_json = read_catalog_manifest(settings.SPCBOY_SEARCH_INDEX_PATH)
+    if payload_json is None:
+        return JsonResponse({"error": "The SPCBOY trial library is not installed yet."}, status=503)
+    cache_headers = {"Cache-Control": "private, max-age=0, must-revalidate", "ETag": etag}
+    if_none_match = request.headers.get("If-None-Match", "")
+    if etag and if_none_match and (if_none_match == etag or etag in [part.strip() for part in if_none_match.split(",")]):
+        return HttpResponseNotModified(headers=cache_headers)
+    return HttpResponse(payload_json, content_type="application/json", headers=cache_headers)
 
 
 @login_required
@@ -1144,42 +1189,21 @@ def spcboy_catalog(request):
 def spcboy_album_playlist(request, album_id):
     if len(album_id) != 32 or any(character not in "0123456789abcdef" for character in album_id):
         raise Http404
-    catalog = _spcboy_catalog_data()
-    if catalog is None:
+    if not _ensure_catalog_store():
         return JsonResponse({"error": "The SPCBOY library is not available."}, status=503)
-    metadata_by_id = catalog["tracks"]
-    for console in catalog["consoles"]:
-        console_name = str(console.get("name", ""))
-        for game in console.get("games", []):
-            game_name = str(game.get("name", ""))
-            if spcboy_album_id(console_name, game_name) != album_id:
-                continue
-            public_tracks = []
-            for track in game.get("tracks", []):
-                if not isinstance(track, dict) or not track.get("id"):
-                    continue
-                track_id = str(track["id"])
-                metadata = metadata_by_id.get(track_id, {})
-                if not isinstance(metadata, dict):
-                    metadata = {}
-                public_tracks.append(_public_spcboy_track(track, metadata, game_name, console_name))
-            if public_tracks:
-                return JsonResponse({
-                    "albumId": album_id,
-                    "name": game_name,
-                    "console": console_name,
-                    "tracks": public_tracks,
-                }, headers={"Cache-Control": "private, no-store"})
-            break
-    raise Http404
+    playlist = get_album_playlist(settings.SPCBOY_SEARCH_INDEX_PATH, album_id)
+    if playlist is None:
+        raise Http404
+    return JsonResponse(playlist, headers={"Cache-Control": "private, max-age=300"})
 
 
 @login_required
 @never_cache
 @require_GET
 def spcboy_track_detail(request, track_id):
-    catalog = _spcboy_catalog_data()
-    track = _catalog_track_index(catalog).get(track_id) if catalog else None
+    if not _ensure_catalog_store():
+        raise Http404
+    track = get_tracks_by_ids(settings.SPCBOY_SEARCH_INDEX_PATH, [track_id]).get(track_id)
     if track is None:
         raise Http404
     album_id = spcboy_album_id(track["console"], track["game"])
@@ -1195,55 +1219,28 @@ def spcboy_track_detail(request, track_id):
 @never_cache
 @require_GET
 def spcboy_favorite_playlist(request):
-    catalog = _spcboy_catalog_data()
-    if catalog is None:
+    if not _ensure_catalog_store():
         return JsonResponse({"error": "The SPCBOY trial library is not installed yet."}, status=503)
     try:
         page_number = max(1, int(request.GET.get("page", "1")))
     except (TypeError, ValueError):
         page_number = 1
-    page_size = 100
-    offset = (page_number - 1) * page_size
     favorite_dates = dict(
         FavoriteTrack.objects.filter(user=request.user).values_list("track_id", "added_at")
     )
     favorite_album_dates = dict(
         FavoriteAlbum.objects.filter(user=request.user).values_list("album_id", "added_at")
     )
-    metadata_by_id = catalog["tracks"]
-    matching = []
-    catalog_order = 0
-    matching_count = 0
-    for console in catalog["consoles"]:
-        console_name = str(console.get("name", ""))
-        for game in console.get("games", []):
-            game_name = str(game.get("name", ""))
-            album_id = spcboy_album_id(console_name, game_name)
-            album_added_at = favorite_album_dates.get(album_id)
-            for track in game.get("tracks", []):
-                if not isinstance(track, dict) or not track.get("id"):
-                    continue
-                track_id = str(track["id"])
-                track_added_at = favorite_dates.get(track_id)
-                added_at = min(
-                    (value for value in (track_added_at, album_added_at) if value is not None),
-                    default=None,
-                )
-                if added_at is None:
-                    continue
-                matching_count += 1
-                metadata = metadata_by_id.get(track_id, {})
-                if not isinstance(metadata, dict):
-                    metadata = {}
-                row = _public_spcboy_track(track, metadata, game_name, console_name)
-                row["addedAt"] = added_at.isoformat()
-                matching.append((added_at, catalog_order, row))
-                catalog_order += 1
-    matching.sort(key=lambda item: (item[0], item[1]))
-    results = [row for _, _, row in matching[offset:offset + page_size]]
+    results, next_page = get_favorite_playlist_page(
+        settings.SPCBOY_SEARCH_INDEX_PATH,
+        favorite_dates,
+        favorite_album_dates,
+        page=page_number,
+        page_size=100,
+    )
     return JsonResponse({
         "tracks": results,
-        "nextPage": page_number + 1 if offset + len(results) < matching_count else None,
+        "nextPage": next_page,
     }, headers={"Cache-Control": "private, no-store"})
 
 
@@ -1258,22 +1255,15 @@ def spcboy_navigation(request):
         return JsonResponse({"error": "Track direction is invalid."}, status=400)
     if not track_id or step not in {-1, 1}:
         return JsonResponse({"error": "Track direction is invalid."}, status=400)
-    source_path = settings.SPCBOY_MEDIA_ROOT / "catalog.json"
     try:
-        if not catalog_index_is_current(settings.SPCBOY_SEARCH_INDEX_PATH, source_path):
-            catalog = _spcboy_catalog_data()
-            if catalog is None:
-                return JsonResponse({"error": "The SPCBOY trial library is not installed yet."}, status=503)
-            build_catalog_index(settings.SPCBOY_SEARCH_INDEX_PATH, source_path, catalog)
+        if not _ensure_catalog_store():
+            return JsonResponse({"error": "The SPCBOY trial library is not installed yet."}, status=503)
         track = adjacent_catalog_track(settings.SPCBOY_SEARCH_INDEX_PATH, track_id, step)
     except (OSError, sqlite3.Error, RuntimeError):
         logger.exception("Could not navigate the hosted SPCBOY catalog.")
         return JsonResponse({"error": "The hosted music library is temporarily unavailable."}, status=503)
     if track is None:
         raise Http404
-    catalog = _spcboy_catalog_data()
-    if catalog:
-        track = _public_spcboy_track(track, catalog["tracks"].get(track["id"]), track["game"], track["console"])
     return JsonResponse({"track": track}, headers={"Cache-Control": "private, no-store"})
 
 
@@ -1316,23 +1306,13 @@ def spcboy_search(request):
         return JsonResponse({"error": "Search page is invalid."}, status=400)
     if page < 1 or page > 100_000:
         return JsonResponse({"error": "Search page is invalid."}, status=400)
-    source_path = settings.SPCBOY_MEDIA_ROOT / "catalog.json"
     try:
-        if not catalog_index_is_current(settings.SPCBOY_SEARCH_INDEX_PATH, source_path):
-            catalog = _spcboy_catalog_data()
-            if catalog is None:
-                return JsonResponse({"error": "The SPCBOY trial library is not installed yet."}, status=503)
-            build_catalog_index(settings.SPCBOY_SEARCH_INDEX_PATH, source_path, catalog)
+        if not _ensure_catalog_store():
+            return JsonResponse({"error": "The SPCBOY trial library is not installed yet."}, status=503)
         result = query_catalog_index(settings.SPCBOY_SEARCH_INDEX_PATH, query, page=page)
     except (OSError, sqlite3.Error, RuntimeError):
         logger.exception("Could not search the hosted SPCBOY catalog.")
         return JsonResponse({"error": "The hosted music search is temporarily unavailable."}, status=503)
-    catalog = _spcboy_catalog_data()
-    if catalog:
-        result["results"] = [
-            _public_spcboy_track(track, catalog["tracks"].get(track["id"]), track["game"], track["console"])
-            for track in result["results"]
-        ]
     return JsonResponse(result, headers={"Cache-Control": "private, no-store"})
 
 
@@ -1361,30 +1341,37 @@ def spcboy_recents(request):
         .order_by("-played_at", "-pk"),
         100,
     ).get_page(request.GET.get("page"))
-    catalog = _spcboy_catalog_data()
-    metadata_by_id = catalog["tracks"] if catalog else {}
     events = list(history.object_list)
-    track_ids = {event.track_id for event in events}
-    # Retain only this page's public rows; do not build a second full catalog.
-    public_rows = {
-        track["id"]: track
-        for console in (catalog or {}).get("consoles", [])
-        for game in console.get("games", [])
-        for track in game.get("tracks", [])
-        if isinstance(track, dict) and track.get("id") in track_ids
-    }
+    track_ids = [event.track_id for event in events]
+    if track_ids and _ensure_catalog_store():
+        tracks_by_id = get_tracks_by_ids(settings.SPCBOY_SEARCH_INDEX_PATH, track_ids)
+    else:
+        tracks_by_id = {}
     results = []
     for event in events:
-        metadata = metadata_by_id.get(event.track_id)
+        catalog_track = tracks_by_id.get(event.track_id)
+        available = catalog_track is not None
+        if catalog_track is not None:
+            row = {**catalog_track, "title": event.title or catalog_track["title"]}
+        else:
+            album_id = spcboy_album_id(event.console, event.game)
+            row = {
+                "id": event.track_id,
+                "title": str(event.title or ""),
+                "artist": "",
+                "year": "",
+                "dumper": "",
+                "durationSeconds": 0,
+                "game": str(event.game),
+                "console": str(event.console),
+                "albumPlaylistUrl": reverse("spcboy_album_playlist", args=[album_id]),
+            }
         results.append({
-            **_public_spcboy_track(
-                {**public_rows.get(event.track_id, {}), "id": event.track_id, "title": event.title}, metadata,
-                event.game, event.console,
-            ),
+            **row,
             "eventId": event.pk,
             "trackId": event.track_id,
             "playedAt": event.played_at.isoformat(),
-            "available": isinstance(metadata, dict),
+            "available": available,
         })
     return JsonResponse({
         "results": results,
@@ -1425,7 +1412,10 @@ def spcboy_now_playing(request):
         user=request.user, playback_id=playback_id, track_id=track_id,
     ).update(updated_at=now):
         return JsonResponse({"ok": True}, headers={"Cache-Control": "private, no-store"})
-    track = _catalog_track_index(_spcboy_catalog_data()).get(track_id)
+    if _ensure_catalog_store():
+        track = get_tracks_by_ids(settings.SPCBOY_SEARCH_INDEX_PATH, [track_id]).get(track_id)
+    else:
+        track = _catalog_track_index(_spcboy_catalog_data()).get(track_id)
     if track is None:
         return HttpResponseBadRequest("Unknown track.")
     # Avoid update_or_create's read-then-write transaction on SQLite when two
@@ -1478,10 +1468,16 @@ def playback_history(request):
         "": all_play_count,
     }[day_filter]
     plays = paginator.get_page(request.GET.get("page"))
-    catalog = _catalog_track_index(_spcboy_catalog_data())
-    artwork_index = _spcboy_gallery_index()
+    active_now_playing = list(_active_now_playing())
+    history_events = list(plays)
+    needed_ids = [item.track_id for item in active_now_playing] + [item.track_id for item in history_events]
+    if needed_ids and _ensure_catalog_store():
+        catalog = get_tracks_by_ids(settings.SPCBOY_SEARCH_INDEX_PATH, needed_ids)
+    else:
+        catalog = _catalog_track_index(_spcboy_catalog_data()) if needed_ids else {}
+    artwork_index = _spcboy_gallery_index() if needed_ids else {}
     now_playing = []
-    for active in _active_now_playing():
+    for active in active_now_playing:
         track = catalog.get(active.track_id, {})
         active.profile = active.user.member_profile
         active.profile_url = reverse("member_public_profile", args=[active.user_id])
@@ -1621,8 +1617,9 @@ def spcboy_audio(request, track_id):
         response["X-Audio-Quota-Remaining"] = "0"
         return response
 
-    catalog = _spcboy_catalog_data()
-    track = catalog.get("tracks", {}).get(track_id) if catalog else None
+    if not _ensure_catalog_store():
+        return HttpResponse(status=404)
+    track = get_track_audio_source(settings.SPCBOY_SEARCH_INDEX_PATH, track_id)
     if not isinstance(track, dict):
         return HttpResponse(status=404)
 

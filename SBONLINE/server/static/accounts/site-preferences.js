@@ -24,7 +24,7 @@
   const playerKeys = new Set([
     "playbackRateFraction", "playbackRate", "playbackSpeedEnabled", "longPlayDurationSeconds",
     "longPlayMinutes", "longPlaySeconds", "longPlayEnabled", "spcFadeSeconds", "fadedSkipsEnabled",
-    "volumeStep", "equalizerEnabled", "equalizerBandGains", "equalizerPresets", "optionsPage",
+    "volumeStep", "equalizerEnabled", "equalizerBandGains", "equalizerPresets", "selectedEqualizerPresetIndex", "optionsPage",
   ]);
   const legacyImports = Object.create(null);
   const pendingUpdates = Object.create(null);

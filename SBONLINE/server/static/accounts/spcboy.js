@@ -124,6 +124,9 @@
   const trackRowsById = new Map();
   const searchOpenedSystems = new Set();
   const gameGroups = [];
+  const systemRecords = [];
+  const systemRecordByEl = new Map();
+  const materializedPlaylistEntries = new Set();
   const gameGroupsByKey = new Map();
   const gameGroupsByAlbumId = new Map();
   const gameGroupsByConsoleGame = new Map();
@@ -898,6 +901,10 @@
   }
 
   function clearEntryRows(entry) {
+    if (!entry.list) {
+      entry.tracks = [];
+      return;
+    }
     for (const row of entry.list.querySelectorAll(".spcboy-track-row")) {
       const rows = trackRowsById.get(row.dataset.id) ?? [];
       const remaining = rows.filter((candidate) => candidate !== row);
@@ -909,6 +916,7 @@
   }
 
   function appendTrackRow(entry, data) {
+    ensureEntryPlaylistDom(entry);
     const existingRow = entry.list.querySelector(`.spcboy-track-row[data-id="${CSS.escape(data.id)}"]`);
     if (existingRow) return tracksById.get(data.id);
     const track = cacheTrack(entry, data);
@@ -927,6 +935,7 @@
     if (!entry) return [];
     if (entry.loaded) return entry.tracks;
     if (entry.loadPromise && !retry) return entry.loadPromise;
+    ensureEntryPlaylistDom(entry);
     entry.list.querySelectorAll(".spcboy-tracks-state, .spcboy-tracks-retry").forEach((node) => node.remove());
     entry.loading = true;
     entry.loadFailed = false;
@@ -1067,9 +1076,11 @@
   function syncTrackContainers() {
     const desktop = isDesktop();
     const mobileAggregate = !desktop && view === "favorites";
-    for (const entry of gameGroups) {
+    for (const entry of materializedPlaylistEntries) {
+      if (!entry.list) continue;
+      if (!desktop && !mobileAggregate && !entry.slot) ensureEntrySidebarDom(entry);
       const destination = desktop || mobileAggregate ? entry.playlistGroup : entry.slot;
-      if (entry.list.parentElement !== destination) destination.append(entry.list);
+      if (destination && entry.list.parentElement !== destination) destination.append(entry.list);
       if (!desktop && !mobileAggregate) {
         for (const row of entry.list.querySelectorAll(".spcboy-track-row")) {
           for (const cell of row.querySelectorAll("[data-column]")) {
@@ -1186,22 +1197,127 @@
     return favoritePlaylistPromise;
   }
 
+  function ensureEntryPlaylistDom(entry) {
+    if (!entry || entry.list) return;
+    const slot = document.createElement("div");
+    slot.className = "spcboy-track-slot";
+    const list = document.createElement("ol");
+    list.className = "spcboy-tracks";
+    list.setAttribute("aria-label", `${entry.gameName} tracks`);
+    const playlistGroup = document.createElement("section");
+    playlistGroup.className = "spcboy-playlist-group";
+    const playlistGroupTitle = document.createElement("h3");
+    playlistGroupTitle.className = "spcboy-playlist-group-title";
+    playlistGroupTitle.textContent = `${entry.gameName} · ${entry.consoleName}`;
+    playlistGroup.append(playlistGroupTitle, list);
+    if (entry.details) entry.details.append(slot);
+    entry.slot = slot;
+    entry.list = list;
+    entry.playlistGroup = playlistGroup;
+    entry.title = playlistGroupTitle;
+    materializedPlaylistEntries.add(entry);
+  }
+
+  function ensureEntrySidebarDom(entry) {
+    if (!entry || entry.row) return;
+    const group = makeDetails("spcboy-game", entry.gameName, entry.trackCount);
+    if (!entry.trackCount) group.classList.add("is-leaf");
+    group.dataset.gameKey = entry.key;
+    const gameRow = document.createElement("div");
+    gameRow.className = "spcboy-game-row";
+    gameRow.hidden = Boolean(entry.hidden);
+    gameRow.append(group);
+    if (entry.albumId) {
+      const albumFavorite = makeAlbumFavoriteButton(entry.albumId, entry.gameName);
+      albumFavorite.hidden = !isDesktop();
+      gameRow.append(albumFavorite);
+    }
+    if (entry.slot) group.append(entry.slot);
+    if (entry.key === selectedGameKey) group.classList.add("is-selected");
+    entry.row = gameRow;
+    entry.details = group;
+  }
+
+  function ensureConsoleContentRendered(systemRecord) {
+    if (!systemRecord || systemRecord.rendered) return;
+    const fragment = document.createDocumentFragment();
+    const showAlbumFavorite = isDesktop();
+    for (const entry of systemRecord.entries) {
+      ensureEntrySidebarDom(entry);
+      const albumFav = entry.row.querySelector(".spcboy-album-favorite");
+      if (albumFav) albumFav.hidden = !showAlbumFavorite;
+      entry.row.hidden = Boolean(entry.hidden);
+      entry.details.classList.toggle("is-selected", entry.key === selectedGameKey);
+      fragment.append(entry.row);
+    }
+    systemRecord.contentEl.append(fragment);
+    systemRecord.rendered = true;
+  }
+
+  let trackListDelegationReady = false;
+  function setupTrackListDelegation() {
+    if (trackListDelegationReady || !trackList) return;
+    trackListDelegationReady = true;
+    trackList.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target) return;
+      const systemSummary = target.closest(".spcboy-system > summary");
+      if (systemSummary) {
+        if (event.isTrusted) searchOpenedSystems.delete(systemSummary.parentElement);
+        return;
+      }
+      const gameSummary = target.closest(".spcboy-game > summary");
+      if (gameSummary && isDesktop()) {
+        event.preventDefault();
+        selectGame(gameSummary.parentElement.dataset.gameKey);
+      }
+    });
+    trackList.addEventListener("toggle", (event) => {
+      const details = event.target instanceof Element ? event.target : null;
+      if (!details) return;
+      if (details.classList.contains("spcboy-system")) {
+        if (details.open) {
+          ensureConsoleContentRendered(systemRecordByEl.get(details));
+          if (event.isTrusted && !isDesktop()) {
+            for (const rec of systemRecords) {
+              if (rec.el === details) continue;
+              rec.el.open = false;
+              if (rec.rendered) {
+                for (const entry of rec.entries) {
+                  if (entry.details) entry.details.open = false;
+                }
+              }
+            }
+          }
+        }
+        return;
+      }
+      if (details.classList.contains("spcboy-game") && event.isTrusted && details.open && !isDesktop()) {
+        selectGame(details.dataset.gameKey);
+      }
+    }, true);
+  }
+
   async function renderCatalog(catalog) {
+    setupTrackListDelegation();
     rawCatalog = catalog;
     trackList.replaceChildren();
     searchOpenedSystems.clear();
+    materializedPlaylistEntries.clear();
     tracks = [];
     tracksById.clear();
     trackIndexById.clear();
     trackRowsById.clear();
     gameGroups.length = 0;
+    systemRecords.length = 0;
+    systemRecordByEl.clear();
     gameGroupsByKey.clear();
     gameGroupsByAlbumId.clear();
     gameGroupsByConsoleGame.clear();
     const consoles = Array.isArray(catalog.consoles) ? catalog.consoles : [];
     const totalGames = consoles.reduce((total, consoleData) => total + (Array.isArray(consoleData.games) ? consoleData.games.length : 0), 0);
-    let renderedGames = 0;
     updateCatalogBuildProgress(0, totalGames);
+    const consoleFragment = document.createDocumentFragment();
     for (const [consoleIndex, consoleData] of consoles.entries()) {
       const consoleName = canonicalConsoleName(consoleData.name);
       const games = Array.isArray(consoleData.games) ? consoleData.games : [];
@@ -1210,91 +1326,53 @@
       const content = document.createElement("div");
       content.className = "spcboy-system-content";
       system.append(content);
-      trackList.append(system);
-      system.querySelector("summary").addEventListener("click", (event) => {
-        if (event.isTrusted) searchOpenedSystems.delete(system);
-      });
-      system.addEventListener("toggle", (event) => {
-        if (!event.isTrusted || !system.open || isDesktop()) return;
-        for (const other of trackList.querySelectorAll(".spcboy-system")) {
-          if (other === system) continue;
-          other.open = false;
-          other.querySelectorAll(".spcboy-game").forEach((details) => { details.open = false; });
-        }
-      });
+      consoleFragment.append(system);
+      const systemRecord = {
+        consoleName,
+        el: system,
+        contentEl: content,
+        entries: [],
+        rendered: false,
+      };
+      systemRecords.push(systemRecord);
+      systemRecordByEl.set(system, systemRecord);
       for (const [gameIndex, gameData] of games.entries()) {
         const trackCount = Math.max(0, Number(gameData.trackCount) || 0);
-        const group = makeDetails("spcboy-game", gameData.name, trackCount);
-        if (!trackCount) group.classList.add("is-leaf");
         const albumId = typeof gameData.albumId === "string" ? gameData.albumId : "";
         const artworkUrl = typeof gameData.artworkUrl === "string" ? gameData.artworkUrl : "";
         const gameKey = `${consoleIndex}:${gameIndex}`;
-        group.dataset.gameKey = gameKey;
-        const gameRow = document.createElement("div");
-        gameRow.className = "spcboy-game-row";
-        gameRow.append(group);
-        if (albumId) {
-          const albumFavorite = makeAlbumFavoriteButton(albumId, gameData.name);
-          albumFavorite.hidden = !isDesktop();
-          gameRow.append(albumFavorite);
-        }
-        const slot = document.createElement("div");
-        slot.className = "spcboy-track-slot";
-        const list = document.createElement("ol");
-        list.className = "spcboy-tracks";
-        list.setAttribute("aria-label", `${gameData.name} tracks`);
-
-        const playlistGroup = document.createElement("section");
-        playlistGroup.className = "spcboy-playlist-group";
-        const playlistGroupTitle = document.createElement("h3");
-        playlistGroupTitle.className = "spcboy-playlist-group-title";
-        playlistGroupTitle.textContent = `${gameData.name} · ${consoleName}`;
-        playlistGroup.append(playlistGroupTitle, list);
-        group.append(slot);
-        content.append(gameRow);
-
         const entry = {
           key: gameKey,
           albumId,
           artworkUrl,
           consoleName,
           gameName: gameData.name,
+          normalizedName: normalizeSearchText(gameData.name),
           trackCount,
           tracks: [],
           loaded: false,
           loading: false,
           loadPromise: null,
-          row: gameRow,
-          details: group,
-          slot,
-          list,
-          playlistGroup,
-          title: playlistGroupTitle,
+          system: systemRecord,
+          row: null,
+          details: null,
+          slot: null,
+          list: null,
+          playlistGroup: null,
+          title: null,
+          hidden: false,
         };
-        group.querySelector("summary").addEventListener("click", (event) => {
-          if (isDesktop()) {
-            event.preventDefault();
-            selectGame(gameKey);
-          }
-        });
-        group.addEventListener("toggle", (event) => {
-          if (event.isTrusted && group.open && !isDesktop()) selectGame(gameKey);
-        });
+        systemRecord.entries.push(entry);
         gameGroups.push(entry);
         gameGroupsByKey.set(gameKey, entry);
         if (albumId) gameGroupsByAlbumId.set(albumId, entry);
         gameGroupsByConsoleGame.set(`${consoleName}\u0000${gameData.name}`, entry);
-        renderedGames += 1;
-        if (renderedGames % 32 === 0 && isDesktop()) {
-          updateCatalogBuildProgress(renderedGames, totalGames);
-          await new Promise((resolve) => window.requestAnimationFrame(resolve));
-        }
       }
     }
-    updateCatalogBuildProgress(renderedGames, totalGames);
+    trackList.append(consoleFragment, empty);
+    updateCatalogBuildProgress(totalGames, totalGames);
     setCatalogFinishing();
     syncSidebarAlbumFavorites();
-    trackList.append(empty);
     catalogLoaded = true;
     catalogAvailable = true;
     resolveCatalogReady();
@@ -1375,6 +1453,7 @@
   function selectGame(gameKey, { openSidebar = true } = {}) {
     const selectedEntry = gameGroupsByKey.get(gameKey);
     if (!selectedEntry) return;
+    const prevEntry = gameGroupsByKey.get(selectedGameKey);
     selectedGameKey = gameKey;
     syncWorkspaceHeading(selectedEntry.gameName || "Playlist");
     if (isDesktop() && (view === "favorites" || view === "recent")) {
@@ -1382,25 +1461,35 @@
       applyFilters();
       return;
     }
-    for (const entry of gameGroups) {
-      const selected = entry.key === gameKey;
-      entry.details.classList.toggle("is-selected", selected);
-      if (isDesktop() && openSidebar) entry.details.open = selected && view !== "favorites";
+    if (prevEntry && prevEntry !== selectedEntry && prevEntry.details) {
+      prevEntry.details.classList.remove("is-selected");
+      if (isDesktop() && openSidebar) prevEntry.details.open = false;
     }
-    if (isDesktop() && openSidebar) {
-      const selectedSystem = selectedEntry.details.closest(".spcboy-system");
-      if (selectedSystem) selectedSystem.open = true;
+    if (isDesktop() || !openSidebar) {
+      ensureConsoleContentRendered(selectedEntry.system);
+    } else if (openSidebar) {
+      ensureConsoleContentRendered(selectedEntry.system);
+    }
+    ensureEntryPlaylistDom(selectedEntry);
+    if (selectedEntry.details) {
+      selectedEntry.details.classList.add("is-selected");
+      if (isDesktop() && openSidebar) selectedEntry.details.open = view !== "favorites";
+    }
+    if (isDesktop() && openSidebar && selectedEntry.system?.el) {
+      selectedEntry.system.el.open = true;
     }
     if (!isDesktop() && openSidebar) {
-      const selectedSystem = selectedEntry.details.closest(".spcboy-system");
-      for (const entry of gameGroups) {
-        if (entry !== selectedEntry) entry.details.open = false;
-      }
-      for (const system of trackList.querySelectorAll(".spcboy-system")) {
-        if (system !== selectedSystem) system.open = false;
+      const selectedSystem = selectedEntry.system?.el;
+      for (const rec of systemRecords) {
+        if (rec.el !== selectedSystem) rec.el.open = false;
+        if (rec.rendered) {
+          for (const entry of rec.entries) {
+            if (entry !== selectedEntry && entry.details) entry.details.open = false;
+          }
+        }
       }
       if (selectedSystem) selectedSystem.open = true;
-      selectedEntry.details.open = true;
+      if (selectedEntry.details) selectedEntry.details.open = true;
     }
     ensureAlbumTracks(selectedEntry);
     captureWorkspace();
@@ -1415,7 +1504,10 @@
     syncSidebarAlbumFavorites();
     if (!desktop) {
       trackList.querySelectorAll(".spcboy-system, .spcboy-game").forEach((details) => { details.open = false; });
-      for (const entry of gameGroups) entry.details.classList.toggle("is-selected", entry.key === selectedGameKey);
+      for (const rec of systemRecords) {
+        if (!rec.rendered) continue;
+        for (const entry of rec.entries) entry.details?.classList.toggle("is-selected", entry.key === selectedGameKey);
+      }
     }
     syncTrackContainers();
     placeSearchMore();
@@ -1490,21 +1582,33 @@
     if (loaded && selectedGameKey && !keys.has(selectedGameKey)) selectedGameKey = null;
     const expandAlbums = collectionSidebarView !== view && keys.size > 0;
     if (keys.size) collectionSidebarView = view;
-    for (const entry of gameGroups) {
-      entry.row.hidden = !keys.has(entry.key);
-      entry.details.classList.toggle("is-selected", entry.key === selectedGameKey);
-      entry.details.open = false;
-    }
-    for (const system of trackList.querySelectorAll('.spcboy-system')) {
-      const entries = gameGroups.filter(entry => entry.details.closest('.spcboy-system') === system);
-      const visibleEntries = entries.filter(entry => !entry.row.hidden)
-        .sort((left, right) => (albumOrder.get(left.key) ?? Infinity) - (albumOrder.get(right.key) ?? Infinity));
-      for (const entry of visibleEntries) entry.row.parentElement?.append(entry.row);
-      const count = visibleEntries.length;
-      system.hidden = count === 0;
-      const label = system.querySelector('summary > .spcboy-count');
-      if (label) label.textContent = String(count);
-      if (expandAlbums && count) system.open = true;
+    for (const rec of systemRecords) {
+      let hasVisible = false;
+      for (const entry of rec.entries) {
+        const show = keys.has(entry.key);
+        entry.hidden = !show;
+        if (show) hasVisible = true;
+      }
+      rec.el.hidden = !hasVisible;
+      if (hasVisible) {
+        ensureConsoleContentRendered(rec);
+        const visibleEntries = [];
+        for (const entry of rec.entries) {
+          if (entry.row) entry.row.hidden = entry.hidden;
+          entry.details?.classList.toggle("is-selected", entry.key === selectedGameKey);
+          if (entry.details) entry.details.open = false;
+          if (!entry.hidden) visibleEntries.push(entry);
+        }
+        visibleEntries.sort((left, right) => (albumOrder.get(left.key) ?? Infinity) - (albumOrder.get(right.key) ?? Infinity));
+        for (const entry of visibleEntries) rec.contentEl.append(entry.row);
+        const count = visibleEntries.length;
+        const label = rec.el.querySelector("summary > .spcboy-count");
+        if (label) label.textContent = String(count);
+        if (expandAlbums && count) rec.el.open = true;
+      } else {
+        const label = rec.el.querySelector("summary > .spcboy-count");
+        if (label) label.textContent = "0";
+      }
     }
     const loading = recent ? recentLoading : favoritePlaylistLoading;
     const failed = recent ? recentFailed : favoritePlaylistFailed;
@@ -1533,9 +1637,11 @@
       return;
     }
     const aggregate = view === "favorites";
+    const selectedFallback = gameGroupsByKey.get(selectedGameKey);
+    if (selectedFallback && !selectedFallback.hidden) ensureEntryPlaylistDom(selectedFallback);
     const candidates = aggregate
-      ? gameGroups.filter((entry) => [...entry.list.querySelectorAll(".spcboy-track-row")].some((row) => !row.hidden))
-      : [gameGroupsByKey.get(selectedGameKey)].filter((entry) => entry && !entry.row.hidden);
+      ? [...materializedPlaylistEntries].filter((entry) => entry.list && [...entry.list.querySelectorAll(".spcboy-track-row")].some((row) => !row.hidden))
+      : [selectedFallback].filter((entry) => entry && !entry.hidden);
 
     if (!candidates.length) {
       playlistEmpty.hidden = false;
@@ -1729,7 +1835,12 @@
       return;
     }
     if (collectionSidebarView !== null) {
-      for (const entry of gameGroups) entry.row.parentElement?.append(entry.row);
+      for (const rec of systemRecords) {
+        if (!rec.rendered) continue;
+        for (const entry of rec.entries) {
+          if (entry.row) rec.contentEl.append(entry.row);
+        }
+      }
     }
     collectionSidebarView = null;
     const timestampHeader = playlistColumnHeadCells?.querySelector('[data-column="timestamp"]');
@@ -1749,46 +1860,54 @@
     }
     let visibleTracks = 0;
     let visibleGames = 0;
+    const desktop = isDesktop();
+    const queryTerms = titleOnlySearch ? searchTerms(query) : [];
     for (const [id, matchingRows] of trackRowsById) {
       const track = tracksById.get(id);
       const isFavorite = favorites.has(id) || Boolean(track?.albumId && favoriteAlbums.has(track.albumId));
       const isVisibleInView = view === "all"
         || (view === "favorites" && isFavorite);
       for (const row of matchingRows) {
-        const track = tracksById.get(id);
         const matchesCurrentQuery = !query || matchesTrackQuery(track, query);
         const isVisible = isVisibleInView && matchesCurrentQuery;
         row.hidden = !isVisible;
         if (isVisible) visibleTracks += 1;
       }
     }
-    for (const entry of gameGroups) {
-      const rows = [...entry.list.querySelectorAll(".spcboy-track-row")];
-      const hasVisibleRows = rows.some((row) => !row.hidden);
-      const titleMatch = titleOnlySearch && matchesSearchText(entry.gameName, query);
-      const shown = query
-        ? titleMatch
-        : view === "all" || (view === "favorites" && (hasVisibleRows || favoriteAlbums.has(entry.albumId)));
-      entry.row.hidden = !shown;
-      entry.details.classList.toggle("is-selected", entry.key === selectedGameKey);
-      if (shown) visibleGames += 1;
-    }
-    if (titleOnlySearch) {
-      for (const system of trackList.querySelectorAll(".spcboy-system")) {
-        const containsMatch = gameGroups.some((entry) =>
-          entry.details.closest(".spcboy-system") === system && !entry.row.hidden);
-        if (containsMatch && !system.open) {
-          system.open = true;
-          searchOpenedSystems.add(system);
+    for (const rec of systemRecords) {
+      let systemHasVisible = false;
+      for (const entry of rec.entries) {
+        let shown = false;
+        if (titleOnlySearch) {
+          shown = queryTerms.length > 0 && queryTerms.every((term) => entry.normalizedName.includes(term));
+        } else if (view === "all") {
+          shown = true;
+        } else if (view === "favorites") {
+          const hasVisibleRows = Boolean(entry.list && [...entry.list.querySelectorAll(".spcboy-track-row")].some((row) => !row.hidden));
+          shown = hasVisibleRows || favoriteAlbums.has(entry.albumId);
+        }
+        entry.hidden = !shown;
+        if (entry.row) entry.row.hidden = !shown;
+        if (entry.details) entry.details.classList.toggle("is-selected", entry.key === selectedGameKey);
+        if (shown) {
+          visibleGames += 1;
+          systemHasVisible = true;
         }
       }
-    } else if (!query) {
+      rec.el.hidden = !systemHasVisible;
+      if (titleOnlySearch && systemHasVisible) {
+        if (!rec.el.open) {
+          rec.el.open = true;
+          searchOpenedSystems.add(rec.el);
+        }
+        if (desktop) ensureConsoleContentRendered(rec);
+      } else if (desktop && rec.el.open && systemHasVisible) {
+        ensureConsoleContentRendered(rec);
+      }
+    }
+    if (!query) {
       for (const system of searchOpenedSystems) system.open = false;
       searchOpenedSystems.clear();
-    }
-    for (const system of library.querySelectorAll(".spcboy-system")) {
-      const shown = gameGroups.some((entry) => entry.details.closest(".spcboy-system") === system && !entry.row.hidden);
-      system.hidden = !shown;
     }
     empty.hidden = (titleOnlySearch ? visibleGames !== 0 : visibleTracks !== 0) || (view === "all" && !query)
       || (view === "favorites" && favoritePlaylistLoading);
@@ -1836,9 +1955,9 @@
       selectGame(track.gameKey);
       const selectedGroup = gameGroupsByKey.get(track.gameKey);
       if (selectedGroup) {
-        const selectedSystem = selectedGroup.details.closest(".spcboy-system");
+        const selectedSystem = selectedGroup.system?.el || selectedGroup.details?.closest?.(".spcboy-system");
         if (selectedSystem) selectedSystem.open = true;
-        if (!isDesktop()) selectedGroup.details.open = true;
+        if (!isDesktop() && selectedGroup.details) selectedGroup.details.open = true;
       }
     }
     syncCurrentTrackRows(currentTrack?.id, false);
@@ -1926,14 +2045,23 @@
     scheduleSelectionIndicators();
   });
   foldAllButton?.addEventListener("click", () => {
-    const systems = [...trackList.querySelectorAll(".spcboy-system")];
-    const games = [...trackList.querySelectorAll(".spcboy-game")];
-    const anyOpen = systems.some((d) => d.open) || games.some((d) => d.open);
+    const anyOpen = systemRecords.some((rec) => rec.el.open)
+      || Boolean(trackList.querySelector(".spcboy-game[open]"));
     if (anyOpen) {
-      systems.forEach((d) => { d.open = false; });
-      games.forEach((d) => { d.open = false; });
+      for (const rec of systemRecords) {
+        rec.el.open = false;
+        if (rec.rendered) {
+          for (const entry of rec.entries) {
+            if (entry.details) entry.details.open = false;
+          }
+        }
+      }
     } else {
-      systems.filter((d) => !d.hidden).forEach((d) => { d.open = true; });
+      for (const rec of systemRecords) {
+        if (rec.el.hidden) continue;
+        rec.el.open = true;
+        if (isDesktop()) ensureConsoleContentRendered(rec);
+      }
     }
     hoveredSidebarItem = null;
     scheduleSelectionIndicators();
@@ -2381,6 +2509,10 @@
     if (volValue && typeof vol === "number") volValue.textContent = `${Math.round(vol * 5)}%`;
 
     const eqEnabled = window.SitePlayer.isEqualizerEnabled?.();
+    const sharedPreset = window.SitePlayer.getSelectedEqualizerPresetIndex?.();
+    if (typeof sharedPreset === "number" && Number.isInteger(sharedPreset)) {
+      currentMobileEqPreset = sharedPreset;
+    }
     const activePreset = typeof currentMobileEqPreset === "number" ? currentMobileEqPreset : 0;
     updateMobileEqToolbar(eqEnabled ? activePreset : "off");
 
@@ -2800,27 +2932,19 @@
       const mode = btn.dataset.mobileEqMode;
       if (mode === "off") {
         updateMobileEqToolbar("off");
-        animateMobileFaders(Array(10).fill(0), {
-          duration: 240,
-          onComplete: async () => {
-            await window.SitePlayer?.setEqualizerEnabled?.(false);
-            showMobileToast("Equalizer OFF");
-          },
-        });
+        animateMobileFaders(Array(10).fill(0), { duration: 240 });
+        await window.SitePlayer?.setEqualizerEnabled?.(false);
+        showMobileToast("Equalizer OFF");
       } else {
         const presetIdx = Number(mode);
         currentMobileEqPreset = presetIdx;
         const presets = window.SitePlayer?.getEqualizerPresets?.() || [];
         const preset = presets[presetIdx];
         const targetGains = preset?.gains && preset.saved ? preset.gains : Array(10).fill(0);
-        animateMobileFaders(targetGains, {
-          duration: 240,
-          onComplete: async () => {
-            await window.SitePlayer?.applyEqualizerPreset?.(presetIdx);
-            updateMobileEqToolbar(presetIdx);
-            showMobileToast(preset?.saved ? `Preset ${presetIdx + 1} loaded` : `Preset ${presetIdx + 1} (Flat)`);
-          },
-        });
+        updateMobileEqToolbar(presetIdx);
+        animateMobileFaders(targetGains, { duration: 240 });
+        await window.SitePlayer?.applyEqualizerPreset?.(presetIdx);
+        showMobileToast(preset?.saved ? `Preset ${presetIdx + 1} loaded` : `Preset ${presetIdx + 1} (Flat)`);
       }
     });
   });
@@ -2842,14 +2966,10 @@
   const resetFlatBtn = document.querySelector("#spcboy-mobile-reset-flat");
   if (resetFlatBtn) {
     resetFlatBtn.onclick = () => {
-      animateMobileFaders(Array(10).fill(0), {
-        duration: 240,
-        onComplete: () => {
-          window.SitePlayer?.resetEqualizer?.();
-          updateMobileEqToolbar(currentMobileEqPreset);
-          showMobileToast("Equalizer reset to Flat");
-        },
-      });
+      animateMobileFaders(Array(10).fill(0), { duration: 240 });
+      window.SitePlayer?.resetEqualizer?.();
+      updateMobileEqToolbar(currentMobileEqPreset);
+      showMobileToast("Equalizer reset to Flat");
     };
   }
 
@@ -3429,7 +3549,7 @@
   function workspaceLabel(tab) {
     if (tab.query) return `Search: ${tab.query}`;
     if (tab.view !== 'all') return ({favorites:'Favorites',recent:'Recent'})[tab.view];
-    return gameGroups.find(entry => entry.albumId === tab.albumId)?.gameName || 'Library';
+    return gameGroupsByAlbumId.get(tab.albumId)?.gameName || 'Library';
   }
   function persistWorkspaces() {
     storage.set('workspaceTabs', { version:1, activeId:activeWorkspaceId, tabs:workspaceTabs });
@@ -3490,7 +3610,7 @@
     view = tab.view;
     search.value = tab.query;
     const selectedAlbumId = tab.albumId;
-    const entry = gameGroups.find(entry => entry.albumId === selectedAlbumId);
+    const entry = selectedAlbumId ? gameGroupsByAlbumId.get(selectedAlbumId) : null;
     selectedGameKey = entry?.key || null;
     trackList.querySelectorAll("details[open]").forEach(details => { details.open = false; });
     syncViewButtons();
@@ -3521,7 +3641,7 @@
     else { persistWorkspaces(); renderWorkspaces(); }
   }
   function openWorkspaceForAlbum(albumId) {
-    const entry = gameGroups.find(candidate => candidate.albumId === albumId);
+    const entry = albumId ? gameGroupsByAlbumId.get(albumId) : null;
     if (!entry) return false;
     if (!isDesktop()) {
       setMobileAppPage("library");
