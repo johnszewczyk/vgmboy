@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -98,9 +99,10 @@ def main() -> int:
 
     notes_page = output_root / "Sites/V4/notes.html"
     html = notes_page.read_text(encoding="utf-8")
-    notes_script = '<script src="notes.js?v=4" defer></script>'
-    if html.count(notes_script) != 1:
+    notes_script_match = re.findall(r'<script src="notes\.js(?:\?[^"]*)?" defer></script>', html)
+    if len(notes_script_match) != 1:
         raise SystemExit("Could not locate the canonical V4 Notes script insertion point.")
+    notes_script = notes_script_match[0]
     html = html.replace(
         notes_script,
         '  <script src="Notes/notes-data.js" defer></script>\n'
