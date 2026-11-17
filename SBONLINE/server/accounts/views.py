@@ -31,7 +31,7 @@ from django.core.files.base import ContentFile
 from django.core.paginator import Paginator
 from django.core.files.storage import default_storage
 from django.db import DatabaseError, IntegrityError, transaction
-from django.db.models import Count, F, Max, Q, Value
+from django.db.models import Count, F, Max, Min, Q, Value
 from django.db.models.functions import Greatest, TruncDate
 from django.http import FileResponse, Http404, HttpResponse, HttpResponseBadRequest, HttpResponseGone, HttpResponseNotModified, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
