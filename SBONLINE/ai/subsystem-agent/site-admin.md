@@ -13,8 +13,8 @@
 
 ## Runtime & Operational Invariants
 
-- **Service & Droplet Limits**: Production runs on a 1 vCPU / 458 MiB RAM
-  Ubuntu 24.04 droplet (`165.227.108.133`) under `private-admin.service`
+- **Service & Droplet Limits**: Production runs on a 2 vCPU / 4 GiB RAM
+  Ubuntu 24.04 droplet (`68.183.113.4`) under `private-admin.service`
   (`precalc-admin` user, `/opt/precalc-admin/venv/bin/gunicorn`,
   `127.0.0.1:8001`).
 - **Stop Service Before Index/Gallery Rebuilds**: `sbonline-setup.sh` stops
@@ -39,8 +39,8 @@
     `#sbonline-add-tab` (`#site-player-queue-toggle` is hidden).
   - `#spcboy-settings-panel` uses a single compact header
     (`.spcboy-settings-header-main`) and shares the mobile card/switch/slider
-    visual system across `Navigation`, `Sound`, `Interface`, and `Playback`
-    (`Long Play`, `Slow Play`, `Fade Out`).
+    visual system across `Navigation`, `Sound`, `Interface`, `Playback`
+    (`Long Play`, `Slow Play`, `Fade Out`), and owner-only `Admin`.
   - `sb-interface.js` applies desktop UI preferences (`--sb-playlist-font-size`,
     `--sb-sidebar-font-size`, `--sb-row-gap`, `--site-motion-duration`) from
     `Options → Interface` (`#spcboy-settings-page-interface`).
@@ -48,11 +48,12 @@
   - On `/spcboy/`, `spcboy-mobile.css` hides `.topbar`, `#site-player`,
     `#spcboy-library`, `#spcboy-settings-panel`, and `#site-player-queue-panel`
     and displays `#spcboy-mobile-app` (`partials/spcboy_mobile_shell.html`).
-  - Core top tabs are `Playing`, `Library`, `Gallery`, `Recent`, `Favorites`,
+  - Core top tabs are `Playing`, `Library`, `Recent`, `Favorites`,
     `Sound`, and `Nav`. `Nav` (`#spcboy-mobile-screen-nav`) provides the deeper
-    vertical navigation (`Site & Account`, superuser `Admin`, and `Other sites`).
-  - When Equalizer is set to `OFF`, fader sliders reset/animate to `0.0`
-    (default positions) on both desktop and mobile.
+    vertical navigation (`Site & Account`, superuser `Admin Console`, and `Other sites`).
+  - Equalizer presets (`1`, `2`, `3`) auto-save band adjustments immediately, and
+    toggling `OFF` dims the fader bank without discarding the selected preset's
+    saved curve.
   - Profile pictures/avatars are not used anywhere on the site.
 
 ## Verification

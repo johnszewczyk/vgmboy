@@ -201,17 +201,6 @@ class MemberProfile(models.Model):
             ),
         ]
 
-    @property
-    def initials(self):
-        handle = self.display_name.strip() or self.user.get_username().strip()
-        return handle[:1].upper() or "?"
-
-    @property
-    def avatar_url(self):
-        if self.avatar:
-            return self.avatar.url
-        return ""
-
     def __str__(self):
         return self.display_name
 

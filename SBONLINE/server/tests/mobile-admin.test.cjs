@@ -12,7 +12,7 @@ test('desktop navigation stays untouched and mobile nav exposes nested Nav scree
   assert.doesNotMatch(desktopNavHtml, /data-nav-key="admin"/);
   assert.match(mobileShellHtml, /<button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="nav">Nav<\/button>/);
   assert.match(mobileShellHtml, /id="spcboy-mobile-screen-nav"/);
-  assert.match(mobileShellHtml, /\{% if request\.user\.is_superuser %\}<button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="admin">Admin<\/button>\{% endif %\}/);
+  assert.match(mobileShellHtml, /\{% if request\.user\.is_superuser %\}<button type="button" class="spcboy-mobile-vnav-item" data-mobile-app-page="admin"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-settings"><\/use><\/svg><span>Admin Console<\/span><\/button>\{% endif %\}/);
   assert.match(mobileShellHtml, /id="spcboy-mobile-screen-admin"/);
   assert.match(mobileShellHtml, /class="spcboy-mobile-card"[\s\S]*Site Controls/);
   assert.match(mobileShellHtml, /class="spcboy-mobile-card"[\s\S]*Invitations/);
@@ -20,7 +20,7 @@ test('desktop navigation stays untouched and mobile nav exposes nested Nav scree
 });
 
 test('spcboy.js integrates nav and admin page switching and spcboy-mobile.css styles admin cards in mobile theme', () => {
-  assert.match(spcboyJs, /\["playing", "library", "gallery", "recent", "favorites", "sound", "detail", "nav", "admin"\]/);
+  assert.match(spcboyJs, /\["playing", "library", "recent", "favorites", "sound", "nav", "admin"\]/);
   assert.match(spcboyJs, /else if \(nextPage === "admin"\) void loadMobileAdmin\(\);/);
   assert.match(mobileCss, /\.spcboy-mobile-admin-item\s*\{/);
   assert.match(mobileCss, /\.spcboy-mobile-admin-code\s*\{/);

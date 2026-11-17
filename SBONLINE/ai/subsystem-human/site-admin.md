@@ -24,16 +24,17 @@ redirects to `/spcboy/` after sign-in.
   button at the top-right of the workspace tab bar, paired with the 24 px bottom
   `#site-player` status dock and the right slide-over `#spcboy-settings-panel`
   drawer (with a single compact header showing display name, play/online counts,
-  and close button above `Navigation`, `Sound`, `Interface`, `Playback`).
+  and close button above `Navigation`, `Sound`, `Interface`, `Playback`, and
+  owner-only `Admin`).
 - **Mobile (`max-width: 780px`)**:
   - On `/spcboy/`, renders the dedicated `#spcboy-mobile-app` portrait shell
-    (`Playing`, `Library`, `Gallery`, `Recent`, `Favorites`, `Sound`, and `Nav`)
+    (`Playing`, `Library`, `Recent`, `Favorites`, `Sound`, and `Nav`)
     with `#spcboy-mobile-dock`. Tapping `Nav` opens the deeper vertical
-    navigation screen (`Site & Account`, owner-only `Admin`, and `Other sites`).
+    navigation screen (`Site & Account`, owner-only `Admin Console`, and `Other sites`).
   - On community and account pages (`/history/`, `/profile/`, `/accounts/`,
     `/usage/`), uses the compact mobile top header (Home link to `/spcboy/`,
     inline transport, game search, and Menu drawer with `Navigation`, `Sound`,
-    and `Playback`). Mobile does not expose font or column settings.
+    `Playback`, and owner-only `Admin`). Mobile does not expose font or column settings.
 
 ## Community & Profile Pages
 
@@ -58,13 +59,9 @@ redirects to `/spcboy/` after sign-in.
     10 GB monthly AAC streaming quotas, `vnStat` `eth0` traffic, droplet
     memory/disk/load/uptime, and daily backup status.
   - `/log/` lists active sessions and 24-hour/historical sign-in events.
-- **Mobile Owner Admin (`#spcboy-mobile-screen-admin`, `/spcboy/admin.json`)**:
-  - Available only to superusers inside the mobile player shell.
-  - Provides native mobile cards for `Site Controls` (bitrate and session
-    limit), `Invitations` (create, copy code/link, revoke), `Accounts` (status,
-    active sessions, audio quota, suspend/reactivate, recovery invite, delete),
-    owner `Account & Sign-In` (display name, login password, sign out), and
-    `Server & Sign-In Log`.
+- **In-Drawer & Mobile Owner Admin (`#spcboy-settings-page-admin` & `#spcboy-mobile-screen-admin`, `/accounts/mobile-state/`)**:
+  - Available only to superusers inside both the desktop/site settings drawer and the mobile player shell.
+  - Provides unified cards for `Site Stats` (library games/tracks, monthly usage, server memory/disk/uptime/load), auto-saving `Site Controls` (bitrate and session limit), `Invitations` (create, copy code/link, revoke), `Accounts` (status, active sessions, audio quota, and unified `Suspend / Recover / Delete` toolbar), owner `Account & Sign-In` (auto-saving display name, login password, sign out), and `Server & Sign-In Log`.
 
 ## Hosted Catalog & Media
 

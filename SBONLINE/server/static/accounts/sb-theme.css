@@ -163,7 +163,6 @@ body.sbonline-site {
 .sbonline-site :is(.track-card-heading,.track-card-status,.community-section-heading) { background: var(--surface-raised); }
 .sbonline-site .track-card-play.play-track-now { border-radius: var(--sb-radius); background: var(--blue-soft); color: var(--blue); }
 .sbonline-site .track-card-title { font-family: var(--sb-font); font-weight: 400; }
-.sbonline-site .member-avatar { border-radius: var(--sb-radius); }
 .sbonline-site .community-heading { align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .sbonline-site .favorite-album-list { gap: var(--sb-gap); }
 /* Shared indicator reproduces SB2's travel, resizing, and clipped hover surface. */

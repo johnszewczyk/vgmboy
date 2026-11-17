@@ -163,8 +163,8 @@
       <section class="spcboy-mobile-card">
         <div class="spcboy-mobile-row">
           <div>
-            <strong>Faded Skips</strong>
-            <small class="spcboy-mobile-dim">Fade audio on track change</small>
+            <strong>Fade Out</strong>
+            <small class="spcboy-mobile-dim">Faded skip on track change</small>
           </div>
           <button class="spcboy-mobile-switch" id="spcboy-mobile-faded-skip" type="button" role="switch" aria-checked="false">No</button>
         </div>
@@ -215,7 +215,7 @@
           <h3 id="spcboy-mobile-vnav-admin-heading">Admin</h3>
         </div>
         <nav class="spcboy-mobile-vnav" aria-label="Admin">
-          {% if request.user.is_superuser %}<button type="button" class="spcboy-mobile-nav-btn" data-mobile-app-page="admin">Admin</button>{% endif %}
+          {% if request.user.is_superuser %}<button type="button" class="spcboy-mobile-vnav-item" data-mobile-app-page="admin"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-settings"></use></svg><span>Admin Console</span></button>{% endif %}
           <a class="spcboy-mobile-vnav-item" href="{% url 'accounts' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-settings"></use></svg><span>Accounts &amp; Invites</span></a>
           <a class="spcboy-mobile-vnav-item" href="{% url 'usage' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-database"></use></svg><span>Site details</span></a>
           <a class="spcboy-mobile-vnav-item" href="{% url 'site_log' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-scroll-text"></use></svg><span>Log</span></a>

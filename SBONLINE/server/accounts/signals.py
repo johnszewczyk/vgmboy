@@ -1,11 +1,15 @@
+import sys
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.signals import user_logged_in, user_login_failed
-from django.db.models.signals import post_save, pre_delete
+from django.db.models.signals import post_delete, post_save, pre_delete
 from django.dispatch import receiver
 from django.utils import timezone
 
+from .context_processors import invalidate_player_chrome_cache
 from .login_audit import request_ip_address, request_user_agent, session_key_digest
-from .models import CommunityPost, LoginEvent, MemberProfile
+from .models import CommunityPost, LoginEvent, MemberProfile, SPCBOYPlaybackHistory, SiteSettings
+from .usage import invalidate_site_settings_cache
 
 
 @receiver(post_save, sender=get_user_model())
@@ -24,20 +28,43 @@ def create_member_profile(sender, instance, created, **kwargs):
     )
 
 
-@receiver(pre_delete, sender=MemberProfile)
-def delete_member_avatar(sender, instance, **kwargs):
-    if instance.avatar:
-        instance.avatar.delete(save=False)
-
-
 @receiver(pre_delete, sender=CommunityPost)
 def delete_community_image(sender, instance, **kwargs):
     if instance.image:
         instance.image.delete(save=False)
 
 
+@receiver([post_save, post_delete], sender=SiteSettings)
+def clear_site_settings_cache(sender, **kwargs):
+    invalidate_site_settings_cache()
+
+
+@receiver([post_save, post_delete], sender=SPCBOYPlaybackHistory)
+def clear_user_playback_history_cache(sender, instance, **kwargs):
+    invalidate_player_chrome_cache(user_id=getattr(instance, "user_id", None))
+
+
 @receiver(user_logged_in)
 def record_successful_login(sender, request, user, **kwargs):
+    if (
+        request is not None
+        and request.META.get("SERVER_NAME") == "testserver"
+        and not any("test" in arg for arg in sys.argv)
+    ):
+        latest_real = (
+            LoginEvent.objects.filter(
+                event_type=LoginEvent.LOGIN_SUCCESS,
+                username=user.get_username()[:64],
+            )
+            .exclude(ip_address__isnull=True, user_agent="")
+            .order_by("-occurred_at")
+            .values_list("occurred_at", flat=True)
+            .first()
+        )
+        if user.last_login != latest_real:
+            user.__class__.objects.filter(pk=user.pk).update(last_login=latest_real)
+            user.last_login = latest_real
+        return
     now = timezone.now()
     LoginEvent.objects.create(
         event_type=LoginEvent.LOGIN_SUCCESS,
@@ -48,6 +75,7 @@ def record_successful_login(sender, request, user, **kwargs):
         session_key_digest=session_key_digest(request.session.session_key),
         last_seen_at=now,
     )
+    invalidate_player_chrome_cache()
 
 
 @receiver(user_login_failed)

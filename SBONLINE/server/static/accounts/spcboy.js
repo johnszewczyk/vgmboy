@@ -2532,6 +2532,7 @@
     if (skipToggle && skips) {
       skipToggle.setAttribute("aria-checked", String(skips.enabled));
       skipToggle.textContent = skips.enabled ? "Yes" : "No";
+      skipToggle.disabled = skips.supported === false;
     }
     if (fadeInput && skips && document.activeElement !== fadeInput) fadeInput.value = String(skips.seconds);
 
@@ -2643,6 +2644,8 @@
           }));
         });
       }).catch(() => {
+        hideMobileLoadingIndicator();
+        showMobileToast("Could not load album tracks.");
         if (statusEl) {
           statusEl.textContent = "Could not load album tracks.";
           statusEl.classList.remove("is-hidden");

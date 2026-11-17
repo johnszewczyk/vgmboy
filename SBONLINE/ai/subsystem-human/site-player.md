@@ -39,17 +39,19 @@ SBONLINE uses an intentional split-skin setup over one shared audio engine
 ### Sound, Playback, and Desktop Interface Options
 
 - **Sound**: Groups Volume (20 steps of 5%), the 10-band Equalizer (−12 to
-  +12 dB in 0.5 dB steps) with a segmented `OFF / 1 / 2 / 3` preset bar, `Reset
-  to Flat`, and `Save to Preset N`. Both skins share the same saved presets and
-  smoothly animate fader transitions; selecting `OFF` moves all sliders to their
-  default (`0.0`) positions.
+  +12 dB in 0.5 dB steps) with an `ON / OFF` toggle, a `1 / 2 / 3` preset bar,
+  and `Reset to Flat`. Both skins share the same saved presets, auto-save band
+  adjustments directly to the selected preset (`1`, `2`, or `3`), and smoothly
+  animate fader transitions; toggling `OFF` dims the fader bank while keeping the
+  selected preset's curve visible.
 - **Playback**: Ordered `Long Play`, `Slow Play`, and `Fade Out` across the
   drawer and mobile Sound screen:
   1. **Long Play** (seconds, `M:SS`, or `H:MM:SS`; `0` means unlimited up to the
      page session limit).
   2. **Slow Play** (source-decoder speed fractions from `1/2×` to `2×` in `1/64`
      increments).
-  3. **Fade Out** (0–30 s) with Faded Skips.
+  3. **Fade Out** (0–30 s) with Faded Skips (`audio.volume` envelope ramping on
+     browsers with writable `<audio>.volume`).
 - **Desktop Interface (`Options → Interface`)**: Desktop-only UI preferences for
   `Track text size` (`--sb-playlist-font-size`, 10–20 px), `Game list text size`
   (`--sb-sidebar-font-size`, 10–20 px), `Row spacing` (`--sb-row-gap`, 0–32 px),
@@ -61,9 +63,10 @@ SBONLINE uses an intentional split-skin setup over one shared audio engine
 Selected tracks stream as live ADTS AAC at the owner-configured global bitrate
 (default 192 kbps). Source packages stay compressed on the server; only the
 requested member is materialized for a playback request through VGMBoy's
-preparation helper. Web Audio processes volume, 10-band EQ, and faded skips in
-the browser when supported; iOS / `ManagedMediaSource` clients automatically
-fall back to server-encoded `?eq=` and `?volume=` stream parameters.
+preparation helper. Equalizer processing (`?eq=`) runs exclusively on the server
+via `ffmpeg` so `<audio>` never routes through `AudioContext`; volume and faded
+skips use native `<audio>.volume` where supported, falling back to server-encoded
+`?volume=` on iOS.
 
 ## Prototype
 

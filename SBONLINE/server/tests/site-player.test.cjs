@@ -632,3 +632,62 @@ test('Clean stream EOF advances to next track even for Infinite Long Play or ear
   assert.match(aacStreamSource, /if\s*\(!run\.ended\)\s*report\(new Error\('AAC source closed'\)\);/);
   assert.match(aacStreamSource, /get streamEnded\(\)\s*\{\s*return Boolean\(active\?\.ended\);\s*\}/);
 });
+
+test('Faded skip works with native audio.volume ramping without AudioContext when volume control is supported', () => {
+  let intervalFn = null;
+  let cleared = false;
+  const audio = { volume: 1, paused: false, ended: false, error: null };
+  const fadedSkipToggle = { disabled: true, title: '', classList: { toggle() {} }, setAttribute() {} };
+  const context = vm.createContext({
+    audio,
+    audioContext: null,
+    transportFadeOutput: null,
+    transportFadeEnvelope: { startGain: 1, targetGain: 1, startTime: 0, endTime: 0 },
+    volumeStep: 10,
+    fadedSkipsEnabled: true,
+    fadedSkipToggle,
+    currentTrack: { id: 'guile' },
+    playbackWanted: true,
+    streamNeedsRetry: false,
+    spcFadeSeconds: 4,
+    supportsClientAudioGraph: () => false,
+    testAudioVolumeSupport: () => true,
+    ensureEqualizerGraph: () => false,
+    updateBooleanSettingsToggle() {},
+    effectiveDuration: () => 120,
+    sourcePositionSeconds: () => 20,
+    effectivePlaybackRate: () => 1,
+    Date: { now: () => 1000_000 },
+    window: {
+      setInterval(fn) { intervalFn = fn; return 77; },
+      clearInterval(id) { if (id === 77) cleared = true; },
+    },
+  });
+  const fadeBlock = source.slice(
+    source.indexOf('  let transportFadeTimer = null;'),
+    source.indexOf('  async function startAudioPlayback()'),
+  );
+  const toggleBlock = source.slice(
+    source.indexOf('  function updateFadedSkipToggle()'),
+    source.indexOf('  function updateSpeedEnabledToggle()'),
+  );
+  const durationBlock = source.slice(
+    source.indexOf('  function fadedSkipDurationSeconds()'),
+    source.indexOf('  function clearFadedSkip('),
+  );
+  vm.runInContext(`${fadeBlock}\n${toggleBlock}\n${durationBlock}`, context);
+
+  context.updateFadedSkipToggle();
+  assert.equal(fadedSkipToggle.disabled, false);
+  assert.equal(context.fadedSkipDurationSeconds(), 4);
+  assert.equal(context.rampTransportFade(0, 4), true);
+  assert.equal(typeof intervalFn, 'function');
+
+  context.Date.now = () => 1002_000;
+  intervalFn();
+  assert.ok(Math.abs(audio.volume - 0.25) < 0.01);
+
+  context.restoreTransportFade();
+  assert.equal(cleared, true);
+  assert.ok(Math.abs(audio.volume - 0.5) < 0.01);
+});

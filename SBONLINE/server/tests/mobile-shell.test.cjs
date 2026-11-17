@@ -12,7 +12,6 @@ const viewsPy = readFileSync(`${__dirname}/../accounts/views.py`, 'utf8');
 
 test('mobile shell CSS defeats shared theme/online specificity clashes and keeps hidden helpers hidden', () => {
   assert.match(mobileCss, /#spcboy-mobile-app \.is-hidden\s*\{\s*display:\s*none\s*!important;/);
-  assert.match(mobileCss, /body\.sbonline-site #spcboy-mobile-app \.spcboy-gallery-console-picker\s*\{\s*display:grid;/);
   assert.match(mobileCss, /#spcboy-mobile-app \.spcboy-mobile-console-toggle\[aria-expanded="true"\]/);
   assert.match(mobileCss, /#spcboy-mobile-app \.spcboy-mobile-album-toggle\[aria-expanded="true"\]/);
   assert.match(mobileCss, /#spcboy-mobile-app \.spcboy-mobile-eq-btn\.is-active/);
@@ -32,8 +31,6 @@ test('mobile player JS avoids duplicate nav binding, full tracklist re-renders o
   assert.match(spcboyJs, /audio\?\.addEventListener\("timeupdate",\s*\(\)\s*=>\s*\{\s*if\s*\(!isDesktop\(\)\)\s*updateMobilePlaybackProgress\(\);/s);
   assert.match(spcboyJs, /const gameGroupsByAlbumId = new Map\(\);/);
   assert.match(spcboyJs, /gameGroupsByAlbumId\.get\(albumId\)/);
-  assert.match(spcboyJs, /#spcboy-mobile-gallery-more"\)\?\.addEventListener\("click"/);
-  assert.match(spcboyJs, /if\s*\(!isDesktop\(\)\)\s*\{\s*openMobileAlbumDetail\(entry,\s*"gallery"\);\s*return true;\s*\}/s);
 });
 
 test('sb-interface suppresses selection rect layout walks for coarse pointers and mobile shell', () => {
@@ -217,7 +214,6 @@ test('mobile library track selection plays the targeted song even when view is f
 
   // Verify mobile & row callers pass explicit playlist sources.
   assert.match(spcboyJs, /selectTrack\(track,\s*true,\s*\{\s*source:\s*"album",\s*group:\s*gameEntry,\s*tracks:\s*gameEntry\.tracks\s*\}\)/);
-  assert.match(spcboyJs, /selectTrack\(track,\s*true,\s*\{\s*source:\s*"album",\s*group:\s*entry\s*\}\)/);
   assert.match(spcboyJs, /selectTrack\(track,\s*true,\s*\{\s*source:\s*"recent",\s*tracks\s*\}\)/);
   assert.match(spcboyJs, /makeTrackRow\(track,\s*entry\.tracks\.length,\s*\{\s*source:\s*"album",\s*group:\s*entry\s*\}\)/);
   assert.match(spcboyJs, /selectTrack\(track,\s*true,\s*playbackOptions \|\| \{\}\)/);

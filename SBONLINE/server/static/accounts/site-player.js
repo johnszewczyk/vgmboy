@@ -360,29 +360,74 @@
       return false;
     }
   }
-  function currentTransportFadeGain(now = audioContext?.currentTime || 0) {
+  let transportFadeTimer = null;
+  function canFadeSkipAudio() {
+    if (typeof supportsClientAudioGraph === "function" && supportsClientAudioGraph()) return true;
+    return typeof testAudioVolumeSupport === "function" ? testAudioVolumeSupport() : true;
+  }
+  function currentTransportFadeGain(now = audioContext?.currentTime ?? Date.now() / 1000) {
     const { startGain, targetGain, startTime, endTime } = transportFadeEnvelope;
     if (endTime <= startTime || now >= endTime) return targetGain;
     if (now <= startTime) return startGain;
     const progress = (now - startTime) / (endTime - startTime);
     return startGain + (targetGain - startGain) * progress;
   }
+  function applyFadedAudioVolume(gainScalar = 1) {
+    try {
+      if (audio) {
+        const baseVolume = Math.max(0, Math.min(1, volumeStep / 20));
+        audio.volume = Math.max(0, Math.min(1, baseVolume * Math.max(0, Math.min(1, gainScalar))));
+      }
+    } catch {}
+  }
   function rampTransportFade(targetGain, durationSeconds) {
-    if (!ensureEqualizerGraph() || !transportFadeOutput || audioContext.state !== "running") return false;
-    const now = audioContext.currentTime;
+    if (ensureEqualizerGraph() && transportFadeOutput && audioContext?.state === "running") {
+      const now = audioContext.currentTime;
+      const startGain = currentTransportFadeGain(now);
+      const endTime = now + Math.max(0, durationSeconds);
+      const parameter = transportFadeOutput.gain;
+      parameter.cancelScheduledValues(now);
+      parameter.setValueAtTime(startGain, now);
+      if (endTime > now) parameter.linearRampToValueAtTime(targetGain, endTime);
+      else parameter.setValueAtTime(targetGain, now);
+      transportFadeEnvelope = { startGain, targetGain, startTime: now, endTime };
+      return true;
+    }
+    if (!canFadeSkipAudio() || !audio) return false;
+    if (transportFadeTimer !== null && typeof window !== "undefined") {
+      window.clearInterval?.(transportFadeTimer);
+      transportFadeTimer = null;
+    }
+    const now = Date.now() / 1000;
     const startGain = currentTransportFadeGain(now);
     const endTime = now + Math.max(0, durationSeconds);
-    const parameter = transportFadeOutput.gain;
-    parameter.cancelScheduledValues(now);
-    parameter.setValueAtTime(startGain, now);
-    if (endTime > now) parameter.linearRampToValueAtTime(targetGain, endTime);
-    else parameter.setValueAtTime(targetGain, now);
     transportFadeEnvelope = { startGain, targetGain, startTime: now, endTime };
+    if (endTime <= now) {
+      applyFadedAudioVolume(targetGain);
+      return true;
+    }
+    applyFadedAudioVolume(startGain);
+    if (typeof window !== "undefined" && typeof window.setInterval === "function") {
+      transportFadeTimer = window.setInterval(() => {
+        const tickNow = Date.now() / 1000;
+        const gain = currentTransportFadeGain(tickNow);
+        applyFadedAudioVolume(gain);
+        if (tickNow >= endTime && transportFadeTimer !== null) {
+          window.clearInterval?.(transportFadeTimer);
+          transportFadeTimer = null;
+        }
+      }, 30);
+    }
     return true;
   }
   function restoreTransportFade() {
+    if (transportFadeTimer !== null && typeof window !== "undefined") {
+      window.clearInterval?.(transportFadeTimer);
+      transportFadeTimer = null;
+    }
     if (!audioContext || !transportFadeOutput) {
       transportFadeEnvelope = { startGain: 1, targetGain: 1, startTime: 0, endTime: 0 };
+      applyFadedAudioVolume(1);
       return;
     }
     const now = audioContext.currentTime;
@@ -390,6 +435,7 @@
     parameter.cancelScheduledValues(now);
     parameter.setValueAtTime(1, now);
     transportFadeEnvelope = { startGain: 1, targetGain: 1, startTime: now, endTime: now };
+    applyFadedAudioVolume(1);
   }
   async function startAudioPlayback() {
     if (playbackSessionExpired() || !currentTrack) return false;
@@ -543,9 +589,11 @@
   }
   function updateFadedSkipToggle() {
     updateBooleanSettingsToggle(fadedSkipToggle, fadedSkipsEnabled, "Faded Skip");
-    if (!supportsClientAudioGraph()) {
+    if (!canFadeSkipAudio()) {
       fadedSkipToggle.disabled = true;
-      fadedSkipToggle.title = "Faded Skip requires working browser audio processing.";
+      fadedSkipToggle.title = "Faded Skip requires working browser audio volume control.";
+    } else {
+      fadedSkipToggle.disabled = false;
     }
   }
   function updateSpeedEnabledToggle() {
@@ -801,8 +849,7 @@
         || audio.error
         || streamNeedsRetry
         || spcFadeSeconds <= 0
-        || !ensureEqualizerGraph()
-        || equalizerGraphFailed) return 0;
+        || !canFadeSkipAudio()) return 0;
     const totalSeconds = effectiveDuration();
     if (!(totalSeconds > 0) && totalSeconds !== Infinity) return 0;
     const elapsedSeconds = sourcePositionSeconds();
@@ -2609,9 +2656,10 @@
         restartCurrentStream(sourcePositionSeconds());
       }
     },
-    getFadedSkips() { return { enabled: fadedSkipsEnabled, seconds: spcFadeSeconds }; },
+    getFadedSkips() { return { enabled: fadedSkipsEnabled, seconds: spcFadeSeconds, supported: canFadeSkipAudio() }; },
     setFadedSkips(enabled, seconds) {
       let changed = false;
+      let fadeSecondsChanged = false;
       if (typeof enabled === "boolean" && enabled !== fadedSkipsEnabled) {
         fadedSkipsEnabled = enabled;
         storage.set("fadedSkipsEnabled", enabled);
@@ -2626,7 +2674,11 @@
           if (spcFadeSecondsInput) spcFadeSecondsInput.value = String(spcFadeSeconds);
           storage.set("spcFadeSeconds", spcFadeSeconds);
           changed = true;
+          fadeSecondsChanged = true;
         }
+      }
+      if (fadeSecondsChanged && currentTrack) {
+        restartCurrentStream();
       }
       if (changed) {
         window.dispatchEvent(new CustomEvent("siteplayer:settings-changed", { detail: { fadedSkipsEnabled, spcFadeSeconds } }));

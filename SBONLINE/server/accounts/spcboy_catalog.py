@@ -1,6 +1,7 @@
 """Catalog projections, metadata indexes and artwork links for SPCBOY."""
 
 import json
+import os
 from functools import lru_cache
 
 from django.conf import settings
@@ -9,6 +10,28 @@ from django.urls import reverse
 from .models import FavoriteAlbum
 from .spcboy_gallery import THUMBNAIL_EXTENSION, read_gallery_index, spcboy_album_id
 from .spcboy_timing import catalog_duration_seconds
+
+
+@lru_cache(maxsize=4)
+def _cached_gallery_files(cache_root_str, dir_mtime_ns):
+    try:
+        return frozenset(
+            entry.name for entry in os.scandir(cache_root_str) if entry.is_file()
+        )
+    except OSError:
+        return frozenset()
+
+
+def _gallery_file_exists(expected_file):
+    cache_root = settings.SPCBOY_GALLERY_CACHE_ROOT
+    try:
+        dir_mtime_ns = cache_root.stat().st_mtime_ns
+    except OSError:
+        return False
+    files = _cached_gallery_files(str(cache_root), dir_mtime_ns)
+    if expected_file in files:
+        return True
+    return (cache_root / expected_file).is_file()
 
 
 def spcboy_catalog_data():
@@ -59,8 +82,7 @@ def spcboy_artwork_url(album_id, artwork_index=None, *, detail=False):
     expected_file = f"{album_id}-detail{THUMBNAIL_EXTENSION}" if detail else f"{album_id}{THUMBNAIL_EXTENSION}"
     if not isinstance(artwork, dict) or artwork.get(filename_key) != expected_file:
         return ""
-    image_path = settings.SPCBOY_GALLERY_CACHE_ROOT / expected_file
-    if not image_path.is_file():
+    if not _gallery_file_exists(expected_file):
         return ""
     hash_key = "detailSha256" if detail else "thumbnailSha256"
     version = str(artwork.get(hash_key, ""))[:12]

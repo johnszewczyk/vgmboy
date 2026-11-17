@@ -1,3 +1,4 @@
+import sys
 import time
 from datetime import timezone as datetime_timezone
 
@@ -21,11 +22,38 @@ DEFAULT_PLAYER_SESSION_LIMIT_MINUTES = 120
 LEGACY_PLAYER_SESSION_MAX_AGE_SECONDS = 60 * 60
 PLAYER_SESSION_MAX_AGE_SECONDS = PLAYER_SESSION_LIMIT_MINUTES_MAX * 60
 
+_SITE_SETTINGS_CACHE_TTL_SECONDS = 5.0
+_site_settings_cache = {"expires_at": 0.0, "values": None}
+
+
+def invalidate_site_settings_cache():
+    _site_settings_cache["expires_at"] = 0.0
+    _site_settings_cache["values"] = None
+
+
+def cached_site_settings_values():
+    is_test_run = any("test" in arg for arg in sys.argv)
+    now = time.monotonic()
+    if not is_test_run and _site_settings_cache["values"] is not None and now < _site_settings_cache["expires_at"]:
+        return _site_settings_cache["values"]
+    row = (
+        SiteSettings.objects.filter(pk=1)
+        .values("aac_bitrate", "player_session_limit_minutes")
+        .first()
+    ) or {}
+    if not is_test_run:
+        _site_settings_cache["values"] = row
+        _site_settings_cache["expires_at"] = now + _SITE_SETTINGS_CACHE_TTL_SECONDS
+    return row
+
+
+def configured_aac_bitrate():
+    bitrate = cached_site_settings_values().get("aac_bitrate") or 192
+    return bitrate if bitrate in {96, 128, 160, 192, 256} else 192
+
 
 def player_session_limit_seconds():
-    configured_minutes = SiteSettings.objects.filter(pk=1).values_list(
-        "player_session_limit_minutes", flat=True
-    ).first()
+    configured_minutes = cached_site_settings_values().get("player_session_limit_minutes")
     if (
         type(configured_minutes) is not int
         or not PLAYER_SESSION_LIMIT_MINUTES_MIN <= configured_minutes <= PLAYER_SESSION_LIMIT_MINUTES_MAX

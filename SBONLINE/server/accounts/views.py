@@ -127,6 +127,7 @@ from .usage import (
     audio_stream_remaining,
     audio_stream_usage,
     claim_audio_stream_bytes,
+    configured_aac_bitrate,
     player_page_load_salt,
 )
 
@@ -1635,8 +1636,7 @@ def spcboy_audio(request, track_id):
     archive_path, member_name, member_suffix = selected_member
     if request.GET.get("format", "aac") != "aac":
         return HttpResponseBadRequest("AAC is required. Reload the player to update.")
-    bitrate = SiteSettings.objects.filter(pk=1).values_list("aac_bitrate", flat=True).first() or 192
-    bitrate = bitrate if bitrate in {96,128,160,192,256} else 192
+    bitrate = configured_aac_bitrate()
     stream_encoding_args = ["-c:a", "aac", "-profile:a", "aac_low", "-b:a", f"{bitrate}k"]
     stream_format_args = ["-f", "adts"]
     try:
