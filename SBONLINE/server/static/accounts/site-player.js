@@ -187,6 +187,14 @@
   let equalizerGraphFailed = false;
   let equalizerFaderAnimationId = null;
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  const ua = typeof navigator !== "undefined" ? (navigator.userAgent || "") : "";
+  const isAppleMobile = typeof navigator !== "undefined"
+    && (/iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+  const isSafariDesktop = typeof navigator !== "undefined"
+    && !isAppleMobile
+    && /Safari\//.test(ua)
+    && !/Chrome\/|Chromium\/|CriOS\/|FxiOS\/|Edg\//.test(ua);
+  const useWebAudioEngine = Boolean(isSafariDesktop && window.SBWebAudioAACStream?.supported?.());
   let supportsAudioVolume = null;
   function testAudioVolumeSupport() {
     if (supportsAudioVolume !== null) return supportsAudioVolume;
@@ -296,9 +304,13 @@
   }
   function supportsClientAudioGraph() {
     if (!AudioContextClass || equalizerGraphFailed) return false;
+    if (typeof useWebAudioEngine === "boolean" && useWebAudioEngine) return true;
     if (typeof window !== "undefined") {
       if (!window.MediaSource && Boolean(window.ManagedMediaSource)) return false;
       if (typeof navigator !== "undefined" && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1))) {
+        return false;
+      }
+      if (typeof isSafariDesktop === "boolean" && isSafariDesktop) {
         return false;
       }
     }
@@ -330,8 +342,16 @@
       : Boolean(AudioContextClass && !equalizerGraphFailed);
     if (equalizerGraphFailed || !clientGraphAllowed) return false;
     try {
-      audioContext = new AudioContextClass();
-      equalizerSource = audioContext.createMediaElementSource(audio);
+      if (typeof useWebAudioEngine === "boolean" && useWebAudioEngine) {
+        try {
+          audioContext = new AudioContextClass({ sampleRate: 44100 });
+        } catch {
+          audioContext = new AudioContextClass();
+        }
+      } else {
+        audioContext = new AudioContextClass();
+        equalizerSource = audioContext.createMediaElementSource(audio);
+      }
       equalizerFilters = equalizerFrequencies.map((frequency) => {
         const filter = audioContext.createBiquadFilter();
         filter.type = "peaking";
@@ -343,9 +363,15 @@
       transportFadeOutput = audioContext.createGain();
       transportFadeOutput.gain.value = 1;
       equalizerFilters.forEach((filter, index) => {
-        if (index === 0) equalizerSource.connect(filter);
-        else equalizerFilters[index - 1].connect(filter);
+        if (index === 0) {
+          if (equalizerSource && equalizerSource !== filter) equalizerSource.connect(filter);
+        } else {
+          equalizerFilters[index - 1].connect(filter);
+        }
       });
+      if (!equalizerSource && equalizerFilters.length) {
+        equalizerSource = equalizerFilters[0];
+      }
       equalizerFilters.at(-1).connect(equalizerOutput);
       equalizerOutput.connect(transportFadeOutput);
       transportFadeOutput.connect(audioContext.destination);
@@ -355,8 +381,10 @@
     } catch {
       // If graph setup fails after creating the media source, keep direct output connected.
       try {
-        equalizerSource?.disconnect();
-        equalizerSource?.connect(audioContext.destination);
+        if (equalizerSource && equalizerSource !== equalizerFilters[0]) {
+          equalizerSource.disconnect();
+          equalizerSource.connect(audioContext.destination);
+        }
       } catch { /* Keep the browser's native player path available when possible. */ }
       equalizerGraphFailed = true;
       equalizerEnabled = false;
@@ -411,8 +439,9 @@
       setPlayerStatus("AAC streaming requires an up-to-date browser.");
       return false;
     }
-    if (streamNeedsRetry || aacTransport.interrupted || audio.error || audio.ended) {
-      streamOffsetSeconds = audio.ended && !streamNeedsRetry ? 0 : sourcePositionSeconds();
+    const playerTarget = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
+    if (streamNeedsRetry || aacTransport.interrupted || playerTarget.error || playerTarget.ended) {
+      streamOffsetSeconds = playerTarget.ended && !streamNeedsRetry ? 0 : sourcePositionSeconds();
       setAudioSource(audioURL(currentTrack, streamOffsetSeconds));
     }
     const clientVolume = typeof supportsClientAudioGraph === "function"
@@ -427,18 +456,18 @@
         setAudioSource(audioURL(currentTrack, streamOffsetSeconds));
       }
     }
-    const source = audio.src;
+    const source = playerTarget.src;
     try {
       // Do not block audio.play() on resume() in WebKit when async chains lose user activation.
       if (audioContext && audioContext.state !== "running") {
         const resumeResult = audioContext.resume();
         if (resumeResult && typeof resumeResult.catch === "function") resumeResult.catch(() => {});
       }
-      await audio.play();
+      await playerTarget.play();
       return true;
     } catch (error) {
       // Track switches and Stop legitimately abort an outstanding play request.
-      if (source === audio.src && error.name !== "AbortError") {
+      if (source === playerTarget.src && error.name !== "AbortError") {
         playbackWanted = false;
         cancelStreamRecovery();
         setPlayerStatus(error.name === "NotAllowedError" ? "Press Play to resume audio." : `Audio could not start (${error.name || "unknown"}). Press Play to retry.`);
@@ -594,7 +623,7 @@
     clearFadedSkip();
     playbackWanted = false;
     cancelStreamRecovery(true);
-    audio.pause();
+    (typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio).pause();
   }
   function recoverStream(error = {}) {
     streamNeedsRetry = true;
@@ -623,14 +652,21 @@
       startAudioPlayback();
     }, delay);
   }
-  const aacTransport = window.SBAACStream?.attach(audio, handleStreamFailure, (seconds) => {
+  const onStreamTiming = (seconds) => {
     if (currentTrack && !longPlayEnabled && Number.isFinite(seconds) && seconds > 0) {
       // The response header reports the track endpoint in source time. Keep
       // it out of the catalog object so playlist labels stay canonical.
       streamDurationSeconds = seconds;
       updatePlaybackClock();
     }
-  });
+  };
+  const aacTransport = useWebAudioEngine && window.SBWebAudioAACStream
+    ? window.SBWebAudioAACStream.attach(audio, handleStreamFailure, onStreamTiming, {
+        ensureGraph: ensureEqualizerGraph,
+        getAudioContext: () => audioContext,
+        getFilterInput: () => equalizerFilters[0] || equalizerSource,
+      })
+    : window.SBAACStream?.attach(audio, handleStreamFailure, onStreamTiming);
   function setAudioSource(url) {
     changingAudioSource = true;
     streamNeedsRetry = false;
@@ -660,7 +696,8 @@
     statusTimer = null;
     const text = String(message || "");
     const desktopDock = document.body.classList.contains("spcboy-body") && window.matchMedia("(min-width: 781px)").matches;
-    const idleText = !currentTrack ? "Ready" : audio.paused || audio.ended ? "Paused" : "Playing";
+    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
+    const idleText = !currentTrack ? "Ready" : target.paused || target.ended ? "Paused" : "Playing";
     const isBusy = Boolean(text && busy);
     state.textContent = String(announcement || "");
     statusText.textContent = text || idleText;
@@ -736,11 +773,12 @@
   let lastPlaybackSignature = "";
   function savePlayback(force = false) {
     if (!currentTrack) return;
+    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
     const saved = {
       track: savedTrack(currentTrack), queue: queue.slice(0,500).map(savedTrack).filter(Boolean),
       history: playlistHistory.slice(-500).map(savedTrack).filter(Boolean), playlist: nowPlayingPlaylist,
       position: sourcePositionSeconds(),
-      playing: !audio.paused && !audio.ended, savedAt: Date.now()
+      playing: !target.paused && !target.ended, savedAt: Date.now()
     };
     const signature = JSON.stringify({
       track: saved.track, queue: saved.queue.map(track => track.id),
@@ -785,12 +823,13 @@
   }
 
   function fadedSkipDurationSeconds() {
+    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
     if (!fadedSkipsEnabled
         || !currentTrack
         || !playbackWanted
-        || audio.paused
-        || audio.ended
-        || audio.error
+        || target.paused
+        || target.ended
+        || target.error
         || streamNeedsRetry
         || spcFadeSeconds <= 0
         || !ensureEqualizerGraph()
@@ -832,7 +871,8 @@
       return;
     }
     const trackDuration = effectiveDuration(currentTrack);
-    const mediaTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
+    const mediaTime = Number.isFinite(target.currentTime) ? target.currentTime : 0;
     const elapsed = Math.min(trackDuration || Infinity, streamOffsetSeconds + mediaTime * nativeFormatPlaybackRate());
     const playlistDuration = trackDuration + queue.reduce(
       (total, queuedTrack) => total + effectiveDuration(queuedTrack),
@@ -879,13 +919,15 @@
   }
 
   function sourcePositionSeconds() {
-    return Math.max(0, streamOffsetSeconds + (Number(audio.currentTime) || 0) * nativeFormatPlaybackRate());
+    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
+    return Math.max(0, streamOffsetSeconds + (Number(target.currentTime) || 0) * nativeFormatPlaybackRate());
   }
 
   function updateControls() {
     if (stopButton) stopButton.disabled = !currentTrack || playbackSessionExpired();
     syncOnlineControls();
-    const playing = Boolean(currentTrack && !audio.paused && !audio.ended && !audio.error);
+    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
+    const playing = Boolean(currentTrack && !target.paused && !target.ended && !target.error);
     playButton.disabled = !playbackSessionExpired() && !currentTrack;
     playButton.setAttribute("aria-label", playbackExpired ? "Reload player" : playing ? "Pause" : "Play");
     playButton.title = playbackExpired ? "Reload player to start a new session" : playing ? "Pause" : "Play";
@@ -908,8 +950,9 @@
   function emitTrack() {
     syncMediaSession();
     savePlayback();
+    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
     window.dispatchEvent(new CustomEvent("siteplayer:track", {
-      detail: { track: currentTrack, playbackId: currentPlaybackId, playing: Boolean(currentTrack && !audio.paused && !audio.ended && !audio.error) },
+      detail: { track: currentTrack, playbackId: currentPlaybackId, playing: Boolean(currentTrack && !target.paused && !target.ended && !target.error) },
     }));
   }
 
@@ -932,7 +975,8 @@
         title: currentTrack.title, artist: currentTrack.artist || "", album: currentTrack.game || "", artwork
       });
     }
-    navigator.mediaSession.playbackState = !currentTrack ? "none" : audio.paused || audio.ended ? "paused" : "playing";
+    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
+    navigator.mediaSession.playbackState = !currentTrack ? "none" : target.paused || target.ended ? "paused" : "playing";
     syncMediaPosition();
   }
   function seekToTrackOffset(seconds) {
@@ -1234,7 +1278,8 @@
   }
 
   function updateNowPlaying() {
-    if (audio.paused || audio.ended) return;
+    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
+    if (target.paused || target.ended) return;
     const payload = nowPlayingPayload("playing");
     if (!payload) return;
     fetch(dock.dataset.nowPlayingUrl, {
@@ -1342,17 +1387,18 @@
     const track = normalizeTrack(rawTrack);
     if (!track) return false;
     if (currentTrack?.id === track.id) {
+      const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
       if (options.toggle) {
         if (streamRecoveryTimer !== null) {
           pausePlayback(); setPlayerStatus("");
-        } else if (streamNeedsRetry || audio.paused || audio.error || audio.ended) {
+        } else if (streamNeedsRetry || target.paused || target.error || target.ended) {
           setPlayerStatus("Preparing audio…", { busy: true });
           await startAudioPlayback();
         } else {
           pausePlayback();
           setPlayerStatus("");
         }
-      } else if (streamNeedsRetry || audio.paused || audio.error || audio.ended) {
+      } else if (streamNeedsRetry || target.paused || target.error || target.ended) {
         setPlayerStatus("Preparing audio…", { busy: true });
         await startAudioPlayback();
       }
@@ -1605,9 +1651,10 @@
       return;
     }
     if (!currentTrack) return;
+    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
     if (streamRecoveryTimer !== null) {
       pausePlayback(); setPlayerStatus("");
-    } else if (streamNeedsRetry || audio.paused || audio.error || audio.ended) {
+    } else if (streamNeedsRetry || target.paused || target.error || target.ended) {
       setPlayerStatus("Preparing audio…", { busy: true });
       startAudioPlayback();
     }
@@ -1637,12 +1684,13 @@
   async function restartCurrentStream(sourcePosition = null) {
     if (playbackSessionExpired() || !currentTrack) return;
     clearFadedSkip();
-    const resume = !audio.paused && !audio.ended;
-    const target = Math.min(sourcePosition ?? sourcePositionSeconds(), Math.max(0, effectiveDuration() - 1));
-    streamOffsetSeconds = target;
+    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
+    const resume = !target.paused && !target.ended;
+    const seekTarget = Math.min(sourcePosition ?? sourcePositionSeconds(), Math.max(0, effectiveDuration() - 1));
+    streamOffsetSeconds = seekTarget;
     streamDurationSeconds = 0;
-    audio.pause();
-    setAudioSource(audioURL(currentTrack, target));
+    target.pause();
+    setAudioSource(audioURL(currentTrack, seekTarget));
     if (resume) setPlayerStatus("Preparing audio…", { busy: true });
     else setPlayerStatus("");
     updateControls();
@@ -2296,9 +2344,10 @@
 
   let lastPlaybackSave = 0;
   audio.addEventListener("timeupdate", () => {
+    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
     updateControls();
     syncMediaPosition();
-    if (!audio.paused && !audio.ended && !audio.error && healthyPlaybackSince && Date.now() - healthyPlaybackSince > 30000) streamRecoveryAttempts = 0;
+    if (!target.paused && !target.ended && !target.error && healthyPlaybackSince && Date.now() - healthyPlaybackSince > 30000) streamRecoveryAttempts = 0;
     if (Date.now() - lastPlaybackSave > 2000) { savePlayback(); lastPlaybackSave = Date.now(); }
   });
   audio.addEventListener("playing", () => {
@@ -2320,7 +2369,8 @@
   });
   audio.addEventListener("pause", () => {
     // Device interruptions cancel intent; source replacement emits its own pause.
-    if (!changingAudioSource && !audio.ended && !audio.error) {
+    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
+    if (!changingAudioSource && !target.ended && !target.error) {
       clearFadedSkip();
       playbackWanted = false;
       cancelStreamRecovery();
@@ -2333,18 +2383,19 @@
     clearNowPlaying();
   });
   audio.addEventListener("waiting", () => {
-    if (currentTrack && !audio.paused) setPlayerStatus("Buffering audio…", { busy: true });
+    if (currentTrack && !(typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio).paused) setPlayerStatus("Buffering audio…", { busy: true });
   });
   audio.addEventListener("stalled", () => {
-    if (currentTrack && !audio.paused) setPlayerStatus("Buffering audio…", { busy: true });
+    if (currentTrack && !(typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio).paused) setPlayerStatus("Buffering audio…", { busy: true });
   });
   audio.addEventListener("ended", async () => {
-    const source = audio.src;
+    const playerTarget = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
+    const source = playerTarget.src;
     const expectedDuration = effectiveDuration();
     const streamEndedCleanly = typeof aacTransport !== "undefined" && Boolean(aacTransport?.streamEnded);
     if (!streamEndedCleanly && expectedDuration > 0 && sourcePositionSeconds() < expectedDuration - 1) {
       const quotaReached = await hasReachedStreamQuota();
-      if (source !== audio.src || !audio.ended) return;
+      if (source !== playerTarget.src || !playerTarget.ended) return;
       if (quotaReached) showStreamQuotaMessage();
       else recoverStream();
       updateControls();
@@ -2353,13 +2404,14 @@
     moveTrack(1, { completeQueuedTarget: true });
   });
   audio.addEventListener("error", async () => {
+    const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
     const failedPlaybackId = currentPlaybackId;
-    const failedSource = audio.src;
-    const stillFailed = () => failedPlaybackId === currentPlaybackId && failedSource === audio.src && audio.error;
+    const failedSource = target.src;
+    const stillFailed = () => failedPlaybackId === currentPlaybackId && failedSource === target.src && target.error;
     if (currentTrack && await hasReachedStreamQuota()) {
       if (stillFailed()) showStreamQuotaMessage();
     } else if (currentTrack && stillFailed()) {
-      recoverStream({status: audio.error.code === 3 || audio.error.code === 4 ? 415 : 0});
+      recoverStream({status: target.error?.code === 3 || target.error?.code === 4 ? 415 : 0});
     }
     updateControls();
   });
@@ -2478,7 +2530,10 @@
     setLibraryNavigator(provider) { libraryNavigator = typeof provider === "function" ? provider : null; updateControls(); },
     getDuration(track) { return effectiveDuration(track); },
     getCurrentTrack() { return currentTrack; },
-    isPlaying() { return Boolean(currentTrack && !audio.paused && !audio.ended && !audio.error); },
+    isPlaying() {
+      const target = typeof aacTransport !== "undefined" && aacTransport?.isWebAudio ? aacTransport : audio;
+      return Boolean(currentTrack && !target.paused && !target.ended && !target.error);
+    },
     getQueue() { return [...queue]; },
     togglePlayback() { playButton.click(); },
     previous() { return moveTrack(-1); },

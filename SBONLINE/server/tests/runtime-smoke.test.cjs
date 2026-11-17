@@ -5,6 +5,7 @@ const { test } = require('node:test');
 
 const serverDir = `${__dirname}/..`;
 const sitePreferencesJs = readFileSync(`${serverDir}/static/accounts/site-preferences.js`, 'utf8');
+const webaudioAacStreamJs = readFileSync(`${serverDir}/static/accounts/webaudio-aac-stream.js`, 'utf8');
 const sitePlayerJs = readFileSync(`${serverDir}/static/accounts/site-player.js`, 'utf8');
 const spcboyJs = readFileSync(`${serverDir}/static/accounts/spcboy.js`, 'utf8');
 
@@ -317,6 +318,7 @@ test('full script boot for site-preferences, site-player, and spcboy throws zero
   });
 
   vm.runInContext(sitePreferencesJs, sandbox);
+  vm.runInContext(webaudioAacStreamJs, sandbox);
   vm.runInContext(sitePlayerJs, sandbox);
   assert.ok(sandbox.window.SitePlayer, 'SitePlayer must initialize without throwing');
   vm.runInContext(spcboyJs, sandbox);
