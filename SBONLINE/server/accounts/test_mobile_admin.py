@@ -206,14 +206,16 @@ class MobileAdminTests(TestCase):
             member = User.objects.create_user(username=f"extra-listener-{idx}")
             MemberProfile.objects.get_or_create(user=member, defaults={"display_name": f"Extra {idx}"})
 
-        # Also delete one profile so fallback _safe_member_profile path is exercised on next read.
-        MemberProfile.objects.filter(user__username="extra-listener-0").delete()
         with CaptureQueriesContext(connection) as larger_ctx:
             rows_larger = _account_rows([])
 
-        self.assertGreater(len(rows_larger), len(rows_small))
-        # Adding members with profiles adds zero per-user queries; only 1 fallback get_or_create runs for the missing profile.
-        self.assertLessEqual(len(larger_ctx), small_queries + 3)
+        self.assertEqual(len(rows_larger), len(rows_small) + 8)
+        self.assertEqual(len(larger_ctx), small_queries)
+
+        # Also delete one profile so fallback _safe_member_profile path recovers cleanly without throwing.
+        MemberProfile.objects.filter(user__username="extra-listener-0").delete()
+        rows_recovered = _account_rows([])
+        self.assertTrue(any(row.username == "extra-listener-0" and row.display_name.startswith("Player ") for row in rows_recovered))
 
         usage_res = self.client.get(reverse("usage"))
         self.assertEqual(usage_res.status_code, 200)
