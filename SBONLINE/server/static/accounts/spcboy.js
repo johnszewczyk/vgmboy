@@ -1377,9 +1377,8 @@
     catalogAvailable = true;
     resolveCatalogReady();
     try {
-      renderMobileNowPlaying(window.SitePlayer?.getCurrentTrack?.() || currentTrack);
-      renderMobileUpNext();
       if (!isDesktop()) {
+        renderMobileNowPlaying(window.SitePlayer?.getCurrentTrack?.() || currentTrack);
         if (mobileAppPage === "library") renderMobileLibrary();
       }
     } catch (err) {
@@ -1841,15 +1840,15 @@
           if (entry.row) rec.contentEl.append(entry.row);
         }
       }
+      for (const label of trackList.querySelectorAll('.spcboy-system > summary > .spcboy-count')) {
+        label.textContent = label.dataset.totalCount;
+      }
     }
     collectionSidebarView = null;
     const timestampHeader = playlistColumnHeadCells?.querySelector('[data-column="timestamp"]');
     if (timestampHeader) {
       timestampHeader.textContent = "DATE/TIME";
       timestampHeader.dataset.label = "DATE/TIME";
-    }
-    for (const label of trackList.querySelectorAll('.spcboy-system > summary > .spcboy-count')) {
-      label.textContent = label.dataset.totalCount;
     }
     if (showingCards) {
       if (view === "recent") renderRecents();
@@ -2040,6 +2039,12 @@
     hoveredPlaylistRow = null;
     lastPlaylistIndicatorTrackId = null;
     syncResponsiveLists();
+    if (!isDesktop()) {
+      renderMobileNowPlaying(window.SitePlayer?.getCurrentTrack?.() || currentTrack);
+      syncMobileSoundControls();
+    } else {
+      hideMobileLoadingIndicator();
+    }
     if (search.value.trim()) scheduleCatalogSearch();
     schedulePlaylistColumnLayout();
     scheduleSelectionIndicators();
@@ -2559,6 +2564,7 @@
   let currentRenderedNowAlbumKey = null;
 
   function showMobileLoadingIndicator(text = "Preparing audio stream…") {
+    if (isDesktop()) return;
     const artLoading = document.querySelector("#spcboy-mobile-art-loading");
     const loadingText = artLoading?.querySelector(".spcboy-mobile-loading-text");
     const dockSpinner = document.querySelector("#spcboy-mobile-dock-spinner");
@@ -2811,6 +2817,7 @@
   }
 
   function renderMobileUpNext() {
+    if (isDesktop()) return;
     renderMobileNowAlbumTracks(currentTrack || window.SitePlayer?.getCurrentTrack?.());
   }
 
@@ -2832,6 +2839,7 @@
   }
 
   function renderMobileNowPlaying(track = currentTrack) {
+    if (isDesktop()) return;
     const activeTrack = track || window.SitePlayer?.getCurrentTrack?.() || null;
     const matchingGroup = mobileGroupForTrack(activeTrack);
     const artworkURL = activeTrack
@@ -3544,16 +3552,18 @@
     if (!isDesktop()) updateMobilePlaybackProgress();
   });
   audio?.addEventListener("playing", () => {
+    if (isDesktop()) return;
     hideMobileLoadingIndicator();
     renderMobileNowPlaying();
   });
   audio?.addEventListener("canplay", () => {
-    hideMobileLoadingIndicator();
+    if (!isDesktop()) hideMobileLoadingIndicator();
   });
   audio?.addEventListener("pause", () => {
-    renderMobileNowPlaying();
+    if (!isDesktop()) renderMobileNowPlaying();
   });
   audio?.addEventListener("ended", () => {
+    if (isDesktop()) return;
     hideMobileLoadingIndicator();
     renderMobileNowPlaying();
   });
@@ -3564,6 +3574,7 @@
     showMobileLoadingIndicator("Preparing audio stream…");
   });
   audio?.addEventListener("error", () => {
+    if (isDesktop()) return;
     hideMobileLoadingIndicator();
     showMobileToast("Playback error. Tap to retry.");
   });
@@ -3594,10 +3605,11 @@
     syncCurrentTrackRows(currentTrack?.id, false);
     currentTrack = tracksById.get(rawTrack.id) || (group ? cacheTrack(group, rawTrack) : rawTrack);
     syncCurrentTrackRows(currentTrack.id, true);
-    renderMobileNowPlaying(currentTrack);
-    renderMobileUpNext();
-    if (mobileAppPage === "recent") renderMobileRecents();
-    if (mobileAppPage === "favorites") renderMobileFavorites();
+    if (!isDesktop()) {
+      renderMobileNowPlaying(currentTrack);
+      if (mobileAppPage === "recent") renderMobileRecents();
+      if (mobileAppPage === "favorites") renderMobileFavorites();
+    }
     scheduleSelectionIndicators();
     if (view === "recent" && event.detail.playing && !recentLoading && recentRefreshedPlaybackId !== event.detail.playbackId) {
       recentRefreshedPlaybackId = event.detail.playbackId;

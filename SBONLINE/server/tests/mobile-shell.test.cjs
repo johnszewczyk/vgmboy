@@ -237,3 +237,62 @@ test('mobile shell replaces track length with favorite toggles and renames tempo
   assert.match(mobileCss, /#spcboy-mobile-app \.spcboy-mobile-track-favorite/);
   assert.match(spcboyJs, /finally\s*\{\s*if\s*\(pendingSelectionToken === selectionToken\)\s*pendingSelectionToken = 0;\s*\}/);
 });
+
+test('activity-badges stops polling when redirected to login and backup/templates are aligned', async () => {
+  const badgesJs = readFileSync(`${staticDir}/activity-badges.js`, 'utf8');
+  const backupUnit = readFileSync(`${__dirname}/../../ops/server/private-admin-backup.service`, 'utf8');
+  const publicProfileHtml = readFileSync(`${__dirname}/../templates/accounts/public_profile.html`, 'utf8');
+
+  assert.match(backupUnit, /CapabilityBoundingSet=.*CAP_DAC_OVERRIDE/);
+  assert.match(publicProfileHtml, /accounts\/profile\.js'\s*%\}\?v=20261117-profile-1/);
+
+  // Guard hidden mobile work in desktop mode and avoid duplicate tracklist passes.
+  assert.match(spcboyJs, /function renderMobileNowPlaying\(track = currentTrack\)\s*\{\s*if \(isDesktop\(\)\) return;/);
+  assert.match(spcboyJs, /function showMobileLoadingIndicator\([^)]*\)\s*\{\s*if \(isDesktop\(\)\) return;/);
+
+  // Simulate expired session causing fetch("/activity/badges.json") to redirect to HTML login page.
+  let clearedTimerId = null;
+  let removedEvents = [];
+  let fetchCount = 0;
+  const badgeEl = { className: '', dataset: {}, hidden: true, textContent: '', setAttribute() {} };
+  const linkEl = {
+    href: 'https://admin.pre-calc.com/history/',
+    dataset: { navKey: 'history' },
+    textContent: 'History',
+    append() {},
+    querySelector: () => badgeEl,
+    setAttribute() {},
+    removeAttribute() {},
+  };
+  const ctx = vm.createContext({
+    URL,
+    window: {
+      location: { href: 'https://admin.pre-calc.com/spcboy/', pathname: '/spcboy/' },
+      setInterval: () => 42,
+      clearInterval(id) { clearedTimerId = id; },
+    },
+    document: {
+      visibilityState: 'visible',
+      createElement: () => ({ ...badgeEl }),
+      querySelectorAll: () => [linkEl],
+      addEventListener() {},
+      removeEventListener(name) { removedEvents.push(name); },
+    },
+    fetch: async () => {
+      fetchCount += 1;
+      return {
+        ok: true,
+        status: 200,
+        redirected: true,
+        headers: { get: () => 'text/html; charset=utf-8' },
+        json: async () => { throw new Error('HTML not JSON'); },
+      };
+    },
+  });
+  vm.runInContext(badgesJs, ctx);
+  await new Promise((r) => setTimeout(r, 15));
+
+  assert.equal(fetchCount, 1);
+  assert.equal(clearedTimerId, 42);
+  assert.deepEqual(removedEvents.sort(), ['site:navigated', 'visibilitychange']);
+});

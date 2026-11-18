@@ -44,8 +44,22 @@
   }
 
   let pending = false;
+  let stopped = false;
+  let pollTimer = 0;
+
+  function stopPolling() {
+    if (stopped) return;
+    stopped = true;
+    if (pollTimer) {
+      window.clearInterval(pollTimer);
+      pollTimer = 0;
+    }
+    document.removeEventListener("site:navigated", refreshBadges);
+    document.removeEventListener("visibilitychange", refreshBadges);
+  }
+
   async function refreshBadges() {
-    if (pending || document.visibilityState === "hidden") return;
+    if (stopped || pending || document.visibilityState === "hidden") return;
     pending = true;
     try {
       const response = await fetch("/activity/badges.json", {
@@ -53,7 +67,16 @@
         cache: "no-store",
         headers: { Accept: "application/json" },
       });
+      if (response.redirected || response.status === 401 || response.status === 403) {
+        stopPolling();
+        return;
+      }
       if (!response.ok) return;
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        stopPolling();
+        return;
+      }
       const payload = await response.json();
       if (payload.counts && typeof payload.counts === "object") updateBadges(payload.counts);
     } catch {
@@ -65,6 +88,6 @@
 
   document.addEventListener("site:navigated", refreshBadges);
   document.addEventListener("visibilitychange", refreshBadges);
-  window.setInterval(refreshBadges, 20000);
+  pollTimer = window.setInterval(refreshBadges, 20000);
   refreshBadges();
 })();

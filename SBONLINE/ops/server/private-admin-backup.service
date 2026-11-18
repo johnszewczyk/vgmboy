@@ -22,5 +22,5 @@ ProtectControlGroups=true
 RestrictAddressFamilies=AF_UNIX
 RestrictSUIDSGID=true
 LockPersonality=true
-CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_CHOWN CAP_FOWNER
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE CAP_CHOWN CAP_FOWNER
 ReadWritePaths=/var/backups/precalc-admin /var/lib/precalc-admin

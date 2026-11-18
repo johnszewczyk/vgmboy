@@ -549,23 +549,25 @@ def _decorate_history(history, active_session_digests):
             event.display_status_class = "status-neutral"
 
 
+def _safe_member_profile(user):
+    try:
+        return user.member_profile
+    except MemberProfile.DoesNotExist:
+        return _member_profile(user)
+
+
 def _account_rows(active_logins):
     sessions_by_user = {}
     for active_login in active_logins:
         sessions_by_user.setdefault(active_login["user_id"], []).append(active_login)
 
-    users = list(User.objects.order_by("username").prefetch_related("passkeys"))
-    passkey_accounts = {
-        account.user_id: account
-        for account in PasskeyAccount.objects.filter(user_id__in=[user.pk for user in users])
-    }
+    users = list(User.objects.order_by("username").select_related("member_profile").prefetch_related("passkeys"))
     rows = []
     for user in users:
         user_sessions = sessions_by_user.get(user.pk, [])
-        passkey_account = passkey_accounts.get(user.pk)
         user.username_set = True
         user.has_passkey = bool(user.passkeys.all())
-        profile = _member_profile(user)
+        profile = _safe_member_profile(user)
         user.is_site_persona = profile.is_site_persona
         user.setup_pending = not user.has_passkey and not user.is_site_persona
         user.display_name = profile.display_name
@@ -2000,20 +2002,15 @@ def usage(request):
         usage.user_id: usage
         for usage in MonthlyUsage.objects.filter(period=selected_period)
     }
-    users = list(User.objects.order_by("username"))
-    passkey_accounts = {
-        account.user_id: account
-        for account in PasskeyAccount.objects.filter(user_id__in=[user.pk for user in users])
-    }
+    users = list(User.objects.order_by("username").select_related("member_profile"))
     rows = []
     for user in users:
         usage = usage_by_user.get(user.pk)
         site_bytes = usage.site_bytes if usage else 0
         media_bytes = usage.media_bytes if usage else 0
         audio_bytes = usage.audio_bytes if usage else 0
-        passkey_account = passkey_accounts.get(user.pk)
         rows.append({
-            "username": _member_profile(user).display_name,
+            "username": _safe_member_profile(user).display_name,
             "role_label": "Owner" if user.is_superuser else "Staff" if user.is_staff else "Member",
             "is_active": user.is_active,
             "site_bytes": _bytes_label(site_bytes),
@@ -2305,7 +2302,10 @@ def _spcboy_admin_payload(request, *, message="", extra=None):
             "expiresAt": timezone.localtime(inv.expires_at).strftime("%b %-d, %-I:%M %p"),
         })
 
-    profile = _member_profile(request.user)
+    profile = next(
+        (member.account_profile for member in account_rows if member.pk == request.user.pk),
+        None,
+    ) or _member_profile(request.user)
     server = _server_stats()
     now_local = timezone.localtime()
     today_start = timezone.make_aware(

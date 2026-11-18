@@ -3,7 +3,9 @@ import uuid
 from datetime import timedelta, timezone as datetime_timezone
 
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
@@ -187,3 +189,32 @@ class MobileAdminTests(TestCase):
         self.assertGreaterEqual(stats["playsToday"], 1)
         self.assertAlmostEqual(stats["avgPlaysPerDay"], round(2 / 4, 1))
         self.assertEqual(stats["monthlyAudio"], "2.1 MB")
+
+    def test_spcboy_admin_and_usage_queries_scale_in_constant_queries_across_members(self):
+        from .views import _account_rows
+
+        User = get_user_model()
+        self.client.force_login(self.owner)
+        baseline_response = self.client.get(reverse("spcboy_admin"))
+        self.assertEqual(baseline_response.status_code, 200)
+
+        with CaptureQueriesContext(connection) as small_ctx:
+            rows_small = _account_rows([])
+        small_queries = len(small_ctx)
+
+        for idx in range(8):
+            member = User.objects.create_user(username=f"extra-listener-{idx}")
+            MemberProfile.objects.get_or_create(user=member, defaults={"display_name": f"Extra {idx}"})
+
+        # Also delete one profile so fallback _safe_member_profile path is exercised on next read.
+        MemberProfile.objects.filter(user__username="extra-listener-0").delete()
+        with CaptureQueriesContext(connection) as larger_ctx:
+            rows_larger = _account_rows([])
+
+        self.assertGreater(len(rows_larger), len(rows_small))
+        # Adding members with profiles adds zero per-user queries; only 1 fallback get_or_create runs for the missing profile.
+        self.assertLessEqual(len(larger_ctx), small_queries + 3)
+
+        usage_res = self.client.get(reverse("usage"))
+        self.assertEqual(usage_res.status_code, 200)
+        self.assertContains(usage_res, "Extra 7")

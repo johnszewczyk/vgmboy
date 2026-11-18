@@ -746,3 +746,63 @@ test('startAudioPlayback primes gesture and waits for initial SourceBuffer appen
   assert.match(aacStreamSource, /waitUntilReady:/);
   assert.match(aacStreamSource, /settleReady\(true\)/);
 });
+
+test('savePlayback avoids redundant SBOProfileStorage writes within 15s when track and queue signature are unchanged', () => {
+  let setCalls = 0;
+  let clock = 100_000;
+  const FakeDate = class extends Date {
+    static now() { return clock; }
+  };
+  const context = vm.createContext({
+    Date: FakeDate,
+    window: {
+      SBOProfileStorage: {
+        set() { setCalls += 1; },
+        get(_s, _k, fb) { return fb; },
+      },
+    },
+    currentTrack: { id: 'guile-1', title: 'Guile', game: 'SFII', durationSeconds: 120 },
+    queue: [{ id: 'ryu-1', title: 'Ryu' }, { id: 'ken-1', title: 'Ken' }],
+    playlistHistory: [{ id: 'intro', title: 'Intro' }],
+    nowPlayingPlaylist: true,
+    audio: { currentTime: 4, paused: false, ended: false },
+    streamOffsetSeconds: 0,
+    sourcePositionSeconds: () => 4,
+    effectiveDuration: () => 120,
+    renderCurrentTrack() {},
+    setAudioSource() {},
+    renderQueue() {},
+    updateControls() {},
+    setPlayerStatus() {},
+    startAudioPlayback() {},
+    createPlaybackId: () => 'pb-1',
+    audioURL: () => '',
+  });
+  const saveStart = source.indexOf('  function albumIdForTrack(');
+  vm.runInContext(source.slice(saveStart, source.indexOf('  function effectiveDuration(')), context);
+
+  context.savePlayback();
+  assert.equal(setCalls, 1);
+
+  // Repeated 2s timeupdate ticks with same track/queue/playing must skip storage writes.
+  clock += 2000;
+  context.savePlayback();
+  clock += 2000;
+  context.savePlayback();
+  assert.equal(setCalls, 1);
+
+  // After 15s, periodic checkpoint write proceeds.
+  clock += 12000;
+  context.savePlayback();
+  assert.equal(setCalls, 2);
+
+  // Queue mutation flushes immediately on next call.
+  clock += 1000;
+  context.queue.push({ id: 'chun-1', title: 'Chun-Li' });
+  context.savePlayback();
+  assert.equal(setCalls, 3);
+
+  // Unchanged playback clock writes skip redundant DOM assignments.
+  assert.match(source, /if \(playbackClock\.textContent !== clockText\)/);
+  assert.doesNotMatch(source, /document\.addEventListener\("change", syncOnlineControls\)/);
+});

@@ -227,6 +227,7 @@
     if (sbonlineVol) sbonlineVol.value = String(volumeStep);
     const sbonlineVal = document.querySelector("#sbonline-volume-value");
     if (sbonlineVal) sbonlineVal.textContent = String(volumeStep * 5);
+    syncOnlineControls();
     window.dispatchEvent(new CustomEvent("siteplayer:settings-changed"));
   }
   function formatEqualizerGain(value) {
@@ -537,12 +538,14 @@
       page.hidden = page.dataset.settingsPage !== selectedPage;
     });
   }
-  function saveEqualizerGains() {
+  function saveEqualizerGains({ notify = true } = {}) {
     storage.set("equalizerBandGains", equalizerBandGains);
     syncEqualizerControls();
     if (equalizerEnabled && typeof ensureEqualizerGraph === "function") ensureEqualizerGraph();
     updateEqualizerGraph();
-    window.dispatchEvent(new CustomEvent("siteplayer:settings-changed", { detail: { equalizerBandGains } }));
+    if (notify) {
+      window.dispatchEvent(new CustomEvent("siteplayer:settings-changed", { detail: { equalizerBandGains } }));
+    }
   }
   function scheduleEqualizerRestart(delay = 300) {
     if (typeof currentTrack === "undefined" || !currentTrack || !equalizerEnabled) return;
@@ -803,20 +806,51 @@
   }
   let lastPlaybackSaveAt = 0;
   let lastPlaybackSignature = "";
+  function isValidSavedTrackId(track) {
+    return Boolean(track && typeof track.id === "string" && /^[a-zA-Z0-9_-]{1,200}$/.test(track.id));
+  }
+  function playbackStateSignature(track, queueTracks, historyTracks, playlist, playing) {
+    if (!isValidSavedTrackId(track)) return "";
+    const queueIds = [];
+    for (let i = 0, limit = Math.min(queueTracks.length, 500); i < limit; i += 1) {
+      if (isValidSavedTrackId(queueTracks[i])) queueIds.push(queueTracks[i].id);
+    }
+    const historyIds = [];
+    const startIdx = Math.max(0, historyTracks.length - 500);
+    for (let i = startIdx; i < historyTracks.length; i += 1) {
+      if (isValidSavedTrackId(historyTracks[i])) historyIds.push(historyTracks[i].id);
+    }
+    return JSON.stringify({
+      track: {
+        id: track.id,
+        title: String(track.title || "").slice(0, 500),
+        game: String(track.game || "").slice(0, 500),
+        console: String(track.console || "").slice(0, 200),
+        artworkUrl: String(track.artworkUrl || "").slice(0, 2048),
+        albumId: albumIdForTrack(track),
+        durationSeconds: Math.max(0, Math.min(86400, Number(track.durationSeconds) || 0)),
+      },
+      queue: queueIds,
+      history: historyIds,
+      playlist: Boolean(playlist),
+      playing: Boolean(playing),
+    });
+  }
   function savePlayback(force = false) {
     if (!currentTrack) return;
-    const saved = {
-      track: savedTrack(currentTrack), queue: queue.slice(0,500).map(savedTrack).filter(Boolean),
-      history: playlistHistory.slice(-500).map(savedTrack).filter(Boolean), playlist: nowPlayingPlaylist,
-      position: sourcePositionSeconds(),
-      playing: !audio.paused && !audio.ended, savedAt: Date.now()
-    };
-    const signature = JSON.stringify({
-      track: saved.track, queue: saved.queue.map(track => track.id),
-      history: saved.history.map(track => track.id), playlist: saved.playlist, playing: saved.playing,
-    });
+    const playing = !audio.paused && !audio.ended;
+    const signature = playbackStateSignature(currentTrack, queue, playlistHistory, nowPlayingPlaylist, playing);
     const now = Date.now();
     if (!force && signature === lastPlaybackSignature && now - lastPlaybackSaveAt < 15000) return;
+    const saved = {
+      track: savedTrack(currentTrack),
+      queue: queue.slice(0, 500).map(savedTrack).filter(Boolean),
+      history: playlistHistory.slice(-500).map(savedTrack).filter(Boolean),
+      playlist: nowPlayingPlaylist,
+      position: sourcePositionSeconds(),
+      playing,
+      savedAt: now,
+    };
     lastPlaybackSignature = signature;
     lastPlaybackSaveAt = now;
     window.SBOProfileStorage?.set("playback", "session", saved);
@@ -831,10 +865,7 @@
     nowPlayingPlaylist = Boolean(saved.playlist);
     streamOffsetSeconds = Math.max(0, Math.min(Number(saved.position) || 0, effectiveDuration() - .1));
     renderCurrentTrack(currentTrack);
-    lastPlaybackSignature = JSON.stringify({
-      track: saved.track, queue: queue.map(track => track.id), history: playlistHistory.map(track => track.id),
-      playlist: nowPlayingPlaylist, playing: Boolean(saved.playing),
-    });
+    lastPlaybackSignature = playbackStateSignature(currentTrack, queue, playlistHistory, nowPlayingPlaylist, Boolean(saved.playing));
     lastPlaybackSaveAt = Date.now();
     // Construct a new authorized URL using this document's token after login/reload.
     setAudioSource(audioURL(currentTrack, streamOffsetSeconds));
@@ -895,8 +926,8 @@
 
   function updatePlaybackClock() {
     if (!currentTrack) {
-      playbackClock.hidden = true;
-      playbackClock.textContent = "";
+      if (!playbackClock.hidden) playbackClock.hidden = true;
+      if (playbackClock.textContent !== "") playbackClock.textContent = "";
       return;
     }
     const trackDuration = effectiveDuration(currentTrack);
@@ -909,12 +940,15 @@
     const elapsedText = formatPlaybackTime(elapsed);
     const trackText = formatPlaybackTime(trackDuration);
     const playlistText = formatPlaybackTime(playlistDuration);
-    playbackClock.textContent = `${elapsedText} / ${trackText} / ${playlistText}`;
-    playbackClock.setAttribute(
-      "aria-label",
-      `${elapsedText} elapsed / ${trackText} track length / ${playlistText} current track and Up Next`,
-    );
-    playbackClock.hidden = false;
+    const clockText = `${elapsedText} / ${trackText} / ${playlistText}`;
+    if (playbackClock.textContent !== clockText) {
+      playbackClock.textContent = clockText;
+      playbackClock.setAttribute(
+        "aria-label",
+        `${elapsedText} elapsed / ${trackText} track length / ${playlistText} current track and Up Next`,
+      );
+    }
+    if (playbackClock.hidden) playbackClock.hidden = false;
   }
 
   function audioURL(track, startSeconds = 0) {
@@ -951,7 +985,6 @@
 
   function updateControls() {
     if (stopButton) stopButton.disabled = !currentTrack || playbackSessionExpired();
-    syncOnlineControls();
     const playing = Boolean(currentTrack && !audio.paused && !audio.ended && !audio.error);
     playButton.disabled = !playbackSessionExpired() && !currentTrack;
     playButton.setAttribute("aria-label", playbackExpired ? "Reload player" : playing ? "Pause" : "Play");
@@ -1141,19 +1174,22 @@
     if (command === "playback-speed") speedEnabledToggle.click();
     const panel = document.querySelector("#sbonline-volume-panel");
     const button = document.querySelector('[data-sbonline-command="volume"]');
-    if (panel && command === "volume") panel.hidden = !panel.hidden;
-    else if (panel && !event.target.closest(".sbonline-volume")) panel.hidden = true;
-    button?.setAttribute("aria-expanded", String(panel && !panel.hidden));
-    syncOnlineControls();
+    if (panel && command === "volume") {
+      panel.hidden = !panel.hidden;
+      button?.setAttribute("aria-expanded", String(!panel.hidden));
+    } else if (panel && !panel.hidden && !event.target.closest(".sbonline-volume")) {
+      panel.hidden = true;
+      button?.setAttribute("aria-expanded", "false");
+    }
+    if (command) syncOnlineControls();
   });
   document.addEventListener("input", (event) => {
     if (event.target.id === "sbonline-volume-input") {
       volumeInput.value = event.target.value;
       volumeInput.dispatchEvent(new Event("input", { bubbles: true }));
+      syncOnlineControls();
     }
-    syncOnlineControls();
   });
-  document.addEventListener("change", syncOnlineControls);
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
     const panel = document.querySelector("#sbonline-volume-panel");
@@ -1719,6 +1755,7 @@
     if (playbackSessionExpired()) return;
     longPlayEnabled = !longPlayEnabled;
     updateLongPlayToggle();
+    syncOnlineControls();
     storage.set("longPlayEnabled", longPlayEnabled);
     await restartCurrentStream();
   });
@@ -2255,7 +2292,7 @@
       const index = Number(input.dataset.equalizerBand);
       if (!Number.isInteger(index) || index < 0 || index >= equalizerBandGains.length) return;
       equalizerBandGains[index] = Math.max(-12, Math.min(12, Math.round(Number(input.value) * 2) / 2));
-      saveEqualizerGains();
+      saveEqualizerGains({ notify: false });
       saveEqualizerPreset(selectedEqualizerPresetIndex, { announce: false });
       if (equalizerEnabled && currentTrack) {
         scheduleEqualizerRestart(300);
@@ -2270,7 +2307,7 @@
       if (equalizerEnabled && graphReady && audioContext?.state !== "running") {
         audioContext?.resume().catch(() => {});
       }
-      saveEqualizerGains();
+      saveEqualizerGains({ notify: false });
       saveEqualizerPreset(selectedEqualizerPresetIndex, { announce: false });
       if (equalizerPresetStatus) equalizerPresetStatus.textContent = "Equalizer reset to Flat.";
       if (!graphReady && equalizerEnabled && currentTrack) {
@@ -2653,7 +2690,7 @@
       const rounded = Math.max(-12, Math.min(12, Math.round(Number(gain) * 2) / 2));
       equalizerBandGains[index] = rounded;
       if (equalizerBandInputs[index]) equalizerBandInputs[index].value = String(rounded);
-      saveEqualizerGains();
+      saveEqualizerGains({ notify: false });
       saveEqualizerPreset(selectedEqualizerPresetIndex, { announce: false });
       if (equalizerEnabled && currentTrack) {
         scheduleEqualizerRestart(300);
@@ -2663,7 +2700,7 @@
       equalizerBandGains = equalizerFrequencies.map(() => 0);
       equalizerBandInputs.forEach(input => { input.value = "0"; });
       const graphReady = ensureEqualizerGraph();
-      saveEqualizerGains();
+      saveEqualizerGains({ notify: false });
       saveEqualizerPreset(selectedEqualizerPresetIndex, { announce: false });
       if (!graphReady && equalizerEnabled && currentTrack) {
         restartCurrentStream(sourcePositionSeconds());
