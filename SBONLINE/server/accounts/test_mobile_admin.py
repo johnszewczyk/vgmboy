@@ -204,7 +204,7 @@ class MobileAdminTests(TestCase):
 
         for idx in range(8):
             member = User.objects.create_user(username=f"extra-listener-{idx}")
-            MemberProfile.objects.get_or_create(user=member, defaults={"display_name": f"Extra {idx}"})
+            MemberProfile.objects.update_or_create(user=member, defaults={"display_name": f"Extra {idx}"})
 
         with CaptureQueriesContext(connection) as larger_ctx:
             rows_larger = _account_rows([])
