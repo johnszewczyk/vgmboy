@@ -691,3 +691,58 @@ test('Faded skip works with native audio.volume ramping without AudioContext whe
   assert.equal(cleared, true);
   assert.ok(Math.abs(audio.volume - 0.5) < 0.01);
 });
+
+test('startAudioPlayback primes gesture and waits for initial SourceBuffer append before playing at t=0', async () => {
+  const events = [];
+  let resolveReady;
+  let ready = false;
+  const { context } = fixture({
+    audio: {
+      src: 'blob:track-1',
+      currentTime: 0,
+      play() {
+        events.push(ready ? 'play-buffered' : 'play-prime');
+        return Promise.resolve();
+      },
+      pause() { events.push('pause-prime'); },
+    },
+    changingAudioSource: false,
+    aacTransport: {
+      supported: true,
+      get ready() { return ready; },
+      waitUntilReady: () => new Promise((resolve) => {
+        resolveReady = (val) => { ready = Boolean(val); resolve(val); };
+      }),
+    },
+  });
+
+  const pending = context.startAudioPlayback();
+  assert.deepEqual(events, ['play-prime', 'pause-prime']);
+  assert.equal(context.changingAudioSource, true);
+
+  resolveReady(true);
+  assert.equal(await pending, true);
+  assert.deepEqual(events, ['play-prime', 'pause-prime', 'play-buffered']);
+
+  // Cancelling / superseding before initial buffer finishes must not call play() a second time.
+  ready = false;
+  events.length = 0;
+  const superseded = context.startAudioPlayback();
+  context.playbackWanted = false;
+  resolveReady(true);
+  assert.equal(await superseded, false);
+  assert.deepEqual(events, ['play-prime', 'pause-prime']);
+
+  // Stream failure before initial buffer finishes yields false without clobbering recovery state.
+  ready = false;
+  events.length = 0;
+  const failedStream = context.startAudioPlayback();
+  resolveReady(false);
+  assert.equal(await failedStream, false);
+  assert.deepEqual(events, ['play-prime', 'pause-prime']);
+
+  const aacStreamSource = readFileSync(`${__dirname}/../static/accounts/aac-stream.js`, 'utf8');
+  assert.match(aacStreamSource, /const startupMinBytes = 4096;/);
+  assert.match(aacStreamSource, /waitUntilReady:/);
+  assert.match(aacStreamSource, /settleReady\(true\)/);
+});

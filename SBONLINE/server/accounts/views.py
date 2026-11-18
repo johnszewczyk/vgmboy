@@ -1745,10 +1745,6 @@ def spcboy_audio(request, track_id):
             bufsize=0,
         )
         audio_filters = []
-        pre_roll_ms = 350 if start_ms == 0 else 0
-        if pre_roll_ms:
-            # Brief silent lead-in keeps browser/hardware output wake-up from clipping sample 0.
-            audio_filters.append(f"adelay={pre_roll_ms}|{pre_roll_ms}")
         effective_volume = volume_step / 20.0
         if effective_volume < 1.0:
             audio_filters.append(f"volume={effective_volume:.4f}")
@@ -1850,8 +1846,8 @@ def spcboy_audio(request, track_id):
                         break
                     if not history_saved:
                         initial_buf = bytearray(chunk)
-                        while len(initial_buf) < 16384 and time.time() - page_loaded_at < page_session_limit_seconds:
-                            more_ready, _, _ = select.select([encoder.stdout], [], [], 0.08)
+                        while len(initial_buf) < 4096 and time.time() - page_loaded_at < page_session_limit_seconds:
+                            more_ready, _, _ = select.select([encoder.stdout], [], [], 0.05)
                             if not more_ready:
                                 break
                             more = encoder.stdout.read(32768)
@@ -1924,7 +1920,7 @@ def spcboy_audio(request, track_id):
     response = StreamingHttpResponse(stream_audio(), content_type="audio/aac")
     response["Cache-Control"] = "private, no-store"
     response["X-Accel-Buffering"] = "no"
-    response["X-Audio-Duration"] = str((play_ms + fade_ms + pre_roll_ms) / 1000)
+    response["X-Audio-Duration"] = str((play_ms + fade_ms) / 1000)
     response["X-Content-Type-Options"] = "nosniff"
     # This is a live generated stream, not a stored byte-addressable media file.
     response["Accept-Ranges"] = "none"

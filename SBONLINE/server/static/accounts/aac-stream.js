@@ -6,10 +6,12 @@
     let active = null;
     function cancel() {
       if (!active) return;
-      active.abort.abort();
-      clearTimeout(active.timer);
-      URL.revokeObjectURL(active.objectURL);
+      const cancelled = active;
       active = null;
+      cancelled.abort.abort();
+      clearTimeout(cancelled.timer);
+      URL.revokeObjectURL(cancelled.objectURL);
+      cancelled.settleReady(false);
     }
     function load(url) {
       cancel();
@@ -19,10 +21,19 @@
       }
       const media = new Source(), abort = new AbortController();
       const objectURL = URL.createObjectURL(media);
-      const run = active = { abort, objectURL, timer: null, ended: false };
+      let resolveReady;
+      const readyPromise = new Promise(resolve => { resolveReady = resolve; });
+      const settleReady = value => {
+        if (run.readySettled) return;
+        run.readySettled = true;
+        run.ready = Boolean(value);
+        resolveReady(Boolean(value));
+      };
+      const run = active = { abort, objectURL, timer: null, ended: false, ready: false, readySettled: false, readyPromise, settleReady };
       const report = error => {
         if (active !== run || abort.signal.aborted) return;
         abort.abort(); clearTimeout(run.timer);
+        settleReady(false);
         failed(error);
       };
       function operation(buffer, action) {
@@ -78,7 +89,7 @@
           }
           timing?.(Number(response.headers.get("X-Audio-Duration")));
           const reader = response.body.getReader();
-          const startupMinBytes = 12288;
+          const startupMinBytes = 4096;
           let startupBuffer = new Uint8Array(0);
           let startupFlushed = false;
           while (!abort.signal.aborted) {
@@ -89,6 +100,7 @@
                 await append(buffer, startupBuffer);
                 startupBuffer = new Uint8Array(0);
               }
+              if (!abort.signal.aborted) settleReady(true);
               run.ended = true;
               if (media.readyState === 'open') media.endOfStream();
               break;
@@ -114,6 +126,7 @@
               }
               if (abort.signal.aborted) break;
               await append(buffer, chunk.subarray(offset,offset+65536));
+              if (!abort.signal.aborted) settleReady(true);
             }
           }
         } catch (error) { report(error); }
@@ -129,7 +142,9 @@
     return {
       load,
       cancel,
+      waitUntilReady: () => active ? active.readyPromise : Promise.resolve(false),
       supported: Boolean(Source),
+      get ready() { return Boolean(active?.ready); },
       get interrupted() { return Boolean(active?.abort.signal.aborted); },
       get streamEnded() { return Boolean(active?.ended); },
     };

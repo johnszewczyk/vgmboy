@@ -80,9 +80,11 @@ test('sb-interface suppresses selection rect layout walks for coarse pointers an
   assert.equal(classSet.has('is-ready'), false);
 });
 
-test('spcboy_audio keeps silent pre-roll when starting from t=0', () => {
-  assert.match(viewsPy, /pre_roll_ms = 350 if start_ms == 0 else 0/);
-  assert.match(viewsPy, /adelay=\{pre_roll_ms\}\|\{pre_roll_ms\}/);
+test('spcboy_audio starts directly at t=0 without adelay truncation workaround', () => {
+  assert.doesNotMatch(viewsPy, /adelay=/);
+  assert.doesNotMatch(viewsPy, /pre_roll_ms/);
+  assert.match(viewsPy, /"-probesize",\s*"32",\s*"-analyzeduration",\s*"0"/);
+  assert.match(viewsPy, /response\["X-Audio-Duration"\] = str\(\(play_ms \+ fade_ms\) \/ 1000\)/);
 });
 
 test('mobile library track selection plays the targeted song even when view is favorites', async () => {

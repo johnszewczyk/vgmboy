@@ -470,12 +470,25 @@
         const resumeResult = audioContext.resume();
         if (resumeResult && typeof resumeResult.catch === "function") resumeResult.catch(() => {});
       }
+      if (typeof aacTransport.waitUntilReady === "function" && !aacTransport.ready) {
+        // Claim WebKit user activation synchronously inside the gesture without leaving <audio>
+        // running against an empty SourceBuffer (which clips the opening ~340ms when data arrives).
+        if (typeof changingAudioSource === "boolean") changingAudioSource = true;
+        const primePlay = audio.play();
+        if (typeof audio.pause === "function") audio.pause();
+        if (primePlay && typeof primePlay.catch === "function") primePlay.catch(() => {});
+        const bufferReady = await aacTransport.waitUntilReady();
+        if (!bufferReady || !playbackWanted || source !== audio.src || playbackSessionExpired()) {
+          return false;
+        }
+      }
       await audio.play();
       return true;
     } catch (error) {
       // Track switches and Stop legitimately abort an outstanding play request.
       if (source === audio.src && error.name !== "AbortError") {
         playbackWanted = false;
+        if (typeof changingAudioSource === "boolean") changingAudioSource = false;
         cancelStreamRecovery();
         setPlayerStatus(error.name === "NotAllowedError" ? "Press Play to resume audio." : `Audio could not start (${error.name || "unknown"}). Press Play to retry.`);
         updateControls();
