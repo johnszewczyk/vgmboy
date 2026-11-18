@@ -81,7 +81,7 @@ test('sb-interface suppresses selection rect layout walks for coarse pointers an
 });
 
 test('spcboy_audio keeps silent pre-roll when starting from t=0', () => {
-  assert.match(viewsPy, /pre_roll_ms = 100 if start_ms == 0 else 0/);
+  assert.match(viewsPy, /pre_roll_ms = 350 if start_ms == 0 else 0/);
   assert.match(viewsPy, /adelay=\{pre_roll_ms\}\|\{pre_roll_ms\}/);
 });
 

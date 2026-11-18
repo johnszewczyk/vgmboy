@@ -1745,7 +1745,7 @@ def spcboy_audio(request, track_id):
             bufsize=0,
         )
         audio_filters = []
-        pre_roll_ms = 100 if start_ms == 0 else 0
+        pre_roll_ms = 350 if start_ms == 0 else 0
         if pre_roll_ms:
             # Brief silent lead-in keeps browser/hardware output wake-up from clipping sample 0.
             audio_filters.append(f"adelay={pre_roll_ms}|{pre_roll_ms}")
@@ -1768,6 +1768,10 @@ def spcboy_audio(request, track_id):
                 "-loglevel",
                 "error",
                 "-nostdin",
+                "-probesize",
+                "32",
+                "-analyzeduration",
+                "0",
                 "-f",
                 "s16le",
                 "-ar",
@@ -1845,6 +1849,16 @@ def spcboy_audio(request, track_id):
                         playback_session_expired = time.time() - page_loaded_at >= page_session_limit_seconds
                         break
                     if not history_saved:
+                        initial_buf = bytearray(chunk)
+                        while len(initial_buf) < 16384 and time.time() - page_loaded_at < page_session_limit_seconds:
+                            more_ready, _, _ = select.select([encoder.stdout], [], [], 0.08)
+                            if not more_ready:
+                                break
+                            more = encoder.stdout.read(32768)
+                            if not more:
+                                break
+                            initial_buf.extend(more)
+                        chunk = bytes(initial_buf)
                         try:
                             _record_spcboy_playback(request.user.pk, playback_id, track_id, track)
                         except DatabaseError:

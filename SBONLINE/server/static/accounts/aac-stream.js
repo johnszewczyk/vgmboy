@@ -78,21 +78,42 @@
           }
           timing?.(Number(response.headers.get("X-Audio-Duration")));
           const reader = response.body.getReader();
+          const startupMinBytes = 12288;
+          let startupBuffer = new Uint8Array(0);
+          let startupFlushed = false;
           while (!abort.signal.aborted) {
             const {value, done} = await networkRead(() => reader.read());
             if (done) {
+              if (!startupFlushed && startupBuffer.byteLength && !abort.signal.aborted) {
+                startupFlushed = true;
+                await append(buffer, startupBuffer);
+                startupBuffer = new Uint8Array(0);
+              }
               run.ended = true;
               if (media.readyState === 'open') media.endOfStream();
               break;
             }
+            let chunk = value;
+            if (!startupFlushed) {
+              const merged = new Uint8Array(startupBuffer.byteLength + value.byteLength);
+              merged.set(startupBuffer, 0);
+              merged.set(value, startupBuffer.byteLength);
+              if (merged.byteLength < startupMinBytes) {
+                startupBuffer = merged;
+                continue;
+              }
+              startupFlushed = true;
+              startupBuffer = new Uint8Array(0);
+              chunk = merged;
+            }
             // Network chunks can coalesce. Bound each append before checking
             // backpressure again so one large read cannot fill the media buffer.
-            for (let offset=0; offset<value.byteLength && !abort.signal.aborted; offset+=65536) {
+            for (let offset=0; offset<chunk.byteLength && !abort.signal.aborted; offset+=65536) {
               while (!abort.signal.aborted && buffer.buffered.length && buffer.buffered.end(buffer.buffered.length-1) - audio.currentTime > 30) {
                 await new Promise(resolve => setTimeout(resolve,250));
               }
               if (abort.signal.aborted) break;
-              await append(buffer, value.subarray(offset,offset+65536));
+              await append(buffer, chunk.subarray(offset,offset+65536));
             }
           }
         } catch (error) { report(error); }
