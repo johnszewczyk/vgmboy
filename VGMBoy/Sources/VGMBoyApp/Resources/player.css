@@ -247,7 +247,7 @@ select.field { text-align: left; }
 .tempo-control .range { flex: 1 1 auto; min-width: 40px; }
 .tempo-input { flex: 0 0 5.2rem; font-variant-numeric: tabular-nums; }
 .metadata-group { margin-top: 18px; }
-.tag-grid { display: grid; grid-template-columns: minmax(90px, 150px) minmax(0, 1fr); margin: 0; }
+.tag-grid { display: grid; grid-template-columns: minmax(90px, 150px) minmax(0, 1fr); max-height: 30rem; margin: 0; overflow-y: auto; overscroll-behavior: contain; }
 .tag-grid dt, .tag-grid dd { min-width: 0; margin: 0; padding: 7px 8px; border-bottom: 1px solid var(--line-soft); }
 .tag-grid dt { color: var(--muted); }
 .tag-grid dd { overflow-wrap: anywhere; color: var(--text); }

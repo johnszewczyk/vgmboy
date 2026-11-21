@@ -17,10 +17,14 @@ finite AAC export; it has no catalog, queue, or UI policy.
 - `ArchiveMaterializer.listEntries` owns bounded archive member discovery for
   local file-open workflows. UAC entries come from the validated manifest and
   only `playable`/`track` roles are offered; assets such as dump-info, artwork,
-  or unresolved capture states are never imported as tracks. Other containers
-  use the configured listing tools and shared parsers. A frontend then filters
-  those entries through `FormatRegistry` and retains the original
-  source/member pair for playback.
+  or unresolved capture states are never imported as tracks. For a `subsong`
+  playlist entry, `listEntriesWithMetadata` exposes a cue row with the
+  playlist's track index, title, artist, and scalar tags while retaining the
+  shared target member path. The plain `listEntries` API still returns unique
+  member paths. Other containers use the configured listing tools and shared
+  parsers. A frontend then filters those rows through `FormatRegistry` and
+  retains the original source/member pair plus any playlist cue identity for
+  playback.
 - `VGMBoyArchiveCore.ArchiveMaterializer` validates the source and member,
   routes the required archive operation, prepares format dependencies, and
   holds the temporary result for the active playback session. AAC export uses

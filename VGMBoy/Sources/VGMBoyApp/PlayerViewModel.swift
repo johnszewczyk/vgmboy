@@ -7,6 +7,17 @@ private struct SessionFile: Hashable {
     let sourceURL: URL
     let archiveEntry: String?
     let metadata: [String: String]
+    let subsongIndex: Int?
+    let playlistID: String?
+
+    init(sourceURL: URL, archiveEntry: String?, metadata: [String: String],
+         subsongIndex: Int? = nil, playlistID: String? = nil) {
+        self.sourceURL = sourceURL
+        self.archiveEntry = archiveEntry
+        self.metadata = metadata
+        self.subsongIndex = subsongIndex
+        self.playlistID = playlistID
+    }
 
     var name: String { archiveEntry ?? sourceURL.lastPathComponent }
     var title: String { tag("Title") ?? name }
@@ -24,11 +35,14 @@ private struct SessionFile: Hashable {
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.sourceURL == rhs.sourceURL && lhs.archiveEntry == rhs.archiveEntry
+            && lhs.subsongIndex == rhs.subsongIndex && lhs.playlistID == rhs.playlistID
     }
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(sourceURL)
         hasher.combine(archiveEntry)
+        hasher.combine(subsongIndex)
+        hasher.combine(playlistID)
     }
 }
 
@@ -153,7 +167,8 @@ final class PlayerViewModel {
                     listingError = "No supported audio tracks were found in \(url.lastPathComponent)."
                 } else {
                     incoming.append(contentsOf: playableEntries.map {
-                        SessionFile(sourceURL: url, archiveEntry: $0.path, metadata: $0.metadata)
+                        SessionFile(sourceURL: url, archiveEntry: $0.path, metadata: $0.metadata,
+                                    subsongIndex: $0.subsongIndex, playlistID: $0.playlistID)
                     })
                 }
             } catch {
@@ -192,7 +207,7 @@ final class PlayerViewModel {
         currentSource = source
         archiveEntry = source.archiveEntry
         filePath = source.sourceURL.path
-        selectedTrack = 0
+        selectedTrack = source.subsongIndex ?? 0
         trackCount = 0
         hasPlaybackLoaded = false
         errorMessage = nil
@@ -202,6 +217,16 @@ final class PlayerViewModel {
     func selectTrack(_ index: Int) {
         guard (0 ..< trackCount).contains(index), index != selectedTrack else { return }
         _ = timingUpdateGate.advance()
+        if let currentSource, currentSource.subsongIndex != nil,
+           let matchingPlaylistTrack = sessionFiles.first(where: {
+               $0.sourceURL == currentSource.sourceURL
+                   && $0.archiveEntry == currentSource.archiveEntry
+                   && $0.playlistID == currentSource.playlistID
+                   && $0.subsongIndex == index
+           }) {
+            load(source: matchingPlaylistTrack)
+            return
+        }
         selectedTrack = index
         loadSelectedTrack(autoplay: isPlaying)
     }

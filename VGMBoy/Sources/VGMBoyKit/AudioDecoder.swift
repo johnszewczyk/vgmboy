@@ -126,7 +126,7 @@ enum DecoderFactory {
         guard let family = FormatRegistry.family(for: path) else { return }
         switch family.id {
         case "standardaudio", "ffmpegaudio", "mdx", "openmpt", "highlycomplete",
-             "twosf", "lazyusf", "playpsf", "ares-snes", "uacngb", "qsf":
+             "twosf", "lazyusf", "playpsf", "ares-snes", "qsf":
             throw PlaybackControlError.invalidPayload("Track index is not available for this single-track format.")
         default:
             return

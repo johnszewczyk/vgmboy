@@ -415,7 +415,7 @@ let package = Package(
         ),
         .testTarget(
             name: "VGMBoyKitTests",
-            dependencies: ["VGMBoyKit", "VGMBoySNDH", "VGMBoyEndpointCore", "VGMBoyCAudioUnit", "VGMBoyMDXInspectionCore", "VGMBoyAmigaInspectionCore"],
+            dependencies: ["VGMBoyKit", "VGMBoyArchiveCore", "VGMBoySNDH", "VGMBoyEndpointCore", "VGMBoyCAudioUnit", "VGMBoyMDXInspectionCore", "VGMBoyAmigaInspectionCore", .product(name: "UACWrapperCore", package: "UACWrapper")],
             path: "Tests/VGMBoyKitTests"
         ),
     ],

@@ -29,9 +29,10 @@ request uses a decoder-provided duration or the shared unknown-duration default.
 Changing timing preserves pause intent and position without blocking the player
 controls. The speed slider uses 1/64 increments and also accepts fractions such
 as `1/64` and `5/4`. UAC session rows use manifest track titles and show artist
-and album; Track Tags presents the selected member's common title, artist,
-album, composer, track number, year, region and selector tags. The position
-slider uses a seek window, not a claimed metadata-derived total duration. Audio
+and album; Track Tags presents the selected member's standard and custom scalar
+tags in a scrollable list, including release, credit, format, source-identity,
+selector, and loop-status metadata when supplied. The position slider uses a
+seek window, not a claimed metadata-derived total duration. Audio
 provides output volume, mono and ten-band EQ. EQ bands use focusable custom
 range sliders with live gain updates and a dB readout; keyboard focus stays on
 the slider for repeated adjustments, and gains remain editable while EQ is
@@ -55,6 +56,11 @@ title, and track window. Supported options:
 ## Supported Formats
 
 - Chip music (libgme): `.ay`, `.gbs`, `.hes`, `.kss`, `.nsf`, `.nsfe`, `.spc`
+- Experimental Game Boy native driver (SameBoy): `.ngbd` (`UACNGB` v3/v4).
+  The current v4 package stores the verified driver bank and a runtime
+  checkpoint rather than the complete retail ROM. SameBoy restores that state
+  and runs the cartridge audio routines. Playback continues until stopped;
+  no natural ending or per-cue sample loop boundary is asserted.
 - Commodore 64 (libsidplayfp): `.sid` (exposes every declared subtune as a
   playlist track and selects the requested subtune on playback)
 - Atari XL (ASAP): `.sap` (TYPE B, C, D, and S; native speed)

@@ -38,7 +38,9 @@ for ScanSong's external inspection executables.
   `build-dependencies.sh` because its source/build belongs to the Game Rips
   workshop, not VGMBoy's ordinary decoder dependency garden.
 - The experimental UACNGB Game Boy decoder uses the SameBoy core and host built
-  from the Game Rips pilot. Use
+  from the Game Rips pilot. The current v4 payload restores a source-derived
+  SameBoy BESS checkpoint and carries only the source header and audio bank;
+  the full ROM is required to rebuild the package, not to play it. Use
   `scripts/stage-sameboy-uacngb-host.sh <host>` to stage the executable and
   Expat license under `.build/dependencies/sameboy-uacngb`; macOS app builders
   copy both into `Contents/Resources/sameboy-uacngb/`. The host source and

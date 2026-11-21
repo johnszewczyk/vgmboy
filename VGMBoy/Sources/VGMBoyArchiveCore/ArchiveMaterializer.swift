@@ -23,10 +23,15 @@ public struct MaterializedArchiveSource: Sendable {
 public struct ArchiveEntryDescriptor: Sendable, Equatable {
     public let path: String
     public let metadata: [String: String]
+    public let subsongIndex: Int?
+    public let playlistID: String?
 
-    public init(path: String, metadata: [String: String] = [:]) {
+    public init(path: String, metadata: [String: String] = [:], subsongIndex: Int? = nil,
+                playlistID: String? = nil) {
         self.path = path
         self.metadata = metadata
+        self.subsongIndex = subsongIndex
+        self.playlistID = playlistID
     }
 }
 
@@ -160,7 +165,10 @@ public final class ArchiveMaterializer: @unchecked Sendable {
     /// playback preparation. Single-file Zstandard input has one implicit
     /// member whose name is the source filename without its compression suffix.
     public func listEntries(archivePath: String) throws -> [String] {
-        try listEntriesWithMetadata(archivePath: archivePath).map(\.path)
+        var seen = Set<String>()
+        return try listEntriesWithMetadata(archivePath: archivePath).compactMap { entry in
+            seen.insert(entry.path).inserted ? entry.path : nil
+        }
     }
 
     /// Lists playable archive entries and retains scalar UAC member tags for
@@ -183,9 +191,43 @@ public final class ArchiveMaterializer: @unchecked Sendable {
                 from: archiveURL,
                 decompressManifestFrame: decompressUACManifestFrame ?? uacZstandardCodec.manifestDecoder
             )
-            entries = container.manifest.members
-                .filter { $0.role == "playable" || $0.role == "track" }
-                .map { ArchiveEntryDescriptor(path: $0.path, metadata: Self.displayMetadata($0.metadata)) }
+            let playableMembers = container.manifest.members.filter {
+                $0.role == "playable" || $0.role == "track"
+            }
+            let membersByPath = Dictionary(uniqueKeysWithValues: playableMembers.map { ($0.path, $0) })
+            var playlistRows: [ArchiveEntryDescriptor] = []
+            var subsongMemberPaths = Set<String>()
+            for playlist in container.manifest.playlists {
+                for entry in playlist.entries where entry.entryKind == "subsong" {
+                    guard let member = membersByPath[entry.targetMemberPath],
+                          let trackIndex = entry.trackIndex.flatMap(Int.init), trackIndex >= 0 else {
+                        throw ArchiveMaterializationError.extractFailed(
+                            "A UAC subsong playlist entry has no playable member or valid track index."
+                        )
+                    }
+                    var metadata = Self.displayMetadata(container.manifest.game.metadata)
+                    metadata.merge(Self.displayMetadata(member.metadata)) { _, memberValue in memberValue }
+                    metadata.merge(Self.displayMetadata(entry.extraFields)) { _, trackValue in trackValue }
+                    if let title = entry.title { metadata["Title"] = title }
+                    if let artist = entry.artist { metadata["Artist"] = artist }
+                    if let playlistTitle = playlist.title { metadata["Playlist"] = playlistTitle }
+                    playlistRows.append(ArchiveEntryDescriptor(
+                        path: member.path,
+                        metadata: metadata,
+                        subsongIndex: trackIndex,
+                        playlistID: playlist.id
+                    ))
+                    subsongMemberPaths.insert(member.path)
+                }
+            }
+            let unlistedMembers = playableMembers
+                .filter { !subsongMemberPaths.contains($0.path) }
+                .map { member in
+                    var metadata = Self.displayMetadata(container.manifest.game.metadata)
+                    metadata.merge(Self.displayMetadata(member.metadata)) { _, memberValue in memberValue }
+                    return ArchiveEntryDescriptor(path: member.path, metadata: metadata)
+                }
+            entries = playlistRows + unlistedMembers
         case .tar:
             let output = try runListingTool("tar", arguments: ["-tf", archiveURL.path])
             entries = try ArchiveListingParser.parseTarListing(output).entries.map { ArchiveEntryDescriptor(path: $0) }
@@ -200,10 +242,12 @@ public final class ArchiveMaterializer: @unchecked Sendable {
         var seen = Set<String>()
         return entries.compactMap { entry in
             let normalized = ArchiveEntryPath.normalized(entry.path)
+            let identity = "\(normalized)\u{0}\(entry.playlistID ?? "")\u{0}\(entry.subsongIndex.map(String.init) ?? "")"
             guard !normalized.isEmpty,
                   ArchiveEntryPath.isSafe(normalized),
-                  seen.insert(normalized).inserted else { return nil }
-            return ArchiveEntryDescriptor(path: normalized, metadata: entry.metadata)
+                  seen.insert(identity).inserted else { return nil }
+            return ArchiveEntryDescriptor(path: normalized, metadata: entry.metadata,
+                                          subsongIndex: entry.subsongIndex, playlistID: entry.playlistID)
         }
     }
 

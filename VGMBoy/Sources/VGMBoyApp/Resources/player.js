@@ -207,22 +207,55 @@
     const nextKey = JSON.stringify(tags || {});
     if (nextKey === tagsKey) return;
     tagsKey = nextKey;
-    const values = new Map(Object.entries(tags || {}).map(([key, value]) => [key.toLowerCase(), String(value)]));
+    const entries = Object.entries(tags || {});
+    const values = new Map(entries.map(([key, value]) => [key.toLowerCase(), String(value)]));
     const fields = [
       ['Title', 'Title'], ['Game Title', 'Game'], ['Artist', 'Artist'],
+      ['Alternate Title', 'Also known as'],
       ['Album Artist', 'Album artist'], ['Album', 'Album'], ['Composer', 'Composer'],
-      ['Track Number', 'Track'], ['Year', 'Year'], ['Region', 'Region'],
-      ['BGM Selector ID', 'Selector']
+      ['Arranger', 'Arranger'], ['Track Number', 'Track'], ['Track Count', 'Track count'],
+      ['Date', 'Release date'], ['Japan Release Date', 'Japan release date'],
+      ['Year', 'Year'], ['Developer', 'Developer'], ['Publisher', 'Publisher'],
+      ['Game Series', 'Series'], ['Original Japanese Title', 'Original Japanese title'],
+      ['Original Romanized Title', 'Original romanized title'],
+      ['Original Release Region', 'Original release region'],
+      ['Genre', 'Genre'], ['System', 'System'], ['Platform', 'Platform'],
+      ['Region', 'Region'], ['Country', 'Country'], ['Language', 'Language'],
+      ['Product ID', 'Product ID'], ['Format', 'Format'], ['Cue Type', 'Cue type'],
+      ['Cue Usage', 'Cue usage'],
+      ['ROM Song ID', 'ROM song ID'], ['Engine Selector', 'Engine selector'],
+      ['BGM Selector ID', 'Selector'], ['ROM File Name', 'Source ROM'],
+      ['ROM CRC32', 'ROM CRC32'], ['ROM SHA 256', 'ROM SHA-256'],
+      ['Source ROM SHA 256', 'Source ROM SHA-256'], ['Loop Status', 'Loop status'],
+      ['Playback Policy', 'Playback policy'], ['Rip Method', 'Rip method'],
+      ['Sound Creator Credits', 'Sound creator credits'],
+      ['Credit Attribution Note', 'Credit note'], ['Title Confidence', 'Title confidence']
     ];
-    const rows = fields.flatMap(([key, label]) => {
+    const consumed = new Set();
+    const ordered = fields.flatMap(([key, label]) => {
       const value = values.get(key.toLowerCase());
       if (!value) return [];
+      consumed.add(key.toLowerCase());
       const term = document.createElement('dt');
       term.textContent = label;
       const description = document.createElement('dd');
       description.textContent = value;
       return [term, description];
     });
+    const remaining = entries
+      .filter(([key, value]) => key.toLowerCase() !== 'game'
+        && !consumed.has(key.toLowerCase()) && String(value).length > 0)
+      .sort(([a], [b]) => a.localeCompare(b));
+    const rows = ordered.concat(remaining.flatMap(([key, value]) => {
+      const term = document.createElement('dt');
+      term.textContent = key
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, letter => letter.toUpperCase());
+      const description = document.createElement('dd');
+      description.textContent = String(value);
+      return [term, description];
+    }));
     if (!rows.length) {
       const empty = document.createElement('div');
       empty.className = 'tag-empty';
