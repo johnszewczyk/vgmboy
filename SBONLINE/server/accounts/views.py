@@ -1575,7 +1575,7 @@ def _spcboy_archive_member(track, media_root):
         return None
     normalized_member = "/".join(part for part in member_path.parts if part not in {"", "."})
     member_suffix = PurePosixPath(normalized_member).suffix.casefold()
-    if member_suffix not in {".vgm", ".vgz", ".spc", ".nsf", ".nsfe", ".gbs"}:
+    if member_suffix not in {".vgm", ".vgz", ".spc", ".nsf", ".nsfe", ".gbs", ".hes"}:
         return None
     return archive_path, normalized_member, member_suffix
 

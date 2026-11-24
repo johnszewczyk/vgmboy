@@ -27,6 +27,7 @@ int const period_60hz = 262 * 455; // scanlines * clocks per scanline
 Hes_Core::Hes_Core() : rom( Hes_Cpu::page_size )
 {
 	timer.raw_load = 0;
+	set_tempo( 1.0 );
 }
 
 Hes_Core::~Hes_Core() { }
