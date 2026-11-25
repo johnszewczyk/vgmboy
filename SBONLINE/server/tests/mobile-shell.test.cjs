@@ -296,3 +296,15 @@ test('activity-badges stops polling when redirected to login and backup/template
   assert.equal(clearedTimerId, 42);
   assert.deepEqual(removedEvents.sort(), ['site:navigated', 'visibilitychange']);
 });
+
+test('Now Playing screen excludes artwork placeholder to maximize track listing room', () => {
+  const mobileShellHtml = readFileSync(`${__dirname}/../templates/accounts/partials/spcboy_mobile_shell.html`, 'utf8');
+  assert.doesNotMatch(mobileShellHtml, /class="spcboy-mobile-art-wrap"/);
+  assert.doesNotMatch(mobileShellHtml, /id="spcboy-mobile-now-art"/);
+  assert.match(mobileShellHtml, /id="spcboy-mobile-art-loading"/);
+  assert.match(mobileShellHtml, /id="spcboy-mobile-now-tracklist"/);
+  const updatedCss = readFileSync(`${staticDir}/spcboy-mobile.css`, 'utf8');
+  assert.match(updatedCss, /\.spcboy-mobile-art-wrap,[\s\S]*?\.spcboy-mobile-now-art\s*\{\s*display:\s*none\s*!important;/);
+  assert.match(updatedCss, /\.spcboy-mobile-art-loading\s*\{/);
+  assert.match(updatedCss, /\.spcboy-mobile-art-loading\.is-hidden\s*\{\s*display:\s*none\s*!important;/);
+});
