@@ -16,7 +16,7 @@
   const mobileNowAlbum = document.querySelector("#spcboy-mobile-now-album");
   const mobileElapsed = document.querySelector("#spcboy-mobile-elapsed");
   const mobileDuration = document.querySelector("#spcboy-mobile-duration");
-  const mobilePlayButton = document.querySelector("#spcboy-mobile-play");
+  const mobilePlayButton = document.querySelector("#spcboy-mobile-play") || document.querySelector("#spcboy-mobile-dock-play");
   const mobilePreviousButton = document.querySelector("#spcboy-mobile-previous");
   const mobileNextButton = document.querySelector("#spcboy-mobile-next");
   const mobileUpNext = document.querySelector("#spcboy-mobile-up-next");
@@ -2204,7 +2204,8 @@
     if (mobileScreenAdmin) mobileScreenAdmin.classList.toggle("is-hidden", nextPage !== "admin");
 
     if (mobileDock) {
-      mobileDock.classList.toggle("is-hidden", nextPage === "playing");
+      // Unified bottom playback control surface stays visible across all screens
+      mobileDock.classList.remove("is-hidden");
     }
 
     try {
@@ -2893,9 +2894,11 @@
   if (dockMain) {
     dockMain.onclick = (event) => {
       const rawTarget = event.target && event.target.nodeType === 3 ? event.target.parentElement : event.target;
-      if (rawTarget && typeof rawTarget.closest === "function" && rawTarget.closest("#spcboy-mobile-dock-play")) return;
+      if (rawTarget && typeof rawTarget.closest === "function" && rawTarget.closest("button, .spcboy-mobile-dock-controls")) return;
       event.preventDefault();
-      setMobileAppPage("playing");
+      if (mobileAppPage !== "playing") {
+        setMobileAppPage("playing");
+      }
     };
   }
 
@@ -2908,20 +2911,24 @@
     };
   }
 
-  if (mobilePlayButton) {
-    mobilePlayButton.onclick = (event) => {
-      event.preventDefault();
-      window.SitePlayer?.togglePlayback?.();
-    };
-  }
+  const handlePlayToggle = (event) => {
+    event.stopPropagation();
+    event.preventDefault();
+    window.SitePlayer?.togglePlayback?.();
+  };
+  if (mobilePlayButton) mobilePlayButton.onclick = handlePlayToggle;
+  if (dockPlayBtn && dockPlayBtn !== mobilePlayButton) dockPlayBtn.onclick = handlePlayToggle;
+
   if (mobilePreviousButton) {
     mobilePreviousButton.onclick = (event) => {
+      event.stopPropagation();
       event.preventDefault();
       window.SitePlayer?.previous?.();
     };
   }
   if (mobileNextButton) {
     mobileNextButton.onclick = (event) => {
+      event.stopPropagation();
       event.preventDefault();
       window.SitePlayer?.next?.();
     };

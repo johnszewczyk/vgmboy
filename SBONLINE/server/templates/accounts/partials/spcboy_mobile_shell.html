@@ -17,28 +17,23 @@
         <div class="spcboy-mobile-spinner" aria-hidden="true"></div>
         <span class="spcboy-mobile-loading-text">Preparing audio stream…</span>
       </div>
-      <div class="spcboy-mobile-track-meta">
-        <div class="spcboy-mobile-now-title" id="spcboy-mobile-now-title">Nothing playing</div>
-        <div class="spcboy-mobile-now-album" id="spcboy-mobile-now-album">Select a track from Library</div>
-      </div>
-      <div class="spcboy-mobile-times" aria-label="Playback time">
-        <span id="spcboy-mobile-elapsed">0:00</span>
-        <span aria-hidden="true">/</span>
-        <span id="spcboy-mobile-duration">0:00</span>
-      </div>
-      <div class="spcboy-mobile-now-controls" aria-label="Playback controls">
-        <button type="button" class="spcboy-mobile-ctrl-btn" id="spcboy-mobile-previous" aria-label="Previous track" title="Previous track">|◀</button>
-        <button type="button" class="spcboy-mobile-ctrl-btn spcboy-mobile-play-btn" id="spcboy-mobile-play" aria-label="Play" title="Play">▶</button>
-        <button type="button" class="spcboy-mobile-ctrl-btn" id="spcboy-mobile-next" aria-label="Next track" title="Next track">▶|</button>
-      </div>
-      <div class="spcboy-mobile-now-album-section">
-        <div class="spcboy-mobile-now-album-header">
-          <h3 class="spcboy-mobile-section-heading" id="spcboy-mobile-now-album-heading">Album Tracks</h3>
+      <div class="spcboy-mobile-now-header">
+        <div class="spcboy-mobile-now-album-row">
+          <h2 class="spcboy-mobile-section-heading" id="spcboy-mobile-now-album-heading">Album Tracks</h2>
           <span class="spcboy-mobile-badge" id="spcboy-mobile-now-album-count"></span>
         </div>
-        <ol class="spcboy-mobile-tracklist" id="spcboy-mobile-now-tracklist" aria-label="Album tracks"></ol>
-        <p class="spcboy-mobile-tracklist-status is-hidden" id="spcboy-mobile-now-tracklist-status" role="status"></p>
+        <div class="spcboy-mobile-now-meta-row">
+          <span class="spcboy-mobile-now-title" id="spcboy-mobile-now-title">Nothing playing</span>
+          <span class="spcboy-mobile-times" aria-label="Playback time">
+            <span id="spcboy-mobile-elapsed">0:00</span>
+            <span aria-hidden="true">/</span>
+            <span id="spcboy-mobile-duration">0:00</span>
+          </span>
+        </div>
+        <span id="spcboy-mobile-now-album" hidden></span>
       </div>
+      <ol class="spcboy-mobile-tracklist" id="spcboy-mobile-now-tracklist" aria-label="Album tracks"></ol>
+      <p class="spcboy-mobile-tracklist-status is-hidden" id="spcboy-mobile-now-tracklist-status" role="status"></p>
     </div>
   </section>
 
@@ -326,19 +321,22 @@
   </section>
   {% endif %}
 
-  <!-- Persistent Mini-Player Dock -->
-  <footer class="spcboy-mobile-dock" id="spcboy-mobile-dock" aria-label="Mini player">
+  <!-- Unified Bottom Playback Control Surface -->
+  <footer class="spcboy-mobile-dock" id="spcboy-mobile-dock" aria-label="Playback control surface">
     <div class="spcboy-mobile-dock-progress" id="spcboy-mobile-dock-progress" aria-hidden="true">
       <span id="spcboy-mobile-dock-progress-fill"></span>
     </div>
     <div class="spcboy-mobile-dock-main" id="spcboy-mobile-dock-main">
-      <img class="spcboy-mobile-dock-art" id="spcboy-mobile-dock-art" alt="" decoding="async">
       <div class="spcboy-mobile-dock-spinner is-hidden" id="spcboy-mobile-dock-spinner" aria-hidden="true"></div>
       <div class="spcboy-mobile-dock-copy">
         <div class="spcboy-mobile-dock-title" id="spcboy-mobile-dock-title">Nothing playing</div>
-        <div class="spcboy-mobile-dock-subtitle" id="spcboy-mobile-dock-subtitle"></div>
+        <div class="spcboy-mobile-dock-subtitle" id="spcboy-mobile-dock-subtitle">Select a track from Library</div>
       </div>
-      <button type="button" class="spcboy-mobile-dock-play" id="spcboy-mobile-dock-play" aria-label="Play">▶</button>
+      <div class="spcboy-mobile-dock-controls" aria-label="Playback controls">
+        <button type="button" class="spcboy-mobile-dock-btn" id="spcboy-mobile-previous" aria-label="Previous track" title="Previous track">|◀</button>
+        <button type="button" class="spcboy-mobile-dock-play" id="spcboy-mobile-dock-play" aria-label="Play" title="Play">▶</button>
+        <button type="button" class="spcboy-mobile-dock-btn" id="spcboy-mobile-next" aria-label="Next track" title="Next track">▶|</button>
+      </div>
     </div>
   </footer>
 

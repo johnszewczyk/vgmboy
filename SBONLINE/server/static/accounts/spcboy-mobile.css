@@ -16,7 +16,7 @@
     --sb-m-ink: #f0f3f6;
     --sb-m-muted: #8e99a2;
     --sb-m-dim: #646e76;
-    --sb-m-accent: #38aaff;
+    --sb-m-accent: dodgerblue;
     --sb-m-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --sb-m-mono: ui-monospace, Menlo, Monaco, Consolas, monospace;
   }
@@ -131,14 +131,14 @@
   .spcboy-mobile-now-layout {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    max-width: 480px;
+    max-width: 520px;
     margin: 0 auto;
     width: 100%;
   }
 
   .spcboy-mobile-art-wrap,
-  .spcboy-mobile-now-art {
+  .spcboy-mobile-now-art,
+  .spcboy-mobile-now-controls {
     display: none !important;
   }
 
@@ -151,8 +151,8 @@
     width: 100%;
     padding: 8px 12px;
     margin: 0 0 10px;
-    background: rgba(56, 170, 255, 0.12);
-    border: 1px solid rgba(56, 170, 255, 0.25);
+    background: rgba(30, 144, 255, 0.12);
+    border: 1px solid rgba(30, 144, 255, 0.25);
     border-radius: 8px;
     box-sizing: border-box;
   }
@@ -182,101 +182,63 @@
     text-align: center;
   }
 
-  .spcboy-mobile-track-meta {
-    text-align: center;
+  /* Screen 1: Now Playing - Album Header & Non-Repeating Meta */
+  .spcboy-mobile-now-header {
     width: 100%;
-    margin-top: 4px;
-    margin-bottom: 12px;
-  }
-
-  .spcboy-mobile-now-title {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--sb-m-ink);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    line-height: 1.3;
-  }
-
-  .spcboy-mobile-now-album {
-    font-size: 13px;
-    color: var(--sb-m-muted);
-    margin-top: 4px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* Playback Time Readout */
-  .spcboy-mobile-times {
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--sb-m-line);
     display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    font-size: 12px;
-    font-family: var(--sb-m-mono);
-    color: var(--sb-m-muted);
-    margin: 0 0 12px;
+    flex-direction: column;
+    gap: 4px;
   }
 
-  /* Transport Row */
-  .spcboy-mobile-now-controls {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 24px;
-    margin-bottom: 16px;
-  }
-
-  .spcboy-mobile-ctrl-btn {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    background: var(--sb-m-card);
-    border: 1px solid var(--sb-m-line);
-    color: var(--sb-m-ink);
-    font-size: 16px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    touch-action: manipulation;
-  }
-
-  .spcboy-mobile-ctrl-btn:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-
-  .spcboy-mobile-play-btn {
-    width: 62px;
-    height: 62px;
-    background: var(--sb-m-accent);
-    border: none;
-    color: #000;
-    font-size: 24px;
-    font-weight: 800;
-  }
-
-  .spcboy-mobile-ctrl-btn:active:not(:disabled) {
-    transform: scale(0.95);
-    opacity: 0.9;
-  }
-
-  /* Screen 1: Now Playing - Full Current Album View */
-  .spcboy-mobile-now-album-section {
-    width: 100%;
-    border-top: 1px solid var(--sb-m-line);
-    padding-top: 14px;
-    margin-top: 4px;
-  }
-
-  .spcboy-mobile-now-album-header {
+  .spcboy-mobile-now-album-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    gap: 10px;
+  }
+
+  .spcboy-mobile-now-album-row .spcboy-mobile-section-heading {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--sb-m-ink);
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .spcboy-mobile-now-meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    min-height: 18px;
+  }
+
+  .spcboy-mobile-now-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sb-m-accent);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+
+  .spcboy-mobile-now-meta-row .spcboy-mobile-times {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-family: var(--sb-m-mono);
+    color: var(--sb-m-dim);
+    flex-shrink: 0;
+    margin: 0;
   }
 
   .spcboy-mobile-section-heading {
@@ -449,7 +411,7 @@
   }
 
   .spcboy-mobile-track.is-playing {
-    background: rgba(56, 170, 255, 0.15);
+    background: rgba(30, 144, 255, 0.15);
     color: var(--sb-m-accent);
     font-weight: 600;
   }
@@ -541,7 +503,7 @@
   }
 
   .spcboy-mobile-track-item.is-playing {
-    background: rgba(56, 170, 255, 0.15);
+    background: rgba(30, 144, 255, 0.15);
     border-color: var(--sb-m-accent);
   }
 
@@ -926,19 +888,20 @@
     border-color: var(--sb-m-accent);
   }
 
-  /* Mini Player Dock */
+  /* Unified Bottom Playback Control Surface */
   .spcboy-mobile-dock {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    height: 56px;
-    background: #161a1e;
+    height: 58px;
+    background: #14181c;
     border-top: 1px solid var(--sb-m-line);
     z-index: 99;
     padding-bottom: env(safe-area-inset-bottom);
     display: flex;
     flex-direction: column;
+    box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.45);
   }
 
   .spcboy-mobile-dock.is-hidden {
@@ -972,21 +935,12 @@
   }
 
   .spcboy-mobile-dock-art {
-    width: 38px;
-    height: 38px;
-    border-radius: 6px;
-    object-fit: cover;
-    background: #20262c;
-    flex-shrink: 0;
-  }
-
-  .spcboy-mobile-dock-art:not([src]) {
-    display: none;
+    display: none !important;
   }
 
   .spcboy-mobile-dock-spinner {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     border: 2px solid rgba(255, 255, 255, 0.2);
     border-top-color: var(--sb-m-accent);
     border-radius: 50%;
@@ -1001,15 +955,20 @@
   .spcboy-mobile-dock-copy {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
   }
 
   .spcboy-mobile-dock-title {
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--sb-m-ink);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    line-height: 1.2;
   }
 
   .spcboy-mobile-dock-subtitle {
@@ -1018,7 +977,40 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    margin-top: 2px;
+    line-height: 1.2;
+  }
+
+  .spcboy-mobile-dock-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .spcboy-mobile-dock-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--sb-m-ink);
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    padding: 0;
+    transition: background 0.12s ease;
+  }
+
+  .spcboy-mobile-dock-btn:active:not(:disabled) {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .spcboy-mobile-dock-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
   }
 
   .spcboy-mobile-dock-play {
@@ -1027,14 +1019,26 @@
     border-radius: 50%;
     background: var(--sb-m-accent);
     border: none;
-    color: #000;
-    font-size: 16px;
+    color: #fff;
+    font-size: 15px;
     font-weight: bold;
     flex-shrink: 0;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
+    touch-action: manipulation;
+    box-shadow: 0 2px 8px rgba(30, 144, 255, 0.35);
+  }
+
+  .spcboy-mobile-dock-play:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+
+  .spcboy-mobile-dock-play:disabled {
+    opacity: 0.35;
+    cursor: default;
+    box-shadow: none;
   }
 
   /* Toast Notification */
@@ -1137,7 +1141,7 @@
   }
 
   .spcboy-mobile-admin-pill.is-active {
-    background: rgba(56, 170, 255, 0.16);
+    background: rgba(30, 144, 255, 0.16);
     color: var(--sb-m-accent);
   }
 
@@ -1154,7 +1158,7 @@
     padding: 12px;
     border: 1px solid var(--sb-m-accent);
     border-radius: 8px;
-    background: rgba(56, 170, 255, 0.08);
+    background: rgba(30, 144, 255, 0.08);
   }
 
   .spcboy-mobile-admin-code {

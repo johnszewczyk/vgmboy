@@ -304,7 +304,25 @@ test('Now Playing screen excludes artwork placeholder to maximize track listing 
   assert.match(mobileShellHtml, /id="spcboy-mobile-art-loading"/);
   assert.match(mobileShellHtml, /id="spcboy-mobile-now-tracklist"/);
   const updatedCss = readFileSync(`${staticDir}/spcboy-mobile.css`, 'utf8');
-  assert.match(updatedCss, /\.spcboy-mobile-art-wrap,[\s\S]*?\.spcboy-mobile-now-art\s*\{\s*display:\s*none\s*!important;/);
+  assert.match(updatedCss, /\.spcboy-mobile-art-wrap,[\s\S]*?display:\s*none\s*!important;/);
   assert.match(updatedCss, /\.spcboy-mobile-art-loading\s*\{/);
   assert.match(updatedCss, /\.spcboy-mobile-art-loading\.is-hidden\s*\{\s*display:\s*none\s*!important;/);
+});
+
+test('unified bottom-of-screen playback control surface, dodgerblue accent, and deduplicated now-playing screen', () => {
+  const updatedCss = readFileSync(`${staticDir}/spcboy-mobile.css`, 'utf8');
+  assert.match(updatedCss, /--sb-m-accent:\s*dodgerblue;/);
+  assert.match(updatedCss, /\.spcboy-mobile-dock-controls\s*\{/);
+  assert.match(updatedCss, /\.spcboy-mobile-dock-btn\s*\{/);
+  assert.match(updatedCss, /\.spcboy-mobile-now-header\s*\{/);
+
+  const mobileShellHtml = readFileSync(`${__dirname}/../templates/accounts/partials/spcboy_mobile_shell.html`, 'utf8');
+  assert.match(mobileShellHtml, /id="spcboy-mobile-dock"/);
+  assert.match(mobileShellHtml, /id="spcboy-mobile-previous"/);
+  assert.match(mobileShellHtml, /id="spcboy-mobile-dock-play"/);
+  assert.match(mobileShellHtml, /id="spcboy-mobile-next"/);
+  assert.doesNotMatch(mobileShellHtml, /class="spcboy-mobile-now-controls"/);
+
+  const updatedJs = readFileSync(`${staticDir}/spcboy.js`, 'utf8');
+  assert.match(updatedJs, /mobileDock\.classList\.remove\("is-hidden"\)/);
 });
