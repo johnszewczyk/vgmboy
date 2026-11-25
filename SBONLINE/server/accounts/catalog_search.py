@@ -32,20 +32,7 @@ def _album_playlist_url(album_parts, album_id):
 
 
 def _artwork_urls(artwork_parts, album_id, artwork_record, existing_files):
-    if not isinstance(artwork_record, dict):
-        return "", ""
-    base = f"{artwork_parts[0]}{album_id}{artwork_parts[1]}"
-    thumb_file = f"{album_id}{THUMBNAIL_EXTENSION}"
-    detail_file = f"{album_id}-detail{THUMBNAIL_EXTENSION}"
-    thumb_url = ""
-    detail_url = ""
-    if artwork_record.get("file") == thumb_file and thumb_file in existing_files:
-        version = str(artwork_record.get("thumbnailSha256", ""))[:12]
-        thumb_url = f"{base}?v={version}"
-    if artwork_record.get("detailFile") == detail_file and detail_file in existing_files:
-        version = str(artwork_record.get("detailSha256", ""))[:12]
-        detail_url = f"{base}?v={version}&size=detail"
-    return thumb_url, detail_url
+    return "", 
 
 
 def normalize_search_text(value):
@@ -57,31 +44,12 @@ def search_terms(value):
     return _TOKEN_PATTERN.findall(normalize_search_text(value))
 
 
-def _gallery_stat(gallery_cache_root):
-    if not gallery_cache_root:
-        return -1, -1
-    index_path = Path(gallery_cache_root) / "index.json"
-    try:
-        stat = index_path.stat()
-        return stat.st_size, stat.st_mtime_ns
-    except OSError:
-        return -1, -1
+def _gallery_stat(gallery_cache_root=None):
+    return 0, 0
 
 
-def _scan_gallery(gallery_cache_root):
-    if not gallery_cache_root:
-        return {}, set()
-    root = Path(gallery_cache_root)
-    artwork_index = read_gallery_index(root)
-    existing_files = set()
-    try:
-        with os.scandir(root) as entries:
-            for entry in entries:
-                if entry.is_file():
-                    existing_files.add(entry.name)
-    except OSError:
-        pass
-    return artwork_index, existing_files
+def _scan_gallery(gallery_cache_root=None):
+    return {}, set()
 
 
 def _default_gallery_root():
@@ -192,19 +160,16 @@ def _collect_catalog_data(catalog, gallery_cache_root=None):
     return list(albums_rows.values()), track_rows, etag, payload_bytes
 
 
-def _index_is_current(index_path, source_stat, gallery_size, gallery_mtime_ns):
+def _index_is_current(index_path, source_stat, gallery_size=0, gallery_mtime_ns=0):
     if not index_path.is_file():
         return False
     try:
         with sqlite3.connect(f"file:{index_path}?mode=ro", uri=True, timeout=5) as connection:
             row = connection.execute(
-                "SELECT source_size, source_mtime_ns, gallery_size, gallery_mtime_ns, index_version "
+                "SELECT source_size, source_mtime_ns, index_version "
                 "FROM catalog_state WHERE singleton = 1"
             ).fetchone()
-            return row == (
-                source_stat.st_size, source_stat.st_mtime_ns,
-                gallery_size, gallery_mtime_ns, _INDEX_VERSION,
-            )
+            return row == (source_stat.st_size, source_stat.st_mtime_ns, _INDEX_VERSION)
     except sqlite3.Error:
         return False
 

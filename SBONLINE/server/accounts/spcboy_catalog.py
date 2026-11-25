@@ -67,50 +67,28 @@ def _read_spcboy_catalog(source_size, source_mtime_ns):
 
 
 def spcboy_gallery_index():
-    index_path = settings.SPCBOY_GALLERY_CACHE_ROOT / "index.json"
-    try:
-        source_stat = index_path.stat()
-    except OSError:
-        return {}
-    return _read_spcboy_gallery_index(source_stat.st_size, source_stat.st_mtime_ns)
+    return {}
 
 
 def spcboy_artwork_url(album_id, artwork_index=None, *, detail=False):
-    artwork_index = spcboy_gallery_index() if artwork_index is None else artwork_index
-    artwork = artwork_index.get(album_id) if isinstance(artwork_index, dict) else None
-    filename_key = "detailFile" if detail else "file"
-    expected_file = f"{album_id}-detail{THUMBNAIL_EXTENSION}" if detail else f"{album_id}{THUMBNAIL_EXTENSION}"
-    if not isinstance(artwork, dict) or artwork.get(filename_key) != expected_file:
-        return ""
-    if not _gallery_file_exists(expected_file):
-        return ""
-    hash_key = "detailSha256" if detail else "thumbnailSha256"
-    version = str(artwork.get(hash_key, ""))[:12]
-    size = "&size=detail" if detail else ""
-    return f"{reverse('spcboy_artwork', args=[album_id])}?v={version}{size}"
+    return ""
 
 
 def track_artwork_url(track, artwork_index=None):
+    return ""
+
+
+def attach_track_artwork(track, artwork_index=None, album_artwork_urls=None):
     if not isinstance(track, dict):
-        return ""
-    return spcboy_artwork_url(
-        spcboy_album_id(track.get("console"), track.get("game")),
-        artwork_index,
-    )
-
-
-def attach_track_artwork(track, artwork_index, album_artwork_urls):
+        return track
     track = dict(track)
-    album_id = spcboy_album_id(track.get("console"), track.get("game"))
-    if album_id not in album_artwork_urls:
-        album_artwork_urls[album_id] = spcboy_artwork_url(album_id, artwork_index)
-    track["artwork_url"] = album_artwork_urls[album_id]
+    track["artwork_url"] = ""
     return track
 
 
 @lru_cache(maxsize=2)
 def _read_spcboy_gallery_index(source_size, source_mtime_ns):
-    return read_gallery_index(settings.SPCBOY_GALLERY_CACHE_ROOT)
+    return {}
 
 
 def public_spcboy_track(track, metadata, game, console):

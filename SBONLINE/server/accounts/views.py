@@ -704,7 +704,6 @@ def _ensure_catalog_store():
         settings.SPCBOY_SEARCH_INDEX_PATH,
         source_path,
         _spcboy_catalog_data,
-        gallery_cache_root=settings.SPCBOY_GALLERY_CACHE_ROOT,
     )
 
 
@@ -1273,27 +1272,7 @@ def spcboy_navigation(request):
 @login_required
 @require_GET
 def spcboy_artwork(request, album_id):
-    if len(album_id) != 32 or any(character not in "0123456789abcdef" for character in album_id):
-        raise Http404
-    record = _spcboy_gallery_index().get(album_id)
-    size = request.GET.get("size", "thumbnail")
-    if size == "detail":
-        filename = f"{album_id}-detail{THUMBNAIL_EXTENSION}"
-        record_key = "detailFile"
-    elif size == "thumbnail":
-        filename = f"{album_id}{THUMBNAIL_EXTENSION}"
-        record_key = "file"
-    else:
-        raise Http404
-    if not record or record.get(record_key) != filename:
-        raise Http404
-    image_path = settings.SPCBOY_GALLERY_CACHE_ROOT / filename
-    if not image_path.is_file():
-        raise Http404
-    response = FileResponse(image_path.open("rb"), content_type=THUMBNAIL_MIME_TYPE)
-    response["Cache-Control"] = "private, max-age=86400"
-    response["X-Content-Type-Options"] = "nosniff"
-    return response
+    raise Http404
 
 
 @login_required
