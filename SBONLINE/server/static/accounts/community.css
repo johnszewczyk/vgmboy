@@ -10,28 +10,6 @@
 .live-indicator::before { width: .42rem; height: .42rem; border-radius: 50%; background: var(--blue); box-shadow: 0 0 .55rem color-mix(in srgb, var(--blue) 60%, transparent); content: ""; }
 .member-activity-avatar { display: block; text-decoration: none; }
 .profile-editor { border: 1px solid var(--line); border-radius: .75rem; background: var(--white); }
-.listening-page { max-width: 68rem; }
-.listening-page-nav { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
-.listening-page-nav a { display: inline-flex; min-height: 2rem; align-items: center; gap: .4rem; padding: 0 .6rem; border: 1px solid var(--line); border-radius: .35rem; background: var(--white); color: var(--muted); font-size: .66rem; text-decoration: none; }
-.listening-page-nav a:hover { border-color: var(--blue); color: var(--blue); }
-.listening-page-nav a span { color: var(--blue); font: 650 .62rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
-.listening-page .community-section { min-width: 0; margin-top: 1.25rem; scroll-margin-top: 1rem; }
-.listening-page .community-section-heading { align-items: center; }
-.listening-page .track-card-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr)); }
-.listening-page .listening-empty { grid-column: 1 / -1; }
-.listening-page .listening-empty .empty-state { margin: 0; padding: .8rem .2rem; }
-.played-day-list { display: grid; gap: 1.1rem; }
-.played-day { min-width: 0; }
-.played-day > header { display: flex; align-items: center; gap: .75rem; margin-bottom: .5rem; padding: 0 .1rem .35rem; border-bottom: 1px solid var(--line); }
-.played-day > header h3 { margin: 0; font-size: .88rem; }
-.played-day-badge { margin-left: auto; padding: .22rem .48rem; border-radius: 999px; background: var(--blue-soft); color: var(--blue); font: 600 .58rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
-.played-rows { grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr)); }
-.played-day-summary { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .4rem; margin: .75rem 0; }
-.played-day-summary a { display: grid; grid-template-columns: auto auto auto; align-items: baseline; gap: .25rem; padding: .4rem .6rem; border: 1px solid var(--line); border-radius: .35rem; background: var(--white); color: var(--muted); font-size: .64rem; text-decoration: none; }
-.played-day-summary a:hover { border-color: var(--blue); }
-.played-day-summary a[aria-current="page"] { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); }
-.played-day-summary strong { color: var(--blue); font: 650 .75rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
-.played-day-summary small { color: var(--muted); font-size: .56rem; }
 .favorite-albums-heading { margin: .9rem 0 .25rem; font-size: .75rem; }
 .favorite-album-list { display: grid; margin: 0; padding: 0; list-style: none; }
 .favorite-album-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .2rem .65rem; padding: .45rem .15rem; border-top: 1px solid var(--line-subtle); }
@@ -112,21 +90,6 @@
   .community-heading { align-items: flex-start; }
   .community-heading h1 { font-size: 1.8rem; }
   .community-section { margin-top: 1rem; }
-  .listening-page { width: min(calc(100% - 1rem), 48rem); margin: .85rem auto 1.5rem; }
-  .listening-page .community-heading { display: grid; gap: .65rem; margin-bottom: .55rem; }
-  .listening-page .community-heading h1 { font-size: 1.55rem; }
-  .listening-page .community-heading .muted { font-size: .7rem; }
-  .listening-page-nav { gap: .3rem; }
-  .listening-page-nav a { min-height: 1.85rem; padding-inline: .5rem; font-size: .62rem; }
-  .listening-page .community-section { margin-top: .95rem; }
-  .listening-page .community-section-heading { margin-bottom: .35rem; }
-  .listening-page .community-section-heading h2 { font-size: .92rem; }
-  .listening-page .track-card-list, .played-rows { grid-template-columns: minmax(0, 1fr); gap: .4rem; }
-  .played-day-list { gap: .85rem; }
-  .played-day > header { margin-bottom: .4rem; }
-  .played-day > header h3 { font-size: .78rem; }
-  .played-day-summary { justify-content: flex-start; margin: .55rem 0 .75rem; }
-  .played-day-summary a { padding: .34rem .48rem; }
   .profile-track-list li > .site-record-time { grid-column: 1 / -1; justify-self: start; }
   .profile-editor { grid-template-columns: 1fr; gap: 1rem; padding: .85rem; }
   .profile-security-grid { grid-template-columns: 1fr; }

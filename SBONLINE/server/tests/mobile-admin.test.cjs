@@ -26,3 +26,30 @@ test('spcboy.js integrates nav and admin page switching and spcboy-mobile.css st
   assert.match(mobileCss, /\.spcboy-mobile-admin-code\s*\{/);
   assert.match(mobileCss, /#spcboy-mobile-app \.spcboy-mobile-vnav > :is\(a, button\)/);
 });
+
+test('unified admin page, persistent sign-in on device, and dead page navigation removal', () => {
+  const drawerNavHtml = readFileSync(serverDir + '/templates/accounts/partials/drawer_navigation.html', 'utf8');
+  const loginHtml = readFileSync(serverDir + '/templates/accounts/login.html', 'utf8');
+  const accountsHtml = readFileSync(serverDir + '/templates/accounts/accounts.html', 'utf8');
+  const adminCss = readFileSync(serverDir + '/static/accounts/admin.css', 'utf8');
+  const adminJs = readFileSync(serverDir + '/static/accounts/admin.js', 'utf8');
+  const settingsPy = readFileSync(serverDir + '/precalc_admin/settings.py', 'utf8');
+
+  // Navigations have no dead Listening or Site details links
+  assert.doesNotMatch(desktopNavHtml, /playback_history|Listening/);
+  assert.doesNotMatch(drawerNavHtml, /playback_history|Listening|site-icon-database/);
+  assert.doesNotMatch(mobileShellHtml, /playback_history|Listening/);
+
+  // Login page has "Save sign-in on this device"
+  assert.match(loginHtml, /name="remember_me"[^>]*checked/);
+  assert.match(loginHtml, /Save sign-in on this device/);
+  assert.match(adminCss, /\.login-remember-label\s*\{/);
+  assert.match(adminJs, /remember_me/);
+  assert.match(settingsPy, /SESSION_COOKIE_AGE\s*=\s*365\s*\*\s*86_400/);
+
+  // Accounts page integrates droplet and server telemetry
+  assert.match(accountsHtml, /Droplet status/);
+  assert.match(accountsHtml, /Private admin backups/);
+  assert.match(accountsHtml, /Monthly transfer/);
+  assert.match(accountsHtml, /account-card-grid/);
+});

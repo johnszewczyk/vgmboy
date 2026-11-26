@@ -32,7 +32,7 @@ def _album_playlist_url(album_parts, album_id):
 
 
 def _artwork_urls(artwork_parts, album_id, artwork_record, existing_files):
-    return "", 
+    return "", ""
 
 
 def normalize_search_text(value):

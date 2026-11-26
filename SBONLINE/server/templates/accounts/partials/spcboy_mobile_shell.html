@@ -189,7 +189,6 @@
         </div>
         <nav class="spcboy-mobile-vnav" aria-label="Site and account">
           <button type="button" class="spcboy-mobile-vnav-item" data-mobile-app-page="playing"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-home"></use></svg><span>Back to player</span></button>
-          <a class="spcboy-mobile-vnav-item" href="{% url 'playback_history' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-recent"></use></svg><span>Listening</span></a>
           <button type="button" class="spcboy-mobile-vnav-item" data-mobile-app-page="favorites"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-star"></use></svg><span>Favorites</span></button>
           <button type="button" class="spcboy-mobile-vnav-item" data-mobile-app-page="recent"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-recent"></use></svg><span>Recent plays</span></button>
           <a class="spcboy-mobile-vnav-item" href="{% url 'member_profile' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-user-round"></use></svg><span>Profile</span></a>
@@ -208,8 +207,7 @@
         </div>
         <nav class="spcboy-mobile-vnav" aria-label="Admin">
           {% if request.user.is_superuser %}<button type="button" class="spcboy-mobile-vnav-item" data-mobile-app-page="admin"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-settings"></use></svg><span>Admin Console</span></button>{% endif %}
-          <a class="spcboy-mobile-vnav-item" href="{% url 'accounts' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-settings"></use></svg><span>Accounts &amp; Invites</span></a>
-          <a class="spcboy-mobile-vnav-item" href="{% url 'usage' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-database"></use></svg><span>Site details</span></a>
+          <a class="spcboy-mobile-vnav-item" href="{% url 'accounts' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-settings"></use></svg><span>Admin &amp; Server</span></a>
           <a class="spcboy-mobile-vnav-item" href="{% url 'site_log' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-scroll-text"></use></svg><span>Log</span></a>
         </nav>
       </section>

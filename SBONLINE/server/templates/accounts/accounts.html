@@ -9,6 +9,46 @@
     <span class="account-count">{{ account_rows|length }} account{{ account_rows|length|pluralize }}</span>
   </header>
 
+  {% if is_owner and server %}
+  <section class="accounts-section" aria-labelledby="server-status-heading">
+    <header class="accounts-section-heading">
+      <h2 id="server-status-heading">Droplet status</h2>
+    </header>
+    <div class="metric-grid" aria-label="Current server status">
+      <article class="metric-card metric-primary"><span>Droplet transfer this month</span>{% if bandwidth.current %}<strong class="metric-value">{{ bandwidth.current.total }}</strong><p class="metric-detail">{{ bandwidth.current.label }} · {{ bandwidth.interface }}</p>{% else %}<strong class="metric-value">Collecting</strong><p class="metric-detail">{{ bandwidth.message }}</p>{% endif %}</article>
+      <article class="metric-card"><span>Memory</span><strong class="metric-value">{{ server.memory_used }}</strong><p class="metric-detail">of {{ server.memory_total }} · {{ server.memory_percent }}% used</p></article>
+      <article class="metric-card"><span>Disk</span><strong class="metric-value">{{ server.disk_used }}</strong><p class="metric-detail">of {{ server.disk_total }} · {{ server.disk_percent }}% used</p></article>
+      <article class="metric-card"><span>Load average</span><strong class="metric-value metric-mono">{{ server.load }}</strong><p class="metric-detail">1, 5, and 15 minutes</p></article>
+      <article class="metric-card"><span>Uptime</span><strong class="metric-value">{{ server.uptime_days }}d {{ server.uptime_hours }}h</strong><p class="metric-detail">Since the last reboot</p></article>
+    </div>
+  </section>
+
+  <section class="accounts-section" aria-labelledby="backup-status-heading">
+    <header class="accounts-section-heading">
+      <h2 id="backup-status-heading">Private admin backups</h2>
+    </header>
+    <div class="metric-grid" aria-label="Private admin backup status">
+      <article class="metric-card metric-primary"><span>Latest backup</span><strong class="metric-value">{{ backup.label }}</strong><p class="metric-detail">{{ backup.last_success }}</p></article>
+      <article class="metric-card"><span>Restore points</span><strong class="metric-value">{{ backup.retained_count }}</strong><p class="metric-detail">Available on this droplet</p></article>
+      <article class="metric-card"><span>Latest archive</span><strong class="metric-value">{{ backup.size }}</strong><p class="metric-detail">Database, private media, and app configuration</p></article>
+    </div>
+    <p class="footnote">Archives are readable only by the droplet administrator and stay on this droplet. They can help recover from application or data mistakes, but do not protect against loss of the droplet itself.</p>
+  </section>
+
+  {% if bandwidth.months %}
+  <section class="accounts-section usage-panel" aria-labelledby="monthly-transfer-heading">
+    <header class="accounts-section-heading">
+      <h2 id="monthly-transfer-heading">Monthly transfer ({{ bandwidth.interface|default:"eth0" }})</h2>
+      <div class="legend"><span><i class="legend-in"></i>Received</span><span><i class="legend-out"></i>Sent</span></div>
+    </header>
+    <div class="month-chart" role="list" aria-label="Monthly network transfer history">
+      {% for month in bandwidth.months %}<div class="month-row" role="listitem"><span class="month-label">{{ month.label }}</span><svg class="transfer-bar" viewBox="0 0 1000 18" preserveAspectRatio="none" role="img" aria-label="{{ month.label }}: {{ month.rx }} received, {{ month.tx }} sent"><rect class="bar-received" x="0" y="0" width="{{ month.rx_units }}" height="18" rx="4"></rect><rect class="bar-sent" x="{{ month.rx_units }}" y="0" width="{{ month.tx_units }}" height="18" rx="4"></rect></svg><span class="month-total">{{ month.total }}</span></div>{% endfor %}
+    </div>
+    <p class="chart-caption">Decimal units · current month is incomplete{% if bandwidth.since %} · tracking since {{ bandwidth.since }}{% endif %}.</p>
+  </section>
+  {% endif %}
+  {% endif %}
+
   <section class="accounts-section" id="site-settings" aria-label="Site settings">
     <section class="profile-library-section" aria-labelledby="site-streaming-heading">
       <header class="community-section-heading"><h2 id="site-streaming-heading">Audio streaming</h2></header>

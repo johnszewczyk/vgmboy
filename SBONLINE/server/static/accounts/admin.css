@@ -462,3 +462,6 @@ h2 { margin-bottom: 5px; font-size: 20px; letter-spacing: -.02em; }
   .usage-page .month-row { grid-template-columns: 58px minmax(0,1fr) 58px; gap: 6px; }
   .usage-page .chart-caption, .usage-page > .footnote { font-size: 9px; line-height: 1.35; }
 }
+
+.login-remember-label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; margin-top: 4px; font-size: 13px; font-weight: 500; color: var(--muted); user-select: none; }
+.login-remember-label input[type="checkbox"] { width: 16px !important; min-height: 16px !important; height: 16px !important; margin: 0 !important; accent-color: dodgerblue; cursor: pointer; }

@@ -3,7 +3,6 @@
     <h3 id="drawer-site-heading">Site &amp; Account</h3>
     <nav aria-label="Site and account">
       <a href="{% url 'spcboy' %}" data-site-player-home aria-label="Back to player" title="Back to player"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-home"></use></svg><span>Back to player</span></a>
-      <a href="{% url 'playback_history' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-recent"></use></svg><span>Listening</span></a>
       <button type="button" data-spcboy-view-shortcut="favorites"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-star"></use></svg><span>Favorites</span></button>
       <button type="button" data-spcboy-view-shortcut="recent"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-recent"></use></svg><span>Recent plays</span></button>
       <a href="{% url 'member_profile' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-user-round"></use></svg><span>Profile</span></a>
@@ -19,8 +18,7 @@
     <h3 id="drawer-admin-heading">Admin</h3>
     <nav aria-label="Admin">
       <button type="button" data-settings-page-target="admin"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-settings"></use></svg><span>Admin Console</span></button>
-      <a href="{% url 'accounts' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-settings"></use></svg><span>Accounts &amp; Invites</span></a>
-      <a href="{% url 'usage' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-database"></use></svg><span>Site details</span></a>
+      <a href="{% url 'accounts' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-settings"></use></svg><span>Admin &amp; Server</span></a>
       <a href="{% url 'site_log' %}"><svg class="site-ui-icon" aria-hidden="true"><use href="#site-icon-scroll-text"></use></svg><span>Log</span></a>
     </nav>
   </section>

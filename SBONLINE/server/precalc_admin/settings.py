@@ -131,7 +131,7 @@ SPCBOY_ZSTD = os.environ.get("SPCBOY_ZSTD", "/usr/bin/zstd")
 SPCBOY_TAR = os.environ.get("SPCBOY_TAR", "/usr/bin/tar")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-SESSION_COOKIE_AGE = 86_400
+SESSION_COOKIE_AGE = 365 * 86_400
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = True
 SESSION_COOKIE_SAMESITE = "Lax"

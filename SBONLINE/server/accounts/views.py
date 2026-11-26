@@ -217,6 +217,10 @@ class PrivateLoginView(TemplateView):
 
         InviteCodeAttempt.objects.filter(ip_digest=_invite_attempt_digest(request)).delete()
         login(request, credential.user, backend=settings.AUTHENTICATION_BACKENDS[0])
+        if request.POST.get("remember_me"):
+            request.session.set_expiry(365 * 86_400)
+        else:
+            request.session.set_expiry(0)
         if not url_has_allowed_host_and_scheme(
             next_url,
             allowed_hosts={request.get_host()},
@@ -1928,7 +1932,7 @@ def server_status(request):
     denied = _owner_required(request)
     if denied:
         return denied
-    return redirect("usage")
+    return redirect("accounts")
 
 
 @login_required
@@ -1962,58 +1966,7 @@ def usage(request):
     denied = _owner_required(request)
     if denied:
         return denied
-    current_period = timezone.now().astimezone(datetime_timezone.utc).date().replace(day=1)
-    period_value = request.GET.get("month", "")
-    try:
-        selected_period = datetime.strptime(period_value, "%Y-%m").date().replace(day=1)
-    except ValueError:
-        selected_period = current_period
-
-    available_periods = list(
-        MonthlyUsage.objects.values_list("period", flat=True).distinct().order_by("-period")[:24]
-    )
-    if current_period not in available_periods:
-        available_periods.insert(0, current_period)
-    if selected_period not in available_periods:
-        selected_period = current_period
-
-    usage_by_user = {
-        usage.user_id: usage
-        for usage in MonthlyUsage.objects.filter(period=selected_period)
-    }
-    users = list(User.objects.order_by("username").select_related("member_profile"))
-    rows = []
-    for user in users:
-        usage = usage_by_user.get(user.pk)
-        site_bytes = usage.site_bytes if usage else 0
-        media_bytes = usage.media_bytes if usage else 0
-        audio_bytes = usage.audio_bytes if usage else 0
-        rows.append({
-            "username": _safe_member_profile(user).display_name,
-            "role_label": "Owner" if user.is_superuser else "Staff" if user.is_staff else "Member",
-            "is_active": user.is_active,
-            "site_bytes": _bytes_label(site_bytes),
-            "media_bytes": _bytes_label(media_bytes),
-            "audio_quota": f"{_bytes_label(audio_bytes)} / {_bytes_label(MONTHLY_AUDIO_STREAM_LIMIT_BYTES)}",
-            "total_bytes": _bytes_label(site_bytes + media_bytes),
-        })
-    site_total = sum(usage.site_bytes for usage in usage_by_user.values())
-    media_total = sum(usage.media_bytes for usage in usage_by_user.values())
-    context = {
-        "rows": rows,
-        "periods": [{"value": _month_label(period), "label": _month_label(period)} for period in available_periods],
-        "selected_period": _month_label(selected_period),
-        "is_current_period": selected_period == current_period,
-        "site_total": _bytes_label(site_total),
-        "media_total": _bytes_label(media_total),
-        "total": _bytes_label(site_total + media_total),
-        "is_owner": request.user.is_superuser,
-    }
-    if request.user.is_superuser:
-        context["bandwidth"] = _bandwidth_stats()
-        context["server"] = _server_stats()
-        context["backup"] = _backup_status()
-    return render(request, "accounts/usage.html", context)
+    return redirect("accounts")
 
 
 @require_POST
@@ -2062,6 +2015,9 @@ def accounts(request):
         context["unrecoverable_invitation_count"] = sum(
             invitation.visible_code is None for invitation in invitations
         )
+        context["bandwidth"] = _bandwidth_stats()
+        context["server"] = _server_stats()
+        context["backup"] = _backup_status()
     return render(request, "accounts/accounts.html", context)
 
 
@@ -2661,6 +2617,10 @@ def passkey_login_verify(request):
         account.username_set = True
         account.save(update_fields=["username_set"])
     login(request, credential.user, backend=settings.AUTHENTICATION_BACKENDS[0])
+    if payload.get("remember_me", True):
+        request.session.set_expiry(365 * 86_400)
+    else:
+        request.session.set_expiry(0)
     next_url = payload.get("next")
     if not isinstance(next_url, str) or not url_has_allowed_host_and_scheme(
         next_url,

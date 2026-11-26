@@ -8,8 +8,8 @@
     {% url 'member_profile' as identity_action_url %}
     {% include "accounts/partials/profile_identity.html" with identity_heading="Member profile" identity_action_url=identity_action_url identity_action_label="Edit profile" %}
   {% else %}
-    {% url 'playback_history' as identity_action_url %}
-    {% include "accounts/partials/profile_identity.html" with identity_heading="Member profile" identity_action_url=identity_action_url identity_action_label="Listening" %}
+{% url 'spcboy' as identity_action_url %}
+    {% include "accounts/partials/profile_identity.html" with identity_heading="Member profile" identity_action_url=identity_action_url identity_action_label="Player" %}
   {% endif %}
   {% include "accounts/partials/profile_bandwidth.html" %}
   <nav class="profile-tabs" data-profile-tabs data-active-tab="{{ profile_tab }}" role="tablist" aria-label="{{ member_profile.display_name }}’s listening">

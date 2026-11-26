@@ -211,6 +211,8 @@
         if (!credential) throw new Error("The device did not return a passkey.");
         const response = credential.response;
         const next = button.closest("form")?.querySelector('input[name="next"]')?.value || "";
+        const rememberInput = button.closest("form")?.querySelector('input[name="remember_me"]') || document.querySelector('input[name="remember_me"]');
+        const remember_me = rememberInput ? Boolean(rememberInput.checked) : true;
         const result = await passkeyJson(button.dataset.passkeyVerify, csrfFor(button), {
           id: credential.id,
           rawId: encodeBase64Url(credential.rawId),
@@ -224,6 +226,7 @@
           },
           clientExtensionResults: credential.getClientExtensionResults(),
           next,
+          remember_me,
         });
         window.location.assign(result.redirect_url);
       } catch (error) {

@@ -8,6 +8,10 @@
   <form class="stack-form" onsubmit="return false">
     {% csrf_token %}
     <input type="hidden" name="next" value="{{ next }}">
+    <label class="login-remember-label" for="passkey-remember-me">
+      <input type="checkbox" id="passkey-remember-me" name="remember_me" checked>
+      <span>Save sign-in on this device</span>
+    </label>
     <button class="primary-button passkey-login-button" type="button" data-passkey-login data-passkey-options="{% url 'passkey_login_options' %}" data-passkey-verify="{% url 'passkey_login_verify' %}">Sign in with a passkey</button>
     <p class="passkey-status" data-passkey-login-status role="status" aria-live="polite">Waiting for a passkey sign-in.</p>
   </form>
@@ -16,6 +20,10 @@
     <input type="hidden" name="next" value="{{ next }}">
     <label for="access-key">Generated login password</label>
     <input id="access-key" name="access_key" type="password" minlength="43" maxlength="128" required autocomplete="current-password" autocapitalize="off" spellcheck="false" inputmode="text">
+    <label class="login-remember-label" for="access-key-remember-me">
+      <input type="checkbox" id="access-key-remember-me" name="remember_me" checked>
+      <span>Save sign-in on this device</span>
+    </label>
     <button class="quiet-button" type="submit">Sign in with password</button>
     {% if access_key_error %}<p class="field-error" role="alert">{{ access_key_error }}</p>{% endif %}
   </form>

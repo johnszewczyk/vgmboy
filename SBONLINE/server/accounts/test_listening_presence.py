@@ -15,12 +15,12 @@ class ListeningPresenceTests(TestCase):
         PasskeyCredential.objects.create(user=user, credential_id='test-only', public_key='test-only')
         client = Client(enforce_csrf_checks=True)
         client.force_login(user)
-        page = client.get('/history/')
+        page = client.get('/spcboy/')
         self.assertEqual(page.status_code, 200)
         token = re.search(r'id="site-player-csrf"[^>]*>.*?value="([^"]+)"', page.content.decode(), re.S)[1]
         self.assertTrue(client.cookies['csrftoken']['httponly'])
         data = json.dumps({'status':'playing','playbackId':str(uuid.uuid4()),'trackId':'vgm-fixture'})
-        with patch('accounts.views._catalog_track_index', return_value={'vgm-fixture':{'title':'VGM fixture','game':'Fixture','console':'Arcade'}}):
+        with patch('accounts.views._catalog_track_index', return_value={'vgm-fixture':{'title':'VGM fixture','game':'Fixture','console':'Arcade'}}), patch('accounts.views.get_tracks_by_ids', return_value={'vgm-fixture':{'title':'VGM fixture','game':'Fixture','console':'Arcade'}}):
             self.assertEqual(client.post('/spcboy/now-playing.json', data, content_type='application/json').status_code,403)
             self.assertEqual(client.post('/spcboy/now-playing.json', data, content_type='application/json',HTTP_X_CSRFTOKEN=token).status_code,200)
             started = SPCBOYNowPlaying.objects.get(user=user).started_at

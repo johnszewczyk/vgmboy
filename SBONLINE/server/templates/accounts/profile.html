@@ -4,8 +4,8 @@
 {% block extra_head %}<link rel="stylesheet" href="{% static 'accounts/community.css' %}?v=20261104-favorites-reveal-1">{% endblock %}
 {% block content %}
 <section class="community-page profile-page">
-  {% url 'playback_history' as identity_action_url %}
-  {% include "accounts/partials/profile_identity.html" with identity_heading="Account" identity_action_url=identity_action_url identity_action_label="Listening" %}
+  {% url 'spcboy' as identity_action_url %}
+  {% include "accounts/partials/profile_identity.html" with identity_heading="Account" identity_action_url=identity_action_url identity_action_label="Player" %}
 
   <nav class="profile-tabs" data-profile-tabs data-active-tab="{{ profile_tab }}" role="tablist" aria-label="Profile sections">
     <a role="tab" data-profile-tab="account" aria-controls="profile-account" aria-selected="{% if profile_tab == 'account' %}true{% else %}false{% endif %}" href="?tab=account">Profile</a>
