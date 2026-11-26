@@ -185,12 +185,13 @@
   /* Screen 1: Now Playing - Album Header & Non-Repeating Meta */
   .spcboy-mobile-now-header {
     width: 100%;
-    padding-bottom: 8px;
-    margin-bottom: 10px;
+    padding: 2px 0 10px;
+    margin-bottom: 12px;
     border-bottom: 1px solid var(--sb-m-line);
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
+    box-sizing: border-box;
   }
 
   .spcboy-mobile-now-album-row {
@@ -198,10 +199,14 @@
     justify-content: space-between;
     align-items: center;
     gap: 10px;
+    width: 100%;
+    min-width: 0;
   }
 
   .spcboy-mobile-now-album-row .spcboy-mobile-section-heading {
-    font-size: 15px;
+    flex: 1 1 0%;
+    min-width: 0;
+    font-size: 16px;
     font-weight: 700;
     color: var(--sb-m-ink);
     margin: 0;
@@ -210,35 +215,55 @@
     white-space: nowrap;
     text-transform: none;
     letter-spacing: 0;
+    line-height: 1.25;
+  }
+
+  .spcboy-mobile-now-album-row .spcboy-mobile-badge {
+    flex-shrink: 0;
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: rgba(30, 144, 255, 0.12);
+    color: var(--sb-m-accent);
+    border: 1px solid rgba(30, 144, 255, 0.22);
+    line-height: 1.2;
   }
 
   .spcboy-mobile-now-meta-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
     min-height: 18px;
   }
 
   .spcboy-mobile-now-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--sb-m-accent);
+    flex: 1 1 0%;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--sb-m-muted);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    flex: 1;
+    line-height: 1.25;
   }
 
   .spcboy-mobile-now-meta-row .spcboy-mobile-times {
+    flex-shrink: 0;
+    white-space: nowrap;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
     font-size: 11px;
     font-family: var(--sb-m-mono);
     color: var(--sb-m-dim);
-    flex-shrink: 0;
     margin: 0;
+    line-height: 1.25;
   }
 
   .spcboy-mobile-section-heading {
