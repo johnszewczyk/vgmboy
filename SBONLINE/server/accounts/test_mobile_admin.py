@@ -217,6 +217,6 @@ class MobileAdminTests(TestCase):
         rows_recovered = _account_rows([])
         self.assertTrue(any(row.username == "extra-listener-0" and row.display_name.startswith("Player ") for row in rows_recovered))
 
-        usage_res = self.client.get(reverse("usage"))
+        usage_res = self.client.get(reverse("usage"), follow=True)
         self.assertEqual(usage_res.status_code, 200)
         self.assertContains(usage_res, "Extra 7")
