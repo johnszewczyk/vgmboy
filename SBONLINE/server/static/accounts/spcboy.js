@@ -112,8 +112,13 @@
   const columnIds = PLAYLIST_COLUMN_DEFINITIONS.map(column => column.id);
   const savedOrder = storage.get('columnOrder', []);
   let playlistColumnOrder = [...new Set([...(Array.isArray(savedOrder) ? savedOrder.filter(id => columnIds.includes(id)) : []), ...columnIds])];
-  let playlistColumnWidths = storage.get('columnWidths', {});
-  if (!playlistColumnWidths || typeof playlistColumnWidths !== 'object' || Array.isArray(playlistColumnWidths)) playlistColumnWidths = {};
+  let playlistColumnWidths = storage.get("columnWidths", {});
+  if (!playlistColumnWidths || typeof playlistColumnWidths !== "object" || Array.isArray(playlistColumnWidths)) playlistColumnWidths = {};
+  if (!storage.get("columnAutoResizeV2", false)) {
+    playlistColumnWidths = {};
+    storage.set("columnWidths", {});
+    storage.set("columnAutoResizeV2", true);
+  }
   let playlistColumnLayoutFrame = 0;
   let playlistColumnResize = null;
   const favorites = new Set(storage.get("favorites", []));
@@ -340,36 +345,91 @@
       ? playlistColumnHead.querySelector('[data-column="favorite"]').getBoundingClientRect().width : 0;
     const available = Math.max(0, playlistContent.clientWidth - 2*inset - favoriteWidth - 2*gap);
     const columnSpace = Math.max(0, available - gap*(columns.length-1));
-    const minimums = columns.map(column => {
-      const header = playlistColumnHeadCells.querySelector(`[data-column="${column.id}"]`);
-      return Math.ceil(Math.max(column.id === 'index' ? header.getBoundingClientRect().height : 0,
-        measurePlaylistColumnText(header, header.dataset.label || column.label) + 2*gap + 1));
-    });
+
+    function measureMax(column, header) {
+      const headerText = header?.dataset.label || column.label || '';
+      const texts = [headerText];
+      for (const row of rows) {
+        const text = row.querySelector(`[data-column="${column.id}"]`)?.textContent.trim();
+        if (text && text !== '—' && text !== '-') texts.push(text);
+      }
+      let maxTextWidth = 0;
+      if (typeof window !== 'undefined' && window.SBPresentation?.measureTexts) {
+        maxTextWidth = window.SBPresentation.measureTexts(texts, getComputedStyle(header));
+      } else {
+        for (const t of texts) {
+          maxTextWidth = Math.max(maxTextWidth, measurePlaylistColumnText(header, t));
+        }
+      }
+      const baseMin = column.id === 'index' ? (header.getBoundingClientRect().height || 14) : 0;
+      return Math.ceil(Math.max(baseMin, maxTextWidth + 2 * gap + 1));
+    }
+
     const savedWidths = columns.map(column => Number(playlistColumnWidths[column.id]));
     const hasSavedWidth = savedWidths.map(width => Number.isFinite(width) && width > 0);
-    const allWidthsSaved = hasSavedWidth.every(Boolean);
-    const preferences = columns.map((column, index) => allWidthsSaved
-      ? Math.max(1, savedWidths[index] - minimums[index]) : column.weight);
-    const flexibleIndices = columns.map((_column, index) => index).filter(index => allWidthsSaved || !hasSavedWidth[index]);
-    const pinnedWidth = columns.reduce((sum, _column, index) =>
-      sum + (hasSavedWidth[index] && !allWidthsSaved ? Math.max(minimums[index], savedWidths[index]) : 0), 0);
-    const flexibleSpace = Math.max(0, columnSpace - pinnedWidth
-      - minimums.reduce((sum, minimum, index) => sum + (flexibleIndices.includes(index) ? minimum : 0), 0));
-    const totalPreference = flexibleIndices.reduce((sum, index) => sum + preferences[index], 0);
-    const widths = columns.map((column, index) => {
-      if (hasSavedWidth[index] && !allWidthsSaved) return Math.max(minimums[index], savedWidths[index]);
-      return minimums[index] + (totalPreference ? flexibleSpace*preferences[index]/totalPreference : 0);
-    });
-    // Saved manual widths retain their proportions while following viewport changes.
+    const allWidthsSaved = hasSavedWidth.length > 0 && hasSavedWidth.every(Boolean);
+
+    let widths;
+    if (!rows.length) {
+      const preferences = columns.map(c => c.weight);
+      const minHeaders = columns.map(column => {
+        const header = playlistColumnHeadCells.querySelector(`[data-column="${column.id}"]`);
+        return Math.ceil(Math.max(column.id === 'index' ? (header.getBoundingClientRect().height || 14) : 0,
+          measurePlaylistColumnText(header, header.dataset.label || column.label) + 2*gap + 1));
+      });
+      const flexibleSpace = Math.max(0, columnSpace - minHeaders.reduce((sum, min) => sum + min, 0));
+      const totalPref = preferences.reduce((sum, p) => sum + p, 0);
+      widths = columns.map((c, i) => minHeaders[i] + (totalPref ? flexibleSpace * preferences[i] / totalPref : 0));
+    } else if (allWidthsSaved) {
+      const minHeaders = columns.map(column => {
+        const header = playlistColumnHeadCells.querySelector(`[data-column="${column.id}"]`);
+        return Math.ceil(Math.max(column.id === 'index' ? (header.getBoundingClientRect().height || 14) : 0,
+          measurePlaylistColumnText(header, header.dataset.label || column.label) + 2*gap + 1));
+      });
+      const preferences = columns.map((column, index) => Math.max(1, savedWidths[index] - minHeaders[index]));
+      const flexibleSpace = Math.max(0, columnSpace - minHeaders.reduce((sum, min) => sum + min, 0));
+      const totalPreference = preferences.reduce((sum, pref) => sum + pref, 0);
+      widths = columns.map((column, index) => minHeaders[index] + (totalPreference ? flexibleSpace * preferences[index] / totalPreference : 0));
+    } else {
+      const naturalWidths = columns.map(column => {
+        const header = playlistColumnHeadCells.querySelector(`[data-column="${column.id}"]`);
+        return measureMax(column, header);
+      });
+
+      widths = columns.map((column, index) => {
+        if (hasSavedWidth[index]) return Math.max(naturalWidths[index], savedWidths[index]);
+        return naturalWidths[index];
+      });
+
+      const totalWidth = widths.reduce((sum, w) => sum + w, 0);
+      if (totalWidth > columnSpace && columnSpace > 0) {
+        const excess = totalWidth - columnSpace;
+        const headerMins = columns.map(column => {
+          const header = playlistColumnHeadCells.querySelector(`[data-column="${column.id}"]`);
+          return Math.ceil(Math.max(column.id === 'index' ? (header.getBoundingClientRect().height || 14) : 0,
+            measurePlaylistColumnText(header, header.dataset.label || column.label) + 2*gap + 1));
+        });
+        const shrinkable = columns.map((column, index) => {
+          if (column.id === 'index' || column.id === 'year' || column.id === 'length') return 0;
+          return Math.max(0, widths[index] - headerMins[index]);
+        });
+        const totalShrinkable = shrinkable.reduce((sum, s) => sum + s, 0);
+        if (totalShrinkable > 0) {
+          const shrinkFactor = Math.min(1, excess / totalShrinkable);
+          widths = widths.map((width, index) => Math.round(width - shrinkable[index] * shrinkFactor));
+        }
+      }
+    }
+
     library.style.setProperty('--sb-column-template', widths.map(width => `${width}px`).join(' '));
     const total = widths.reduce((sum, width) => sum + width, 0) + gap*(columns.length-1) + favoriteWidth + 2*gap + 2*inset;
     library.style.setProperty('--sb-playlist-width', `${Math.ceil(total)}px`);
-    // Reordering hidden columns must not leave gaps or disturb saved ordering.
     for (const row of rows) for (const cell of row.querySelectorAll('[data-column]')) {
       cell.style.order = String(playlistColumnOrder.indexOf(cell.dataset.column));
     }
     syncPlaylistHeaderScroll();
   }
+
   function syncPlaylistHeaderScroll() {
     if (playlistColumnHead && isDesktop()) playlistColumnHead.style.transform = `translateX(${-playlistContent.scrollLeft}px)`;
   }
@@ -441,6 +501,18 @@
       handle.className = 'sb-column-handle';
       handle.title = `Resize ${header.textContent}`;
       handle.addEventListener('pointerdown', event => beginPlaylistColumnResize(event, header));
+      handle.addEventListener('dblclick', event => {
+        event.preventDefault(); event.stopPropagation();
+        delete playlistColumnWidths[id];
+        if (event.altKey || Object.keys(playlistColumnWidths).length <= 1) playlistColumnWidths = {};
+        savePlaylistColumnSettings();
+      });
+      header.addEventListener('dblclick', event => {
+        if (event.target.classList?.contains('sb-column-handle')) return;
+        event.preventDefault();
+        playlistColumnWidths = {};
+        savePlaylistColumnSettings();
+      });
       header.append(handle); playlistColumnHeadCells.append(header);
     }
     window.SBPresentation.columns(playlistColumnHeadCells, {

@@ -82,5 +82,5 @@ test("cache-busting script version tags are updated to force browser cache refre
 
   assert.match(baseHtml, /site-components\.js.*20261127-desktop-select-1/);
   assert.match(baseHtml, /sb-interface\.js.*20261127-desktop-select-1/);
-  assert.match(spcboyHtml, /spcboy\.js.*20261127-desktop-select-1/);
+  assert.match(spcboyHtml, /spcboy\.js.*20261127-col-shrink-1/);
 });

@@ -98,7 +98,7 @@ test('an empty playlist leaves every configured column heading visible', () => {
   for (const header of headers.values()) assert.equal(header.hidden, false);
 });
 
-test('default widths ignore track text and saved manual widths still apply', () => {
+test('auto-resize widths shrink to largest item and saved manual widths still apply', () => {
   const readWidths = options => {
     const { context, style } = fixture(options);
     context.updatePlaylistColumnLayout();
@@ -107,10 +107,30 @@ test('default widths ignore track text and saved manual widths still apply', () 
   const shared = { index: '1', game: 'Game', timestamp: 'Date' };
   const short = readWidths({ rowValues: [{ ...shared, title: 'Short' }] });
   const long = readWidths({ rowValues: [{ ...shared, title: 'A much longer song title' }] });
-  assert.deepEqual(long, short);
+  // Column shrinks to largest item: long title is wider than short title
+  assert.ok(long[1] > short[1], `long (${long[1]}) should be wider than short (${short[1]})`);
+  assert.equal(short[1], 39, `short title column should shrink to largest item (39px)`);
+  assert.equal(long[1], 153, `long title column should size to largest item (153px)`);
 
   const manuallySized = readWidths({ rowValues: [{ ...shared, title: 'Short' }], columnWidths: { title: 220 } });
   assert.equal(manuallySized[1], 220);
+});
+
+test('auto-resize shrinks flexible columns to fit visible screen when total exceeds available space', () => {
+  const readWidths = options => {
+    const { context, style } = fixture(options);
+    context.updatePlaylistColumnLayout();
+    return style.get('--sb-column-template').split(' ').map(value => Number.parseFloat(value));
+  };
+  const shared = { index: '1', game: 'A Game with very long title text', timestamp: 'Date' };
+  // Large screen: widths stay at natural size
+  const wide = readWidths({ rowValues: [{ ...shared, title: 'A very long song title in this playlist' }], width: 1200 });
+  // Small screen: flexible columns shrink to fit visible screen
+  const compact = readWidths({ rowValues: [{ ...shared, title: 'A very long song title in this playlist' }], width: 300 });
+  assert.ok(compact[1] < wide[1], `compact title (${compact[1]}) should shrink compared to wide (${wide[1]})`);
+  assert.ok(compact[2] < wide[2], `compact game (${compact[2]}) should shrink compared to wide (${wide[2]})`);
+  // Fixed index column (#) remains at minimum
+  assert.equal(compact[0], wide[0]);
 });
 
 test('saved manual column widths keep their proportions when the viewport changes', () => {
