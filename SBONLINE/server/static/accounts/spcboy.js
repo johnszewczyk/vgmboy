@@ -933,7 +933,13 @@
 
   async function ensureAlbumTracks(entry, { retry = false } = {}) {
     if (!entry) return [];
-    if (entry.loaded) return entry.tracks;
+    if (entry.loaded) {
+      if (isDesktop() && selectedGameKey === entry.key) {
+        for (const row of entry.list?.querySelectorAll(".spcboy-track-row") || []) row.hidden = false;
+        renderDesktopPlaylist();
+      }
+      return entry.tracks;
+    }
     if (entry.loadPromise && !retry) return entry.loadPromise;
     ensureEntryPlaylistDom(entry);
     entry.list.querySelectorAll(".spcboy-tracks-state, .spcboy-tracks-retry").forEach((node) => node.remove());
@@ -962,6 +968,10 @@
       entry.loadFailed = false;
       entry.title.textContent = `${entry.gameName} · ${entry.consoleName}`;
       window.SitePlayer?.setLibrary(tracks);
+      for (const row of entry.list.querySelectorAll(".spcboy-track-row")) row.hidden = false;
+      if (isDesktop() && selectedGameKey === entry.key) {
+        renderDesktopPlaylist();
+      }
       return entry.tracks;
     }).catch((error) => {
       loading.remove();
@@ -1266,10 +1276,16 @@
         if (event.isTrusted) searchOpenedSystems.delete(systemSummary.parentElement);
         return;
       }
+      if (target.closest(".spcboy-album-favorite")) return;
       const gameSummary = target.closest(".spcboy-game > summary");
-      if (gameSummary && isDesktop()) {
-        event.preventDefault();
-        selectGame(gameSummary.parentElement.dataset.gameKey);
+      const gameRow = target.closest(".spcboy-game-row, .spcboy-game");
+      const gameTarget = gameSummary ? gameSummary.parentElement : (gameRow?.classList.contains("spcboy-game") ? gameRow : gameRow?.querySelector(".spcboy-game"));
+      if (gameTarget && isDesktop()) {
+        const gameKey = gameTarget.dataset.gameKey;
+        if (gameKey) {
+          event.preventDefault();
+          selectGame(gameKey);
+        }
       }
     });
     trackList.addEventListener("toggle", (event) => {
@@ -1452,12 +1468,20 @@
   function selectGame(gameKey, { openSidebar = true } = {}) {
     const selectedEntry = gameGroupsByKey.get(gameKey);
     if (!selectedEntry) return;
+    const cmd = window.SiteCommands?.record("album-select", {
+      gameKey,
+      gameName: selectedEntry.gameName,
+      albumId: selectedEntry.albumId,
+      cached: Boolean(selectedEntry.loaded),
+      searchActive: Boolean(search.value.trim()),
+    });
     const prevEntry = gameGroupsByKey.get(selectedGameKey);
     selectedGameKey = gameKey;
     syncWorkspaceHeading(selectedEntry.gameName || "Playlist");
     if (isDesktop() && (view === "favorites" || view === "recent")) {
       captureWorkspace();
       applyFilters();
+      cmd?.complete("collection-rendered");
       return;
     }
     if (prevEntry && prevEntry !== selectedEntry && prevEntry.details) {
@@ -1490,9 +1514,15 @@
       if (selectedSystem) selectedSystem.open = true;
       if (selectedEntry.details) selectedEntry.details.open = true;
     }
+    if (selectedEntry.list) {
+      for (const row of selectedEntry.list.querySelectorAll(".spcboy-track-row")) {
+        row.hidden = false;
+      }
+    }
     ensureAlbumTracks(selectedEntry);
     captureWorkspace();
-    if (isDesktop() && (view === "favorites" || (view === "all" && !search.value.trim()))) renderDesktopPlaylist();
+    if (isDesktop()) renderDesktopPlaylist();
+    cmd?.complete(selectedEntry.loaded ? "hydrated-cached" : "hydration-started");
     scheduleSelectionIndicators();
   }
 
@@ -1637,10 +1667,10 @@
     }
     const aggregate = view === "favorites";
     const selectedFallback = gameGroupsByKey.get(selectedGameKey);
-    if (selectedFallback && !selectedFallback.hidden) ensureEntryPlaylistDom(selectedFallback);
+    if (selectedFallback) ensureEntryPlaylistDom(selectedFallback);
     const candidates = aggregate
       ? [...materializedPlaylistEntries].filter((entry) => entry.list && [...entry.list.querySelectorAll(".spcboy-track-row")].some((row) => !row.hidden))
-      : [selectedFallback].filter((entry) => entry && !entry.hidden);
+      : (selectedFallback ? [selectedFallback] : []);
 
     if (!candidates.length) {
       playlistEmpty.hidden = false;
@@ -1867,7 +1897,7 @@
       const isVisibleInView = view === "all"
         || (view === "favorites" && isFavorite);
       for (const row of matchingRows) {
-        const matchesCurrentQuery = !query || matchesTrackQuery(track, query);
+        const matchesCurrentQuery = !query || (track?.gameKey === selectedGameKey) || matchesTrackQuery(track, query);
         const isVisible = isVisibleInView && matchesCurrentQuery;
         row.hidden = !isVisible;
         if (isVisible) visibleTracks += 1;

@@ -72,5 +72,91 @@
     return time;
   }
 
+
+  const commandHistory = [];
+  const MAX_COMMAND_HISTORY = 120;
+  let nextCommandId = 1;
+
+  function recordCommand(type, details = {}) {
+    const id = nextCommandId++;
+    const start = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+    const entry = {
+      id,
+      type: String(type || "unknown"),
+      details: typeof details === "object" && details !== null ? { ...details } : { value: details },
+      timestamp: Date.now(),
+      durationMs: null,
+      status: "pending",
+    };
+
+    commandHistory.push(entry);
+    if (commandHistory.length > MAX_COMMAND_HISTORY) {
+      commandHistory.shift();
+    }
+
+    let completed = false;
+    const handle = {
+      id,
+      complete(status = "completed", extraDetails = null) {
+        if (completed) return entry;
+        completed = true;
+        const end = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+        entry.durationMs = Math.round((end - start) * 100) / 100;
+        entry.status = status;
+        if (extraDetails && typeof extraDetails === "object") {
+          Object.assign(entry.details, extraDetails);
+        }
+        if (typeof document !== "undefined" && document.dispatchEvent) {
+          try {
+            document.dispatchEvent(new CustomEvent("site:command-completed", { detail: entry }));
+          } catch {}
+        }
+        return entry;
+      },
+    };
+
+    if (typeof document !== "undefined" && document.dispatchEvent) {
+      try {
+        document.dispatchEvent(new CustomEvent("site:command-recorded", { detail: entry }));
+      } catch {}
+    }
+
+    return handle;
+  }
+
+  function getCommandHistory() {
+    return [...commandHistory];
+  }
+
+  function getCommandSummary() {
+    const total = commandHistory.length;
+    if (!total) return { total: 0, averageMs: 0, maxMs: 0, slowCommands: [] };
+    const completed = commandHistory.filter((c) => typeof c.durationMs === "number");
+    const avg = completed.length
+      ? Math.round(completed.reduce((sum, c) => sum + c.durationMs, 0) / completed.length * 10) / 10
+      : 0;
+    const max = completed.reduce((m, c) => Math.max(m, c.durationMs), 0);
+    const slow = completed.filter((c) => c.durationMs > 100);
+    return {
+      total,
+      completedCount: completed.length,
+      averageMs: avg,
+      maxMs: max,
+      slowCount: slow.length,
+      recent: commandHistory.slice(-10),
+    };
+  }
+
+  function clearCommandHistory() {
+    commandHistory.length = 0;
+  }
+
+  window.SiteCommands = Object.freeze({
+    record: recordCommand,
+    history: getCommandHistory,
+    summary: getCommandSummary,
+    clear: clearCommandHistory,
+  });
+
   window.SiteComponents = Object.freeze({ trackControls, trackDisplay, formatSiteTime, recordTime });
 })();

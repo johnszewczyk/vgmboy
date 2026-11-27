@@ -134,6 +134,14 @@
   });
   document.addEventListener('sb:interface-changed', schedule);
   reducedMotion.addEventListener('change', apply);
+
+  document.addEventListener('click', event => {
+    const target = event.target instanceof Element ? event.target.closest('button, summary, .topnav a, .spcboy-track') : null;
+    if (!target) return;
+    const label = target.getAttribute('aria-label') || target.textContent?.trim()?.slice(0, 40) || target.className;
+    window.SiteCommands?.record('ui-click', { tag: target.tagName.toLowerCase(), label: String(label).slice(0, 50) })?.complete();
+  }, { capture: true, passive: true });
+
   window.SBInterface = { duration: () => preferences.motionEnabled && !reducedMotion.matches ? preferences.motionDuration : 0 };
   apply();
   const initialPageLink = document.querySelector('.topnav a[data-nav-key][aria-current="page"]');
