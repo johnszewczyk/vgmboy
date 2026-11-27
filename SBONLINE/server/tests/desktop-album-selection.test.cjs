@@ -75,3 +75,12 @@ test('spcboy desktop sidebar selection and playlist hydration support search res
   // 6. SiteCommands logging is integrated for album selection
   assert.match(spcboyJs, /window\.SiteCommands\?\.record\("album-select"/);
 });
+
+test("cache-busting script version tags are updated to force browser cache refresh", () => {
+  const baseHtml = readFileSync(serverDir + "/templates/accounts/base.html", "utf8");
+  const spcboyHtml = readFileSync(serverDir + "/templates/accounts/spcboy.html", "utf8");
+
+  assert.match(baseHtml, /site-components\.js.*20261127-desktop-select-1/);
+  assert.match(baseHtml, /sb-interface\.js.*20261127-desktop-select-1/);
+  assert.match(spcboyHtml, /spcboy\.js.*20261127-desktop-select-1/);
+});

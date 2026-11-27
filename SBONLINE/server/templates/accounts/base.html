@@ -20,7 +20,7 @@
   {% if request.user.is_authenticated %}
   {{ request.user.member_profile.spcboy_preferences|json_script:"spcboy-profile-preferences" }}
   <script src="{% static 'accounts/activity-badges.js' %}?v=20261118-sweep-1" data-site-global defer></script>
-  <script src="{% static 'accounts/site-components.js' %}?v=20261116-sbo-drawer-2" data-site-global defer></script>
+  <script src="{% static 'accounts/site-components.js' %}?v=20261127-desktop-select-1" data-site-global defer></script>
   <script src="{% static 'accounts/sb-presentation.js' %}?v=20261026-collections-1" data-site-global defer></script>
   <script src="{% static 'accounts/aac-stream.js' %}?v=20261118-0ms-1" data-site-global defer></script>
   <script src="{% static 'accounts/site-preferences.js' %}?v=20261117-eq-perf-2" data-preferences-url="{% url 'spcboy_preferences' %}" data-site-global defer></script>
@@ -32,7 +32,7 @@
   {% if request.user.is_authenticated %}<link rel="stylesheet" href="{% static 'accounts/player.css' %}?v=20261116-sbo-no-gallery-1">{% endif %}
   <link rel="stylesheet" href="{% static 'accounts/sbonline.css' %}?v=20261116-sbo-no-gallery-fix-1">
   <link rel="stylesheet" href="{% static 'accounts/sb-theme.css' %}?v=20261118-sweep-1">
-  <script src="{% static 'accounts/sb-interface.js' %}?v=20261116-sbo-drawer-2" data-site-global defer></script>
+  <script src="{% static 'accounts/sb-interface.js' %}?v=20261127-desktop-select-1" data-site-global defer></script>
 <link rel="stylesheet" href="{% static 'accounts/sb-presentation.css' %}?v=20261026-collections-1">
   <link rel="stylesheet" href="{% static 'accounts/sb-mobile.css' %}?v=20261116-sbo-drawer-2" media="(max-width: 780px)">
   {% block mobile_head %}{% endblock %}
